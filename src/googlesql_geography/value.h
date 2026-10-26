@@ -124,9 +124,10 @@ absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices);
 // without holes that collapses is the linestring or the point it leaves. BigQuery also snaps edges,
 // and rings where they cross or touch at an edge, which is unsupported, as is a shell with holes
 // that collapses. An empty first ring denotes a full shell; its holes must be disjoint and
-// unnested. Other empty rings are invalid.
+// unnested. Other empty rings are invalid. Where `oriented`, each ring instead encloses the region
+// on its left, however large, as the region a hole removes.
 absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& input,
-                                       std::string_view failed);
+                                       std::string_view failed, bool oriented = false);
 
 // The geography of `parts`, each as BuildLine or BuildPolygon builds it, as BigQuery makes a
 // collection: the union of the parts in order, snapped together within a micrometer, where a

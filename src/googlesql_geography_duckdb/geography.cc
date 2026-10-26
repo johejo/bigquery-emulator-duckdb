@@ -20,6 +20,7 @@
 #include "absl/status/statusor.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
+#include "googlesql/public/type.pb.h"
 #include "s2/s2boolean_operation.h"
 #include "src/backend_error.h"
 #include "src/duckdb_functions/register.h"
@@ -28,6 +29,7 @@
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/rules.h"
 #include "src/googlesql_geography/geography.h"
+#include "src/googlesql_geography/geojson.h"
 #include "src/googlesql_geography/options.h"
 #include "src/googlesql_geography/value.h"
 #include "src/googlesql_geography/wkt.h"
@@ -160,14 +162,22 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
                              googlesql_geography::ReadWkt(args.String(0)));
   return EncodeGeography(geography);
 }
-// A GEOGRAPHY that a load or tabledata.insertAll writes, given as WKT whose polygons are oriented.
-// BigQuery also takes GeoJSON and WKB, hex-encoded or, from Parquet, binary, which DuckDB casts to
-// text that starts with the escape of its first byte; these are unsupported.
-absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
-  const std::string text = args.String(0);
+
+absl::StatusOr<std::string> GeogFromGeoJson(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
+                             googlesql_geography::ReadGeoJson(args.String(0)));
+  return EncodeGeography(geography);
+}
+
+// The geography of `text` as ST_GEOGFROM reads a STRING, and loads and tabledata.insertAll with
+// `oriented` WKT: GeoJSON where it starts with '{', and WKT otherwise. BigQuery also takes WKB,
+// hex-encoded or, from Parquet, binary, which DuckDB casts to text that starts with the escape of
+// its first byte; these are unsupported.
+absl::StatusOr<std::string> ReadGeography(const std::string& text, bool oriented) {
   const size_t start = text.find_first_not_of(" \t\r\n");
   if (start != std::string::npos && text.at(start) == '{') {
-    return absl::UnimplementedError("The emulator does not support GeoJSON GEOGRAPHY values");
+    GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, googlesql_geography::ReadGeoJson(text));
+    return EncodeGeography(geography);
   }
   if (text.starts_with("\\x") || (!text.empty() && std::ranges::all_of(text, [](unsigned char c) {
         return std::isxdigit(c) != 0;
@@ -175,8 +185,17 @@ absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
     return absl::UnimplementedError("The emulator does not support WKB GEOGRAPHY values");
   }
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
-                             googlesql_geography::ReadWkt(text, /*oriented=*/true));
+                             googlesql_geography::ReadWkt(text, oriented));
   return EncodeGeography(geography);
+}
+
+absl::StatusOr<std::string> GeogFrom(const Arguments& args) {
+  return ReadGeography(args.String(0), /*oriented=*/false);
+}
+
+// A GEOGRAPHY that a load or tabledata.insertAll writes, whose WKT polygons are oriented.
+absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
+  return ReadGeography(args.String(0), /*oriented=*/true);
 }
 
 absl::StatusOr<std::optional<std::string>> UnionGeographies(
@@ -395,6 +414,18 @@ const Definitions& GeographyDefinitions() {
         .Call("ST_GEOGPOINT", 2);
     definitions->Scalar("bq_st_geogfromtext", {kVarchar}, kGeography, EachRow<GeogFromText>)
         .Call("ST_GEOGFROMTEXT", 1);
+    definitions->Scalar("bq_st_geogfromgeojson", {kVarchar}, kGeography, EachRow<GeogFromGeoJson>)
+        .Call("ST_GEOGFROMGEOJSON", 1);
+    // BYTES, which BigQuery reads as WKB, is unsupported.
+    definitions->Scalar("bq_st_geogfrom", {kVarchar}, kGeography, EachRow<GeogFrom>)
+        .Sql("ST_GEOGFROM",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "bq_st_geogfrom($1)",
+                     .conditions = {{.argument = 1, .types = {googlesql::TYPE_STRING}}},
+                 },
+             });
     definitions->Scalar("bq_geography_input", {kVarchar}, kGeography, EachRow<GeographyInput>);
     definitions
         ->Scalar("bq_st_geogpointfromgeohash", {kVarchar}, kGeography,
