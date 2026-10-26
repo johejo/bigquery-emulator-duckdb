@@ -7,6 +7,9 @@
 
 namespace googlesql_geography {
 
+// The prefix of ReadGeoJson's errors.
+inline constexpr std::string_view kGeoJsonFailed = "ST_GeogFromGeoJSON failed: ";
+
 // The geography of a GeoJSON geometry object as ST_GEOGFROMGEOJSON reads it: a Point, MultiPoint,
 // LineString, MultiLineString, Polygon, MultiPolygon or a GeometryCollection of these, with
 // types in any case and no other members, whose positions are a longitude and a latitude. Edges

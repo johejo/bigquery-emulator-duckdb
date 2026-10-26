@@ -9,6 +9,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "//:api_error",
+        "//src/googlesql_geography",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",

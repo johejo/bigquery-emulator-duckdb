@@ -1,0 +1,226 @@
+version: 1
+description: >-
+  Storage Write's AppendRows errors for writer schema types and GEOGRAPHY values. A protobuf type
+  that cannot hold its column's ends the connection; an invalid value fails its row. The
+  expectations are BigQuery's answers in the sidecar.
+vars:
+  dataset: bqa_${run}_${case}
+  stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+  nested: []
+templates:
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema:
+                  protoDescriptor:
+                    name: Row
+                    field: ['${field}']
+                    nestedType: '${nested}'
+                rows:
+                  serializedRows: ['${row}']
+        expectFailure: true
+        observe:
+          code: /code
+          error: /error
+          messages: /messages
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  row_error:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema:
+                  protoDescriptor:
+                    name: Row
+                    field: ['${field}']
+                    nestedType: '${nested}'
+                rows:
+                  serializedRows: ['${row}']
+        # BigQuery's error also has a google.rpc.DebugInfo detail, which the emulator leaves out.
+        observe:
+          code: /messages/0/error/code
+          message: /messages/0/error/message
+          rowErrors: /messages/0/rowErrors
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  # POINT(1) in a string field.
+  - name: invalid_wkt
+    template: row_error
+    vars:
+      columns: g GEOGRAPHY
+      field: {name: g, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CghQT0lOVCgxKQ==
+    expect:
+      append:
+        code: 3
+        message: >-
+          Errors found while processing rows. Please refer to the row_errors field for details.
+          The list may not be complete because of the size limitations. Entity: ${stream}
+        rowErrors:
+          - code: FIELDS_ERROR
+            message: >-
+              Cannot convert value POINT(1) to GEOGRAPHY: Expected latitude, but saw ')' at
+              position 7. on field g.
+  # 1 in an int64 field of a STRING column.
+  - name: int64_field_of_string
+    template: rejected
+    vars:
+      columns: s STRING
+      field: {name: s, number: 1, label: LABEL_OPTIONAL, type: TYPE_INT64}
+      row: CAE=
+    expect:
+      append:
+        code: InvalidArgument
+        error:
+          code: 3
+          message: >-
+            The proto field mismatched with BigQuery field at Row.s, the proto field type int64,
+            BigQuery field type STRING Entity: ${stream}
+        messages: []
+  # 'a' in a string field of the INT64 field x of a STRUCT column rec, which BigQuery names by
+  # the protobuf message's full name and the REST type name.
+  - name: nested_string_field_of_int64
+    template: rejected
+    vars:
+      columns: rec STRUCT<x INT64>
+      field: {name: rec, number: 1, label: LABEL_OPTIONAL, type: TYPE_MESSAGE, typeName: .Row.Record}
+      nested:
+        - name: Record
+          field:
+            - {name: x, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CgMKAWE=
+    expect:
+      append:
+        code: InvalidArgument
+        error:
+          code: 3
+          message: >-
+            The proto field mismatched with BigQuery field at Row.Record.x, the proto field type
+            string, BigQuery field type INTEGER Entity: ${stream}
+        messages: []
+  # 'a' in a string field of an INT64 column.
+  - name: string_field_of_int64
+    template: rejected
+    vars:
+      columns: n INT64
+      field: {name: n, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CgFh
+    expect:
+      append:
+        code: InvalidArgument
+        error:
+          code: 3
+          message: >-
+            The proto field mismatched with BigQuery field at Row.n, the proto field type string,
+            BigQuery field type INTEGER Entity: ${stream}
+        messages: []
+  # {"type": "Point"}, which has no coordinates.
+  - name: invalid_geojson
+    template: row_error
+    vars:
+      columns: g GEOGRAPHY
+      field: {name: g, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: ChF7InR5cGUiOiAiUG9pbnQifQ==
+    expect:
+      append:
+        code: 3
+        message: >-
+          Errors found while processing rows. Please refer to the row_errors field for details.
+          The list may not be complete because of the size limitations. Entity: ${stream}
+        rowErrors:
+          - code: FIELDS_ERROR
+            message: >-
+              Cannot convert value {"type": "Point"} to GEOGRAPHY: Missing member 'coordinates'
+              on field g.
+  # 0101000000, the header of a WKB point without its coordinates.
+  - name: truncated_wkb_hex
+    template: row_error
+    vars:
+      columns: g GEOGRAPHY
+      field: {name: g, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CgowMTAxMDAwMDAw
+    expect:
+      append:
+        code: 3
+        message: >-
+          Errors found while processing rows. Please refer to the row_errors field for details.
+          The list may not be complete because of the size limitations. Entity: ${stream}
+        rowErrors:
+          - code: FIELDS_ERROR
+            message: >-
+              Cannot convert value 0101000000 to GEOGRAPHY: End of input while reading
+              longitude; during WKB parsing on field g.
+  # POINT(1) in the GEOGRAPHY field g of a STRUCT column rec, after which BigQuery names rec too.
+  - name: nested_invalid_wkt
+    template: row_error
+    vars:
+      columns: rec STRUCT<g GEOGRAPHY>
+      field: {name: rec, number: 1, label: LABEL_OPTIONAL, type: TYPE_MESSAGE, typeName: .Row.Record}
+      nested:
+        - name: Record
+          field:
+            - {name: g, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CgoKCFBPSU5UKDEp
+    expect:
+      append:
+        code: 3
+        message: >-
+          Errors found while processing rows. Please refer to the row_errors field for details.
+          The list may not be complete because of the size limitations. Entity: ${stream}
+        rowErrors:
+          - code: FIELDS_ERROR
+            message: >-
+              Cannot convert value POINT(1) to GEOGRAPHY: Expected latitude, but saw ')' at
+              position 7. on field g. on field rec.

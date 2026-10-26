@@ -113,12 +113,18 @@ cases:
     expect:
       append:
         messages:
-          - error: {code: 3, message: Invalid rows; no rows were appended}
+          - error:
+              code: 3
+              message: >-
+                Errors found while processing rows. Please refer to the row_errors field for
+                details. The list may not be complete because of the size limitations. Entity:
+                ${stream}
             rowErrors:
               - code: FIELDS_ERROR
                 message: >-
-                  The emulator does not support GEOGRAPHY values of polygons whose shell runs
-                  clockwise or whose holes run counterclockwise
+                  Cannot convert value POLYGON((0 0, 0 1, 1 1, 1 0, 0 0)) to GEOGRAPHY: The
+                  emulator does not support GEOGRAPHY values of polygons whose shell runs
+                  clockwise or whose holes run counterclockwise on field g.
             writeStream: '${stream}'
       read:
         jobComplete: true

@@ -25,6 +25,8 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/field_schema.h"
+#include "src/googlesql_geography/geojson.h"
+#include "src/googlesql_geography/input.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -143,9 +145,14 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
   const auto* r = message.GetReflection();
   const bool repeated = index >= 0;
   if (input.cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
-    return ProtoMessage(
-        repeated ? r->GetRepeatedMessage(message, &input, index) : r->GetMessage(message, &input),
-        field.fields);
+    // BigQuery names each enclosing field after an error in a record.
+    try {
+      return ProtoMessage(
+          repeated ? r->GetRepeatedMessage(message, &input, index) : r->GetMessage(message, &input),
+          field.fields);
+    } catch (const ApiError& error) {
+      throw ApiError::Invalid(std::string(error.what()) + " on field " + field.name + ".");
+    }
   }
   if (input.cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
     std::string text =
@@ -191,6 +198,20 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
           const auto value = googlesql::BigNumericValue::FromStringStrict(text);
           Check(value.status());
           return value->ToString();
+        }
+        case FieldType::kGeography: {
+          // Read here only for BigQuery's error, which names no function, since the value is
+          // written from its text.
+          const auto geography = googlesql_geography::ReadGeography(text, /*oriented=*/true, "");
+          if (!geography.ok()) {
+            std::string_view reason = geography.status().message();
+            if (reason.starts_with(googlesql_geography::kGeoJsonFailed)) {
+              reason.remove_prefix(googlesql_geography::kGeoJsonFailed.size());
+            }
+            throw ApiError::Invalid("Cannot convert value " + text + " to GEOGRAPHY: " +
+                                    std::string(reason) + " on field " + field.name + ".");
+          }
+          return text;
         }
         default:
           break;
