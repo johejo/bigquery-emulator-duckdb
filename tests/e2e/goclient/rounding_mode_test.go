@@ -47,15 +47,7 @@ func TestColumnRoundingModes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", sql, err)
 		}
-		var result [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err != nil {
-				break
-			}
-			result = append(result, row)
-		}
-		return result
+		return readRows(t, rows)
 	}
 
 	for _, sql := range []string{
@@ -254,14 +246,7 @@ func TestAppendedRoundingModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got [][]bigquery.Value
-	for {
-		var row []bigquery.Value
-		if err := rows.Next(&row); err != nil {
-			break
-		}
-		got = append(got, row)
-	}
+	got := readRows(t, rows)
 	want := [][]bigquery.Value{
 		{int64(1), "2.2", "2.3", "2", nil, "2.2", "2.2,-2.2,2.4"},
 		{int64(2), "2.2", "2.3", "2", "3", "2.2", "2.2,-2.2,2.4"},
@@ -326,15 +311,7 @@ func TestDefaultRoundingModes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", sql, err)
 		}
-		var result [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err != nil {
-				break
-			}
-			result = append(result, row)
-		}
-		return result
+		return readRows(t, rows)
 	}
 	// The rounding modes tables.get reports for the fields of `table`, by path.
 	modes := func(table string) map[string]bigquery.RoundingMode {

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"google.golang.org/api/iterator"
 )
 
 // tableView is what clients see of a table: its resource from tables.get, and its columns,
@@ -84,16 +83,7 @@ func (p creationPaths) read(sql string, parameters ...bigquery.QueryParameter) [
 	if err != nil {
 		p.t.Fatalf("%s: %v", sql, err)
 	}
-	var result [][]bigquery.Value
-	for {
-		var row []bigquery.Value
-		if err := rows.Next(&row); err == iterator.Done {
-			return result
-		} else if err != nil {
-			p.t.Fatalf("%s: %v", sql, err)
-		}
-		result = append(result, row)
-	}
+	return readRows(p.t, rows)
 }
 
 func (p creationPaths) view(table string) tableView {

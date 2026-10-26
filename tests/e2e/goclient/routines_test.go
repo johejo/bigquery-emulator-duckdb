@@ -2,6 +2,7 @@ package goclient
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -23,11 +24,14 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 	if err != nil {
 		return nil, err
 	}
-	var row []bigquery.Value
-	if err := rows.Next(&row); err != nil {
+	result, err := collectRows(rows)
+	if err != nil {
 		return nil, err
 	}
-	return row[0], nil
+	if len(result) != 1 || len(result[0]) != 1 {
+		return nil, fmt.Errorf("%s: expected one row with one column, got %v", sql, result)
+	}
+	return result[0][0], nil
 }
 
 // Persistent SQL UDFs that CREATE FUNCTION defines are called by other queries through their

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -52,6 +53,29 @@ func runJob(ctx context.Context, job *bigquery.Job, err error) error {
 	}
 	_, err = waitJob(ctx, job)
 	return err
+}
+
+// collectRows distinguishes the end of a result set from a failed read.
+func collectRows(rows *bigquery.RowIterator) ([][]bigquery.Value, error) {
+	var result [][]bigquery.Value
+	for {
+		var row []bigquery.Value
+		if err := rows.Next(&row); err == iterator.Done {
+			return result, nil
+		} else if err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+}
+
+func readRows(t *testing.T, rows *bigquery.RowIterator) [][]bigquery.Value {
+	t.Helper()
+	result, err := collectRows(rows)
+	if err != nil {
+		t.Fatalf("read rows: %v", err)
+	}
+	return result
 }
 
 func newClient(t *testing.T) *bigquery.Client {
