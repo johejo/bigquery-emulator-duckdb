@@ -34,15 +34,10 @@ func loadGCS(ctx context.Context, table *bigquery.Table, schema bigquery.Schema,
 // without a schema appends to the table's own.
 func TestGCSLoadWildcards(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_gcs_load")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_gcs_load")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	carol, dave := []bigquery.Value{int64(3), "carol"}, []bigquery.Value{int64(4), "dave"}
 
 	for _, c := range []struct {
@@ -79,15 +74,10 @@ func TestGCSLoadWildcards(t *testing.T) {
 // A load that names no object, or an object it cannot read, fails and leaves the table's rows.
 func TestGCSLoadErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_gcs_load_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_gcs_load_errors")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	table := dataset.Table("t")
 	if err := loadGCS(ctx, table, people, "", "gs://load-fixtures/nested/people.jsonl"); err != nil {
 		t.Fatal(err)
@@ -118,15 +108,10 @@ func TestGCSLoadErrors(t *testing.T) {
 // A gzip-compressed file loads whether it is uploaded or read from GCS.
 func TestGzipLoad(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_gzip_load")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_gzip_load")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	table := dataset.Table("t")
 
 	file, err := os.Open("../gcs/load-fixtures/compressed/people.csv.gz")
@@ -157,15 +142,10 @@ func TestGzipLoad(t *testing.T) {
 // DuckDB number or FLOAT64 would lose, at any depth. The values are the bounds BigQuery documents.
 func TestBigNumericTextLoads(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_text_load")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_bignumeric_text_load")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	const maxNumeric = "99999999999999999999999999999.999999999"
 	load := func(table string, format bigquery.DataFormat, data string, schema bigquery.Schema) error {
 		source := bigquery.NewReaderSource(strings.NewReader(data))

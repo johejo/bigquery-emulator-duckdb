@@ -58,14 +58,14 @@ func TestRequirePartitionFilterDML(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 			client := newClient(t)
 			dataset := client.Dataset("go_rpf_dml_" + c.name)
 			if err := dataset.Create(ctx, nil); err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-			p := creationPaths{t: t, client: client, dataset: dataset}
+			t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+			p := datasetQueries{t: t, client: client, dataset: dataset}
 			for _, table := range []string{"target", "source"} {
 				required := table == "target" || c.sourceRequired
 				p.mustRun(fmt.Sprintf("CREATE TABLE %s (day DATE, other_day DATE, id INT64, v INT64) PARTITION BY day OPTIONS (require_partition_filter = %t)", table, required))

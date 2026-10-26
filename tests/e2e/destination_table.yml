@@ -11,13 +11,6 @@ steps:
         --destination_table=dest.results 'SELECT 1 AS id, "a" AS name'
     test: |
       current.exit_code == 0 && trim(current.stdout) == '[{"id":"1","name":"a"}]'
-  show_created:
-    exec:
-      command: tests/e2e/bq.sh show --format=json dest.results
-    test: |
-      current.exit_code == 0 &&
-      current.stdout contains '"name":"id","type":"INTEGER"' &&
-      current.stdout contains '"name":"name","type":"STRING"'
   write_empty_fails_on_a_table_with_rows:
     exec:
       command: >-

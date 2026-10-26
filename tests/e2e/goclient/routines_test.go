@@ -2,6 +2,7 @@ package goclient
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,15 +20,18 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 	if err != nil {
 		return nil, err
 	}
-	rows, err := job.Read(context.Background())
+	rows, err := job.Read(t.Context())
 	if err != nil {
 		return nil, err
 	}
-	var row []bigquery.Value
-	if err := rows.Next(&row); err != nil {
+	result, err := collectRows(rows)
+	if err != nil {
 		return nil, err
 	}
-	return row[0], nil
+	if len(result) != 1 || len(result[0]) != 1 {
+		return nil, fmt.Errorf("%s: expected one row with one column, got %v", sql, result)
+	}
+	return result[0][0], nil
 }
 
 // Persistent SQL UDFs that CREATE FUNCTION defines are called by other queries through their
@@ -35,14 +39,9 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 // routines.get and routines.list describe them.
 func TestPersistentSqlUdfs(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_routines")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_routines")
 	run := func(sql string) error {
 		t.Helper()
 		_, _, err := runScript(t, client, "", sql)
@@ -168,7 +167,7 @@ func TestPersistentSqlUdfs(t *testing.T) {
 	// A dataset with routines is still in use.
 	other := client.Dataset("go_routines_in_use")
 	_ = other.DeleteWithContents(ctx)
-	t.Cleanup(func() { _ = other.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = other.DeleteWithContents(context.Background()) })
 	if err := other.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -203,14 +202,8 @@ func TestPersistentSqlUdfs(t *testing.T) {
 // The emulator rejects the forms of persistent UDFs it does not run.
 func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_routines_unsupported")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	newDataset(t, client, "go_routines_unsupported")
 	if _, _, err := runScript(t, client, "", "CREATE FUNCTION go_routines_unsupported.f(x INT64) AS (x)"); err != nil {
 		t.Fatal(err)
 	}
@@ -247,14 +240,9 @@ func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 // documentation: https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
 func TestRoutineInsertUpdate(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_routine_api")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_routine_api")
 	routine := dataset.Routine("f")
 	args := []*bigquery.RoutineArgument{{Name: "x", DataType: &bigquery.StandardSQLDataType{TypeKind: "INT64"}}}
 	initial := &bigquery.RoutineMetadata{Type: "SCALAR_FUNCTION", Arguments: args,

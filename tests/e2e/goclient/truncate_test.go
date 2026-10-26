@@ -1,7 +1,6 @@
 package goclient
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -13,15 +12,10 @@ import (
 // would make it fail.
 func TestTruncateTableAndDryRuns(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_truncate")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_truncate")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE t AS SELECT id, CAST(id AS STRING) AS name FROM UNNEST([1, 2]) AS id")
 
 	for _, sql := range []string{

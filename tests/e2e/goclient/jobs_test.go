@@ -15,14 +15,14 @@ import (
 // creationTime), and omitted repeated columns read as empty arrays.
 func TestJobTableCreation(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_job_table_creation")
 	_ = dataset.DeleteWithContents(ctx)
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
 		{Name: "tags", Type: bigquery.StringFieldType, Repeated: true},
@@ -100,7 +100,7 @@ func TestJobTableCreation(t *testing.T) {
 
 func TestQueryToADestinationTable(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 
 	dataset := client.Dataset("go_destination")
@@ -108,7 +108,7 @@ func TestQueryToADestinationTable(t *testing.T) {
 	if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 		t.Fatalf("Dataset.Create: %v", err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 
 	table := dataset.Table("results")
 	var creationTime time.Time
@@ -155,20 +155,20 @@ func TestQueryToADestinationTable(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
 func TestQueryDestinationTableEdges(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_destination_edges")
 	_ = dataset.DeleteWithContents(ctx)
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 
 	never := client.Query("SELECT 1 AS a")
 	never.Dst = dataset.Table("dest")
 	never.CreateDisposition = bigquery.CreateNever
-	err := p.wait(never.Run(ctx))
+	err := wait(ctx, never)
 	if err == nil || !strings.Contains(err.Error(), "Not found: Table") {
 		t.Errorf("CREATE_NEVER for a missing table: got %v, want Not found", err)
 	}
@@ -207,7 +207,7 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 		"CREATE TABLE go_destination_edges.duplicates AS (SELECT 1 AS a, 2 AS a)",
 		"CREATE VIEW go_destination_edges.duplicates AS (SELECT 1 AS a, 2 AS a)",
 	} {
-		if err := p.wait(client.Query(sql).Run(ctx)); err == nil {
+		if err := wait(ctx, client.Query(sql)); err == nil {
 			t.Errorf("%s: succeeded", sql)
 		}
 	}
@@ -215,7 +215,7 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 
 func TestJobLifecycle(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	query := client.Query("SELECT 1 AS n")
 	query.JobID = "go_job_lifecycle"
@@ -259,7 +259,7 @@ func TestJobLifecycle(t *testing.T) {
 
 func TestJobListAndResultPagination(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClientForProject(t, "go-job-list-pages")
 	query := client.Query("SELECT x FROM UNNEST([1, 2, 3]) AS x ORDER BY x")
 	query.JobID = "go_paginated_job"

@@ -22,56 +22,16 @@ func (r jsonRow) Save() (map[string]bigquery.Value, string, error) {
 	return r, bigquery.NoDedupeID, nil
 }
 
-// wait runs a job and returns its error.
-func wait(ctx context.Context, runner interface {
-	Run(context.Context) (*bigquery.Job, error)
-}) error {
-	job, err := runner.Run(ctx)
-	if err != nil {
-		return err
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	return status.Err()
-}
-
 // Columns keep the rounding mode that DDL and tables.insert give them, and DML rounds the values
 // it writes to a parameterized column with it. The expected values are the examples of BigQuery's
 // DDL reference (2.25 and -2.25 to one digit) and of its RoundingMode enum (1.5 and 2.5 to none).
 func TestColumnRoundingModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_rounding_mode")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
-	read := func(sql string) [][]bigquery.Value {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		var result [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err != nil {
-				break
-			}
-			result = append(result, row)
-		}
-		return result
-	}
+	dataset := newDataset(t, client, "go_rounding_mode")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
+	run, read := p.run, p.read
 
 	for _, sql := range []string{
 		`CREATE TABLE t (id INT64,
@@ -187,14 +147,9 @@ func TestColumnRoundingModes(t *testing.T) {
 // answers.
 func TestAppendedRoundingModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_appended_rounding_mode")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_appended_rounding_mode")
 	numeric := func(name string, typ bigquery.FieldType, precision, scale int64, mode bigquery.RoundingMode) *bigquery.FieldSchema {
 		return &bigquery.FieldSchema{Name: name, Type: typ, Precision: precision, Scale: scale, RoundingMode: mode}
 	}
@@ -269,14 +224,7 @@ func TestAppendedRoundingModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got [][]bigquery.Value
-	for {
-		var row []bigquery.Value
-		if err := rows.Next(&row); err != nil {
-			break
-		}
-		got = append(got, row)
-	}
+	got := readRows(t, rows)
 	want := [][]bigquery.Value{
 		{int64(1), "2.2", "2.3", "2", nil, "2.2", "2.2,-2.2,2.4"},
 		{int64(2), "2.2", "2.3", "2", "3", "2.2", "2.2,-2.2,2.4"},
@@ -318,39 +266,13 @@ func TestAppendedRoundingModes(t *testing.T) {
 // of BigQuery's DDL reference, 2.25 to 2.2 and 2.3.
 func TestDefaultRoundingModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_default_rounding_mode")
 	_ = dataset.DeleteWithContents(ctx)
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
-	mustRun := func(sql string) {
-		t.Helper()
-		if err := run(sql); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
-	read := func(sql string) [][]bigquery.Value {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		var result [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err != nil {
-				break
-			}
-			result = append(result, row)
-		}
-		return result
-	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	p := datasetQueries{t: t, client: client, dataset: dataset}
+	run, mustRun, read := p.run, p.mustRun, p.read
 	// The rounding modes tables.get reports for the fields of `table`, by path.
 	modes := func(table string) map[string]bigquery.RoundingMode {
 		t.Helper()
@@ -457,13 +379,13 @@ func TestDefaultRoundingModes(t *testing.T) {
 // do not; BigQuery's answers to cases that were unverified.
 func TestCopiedDefaultRoundingModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	plain := client.Dataset("go_default_rounding_plain")
 	even := client.Dataset("go_default_rounding_even")
 	for _, dataset := range []*bigquery.Dataset{plain, even} {
 		_ = dataset.DeleteWithContents(ctx)
-		t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+		t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 	}
 	run := func(sql string) error {
 		_, _, err := runScript(t, client, "", sql)
@@ -576,13 +498,13 @@ func tableRoundingModes(t *testing.T, client *bigquery.Client, dataset, table st
 // keeps it too. BigQuery's answers, which bq show reported for the same jobs.
 func TestJobDefaultRoundingModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	plain := client.Dataset("go_job_rounding_plain")
 	even := client.Dataset("go_job_rounding_even")
 	for _, dataset := range []*bigquery.Dataset{plain, even} {
 		_ = dataset.DeleteWithContents(ctx)
-		t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+		t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 	}
 	if _, _, err := runScript(t, client, "", `
 		CREATE SCHEMA go_job_rounding_plain;
@@ -654,12 +576,7 @@ func TestCopyRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_copy_rounding_modes")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	dataset := newDataset(t, client, "go_copy_rounding_modes")
 	if _, _, err := runScript(t, client, dataset.DatasetID, `
 	 CREATE TABLE src (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
 	 INSERT src VALUES (NUMERIC '2.25');
@@ -701,12 +618,7 @@ func TestLoadedUnparameterizedRoundingModes(t *testing.T) {
 	t.Parallel()
 	client := newClient(t)
 	ctx := t.Context()
-	dataset := client.Dataset("go_loaded_rounding_modes")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	dataset := newDataset(t, client, "go_loaded_rounding_modes")
 	schema := bigquery.Schema{
 		{Name: "n", Type: bigquery.NumericFieldType, RoundingMode: bigquery.RoundHalfEven},
 		{Name: "b", Type: bigquery.BigNumericFieldType, RoundingMode: bigquery.RoundHalfEven},
@@ -757,12 +669,7 @@ func TestUpdatedDefaultRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_updated_default_rounding")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	dataset := newDataset(t, client, "go_updated_default_rounding")
 	const even, away, unspecified = "ROUND_HALF_EVEN", "ROUND_HALF_AWAY_FROM_ZERO", "ROUNDING_MODE_UNSPECIFIED"
 	for _, method := range []string{"PATCH", "PUT"} {
 		for index, modes := range [][2]string{{away, even}, {even, away}, {even, unspecified}, {away, unspecified}} {

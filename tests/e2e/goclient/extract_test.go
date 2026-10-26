@@ -3,7 +3,6 @@ package goclient
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -134,16 +133,11 @@ func duration(value any, unit schema.TimeUnitType) time.Duration {
 // options a job sets, and count the files they write.
 func TestExtract(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	bucket := newExtractBucket(t, "go-extract")
-	dataset := client.Dataset("go_extract")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_extract")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun(`CREATE TABLE scalars AS SELECT
 	  1 AS i, 2.5 AS f, NUMERIC '1.5' AS n, TRUE AS b, b'ab' AS bt,
 	  TIMESTAMP '2020-01-02 03:04:05.12 UTC' AS ts, DATETIME '2020-01-02 03:04:05.5' AS dt,
@@ -268,16 +262,11 @@ func TestExtract(t *testing.T) {
 // with a wildcard in its bucket name or more than one wildcard.
 func TestExtractErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	newExtractBucket(t, "go-extract-errors")
-	dataset := client.Dataset("go_extract_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_extract_errors")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE scalars AS SELECT 1 AS i")
 	p.mustRun("CREATE TABLE nested AS SELECT STRUCT(1 AS x) AS r")
 	p.mustRun("CREATE VIEW v AS SELECT 1 AS i")

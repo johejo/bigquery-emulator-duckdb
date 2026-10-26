@@ -2,7 +2,6 @@ package goclient
 
 import (
 	"cmp"
-	"context"
 	"encoding/hex"
 	"errors"
 	"reflect"
@@ -35,15 +34,10 @@ const (
 // those of scalars/geography.txt and scalars/geography_linestring.txt.
 func TestGeographyColumns(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_geography_columns")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	dataset := newDataset(t, client, "go_geography_columns")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
 		{Name: "g", Type: bigquery.GeographyFieldType},
@@ -184,14 +178,9 @@ func TestGeographyColumns(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/geospatial-data#loading_data
 func TestGeographyParquetWkb(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_geography_parquet_wkb")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_geography_parquet_wkb")
 
 	point, err := hex.DecodeString(pointWkb)
 	if err != nil {
@@ -221,7 +210,7 @@ func TestGeographyParquetWkb(t *testing.T) {
 	if err := loadParquet(ctx, dataset.Table("places"), source, schema); err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	if got, want := p.read(`SELECT id, ST_ASTEXT(g), ARRAY(SELECT ST_ASTEXT(e) FROM UNNEST(gs) AS e)
 		FROM places ORDER BY id`), [][]bigquery.Value{
 		{int64(1), "POINT(2 4)", []bigquery.Value{"POINT(2 4)"}},

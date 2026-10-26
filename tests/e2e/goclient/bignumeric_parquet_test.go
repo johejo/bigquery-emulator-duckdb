@@ -72,19 +72,6 @@ func writeParquet(t *testing.T, fields []arrow.Field, columns []arrow.Array) str
 	return path
 }
 
-func runJob(ctx context.Context, job interface {
-	Wait(context.Context) (*bigquery.JobStatus, error)
-}, err error) error {
-	if err != nil {
-		return err
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	return status.Err()
-}
-
 func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigquery.Schema,
 	targets ...bigquery.DecimalTargetType) error {
 	source := bigquery.NewGCSReference(path)
@@ -93,8 +80,7 @@ func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigq
 	source.Schema = s
 	loader := table.LoaderFrom(source)
 	loader.DecimalTargetTypes = targets
-	job, err := loader.Run(ctx)
-	return runJob(ctx, job, err)
+	return wait(ctx, loader)
 }
 
 // A Parquet DECIMAL loads into BIGNUMERIC exactly, at any depth, whether it is as wide as
@@ -102,14 +88,9 @@ func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigq
 // 38), which loads back into the same values.
 func TestBigNumericParquet(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_parquet")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_bignumeric_parquet")
 
 	allocator := memory.NewGoAllocator()
 	wide := array.NewDecimal256Builder(allocator, bigNumericParquet)
@@ -246,8 +227,7 @@ func TestBigNumericParquet(t *testing.T) {
 	destination := bigquery.NewGCSReference(extracted)
 	destination.DestinationFormat = bigquery.Parquet
 	extractor := dataset.Table("loaded").ExtractorTo(destination)
-	job, err := extractor.Run(ctx)
-	if err := runJob(ctx, job, err); err != nil {
+	if err := wait(ctx, extractor); err != nil {
 		t.Fatalf("extract: %v", err)
 	}
 	reader, err := file.OpenParquetFile(extracted, false)
@@ -275,14 +255,9 @@ func TestBigNumericParquet(t *testing.T) {
 // A load that would change a value or BigQuery would treat differently fails.
 func TestBigNumericParquetErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_parquet_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_bignumeric_parquet_errors")
 
 	allocator := memory.NewGoAllocator()
 	// 10^75 units of 1 is out of BIGNUMERIC's range.

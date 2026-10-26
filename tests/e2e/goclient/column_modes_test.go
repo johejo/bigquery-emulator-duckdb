@@ -13,14 +13,14 @@ import (
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
 func TestCreateTableAsSelectColumnModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_ctas_column_modes")
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	p.mustRun(`CREATE TABLE source (id INT64 NOT NULL, name STRING)`)
 	p.mustRun(`INSERT source VALUES (1, 'one')`)
 	p.mustRun(`CREATE TABLE inferred AS SELECT * FROM source`)
@@ -68,14 +68,14 @@ func TestCreateTableAsSelectColumnModes(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement
 func TestAlterTableAddColumnModes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_add_column_modes")
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	for _, table := range []string{"empty", "populated"} {
 		p.mustRun("CREATE TABLE " + table + " (id INT64)")
 	}
@@ -107,14 +107,14 @@ func TestAlterTableAddColumnModes(t *testing.T) {
 // record may itself be NULL. LIKE AS SELECT inherits these modes from the source schema.
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
 func TestCreateTableAsSelectNestedColumnModes(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_ctas_nested_modes")
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	columns := `(r STRUCT<x INT64 NOT NULL, s STRUCT<y STRING NOT NULL>>, a ARRAY<STRUCT<x INT64 NOT NULL>>)`
 	values := `SELECT STRUCT(1 AS renamed, STRUCT('ok' AS renamed) AS renamed_s), [STRUCT(2 AS renamed)] FROM UNNEST([0])`
 	p.mustRun("CREATE TABLE source " + columns)

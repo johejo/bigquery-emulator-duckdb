@@ -37,16 +37,7 @@ func TestInformationSchema(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		var result [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err == iterator.Done {
-				return result, nil
-			} else if err != nil {
-				return nil, err
-			}
-			result = append(result, row)
-		}
+		return collectRows(rows)
 	}
 
 	for _, c := range []struct {
