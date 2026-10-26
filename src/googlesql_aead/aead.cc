@@ -1,14 +1,13 @@
-#include <openssl/aead.h>
-#include <openssl/aes.h>
-#include <openssl/base64.h>
-#include <openssl/cmac.h>
-#include <openssl/mem.h>
+#include <openssl/crypto.h>
+#include <openssl/evp.h>
 #include <openssl/rand.h>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -360,35 +359,58 @@ absl::StatusOr<Keys> ParseKeys(const Primitive& primitive, std::string_view data
 // Seals or opens `in` with the AES-GCM `key`, or returns nullopt when opening fails.
 std::optional<std::string> Seal(const Key& key, std::string_view iv, std::string_view in,
                                 std::string_view aad, bool open) {
-  const EVP_AEAD* aead = key.value.size() == 16 ? EVP_aead_aes_128_gcm() : EVP_aead_aes_256_gcm();
-  bssl::ScopedEVP_AEAD_CTX context;
-  if (EVP_AEAD_CTX_init(context.get(), aead, reinterpret_cast<const uint8_t*>(key.value.data()),
-                        key.value.size(), kTagSize, nullptr) != 1) {
+  if ((open && in.size() < kTagSize) || in.size() > std::numeric_limits<int>::max() ||
+      aad.size() > std::numeric_limits<int>::max()) {
     return std::nullopt;
   }
-  std::string out(in.size() + (open ? 0 : kTagSize), '\0');
-  std::size_t size = 0;
+  const EVP_CIPHER* cipher = key.value.size() == 16 ? EVP_aes_128_gcm() : EVP_aes_256_gcm();
+  const std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> context(
+      EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  if (!context ||
+      EVP_CipherInit_ex(context.get(), cipher, nullptr,
+                        reinterpret_cast<const uint8_t*>(key.value.data()),
+                        reinterpret_cast<const uint8_t*>(iv.data()), open ? 0 : 1) != 1) {
+    return std::nullopt;
+  }
+  if (open) {
+    // OpenSSL copies the tag; it does not modify the ciphertext.
+    if (EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_SET_TAG, kTagSize,
+                            const_cast<char*>(in.data() + in.size() - kTagSize)) != 1) {
+      return std::nullopt;
+    }
+    in.remove_suffix(kTagSize);
+  }
+  std::string out(in.size() + kTagSize, '\0');
   auto* out_data = reinterpret_cast<uint8_t*>(out.data());
-  const auto* iv_data = reinterpret_cast<const uint8_t*>(iv.data());
-  const auto* in_data = reinterpret_cast<const uint8_t*>(in.data());
-  const auto* aad_data = reinterpret_cast<const uint8_t*>(aad.data());
-  const int ok = open ? EVP_AEAD_CTX_open(context.get(), out_data, &size, out.size(), iv_data,
-                                          iv.size(), in_data, in.size(), aad_data, aad.size())
-                      : EVP_AEAD_CTX_seal(context.get(), out_data, &size, out.size(), iv_data,
-                                          iv.size(), in_data, in.size(), aad_data, aad.size());
-  if (ok != 1) {
+  int size = 0;
+  int final_size = 0;
+  if (EVP_CipherUpdate(context.get(), nullptr, &size, reinterpret_cast<const uint8_t*>(aad.data()),
+                       static_cast<int>(aad.size())) != 1 ||
+      EVP_CipherUpdate(context.get(), out_data, &size, reinterpret_cast<const uint8_t*>(in.data()),
+                       static_cast<int>(in.size())) != 1 ||
+      EVP_CipherFinal_ex(context.get(), out_data + size, &final_size) != 1) {
     return std::nullopt;
   }
-  out.resize(size);
+  const auto length = static_cast<std::size_t>(size) + static_cast<std::size_t>(final_size);
+  if (!open &&
+      EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_GET_TAG, kTagSize, out_data + length) != 1) {
+    return std::nullopt;
+  }
+  out.resize(length + (open ? 0 : kTagSize));
   return out;
 }
 
 using Block = std::array<uint8_t, kBlockSize>;
 
-Block Cmac(std::string_view key, std::string_view in) {
+std::optional<Block> Cmac(std::string_view key, std::string_view in) {
   Block out{};
-  AES_CMAC(out.data(), reinterpret_cast<const uint8_t*>(key.data()), key.size(),
-           reinterpret_cast<const uint8_t*>(in.data()), in.size());
+  std::size_t size = 0;
+  if (EVP_Q_mac(nullptr, "CMAC", nullptr, "AES-256-CBC", nullptr, key.data(), key.size(),
+                reinterpret_cast<const uint8_t*>(in.data()), in.size(), out.data(), out.size(),
+                &size) == nullptr ||
+      size != out.size()) {
+    return std::nullopt;
+  }
   return out;
 }
 
@@ -409,12 +431,15 @@ void Xor(char& byte, uint8_t mask) { byte = static_cast<char>(static_cast<uint8_
 
 // RFC 5297's S2V of the additional data and the plaintext, as Tink computes it.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the order of S2V's strings.
-Block S2v(std::string_view key, std::string_view aad, std::string_view plaintext) {
-  Block d = Cmac(key, std::string(kBlockSize, '\0'));
-  const Block aad_mac = Cmac(key, aad);
-  d = Double(d);
+std::optional<Block> S2v(std::string_view key, std::string_view aad, std::string_view plaintext) {
+  const auto initial = Cmac(key, std::string(kBlockSize, '\0'));
+  const auto aad_mac = Cmac(key, aad);
+  if (!initial || !aad_mac) {
+    return std::nullopt;
+  }
+  Block d = Double(*initial);
   for (std::size_t i = 0; i < kBlockSize; ++i) {
-    d.at(i) ^= aad_mac.at(i);
+    d.at(i) ^= aad_mac->at(i);
   }
   std::string t(plaintext);
   if (t.size() >= kBlockSize) {
@@ -434,26 +459,44 @@ Block S2v(std::string_view key, std::string_view aad, std::string_view plaintext
 
 // AES-CTR with the second half of the AES-SIV `key`, from the synthetic IV `siv` with the bits
 // RFC 5297 clears.
-std::string Ctr(std::string_view key, const Block& siv, std::string_view in) {
-  AES_KEY aes;
-  AES_set_encrypt_key(reinterpret_cast<const uint8_t*>(key.data()) + (key.size() / 2),
-                      (key.size() / 2) * 8, &aes);
+std::optional<std::string> Ctr(std::string_view key, const Block& siv, std::string_view in) {
+  if (in.size() > std::numeric_limits<int>::max()) {
+    return std::nullopt;
+  }
   Block counter = siv;
   counter.at(8) &= 0x7fU;
   counter.at(12) &= 0x7fU;
-  Block stream{};
-  unsigned num = 0;
-  std::string out(in.size(), '\0');
-  AES_ctr128_encrypt(reinterpret_cast<const uint8_t*>(in.data()),
-                     reinterpret_cast<uint8_t*>(out.data()), in.size(), &aes, counter.data(),
-                     stream.data(), &num);
+  const std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> context(
+      EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+  std::string out(in.size() + kBlockSize, '\0');
+  auto* out_data = reinterpret_cast<uint8_t*>(out.data());
+  int size = 0;
+  int final_size = 0;
+  if (!context ||
+      EVP_EncryptInit_ex(context.get(), EVP_aes_256_ctr(), nullptr,
+                         reinterpret_cast<const uint8_t*>(key.data()) + (key.size() / 2),
+                         counter.data()) != 1 ||
+      EVP_EncryptUpdate(context.get(), out_data, &size, reinterpret_cast<const uint8_t*>(in.data()),
+                        static_cast<int>(in.size())) != 1 ||
+      EVP_EncryptFinal_ex(context.get(), out_data + size, &final_size) != 1) {
+    return std::nullopt;
+  }
+  out.resize(static_cast<std::size_t>(size) + static_cast<std::size_t>(final_size));
   return out;
 }
 
-std::string SivEncrypt(const Key& key, std::string_view plaintext, std::string_view aad) {
+std::optional<std::string> SivEncrypt(const Key& key, std::string_view plaintext,
+                                      std::string_view aad) {
   const std::string_view mac_key = std::string_view(key.value).substr(0, key.value.size() / 2);
-  const Block siv = S2v(mac_key, aad, plaintext);
-  return std::string(siv.begin(), siv.end()) + Ctr(key.value, siv, plaintext);
+  const auto siv = S2v(mac_key, aad, plaintext);
+  if (!siv) {
+    return std::nullopt;
+  }
+  const auto ciphertext = Ctr(key.value, *siv, plaintext);
+  if (!ciphertext) {
+    return std::nullopt;
+  }
+  return std::string(siv->begin(), siv->end()) + *ciphertext;
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the order of Seal's arguments.
@@ -464,10 +507,13 @@ std::optional<std::string> SivDecrypt(const Key& key, std::string_view ciphertex
   }
   Block siv{};
   std::ranges::copy(ciphertext.substr(0, kBlockSize), siv.begin());
-  std::string plaintext = Ctr(key.value, siv, ciphertext.substr(kBlockSize));
+  auto plaintext = Ctr(key.value, siv, ciphertext.substr(kBlockSize));
+  if (!plaintext) {
+    return std::nullopt;
+  }
   const std::string_view mac_key = std::string_view(key.value).substr(0, key.value.size() / 2);
-  const Block expected = S2v(mac_key, aad, plaintext);
-  if (CRYPTO_memcmp(expected.data(), siv.data(), kBlockSize) != 0) {
+  const auto expected = S2v(mac_key, aad, *plaintext);
+  if (!expected || CRYPTO_memcmp(expected->data(), siv.data(), kBlockSize) != 0) {
     return std::nullopt;
   }
   return plaintext;
@@ -507,7 +553,9 @@ absl::StatusOr<std::string> Encrypt(std::string_view keyset_bytes, std::string_v
     return keys.status();
   }
   std::string iv(kIvSize, '\0');
-  RAND_bytes(reinterpret_cast<uint8_t*>(iv.data()), iv.size());
+  if (RAND_bytes(reinterpret_cast<uint8_t*>(iv.data()), static_cast<int>(iv.size())) != 1) {
+    return Failed(kFunction, "encryption failed");
+  }
   const auto sealed = Seal(keys->primary, iv, input, aad, false);
   if (!sealed) {
     return Failed(kFunction, "encryption failed");
@@ -523,7 +571,11 @@ absl::StatusOr<std::string> DeterministicEncrypt(std::string_view keyset_bytes,
   if (!keys.ok()) {
     return keys.status();
   }
-  return keys->primary.prefix + SivEncrypt(keys->primary, input, aad);
+  const auto ciphertext = SivEncrypt(keys->primary, input, aad);
+  if (!ciphertext) {
+    return Failed("DETERMINISTIC_ENCRYPT", "encryption failed");
+  }
+  return keys->primary.prefix + *ciphertext;
 }
 
 namespace {
@@ -597,7 +649,9 @@ absl::StatusOr<KeysetKey> NewKey(std::string_view function, std::string_view key
                                  std::string(key_type) + "'");
   }
   std::string value(gcm ? 32 : 64, '\0');
-  RAND_bytes(reinterpret_cast<uint8_t*>(value.data()), value.size());
+  if (RAND_bytes(reinterpret_cast<uint8_t*>(value.data()), static_cast<int>(value.size())) != 1) {
+    return Failed(function, "key generation failed");
+  }
   std::string key;
   WriteBytesField(key, gcm ? 3 : 2, value);
   return KeysetKey{
@@ -746,26 +800,35 @@ std::optional<uint64_t> EnumValue(const std::array<std::string_view, N>& names,
 }
 
 std::string Base64(std::string_view data) {
-  std::size_t size = 0;
-  EVP_EncodedLength(&size, data.size());
-  std::string out(size, '\0');
+  if (data.size() > (static_cast<std::size_t>(std::numeric_limits<int>::max()) / 4) * 3) {
+    return "";
+  }
+  std::string out((4 * ((data.size() + 2) / 3)) + 1, '\0');
   out.resize(EVP_EncodeBlock(reinterpret_cast<uint8_t*>(out.data()),
-                             reinterpret_cast<const uint8_t*>(data.data()), data.size()));
+                             reinterpret_cast<const uint8_t*>(data.data()),
+                             static_cast<int>(data.size())));
   return out;
 }
 
 // The decoded `data`, which is empty when `data` is not base64, as BigQuery takes it.
 std::string FromBase64(std::string_view data) {
-  std::size_t size = 0;
-  if (EVP_DecodedLength(&size, data.size()) != 1) {
+  if (data.empty() || data.size() % 4 != 0 || data.size() > std::numeric_limits<int>::max()) {
     return "";
   }
-  std::string out(size, '\0');
-  if (EVP_DecodeBase64(reinterpret_cast<uint8_t*>(out.data()), &size, out.size(),
-                       reinterpret_cast<const uint8_t*>(data.data()), data.size()) != 1) {
+  const std::size_t padding = data.ends_with("==") ? 2 : (data.ends_with('=') ? 1 : 0);
+  constexpr std::string_view alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  if (data.substr(0, data.size() - padding).find_first_not_of(alphabet) != std::string_view::npos) {
     return "";
   }
-  out.resize(size);
+  std::string out(3 * (data.size() / 4), '\0');
+  const int size =
+      EVP_DecodeBlock(reinterpret_cast<uint8_t*>(out.data()),
+                      reinterpret_cast<const uint8_t*>(data.data()), static_cast<int>(data.size()));
+  if (size < 0) {
+    return "";
+  }
+  out.resize(static_cast<std::size_t>(size) - padding);
   return out;
 }
 

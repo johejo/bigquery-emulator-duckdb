@@ -153,8 +153,6 @@
     "https://bcr.bazel.build/modules/boringssl/0.0.0-20240530-2db0eb3/MODULE.bazel": "d0405b762c5e87cd445b7015f2b8da5400ef9a8dbca0bfefa6c1cea79d528a97",
     "https://bcr.bazel.build/modules/boringssl/0.20240913.0/MODULE.bazel": "fcaa7503a5213290831a91ed1eb538551cf11ac0bc3a6ad92d0fef92c5bd25fb",
     "https://bcr.bazel.build/modules/boringssl/0.20241024.0/MODULE.bazel": "b540cff73d948cb79cb0bc108d7cef391d2098a25adabfda5043e4ef548dbc87",
-    "https://bcr.bazel.build/modules/boringssl/0.20250818.0/MODULE.bazel": "f1d47a56473955f97a14701e74c41668e5e12c3a694212c231e237a13a51b2bd",
-    "https://bcr.bazel.build/modules/boringssl/0.20251124.0/MODULE.bazel": "1e107f2b52cc5e002924bc3b33bb60516f96f91b51eb523127df9ea9a944a3b4",
     "https://bcr.bazel.build/modules/boringssl/0.20260327.0/MODULE.bazel": "b8b38921926f13f15b48ce9009836810c4704a4228745dfb73f39265456aff08",
     "https://bcr.bazel.build/modules/boringssl/0.20260327.0/source.json": "ec6ffc49f18c9c9f54d58c6b05172f4c826338ce482dcfcb3846826fa2644958",
     "https://bcr.bazel.build/modules/brotli/1.1.0/MODULE.bazel": "3b5b90488995183419c4b5c9b063a164f6c0bc4d0d6b40550a612a5e860cc0fe",
@@ -876,7 +874,7 @@
     },
     "@@googlesql+//bazel:http_archive_deps.bzl%googlesql_http_archive_deps": {
       "general": {
-        "bzlTransitiveDigest": "463JJ0RKVu6TJhX01epS8YSPcJUqsF3JDbPMFG3Sfao=",
+        "bzlTransitiveDigest": "4VeLZifzoL9ZldTSrDXSJmYrF+BGFs3Z7uBWELTLFho=",
         "usagesDigest": "tOJUFB+7Qxm/gkyLMNck2pJ4TlTkSSVpltvfXkpPb2w=",
         "recordedInputs": [
           "REPO_MAPPING:googlesql+,bazel_tools bazel_tools"
@@ -893,6 +891,9 @@
           "com_google_cc_differential_privacy": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
+              "patch_cmds": [
+                "sed -i.bak 's|@boringssl//|@openssl//|g' algorithms/BUILD"
+              ],
               "sha256": "1a8612290740bd0bacc7052df7accb4f3368e2c2cb3de8eb608f58522c2e1891",
               "strip_prefix": "differential-privacy-4.0.0/cc",
               "url": "https://github.com/google/differential-privacy/archive/refs/tags/v4.0.0.tar.gz"
@@ -1644,69 +1645,6 @@
             "repoRuleId": "@@rules_nodejs+//nodejs/private:nodejs_toolchains_repo.bzl%nodejs_toolchains_repo",
             "attributes": {
               "user_node_repository_name": "nodejs"
-            }
-          }
-        }
-      }
-    },
-    "@@rules_perl+//perl:extensions.bzl%perl_repositories": {
-      "general": {
-        "bzlTransitiveDigest": "53ijzqojLw9qw1l17hc9qzG1nTGxlmf5ac0iBf09aFI=",
-        "usagesDigest": "qSSNDdCNVxNhY36wMndEAFacdhR0ooLTmumfad0km9s=",
-        "recordedInputs": [
-          "REPO_MAPPING:rules_perl+,bazel_tools bazel_tools",
-          "REPO_MAPPING:rules_perl+,rules_perl rules_perl+"
-        ],
-        "generatedRepoSpecs": {
-          "perl_darwin_arm64": {
-            "repoRuleId": "@@rules_perl+//perl:repo.bzl%perl_download",
-            "attributes": {
-              "strip_prefix": "perl-darwin-arm64",
-              "sha256": "285769f3c50c339fb59a3987b216ae3c5c573b95babe6875a1ef56fb178433da",
-              "urls": [
-                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-darwin-arm64.tar.xz"
-              ]
-            }
-          },
-          "perl_darwin_amd64": {
-            "repoRuleId": "@@rules_perl+//perl:repo.bzl%perl_download",
-            "attributes": {
-              "strip_prefix": "perl-darwin-amd64",
-              "sha256": "63bc5ee36f5394d71c50cca6cafdd333ee58f9eaa40bca63c85f9bd06f2c1fd6",
-              "urls": [
-                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-darwin-amd64.tar.xz"
-              ]
-            }
-          },
-          "perl_linux_amd64": {
-            "repoRuleId": "@@rules_perl+//perl:repo.bzl%perl_download",
-            "attributes": {
-              "strip_prefix": "perl-linux-amd64",
-              "sha256": "3bdffa9d7a3f97c0207314637b260ba5115b1d0829f97e3e2e301191a4d4d076",
-              "urls": [
-                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-linux-amd64.tar.xz"
-              ]
-            }
-          },
-          "perl_linux_arm64": {
-            "repoRuleId": "@@rules_perl+//perl:repo.bzl%perl_download",
-            "attributes": {
-              "strip_prefix": "perl-linux-arm64",
-              "sha256": "6fa4ece99e790ecbc2861f6ecb7b52694c01c2eeb215b4370f16a3b12d952117",
-              "urls": [
-                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-linux-arm64.tar.xz"
-              ]
-            }
-          },
-          "perl_windows_x86_64": {
-            "repoRuleId": "@@rules_perl+//perl:repo.bzl%perl_download",
-            "attributes": {
-              "strip_prefix": "",
-              "sha256": "aeb973da474f14210d3e1a1f942dcf779e2ae7e71e4c535e6c53ebabe632cc98",
-              "urls": [
-                "https://mirror.bazel.build/strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.zip",
-                "https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.zip"
-              ]
             }
           }
         }

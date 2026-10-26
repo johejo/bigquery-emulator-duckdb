@@ -1,0 +1,11 @@
+diff --git a/BUILD b/BUILD
+--- a/BUILD
++++ b/BUILD
+@@ -4541,6 +4541,7 @@
+     external_deps = [
+         "absl/log",
+         "absl/memory",
++        "libcrypto",
+         "libssl",
+     ],
+     visibility = ["//visibility:public"],

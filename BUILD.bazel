@@ -1200,9 +1200,9 @@ cc_library(
 
 genrule(
     name = "python_runtime_path",
-    srcs = ["@python_3_11//:python3"],
+    srcs = ["//third_party/python:python3"],
     outs = ["python_runtime_path.h"],
-    cmd = "echo 'inline constexpr char kPythonRuntime[] = \"$(rlocationpath @python_3_11//:python3)\";' > $@",
+    cmd = "echo 'inline constexpr char kPythonRuntime[] = \"$(rlocationpath //third_party/python:python3)\";' > $@",
 )
 
 cc_library(
@@ -1213,15 +1213,14 @@ cc_library(
     ],
     hdrs = ["src/python_worker.h"],
     data = [
-        "@python_3_11//:files",
-        "@python_3_11//:python3",
+        "//third_party/python:files",
+        "//third_party/python:python3",
     ],
     linkstatic = True,
     deps = [
+        "//third_party/python:runtime",
         "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
-        "@python_3_11//:libpython",
-        "@python_3_11//:python_headers",
         "@rules_cc//cc/runfiles",
     ],
 )

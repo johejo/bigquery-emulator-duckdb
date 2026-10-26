@@ -1,4 +1,8 @@
-# googlesql patch
+# googlesql patches
+
+`openssl.patch` builds GoogleSQL's hashing and exact-float code against OpenSSL instead of
+BoringSSL. It also switches differential-privacy's random-number dependency to OpenSSL, so
+these libraries share the crypto implementation linked by the embedded CPython runtime.
 
 `throw_delegate.patch` replaces `absl::base_internal::ThrowStdOutOfRange` with the public
 `absl::ThrowStdOutOfRange` in `googlesql/base/associative_view_internal.h`.

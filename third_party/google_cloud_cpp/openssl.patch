@@ -1,0 +1,72 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -30,7 +30,7 @@
+ # a native repository we cannot override.
+ # See https://github.com/googleapis/google-cloud-cpp/issues/15393
+ bazel_dep(name = "protobuf", version = "35.1", repo_name = "com_google_protobuf")
+-bazel_dep(name = "boringssl", version = "0.20251124.0")
++bazel_dep(name = "openssl", version = "3.5.5.bcr.4")
+ bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.1")
+ bazel_dep(name = "curl", version = "8.8.0.bcr.3")
+ bazel_dep(name = "opentelemetry-cpp", version = "1.24.0")
+diff --git a/google/cloud/BUILD.bazel b/google/cloud/BUILD.bazel
+--- a/google/cloud/BUILD.bazel
++++ b/google/cloud/BUILD.bazel
+@@ -82,7 +82,7 @@
+     ] + select({
+         "@platforms//os:windows": [],
+         "//conditions:default": [
+-            "@boringssl//:crypto",
++            "@openssl//:crypto",
+         ],
+     }),
+ )
+@@ -265,8 +265,8 @@
+     ] + select({
+         "@platforms//os:windows": [],
+         "//conditions:default": [
+-            "@boringssl//:crypto",
+-            "@boringssl//:ssl",
++            "@openssl//:crypto",
++            "@openssl//:ssl",
+         ],
+     }),
+ )
+diff --git a/google/cloud/storage/BUILD.bazel b/google/cloud/storage/BUILD.bazel
+--- a/google/cloud/storage/BUILD.bazel
++++ b/google/cloud/storage/BUILD.bazel
+@@ -150,8 +150,8 @@
+     ] + select({
+         "@platforms//os:windows": [],
+         "//conditions:default": [
+-            "@boringssl//:crypto",
+-            "@boringssl//:ssl",
++            "@openssl//:crypto",
++            "@openssl//:ssl",
+         ],
+     }),
+ )
+@@ -217,8 +217,8 @@
+     ] + select({
+         "@platforms//os:windows": [],
+         "//conditions:default": [
+-            "@boringssl//:crypto",
+-            "@boringssl//:ssl",
++            "@openssl//:crypto",
++            "@openssl//:ssl",
+         ],
+     }),
+ ) for test in storage_client_unit_tests]
+diff --git a/bazel/curl.BUILD b/bazel/curl.BUILD
+--- a/bazel/curl.BUILD
++++ b/bazel/curl.BUILD
+@@ -458,7 +458,7 @@
+     ] + select({
+         ":windows": [],
+         "//conditions:default": [
+-            "@boringssl//:ssl",
++            "@openssl//:ssl",
+         ],
+     }),
+ )
