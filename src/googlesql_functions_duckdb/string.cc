@@ -395,7 +395,8 @@ void RegisterStringFunctions(duckdb_connection connection, const Options& option
   Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, Apply<DecimalString>);
   RegisterWithContext(connection, "bq_chr", {kBigint}, kVarchar, ApplyWithContext<Chr>,
                       options.chr_zero_is_empty);
-  Register(connection, "bq_double_string", {kDouble}, kVarchar, Apply<DoubleString>);
+  RegisterWithContext(connection, "bq_double_string", {kDouble}, kVarchar,
+                      ApplyWithContext<DoubleString>, options.signed_zero_strings);
   Register(connection, "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar, Initcap<false>);
   Register(connection, "bq_edit_distance", {kVarchar, kVarchar, kBigint}, kBigint,
            Apply<EditDistance<fn::EditDistance>>);

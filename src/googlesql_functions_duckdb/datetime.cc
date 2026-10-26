@@ -287,6 +287,7 @@ void RegisterDatetimeFunctions(duckdb_connection connection, const Options& opti
                       googlesql_functions::FormatOptions{
                           .adapt_specifiers = options.format_specifiers,
                           .unsigned_nan = options.unsigned_nan,
+                          .signed_zero = options.signed_zero_strings,
                       },
                       /*nulls=*/false, DUCKDB_TYPE_ANY);
 }

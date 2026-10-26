@@ -10,6 +10,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .chr_zero_is_empty = true,
       .format_specifiers = true,
       .unsigned_nan = true,
+      .signed_zero_strings = true,
       .unpadded_iso_year = true,
       .extended_array_limits = true,
       .json_strict_numbers = true,

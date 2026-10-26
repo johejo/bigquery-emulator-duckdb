@@ -1878,17 +1878,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "FORMAT preserves FLOAT64 negative zero as BigQuery does; GoogleSQL canonicalizes it"
-  label: "code:format_STRING_<%@e>_FLOAT64_-0"
-  label: "code:format_STRING_<%@f>_FLOAT64_-0"
-  label: "code:format_STRING_<%@g>_FLOAT64_-0"
-  label: "code:format_STRING_<%e>_FLOAT64_-0"
-  label: "code:format_STRING_<%f>_FLOAT64_-0"
-  label: "code:format_STRING_<%g>_FLOAT64_-0"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "SPLIT of NULL differs"
   label: "strings_test:split_nulls"
 }
@@ -1903,13 +1892,6 @@ known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1@844674407370955e19"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casting FLOAT64 negative zero to STRING gives '-0', as BigQuery does, where the reference implementation gives '0'"
-  label: "code:CastTo_STRING_FLOAT64_-0"
-  label: "code:SafeCastTo_STRING_FLOAT64_-0"
 }
 
 known_errors {
