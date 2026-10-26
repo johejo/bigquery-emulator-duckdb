@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -12,12 +11,12 @@
 #include <set>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/json_int64.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -94,16 +93,13 @@ std::optional<int64_t> Int64Member(const json& value, const char* key) {
   if (it == value.end() || it->is_null()) {
     return std::nullopt;
   }
+  // Preserve the existing unchecked integer conversion here; tightening its range is
+  // separate from sharing the checked value parser.
   if (it->is_number_integer()) {
     return it->get<int64_t>();
   }
-  if (it->is_string()) {
-    const auto& text = it->get_ref<const std::string&>();
-    int64_t parsed = 0;
-    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), parsed);
-    if (error == std::errc() && end == text.data() + text.size()) {
-      return parsed;
-    }
+  if (const auto parsed = ParseJsonInt64(*it)) {
+    return parsed;
   }
   throw ApiError::Invalid(std::string("Field ") + key + " must be an integer");
 }
