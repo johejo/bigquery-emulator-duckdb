@@ -38,12 +38,17 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
+#include "src/external_query.h"
 #include "src/field_schema.h"
+#include "src/googlesql_functions_duckdb/options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/language_options.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/result_value.h"
 #include "src/type_mapping.h"
+#include "src/udf/javascript/limits.h"
+#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -363,8 +368,13 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     return absl::OkStatus();
   }
 
+  // The backend functions keep GoogleSQL's behavior where BigQuery's differs, so that these tests
+  // check what the two share; end-to-end tests check BigQuery's differences.
   void Reset() {
-    emulator_ = std::make_unique<Emulator>("", std::vector<Project>{{.project_id = kProject}});
+    emulator_ = std::make_unique<Emulator>(
+        "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, udf::JavaScriptLimits(),
+        std::vector<ExternalConnection>(), udf::PythonOptions(),
+        googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{});
     emulator_->CreateDataset(DatasetReference{kProject, kDataset});
   }
 
