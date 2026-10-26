@@ -18,6 +18,18 @@ const function_catalog::Catalog& EmulatorFunctionCatalog() {
     for (const auto& [name, definition] : geography_duckdb::GeographyFunctions()) {
       functions->AddRules(name, definition, function_catalog::Implementation::kS2);
     }
+    for (const auto& [name, definition] : geography_duckdb::GeographyAggregates()) {
+      functions->Add(name, {
+                               .translation = function_catalog::Translation::kAggregate,
+                               .uses = definition.uses,
+                               .implementations =
+                                   {
+                                       function_catalog::Implementation::kAggregate,
+                                       function_catalog::Implementation::kS2,
+                                   },
+                               .aggregates = definition.rules,
+                           });
+    }
     return functions;
   }();
   return *kFunctions;

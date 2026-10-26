@@ -1,0 +1,36 @@
+## GEOGRAPHY aggregates
+# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg
+# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg
+# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent
+# The examples are documented. The three functions ignore NULL values, and ST_EXTENT is NULL
+# where all its values are NULL or empty. Round away floating-point error in spherical bounds.
+
+SELECT ST_UNION_AGG(items) FROM UNNEST([ST_GEOGFROMTEXT('POINT(-122.4 37.8)'), ST_GEOGFROMTEXT('POINT(-122.4 37.8)'), ST_GEOGFROMTEXT('POINT(-122.4 37.8)')]) AS items
+=> "POINT(-122.4 37.8)"
+
+SELECT ST_EQUALS(ST_UNION_AGG(g), ST_GEOGFROMTEXT('MULTIPOINT(1 2, 3 4)')) FROM UNNEST([ST_GEOGPOINT(1, 2), NULL, ST_GEOGPOINT(3, 4)]) g
+=> "true"
+
+SELECT ST_CENTROID_AGG(points) FROM UNNEST([ST_GEOGPOINT(1, 5), ST_GEOGPOINT(1, 2), ST_GEOGPOINT(1, -1), ST_GEOGPOINT(1, -1)]) points
+=> "POINT(1 1.24961422620969)"
+
+SELECT ST_CENTROID(ST_UNION_AGG(points)) FROM UNNEST([ST_GEOGPOINT(1, 5), ST_GEOGPOINT(1, 2), ST_GEOGPOINT(1, -1), ST_GEOGPOINT(1, -1)]) points
+=> "POINT(1 2)"
+
+SELECT ST_CENTROID_AGG(g) FROM UNNEST([ST_GEOGPOINT(1, 5), NULL, ST_GEOGPOINT(1, 2), ST_GEOGPOINT(1, -1), NULL, ST_GEOGPOINT(1, -1)]) g
+=> "POINT(1 1.24961422620969)"
+
+SELECT ROUND(b.xmin, 10) = 172 AND ROUND(b.ymin, 10) = 46 AND ROUND(b.xmax, 10) = 243 AND ROUND(b.ymax, 10) = 70 FROM (SELECT ST_EXTENT(g) AS b FROM UNNEST([ST_GEOGFROMTEXT('POLYGON((-125 48, -124 46, -117 46, -117 49, -125 48))'), ST_GEOGFROMTEXT('POLYGON((172 53, -130 55, -141 70, 172 53))'), ST_GEOGFROMTEXT('POINT EMPTY')]) g)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = 1 AND ROUND(b.ymin, 10) = 2 AND ROUND(b.xmax, 10) = 3 AND ROUND(b.ymax, 10) = 4 FROM (SELECT ST_EXTENT(g) AS b FROM UNNEST([ST_GEOGPOINT(1, 2), NULL, ST_GEOGPOINT(3, 4)]) g)
+=> "true"
+
+SELECT ST_EXTENT(g) FROM UNNEST([CAST(NULL AS GEOGRAPHY), NULL]) g
+=> null
+
+SELECT ST_EXTENT(g) FROM UNNEST([ST_GEOGFROMTEXT('POINT EMPTY'), NULL, ST_GEOGFROMTEXT('LINESTRING EMPTY')]) g
+=> null
+
+SELECT TYPEOF(ST_EXTENT(g)) FROM UNNEST([ST_GEOGPOINT(1, 2)]) g
+=> "STRUCT<xmin FLOAT64, ymin FLOAT64, xmax FLOAT64, ymax FLOAT64>"

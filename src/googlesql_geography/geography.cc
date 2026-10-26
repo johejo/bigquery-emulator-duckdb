@@ -14,6 +14,8 @@
 #include <numbers>
 #include <numeric>
 #include <optional>
+#include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -607,7 +609,12 @@ absl::StatusOr<Geography> Boundary(const Geography& geography) {
 }
 
 std::optional<BoundingBox> Bounds(const Geography& geography, const Options& options) {
-  if (geography.Empty()) {
+  return Extent(std::span(&geography, 1), options);
+}
+
+// The bounds of all the parts of `geographies` together, which no empty geography changes.
+std::optional<BoundingBox> Extent(std::span<const Geography> geographies, const Options& options) {
+  if (std::ranges::all_of(geographies, &Geography::Empty)) {
     return std::nullopt;
   }
   BoundingBox box{.xmin = -180, .ymin = 90, .xmax = 180, .ymax = -90};
@@ -624,14 +631,16 @@ std::optional<BoundingBox> Bounds(const Geography& geography, const Options& opt
       longitudes.emplace_back(lo, hi);
     }
   };
-  for (const S2Point& point : geography.points) {
-    add(S2LatLngRect::FromPoint(S2LatLng(point)));
-  }
-  for (const std::vector<S2Point>& line : geography.lines) {
-    add(S2Polyline(line).GetRectBound());
-  }
-  if (!geography.polygons.empty()) {
-    add(ToS2Polygon(geography)->GetRectBound());
+  for (const Geography& geography : geographies) {
+    for (const S2Point& point : geography.points) {
+      add(S2LatLngRect::FromPoint(S2LatLng(point)));
+    }
+    for (const std::vector<S2Point>& line : geography.lines) {
+      add(S2Polyline(line).GetRectBound());
+    }
+    if (!geography.polygons.empty()) {
+      add(ToS2Polygon(geography)->GetRectBound());
+    }
   }
   // The complement of the largest uncovered longitude gap is the smallest interval. Taking
   // pairwise rectangle unions can miss it when there are several disconnected components.
@@ -738,27 +747,54 @@ bool IsRing(const Geography& geography) {
   return !loop.FindValidationError(&error);
 }
 
-// Only the highest dimension contributes. S2's centroids already include the
-// measure of each component, so their sum gives the weighted centroid.
-absl::StatusOr<Geography> Centroid(const Geography& geography) {
-  if (geography.Empty()) {
-    return geography;
+namespace {
+
+// The centroid of the parts of `geography` of `dimension`, scaled by their measure, as S2's
+// centroids are, so that the sum over several gives their weighted centroid.
+S2Point WeightedCentroid(const Geography& geography, int64_t dimension) {
+  if (dimension == 2) {
+    return geography.polygons.empty() ? S2Point(0, 0, 0) : ToS2Polygon(geography)->GetCentroid();
   }
-  S2Point centroid(0, 0, 0);
-  if (!geography.polygons.empty()) {
-    centroid = ToS2Polygon(geography)->GetCentroid();
-  } else if (!geography.lines.empty()) {
-    centroid = std::accumulate(geography.lines.begin(), geography.lines.end(), S2Point(0, 0, 0),
-                               [](const S2Point& sum, const std::vector<S2Point>& line) {
-                                 return sum + S2::GetCentroid(S2LaxPolylineShape(line));
-                               });
-  } else {
-    centroid = std::accumulate(geography.points.begin(), geography.points.end(), S2Point(0, 0, 0));
+  if (dimension == 1) {
+    return std::accumulate(geography.lines.begin(), geography.lines.end(), S2Point(0, 0, 0),
+                           [](const S2Point& sum, const std::vector<S2Point>& line) {
+                             return sum + S2::GetCentroid(S2LaxPolylineShape(line));
+                           });
   }
+  return std::accumulate(geography.points.begin(), geography.points.end(), S2Point(0, 0, 0));
+}
+
+// Only the highest dimension of `geographies` contributes, and the empty geography where they have
+// none.
+Geography CentroidOf(std::span<const Geography> geographies) {
+  const int64_t dimension = std::ranges::max(geographies | std::views::transform(Dimension));
+  if (dimension < 0) {
+    return {};
+  }
+  const S2Point centroid =
+      std::accumulate(geographies.begin(), geographies.end(), S2Point(0, 0, 0),
+                      [dimension](const S2Point& sum, const Geography& geography) {
+                        return sum + WeightedCentroid(geography, dimension);
+                      });
   if (centroid.Norm2() == 0) {
     return PointGeography(S2Point(1, 0, 0));
   }
   return PointGeography(centroid.Normalize());
+}
+
+}  // namespace
+
+absl::StatusOr<Geography> Centroid(const Geography& geography) {
+  return CentroidOf(std::span(&geography, 1));
+}
+
+// ST_CENTROID_AGG, which weights each geography as ST_CENTROID weights the parts of one, so a
+// repeated geography counts each time; NULL for no geographies.
+std::optional<Geography> CentroidAggregate(const std::vector<Geography>& geographies) {
+  if (geographies.empty()) {
+    return std::nullopt;
+  }
+  return CentroidOf(geographies);
 }
 
 // ST_LENGTH, the length of the edges of the linestrings, which is 0 for points, polygons and the
