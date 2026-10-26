@@ -22,6 +22,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
 #include "src/column_default.h"
+#include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
@@ -89,11 +90,13 @@ bool ApplyAnnotations(const googlesql::Type* type,
     field.mode = FieldMode::kRequired;
   }
   for (const auto& option : annotations.option_list()) {
-    const std::string name = ToLowerAscii(option->name());
-    const std::optional<googlesql::Value> value = OptionValue(*option, "column", scope);
+    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    const std::optional<googlesql::Value> value =
+        OptionValue(*option, DdlOptionContext::kColumn, scope);
     if (!value.has_value() ||
-        !((name == "description" && StringOption(*value, field.description)) ||
-          (name == "rounding_mode" && RoundingModeOption(*value, field.rounding_mode)))) {
+        !((name == DdlOptionId::kDescription && StringOption(*value, field.description)) ||
+          (name == DdlOptionId::kRoundingMode &&
+           RoundingModeOption(*value, field.rounding_mode)))) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -166,12 +169,13 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
 // they are unsupported, and so are += and -=.
 bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsAction& action) {
   for (const auto& option : options) {
-    const std::string name = ToLowerAscii(option->name());
-    const std::optional<googlesql::Value> value = OptionValue(*option, "column", scope);
-    if (!value.has_value() ||
-        !((name == "description" && StringOption(*value, action.description.emplace())) ||
-          (name == "rounding_mode" &&
-           RoundingModeOption(*value, action.rounding_mode.emplace())))) {
+    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    const std::optional<googlesql::Value> value =
+        OptionValue(*option, DdlOptionContext::kColumn, scope);
+    if (!value.has_value() || !((name == DdlOptionId::kDescription &&
+                                 StringOption(*value, action.description.emplace())) ||
+                                (name == DdlOptionId::kRoundingMode &&
+                                 RoundingModeOption(*value, action.rounding_mode.emplace())))) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -367,7 +371,7 @@ std::optional<RangePartitioning> GenerateArrayRange(const googlesql::ResolvedExp
 // pseudo-columns, which the emulator does not have.
 bool Partitioning(const googlesql::ResolvedExpr& expression, TableMetadata& metadata) {
   if (const std::string column = ColumnName(expression); !column.empty()) {
-    metadata.time_partitioning = TimePartitioning{.type = "DAY", .field = column};
+    metadata.time_partitioning = TimePartitioning{.type = TimePartitionUnit::kDay, .field = column};
     return expression.type()->IsDate();
   }
   if (!expression.Is<googlesql::ResolvedFunctionCall>()) {
@@ -382,7 +386,7 @@ bool Partitioning(const googlesql::ResolvedExpr& expression, TableMetadata& meta
   }
   const googlesql::Type* type = arguments.at(0)->type();
   if (function == "date" && arguments.size() == 1) {
-    metadata.time_partitioning = TimePartitioning{.type = "DAY", .field = column};
+    metadata.time_partitioning = TimePartitioning{.type = TimePartitionUnit::kDay, .field = column};
     return type->IsTimestamp() || type->IsDatetime();
   }
   if (function == "range_bucket" && arguments.size() == 2) {
@@ -397,9 +401,14 @@ bool Partitioning(const googlesql::ResolvedExpr& expression, TableMetadata& meta
   }
   const std::string part =
       arguments.at(1)->GetAs<googlesql::ResolvedLiteral>()->value().EnumDisplayName();
-  metadata.time_partitioning = TimePartitioning{.type = part, .field = column};
-  return part == "MONTH" || part == "YEAR" ||
-         (!type->IsDate() && (part == "DAY" || part == "HOUR"));
+  const auto unit = ParseTimePartitionUnit(part);
+  if (!unit) {
+    return false;
+  }
+  metadata.time_partitioning = TimePartitioning{.type = *unit, .field = column};
+  return *unit == TimePartitionUnit::kMonth || *unit == TimePartitionUnit::kYear ||
+         (!type->IsDate() &&
+          (*unit == TimePartitionUnit::kDay || *unit == TimePartitionUnit::kHour));
 }
 
 // Records the PARTITION BY and CLUSTER BY of a CREATE TABLE [AS SELECT] on `metadata`.
@@ -554,8 +563,8 @@ std::optional<TableDescription> LikeDescription(const CreateTable& create, const
   if (create.cluster_by_list_size() > 0) {
     inherited.clustering.clear();
   }
-  auto metadata =
-      OptionsMetadata(create.option_list(), "CREATE TABLE", scope, std::move(inherited));
+  auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope,
+                                  std::move(inherited));
   if (!metadata || !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
   }
@@ -630,7 +639,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   if (clone && !restore) {
     description->metadata.clone = BaseTableDefinition{.base_table = source, .time = time};
   }
-  auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope,
+  auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope,
                                   std::move(description->metadata));
   const auto columns = ColumnsSql(description->schema, scope);
   if (!head || !target || !metadata || !columns) {
@@ -748,7 +757,7 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
     } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
       OptionUpdates updates;
       if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
-                      "ALTER TABLE", scope, updates)) {
+                      DdlOptionContext::kAlterTable, scope, updates)) {
         return std::nullopt;
       }
       alteration.actions.emplace_back(std::move(updates));
@@ -766,7 +775,8 @@ std::optional<std::string> AlterTableSetOptions(
   const auto path = TargetTable(alter.name_path(), scope);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   OptionUpdates updates;
-  if (!path || !target || !SetOptions(alter.option_list(), "ALTER TABLE", scope, updates)) {
+  if (!path || !target ||
+      !SetOptions(alter.option_list(), DdlOptionContext::kAlterTable, scope, updates)) {
     return std::nullopt;
   }
   scope.context.statement.altered_table = TableAlteration{
@@ -787,7 +797,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   }
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
-  auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
+  auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope);
   if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
   }
@@ -878,8 +888,8 @@ std::optional<std::string> CreateSnapshotTable(
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   description->metadata.snapshot = BaseTableDefinition{.base_table = base, .time = time};
   description->metadata.expiration_time.reset();
-  auto metadata =
-      OptionsMetadata(create.option_list(), statement, scope, std::move(description->metadata));
+  auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateSnapshotTable,
+                                  scope, std::move(description->metadata));
   const auto columns = ColumnsSql(description->schema, scope);
   if (!path || !target || !metadata || !columns) {
     return std::nullopt;
@@ -914,7 +924,7 @@ std::optional<std::string> CreateTableAsSelect(
   if (like) {
     description = LikeDescription(create, scope);
   } else {
-    auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
+    auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope);
     if (metadata && PartitioningAndClustering(create, *metadata, scope)) {
       description = TableDescription{.schema = {}, .metadata = *std::move(metadata)};
     }
@@ -937,8 +947,8 @@ std::optional<std::string> CreateTableAsSelect(
       .copies_table = like,
       .keeps_rounding_modes = like,
   };
-  std::string rounding_mode = table.metadata.default_rounding_mode;
-  if (rounding_mode.empty() && !like && !table.temporary &&
+  RoundingMode rounding_mode = table.metadata.default_rounding_mode;
+  if (rounding_mode == RoundingMode::kUnspecified && !like && !table.temporary &&
       scope.context.defaults.source != nullptr) {
     if (const auto dataset = scope.context.defaults.source->DescribeDataset(target->project_id,
                                                                             target->dataset_id)) {

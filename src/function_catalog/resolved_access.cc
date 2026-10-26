@@ -98,7 +98,7 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
                                                                : std::nullopt;
 }
 
-std::optional<std::string> RoundingMode(const googlesql::ResolvedExpr& expr) {
+std::optional<std::string> RoundingModeOf(const googlesql::ResolvedExpr& expr) {
   if (!expr.Is<googlesql::ResolvedLiteral>()) {
     return std::nullopt;
   }

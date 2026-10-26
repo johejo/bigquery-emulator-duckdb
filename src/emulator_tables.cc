@@ -129,7 +129,7 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
   DdlWrite write = CreateTableWrite(
       TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);
   auto defaults = schema;
-  ApplyDefaultRoundingMode(defaults, metadata.default_rounding_mode.empty()
+  ApplyDefaultRoundingMode(defaults, metadata.default_rounding_mode == RoundingMode::kUnspecified
                                          ? dataset.default_rounding_mode
                                          : metadata.default_rounding_mode);
   std::ranges::move(ColumnDefaultStatements(table, defaults),
@@ -206,7 +206,7 @@ TableInfo Emulator::UpdateTable(TableReference table,
   std::vector<std::string> statements;
   std::optional<std::vector<FieldSchema>> updated_schema = schema;
   if (updated_schema.has_value()) {
-    const std::string& mode = metadata.value_or(info.metadata).default_rounding_mode;
+    const RoundingMode mode = metadata.value_or(info.metadata).default_rounding_mode;
     ApplyDefaultRoundingMode(info.schema, *updated_schema, mode);
     statements = SchemaUpdateStatements(table, info.schema, *updated_schema);
     // The rows kept from before the table had these columns are not those it has now.

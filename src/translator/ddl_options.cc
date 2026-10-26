@@ -208,11 +208,13 @@ bool LocationOption(const googlesql::Value& value, std::string& into) {
 // which the backend evaluates as a query would. nullopt for an unsupported assignment or value the
 // emulator does not support, which `scope` may then name.
 std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
-                                            std::string_view context, const Scope& scope) {
-  const std::string object = context == "column" ? "column" : OptionObject(context);
+                                            DdlOptionContext context, const Scope& scope) {
+  const auto context_name = DdlOptionContextName(context);
+  const std::string object =
+      context == DdlOptionContext::kColumn ? "column" : OptionObject(context_name);
   const auto* definition = FindDdlOption(context, ToLowerAscii(option.name()));
   if (definition == nullptr) {
-    Unsupported(scope, std::string(context) + " option " + option.name());
+    Unsupported(scope, std::string(context_name) + " option " + option.name());
     return std::nullopt;
   }
   const auto checked = [&](std::optional<googlesql::Value> value) {
@@ -221,7 +223,8 @@ std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& opt
     }
     return value;
   };
-  const bool removing_tags = context == "ALTER TABLE" && ToLowerAscii(option.name()) == "tags" &&
+  const bool removing_tags = context == DdlOptionContext::kAlterTable &&
+                             definition->name == DdlOptionId::kTags &&
                              option.assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN;
   if (!option.qualifier().empty() ||
       (option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN && !removing_tags)) {
@@ -255,38 +258,43 @@ bool StringOption(const googlesql::Value& value, std::string& into) {
   return true;
 }
 
-bool RoundingModeOption(const googlesql::Value& value, std::string& into) {
+bool RoundingModeOption(const googlesql::Value& value, RoundingMode& into) {
   std::string mode;
-  if (!StringOption(value, mode) ||
-      (!mode.empty() && mode != kRoundHalfAwayFromZero && mode != kRoundHalfEven)) {
+  if (!StringOption(value, mode) || mode == "ROUNDING_MODE_UNSPECIFIED") {
     return false;
   }
-  into = std::move(mode);
+  const auto parsed = ParseRoundingMode(mode);
+  if (!parsed) {
+    return false;
+  }
+  into = *parsed;
   return true;
 }
 
 // The metadata the OPTIONS of a CREATE TABLE or CREATE VIEW set; only a table has a default
 // rounding mode.
-std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
+std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionContext statement,
                                              const Scope& scope, TableMetadata metadata) {
+  using enum DdlOptionId;
   for (const auto& option : options) {
-    const std::string name = ToLowerAscii(option->name());
-    const std::optional<googlesql::Value> value = OptionValue(*option, statement, scope);
+    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    const auto value = OptionValue(*option, statement, scope);
+    const bool table = statement == DdlOptionContext::kCreateTable;
     const bool applied =
-        value.has_value() &&
-        ((statement == "CREATE TABLE" && name == "require_partition_filter" &&
+        value &&
+        ((table && name == kRequirePartitionFilter &&
           BoolOption(*value, metadata.require_partition_filter)) ||
-         (statement == "CREATE TABLE" && value->is_null() &&
-          (name == "partition_expiration_days" || name == "kms_key_name")) ||
-         (name == "description" && StringOption(*value, metadata.description)) ||
-         (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
-         (name == "labels" && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
-         (name == "tags" && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
-         (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)) ||
-         (statement == "CREATE TABLE" && name == "default_rounding_mode" &&
+         (table && value->is_null() && (name == kPartitionExpirationDays || name == kKmsKeyName)) ||
+         (name == kDescription && StringOption(*value, metadata.description)) ||
+         (name == kFriendlyName && StringOption(*value, metadata.friendly_name)) ||
+         (name == kLabels && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
+         (name == kTags && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
+         (name == kExpirationTimestamp && ExpirationOption(*value, metadata.expiration_time)) ||
+         (table && name == kDefaultRoundingMode &&
           RoundingModeOption(*value, metadata.default_rounding_mode)));
     if (!applied) {
-      return Unsupported(scope, std::string(statement) + " option " + option->name());
+      return Unsupported(
+          scope, std::string(DdlOptionContextName(statement)) + " option " + option->name());
     }
   }
   return metadata;
@@ -296,21 +304,22 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
 // location the OPTIONS of a CREATE SCHEMA set. The other options are unsupported, since they change
 // how BigQuery treats the dataset's tables. Throws ApiError for a location BigQuery does not have.
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
+  using enum DdlOptionId;
   DatasetMetadata metadata;
   for (const auto& option : options) {
-    const std::string name = ToLowerAscii(option->name());
-    const std::optional<googlesql::Value> value = OptionValue(*option, "CREATE SCHEMA", scope);
+    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    const auto value = OptionValue(*option, DdlOptionContext::kCreateSchema, scope);
     const bool applied =
-        value.has_value() &&
-        ((name == "description" && StringOption(*value, metadata.description)) ||
-         (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
-         (name == "labels" && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
-         (name == "tags" && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
-         (name == "default_table_expiration_days" &&
+        value &&
+        ((name == kDescription && StringOption(*value, metadata.description)) ||
+         (name == kFriendlyName && StringOption(*value, metadata.friendly_name)) ||
+         (name == kLabels && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
+         (name == kTags && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
+         (name == kDefaultTableExpirationDays &&
           DaysOption(*value, metadata.default_table_expiration_ms)) ||
-         (name == "default_rounding_mode" &&
+         (name == kDefaultRoundingMode &&
           RoundingModeOption(*value, metadata.default_rounding_mode)) ||
-         (name == "location" && LocationOption(*value, metadata.location)));
+         (name == kLocation && LocationOption(*value, metadata.location)));
     if (!applied) {
       return Unsupported(scope, "CREATE SCHEMA option " + option->name());
     }
@@ -321,51 +330,54 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
 // The metadata SET OPTIONS of `statement` sets on `updates`. The
 // other options change how BigQuery stores or reads the table or dataset, which the
 // emulator does not emulate, so they are unsupported. Tag removal also accepts -=.
-bool SetOptions(const Options& options, std::string_view statement, const Scope& scope,
+bool SetOptions(const Options& options, DdlOptionContext statement, const Scope& scope,
                 OptionUpdates& updates) {
+  using enum DdlOptionId;
   bool tags_seen = false;
+  const bool table = statement == DdlOptionContext::kAlterTable;
+  const bool schema = statement == DdlOptionContext::kAlterSchema;
   for (const auto& option : options) {
-    const std::string name = ToLowerAscii(option->name());
-    // A dataset cannot move, and BigQuery takes no location in ALTER SCHEMA.
-    if (statement == "ALTER SCHEMA" && name == "location") {
+    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    if (schema && name == kLocation) {
       throw ApiError::InvalidQuery("Unknown option: " + option->name());
     }
-    if (name == "tags") {
+    if (name == kTags) {
       if (tags_seen) {
         Unsupported(scope, "repeated tags in SET OPTIONS");
         return false;
       }
       tags_seen = true;
     }
-    const std::optional<googlesql::Value> value = OptionValue(*option, statement, scope);
-    if (name == "tags" && option->assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN) {
+    const auto value = OptionValue(*option, statement, scope);
+    const auto fail = [&] {
+      Unsupported(scope,
+                  std::string(DdlOptionContextName(statement)) + " option " + option->name());
+      return false;
+    };
+    if (name == kTags && option->assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN) {
       std::vector<std::string> order;
       if (!value || value->is_null() || !TagsOption(*value, updates.removed_tags, order)) {
-        Unsupported(scope, std::string(statement) + " option " + option->name());
-        return false;
+        return fail();
       }
       continue;
     }
     const bool applied =
-        value.has_value() &&
-        ((statement == "ALTER TABLE" && name == "require_partition_filter" &&
+        value &&
+        ((table && name == kRequirePartitionFilter &&
           BoolOption(*value, updates.require_partition_filter.emplace())) ||
-         (name == "description" && StringOption(*value, updates.description.emplace())) ||
-         (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
-         (name == "labels" &&
-          LabelsOption(*value, updates.labels.emplace(), updates.label_order)) ||
-         (name == "tags" &&
+         (name == kDescription && StringOption(*value, updates.description.emplace())) ||
+         (name == kFriendlyName && StringOption(*value, updates.friendly_name.emplace())) ||
+         (name == kLabels && LabelsOption(*value, updates.labels.emplace(), updates.label_order)) ||
+         (name == kTags &&
           TagsOption(*value, updates.resource_tags.emplace(), updates.tag_order)) ||
-         (statement == "ALTER TABLE" && name == "expiration_timestamp" &&
+         (table && name == kExpirationTimestamp &&
           ExpirationOption(*value, updates.expiration_time.emplace())) ||
-         (statement == "ALTER SCHEMA" && name == "default_table_expiration_days" &&
+         (schema && name == kDefaultTableExpirationDays &&
           DaysOption(*value, updates.default_table_expiration_ms.emplace())) ||
-         ((statement == "ALTER TABLE" || statement == "ALTER SCHEMA") &&
-          name == "default_rounding_mode" &&
+         ((table || schema) && name == kDefaultRoundingMode &&
           RoundingModeOption(*value, updates.default_rounding_mode.emplace())));
     if (!applied) {
-      Unsupported(scope, std::string(statement) + " option " + option->name());
-      return false;
+      return fail();
     }
   }
   return true;

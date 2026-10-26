@@ -4,6 +4,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "nlohmann/json_fwd.hpp"
@@ -13,10 +14,14 @@
 
 namespace bigquery_emulator_duckdb {
 
+enum class TimePartitionUnit : uint8_t { kDay, kHour, kMonth, kYear };
+std::string_view TimePartitionUnitName(TimePartitionUnit unit);
+std::optional<TimePartitionUnit> ParseTimePartitionUnit(std::string_view name);
+
 // Table.timePartitioning on a column. Ingestion-time partitioning, which adds pseudo-columns,
 // and partition expiration, which deletes data, are not emulated.
 struct TimePartitioning {
-  std::string type;  // DAY, HOUR, MONTH or YEAR.
+  TimePartitionUnit type = TimePartitionUnit::kDay;
   std::string field;
 
   bool operator==(const TimePartitioning&) const = default;
@@ -45,7 +50,7 @@ struct BaseTableDefinition {
 // resourceTags, and a table's partitioning and clustering, which only shape how BigQuery stores it,
 // the defaultRoundingMode that NUMERIC and BIGNUMERIC fields added to it later take, the
 // cloneDefinition of a clone or snapshotDefinition of a table snapshot, and its expiration. An
-// empty description, friendly name or rounding mode is unset, as BigQuery reports it.
+// empty description or friendly name, or kUnspecified rounding mode, is unset.
 struct TableMetadata {
   std::string description;
   std::string friendly_name;
@@ -59,7 +64,7 @@ struct TableMetadata {
   // Queries must have a predicate eligible for partition elimination.
   bool require_partition_filter = false;
   std::vector<std::string> clustering;  // Clustering.fields.
-  std::string default_rounding_mode;    // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
+  RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
   std::optional<BaseTableDefinition> clone;
   // A table snapshot is read-only: only its metadata can change.
   std::optional<BaseTableDefinition> snapshot;
@@ -72,9 +77,9 @@ struct TableMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !partitioned() && !require_partition_filter &&
-           clustering.empty() && default_rounding_mode.empty() && !clone.has_value() &&
-           !snapshot.has_value() && !expiration_time.has_value() && !restored_from_snapshot &&
-           creation_time == 0;
+           clustering.empty() && default_rounding_mode == RoundingMode::kUnspecified &&
+           !clone.has_value() && !snapshot.has_value() && !expiration_time.has_value() &&
+           !restored_from_snapshot && creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -118,7 +123,7 @@ struct DatasetMetadata {
   std::map<std::string, std::string> resource_tags;
   std::vector<std::string> tag_order;
   std::optional<int64_t> default_table_expiration_ms;
-  std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
+  RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
   // Output only and recorded with the dataset.
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old datasets.
   // As CanonicalLocation spells it; empty for a dataset recorded before datasets had locations,
@@ -128,7 +133,8 @@ struct DatasetMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !default_table_expiration_ms.has_value() &&
-           default_rounding_mode.empty() && creation_time == 0 && location.empty();
+           default_rounding_mode == RoundingMode::kUnspecified && creation_time == 0 &&
+           location.empty();
   }
   [[nodiscard]] std::string Location() const {
     return location.empty() ? kDefaultLocation : location;

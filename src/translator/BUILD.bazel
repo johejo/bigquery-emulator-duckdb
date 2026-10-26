@@ -147,7 +147,6 @@ cc_library(
         ":context",
         ":query",
         "//:api_error",
-        "//:ddl_option_types",
         "//:duckdb_sql",
         "//:field_schema",
         "//:language_options",
@@ -160,6 +159,7 @@ cc_library(
     ],
     linkstatic = True,
     deps = [
+        "//:ddl_option_types",
         "//:table_metadata",
         "@googlesql//googlesql/public:value",
     ],
@@ -182,6 +182,7 @@ cc_library(
         ":query",
         "//:catalog_table",
         "//:column_default",
+        "//:ddl_option_types",
         "//:duckdb_sql",
         "//:field_schema",
         "//:python_function",

@@ -34,7 +34,7 @@ using function_catalog::DatePart;
 using function_catalog::FunctionEntry;
 using function_catalog::NormalizeMode;
 using function_catalog::RejectArgumentTypes;
-using function_catalog::RoundingMode;
+using function_catalog::RoundingModeOf;
 using function_catalog::ScalarCall;
 using function_catalog::Translation;
 using function_catalog::TypeUse;
@@ -57,7 +57,7 @@ std::optional<std::string> Call(const Catalog& functions,
         .sql = args.at(i),
         .type = argument.type()->kind(),
         .date_part = DatePart(argument),
-        .rounding_mode = RoundingMode(argument),
+        .rounding_mode = RoundingModeOf(argument),
     });
   }
   if (!args.empty() && resolved.argument_list(0)->type()->IsStruct() &&
@@ -406,7 +406,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       continue;
     }
     if (argument->type()->IsEnum()) {
-      if (const auto mode = RoundingMode(*argument)) {
+      if (const auto mode = RoundingModeOf(*argument)) {
         args.push_back(QuoteLiteral(*mode));
         continue;
       }

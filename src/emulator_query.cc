@@ -766,7 +766,8 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
       auto defaults = translation.table->schema;
       if (!translation.table->keeps_rounding_modes) {
         const auto dataset = CreatedInDataset(backend, translation);
-        ApplyDefaultRoundingMode(defaults, translation.table->metadata.default_rounding_mode.empty()
+        ApplyDefaultRoundingMode(defaults, translation.table->metadata.default_rounding_mode ==
+                                                   RoundingMode::kUnspecified
                                                ? dataset.default_rounding_mode
                                                : translation.table->metadata.default_rounding_mode);
       }

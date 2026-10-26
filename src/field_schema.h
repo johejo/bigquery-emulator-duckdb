@@ -43,6 +43,10 @@ std::string_view FieldTypeName(FieldType type);
 std::optional<FieldMode> ParseFieldMode(std::string_view name);
 std::string_view FieldModeName(FieldMode mode);
 
+enum class RoundingMode : uint8_t { kUnspecified, kHalfAwayFromZero, kHalfEven };
+
+std::string_view RoundingModeName(RoundingMode mode);
+
 // A column described with BigQuery's TableFieldSchema vocabulary.
 struct FieldSchema {
   std::string name = {};
@@ -59,8 +63,8 @@ struct FieldSchema {
   std::optional<int64_t> precision = {};   // NUMERIC and BIGNUMERIC.
   std::optional<int64_t> scale = {};       // NUMERIC and BIGNUMERIC.
   std::string default_value_expression = {};
-  // roundingMode: ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN, empty when unset.
-  std::string rounding_mode = {};
+  // roundingMode; kUnspecified means the field has no recorded rounding mode.
+  RoundingMode rounding_mode = RoundingMode::kUnspecified;
   std::vector<std::string> policy_tags = {};  // policyTags.names.
 
   [[nodiscard]] nlohmann::json ToJson() const;
@@ -81,8 +85,8 @@ FieldSchema RangeBoundField(const FieldSchema& field, std::string name);
 std::optional<std::array<std::optional<std::string>, 2>> RangeCellBounds(std::string_view text);
 
 // The rounding modes a NUMERIC or BIGNUMERIC field takes.
-inline constexpr std::string_view kRoundHalfAwayFromZero = "ROUND_HALF_AWAY_FROM_ZERO";
-inline constexpr std::string_view kRoundHalfEven = "ROUND_HALF_EVEN";
+inline constexpr RoundingMode kRoundHalfAwayFromZero = RoundingMode::kHalfAwayFromZero;
+inline constexpr RoundingMode kRoundHalfEven = RoundingMode::kHalfEven;
 
 // Whether a field of `schema`, at any depth, rounds halfway values to even. DuckDB's casts round
 // them away from zero, so only writes that round values before the cast write such fields.
@@ -96,21 +100,21 @@ bool RoundsToEven(const FieldSchema& field);
 // so that a write reads their values unrounded and rounds them itself.
 FieldSchema WithoutRoundingParameters(FieldSchema field);
 
-// The rounding mode `mode` names, empty for one that leaves it unset ("" or
-// ROUNDING_MODE_UNSPECIFIED), or nullopt for a value that names none.
-std::optional<std::string> ParseRoundingMode(const std::string& mode);
+// The rounding mode `mode` names, kUnspecified for "" or ROUNDING_MODE_UNSPECIFIED,
+// or nullopt for an invalid name.
+std::optional<RoundingMode> ParseRoundingMode(std::string_view mode);
 
 // Gives the NUMERIC and BIGNUMERIC fields of `schema` that have no rounding mode, at any depth,
-// `mode`, the default rounding mode of the table they are created in; an empty one leaves them
+// `mode`, the default rounding mode of the table they are created in; kUnspecified leaves them
 // unset. BigQuery records the mode on each field, so changing the default later keeps it.
-void ApplyDefaultRoundingMode(std::vector<FieldSchema>& schema, std::string_view mode);
+void ApplyDefaultRoundingMode(std::vector<FieldSchema>& schema, RoundingMode mode);
 // The same for `field` and its fields.
-void ApplyDefaultRoundingMode(FieldSchema& field, std::string_view mode);
+void ApplyDefaultRoundingMode(FieldSchema& field, RoundingMode mode);
 
 // ApplyDefaultRoundingMode for the fields that `updated`, a schema update of `current`, adds at
 // any depth; a schema update keeps existing fields in their positions.
 void ApplyDefaultRoundingMode(const std::vector<FieldSchema>& current,
-                              std::vector<FieldSchema>& updated, std::string_view mode);
+                              std::vector<FieldSchema>& updated, RoundingMode mode);
 
 // Throws ApiError::Unsupported for a rounding mode the emulator cannot keep: one on a field that
 // is not NUMERIC or BIGNUMERIC, or ROUND_HALF_EVEN on a parameterized field of a column with a

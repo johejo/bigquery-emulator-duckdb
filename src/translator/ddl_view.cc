@@ -7,6 +7,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
+#include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
@@ -73,8 +74,10 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
       create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
   scope.context.defines_view = true;
   const auto relation = Scan(*create.query(), scope);
-  auto metadata = OptionsMetadata(create.option_list(),
-                                  materialized ? "CREATE MATERIALIZED VIEW" : "CREATE VIEW", scope);
+  auto metadata = OptionsMetadata(
+      create.option_list(),
+      materialized ? DdlOptionContext::kCreateMaterializedView : DdlOptionContext::kCreateView,
+      scope);
   if (!path || !target || !relation || !metadata) {
     return std::nullopt;
   }

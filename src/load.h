@@ -3,20 +3,20 @@
 #include <string>
 #include <vector>
 
-#include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/job_options.h"
 #include "src/parquet_metadata.h"
 #include "src/temporary_files.h"
 
 namespace bigquery_emulator_duckdb {
 
-// Stages the files that the sourceUris of `config`, a load job's configuration.load, name for
+// Stages the files that `uris` name for
 // DuckDB to read in `format`: gs:// objects, with wildcards expanded, are downloaded into
 // `downloads`, and a gzip file is moved or copied there under a name ending in .gz, since DuckDB
 // selects gzip by suffix. Returns their paths. Throws ApiError::Invalid for a missing or
 // unsupported URI.
-std::vector<std::string> StageLoadSources(const nlohmann::json& config, const std::string& format,
+std::vector<std::string> StageLoadSources(const std::vector<std::string>& uris, FileFormat format,
                                           GcsClient& gcs, TemporaryFiles& downloads);
 
 // Stages the NEWLINE_DELIMITED_JSON files `paths` for LoadQuery with `schema`. DuckDB reads a
@@ -44,17 +44,16 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
 
 // Gives the fields of `schema`, as DuckDB detects it from staged Parquet files with `columns`,
 // that hold a DECIMAL wider than 38 digits the type that BigQuery detects for them under the
-// decimalTargetTypes of `config`, a load job's configuration.load. Throws ApiError::Invalid when
+// decimalTargetTypes in `targets`. Throws ApiError::Invalid when
 // that type is not BIGNUMERIC, which the emulator does not support.
 void DetectParquetDecimals(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
-                           const nlohmann::json& config);
+                           const std::vector<DecimalTargetType>& targets);
 
-// The query that reads the files `paths` in `format`, CSV, NEWLINE_DELIMITED_JSON or PARQUET,
-// with the options of `config`, as the columns of `schema`, or as DuckDB detects them when
+// The query that reads the files `paths` using `options`, as the columns of `schema`,
+// or as DuckDB detects them when
 // `schema` is empty. PARQUET files take the `parquet` columns StageParquetDecimals found. Throws
 // ApiError::Invalid for a Parquet column the emulator cannot load into its field.
-std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
-                      const nlohmann::json& config, const std::vector<FieldSchema>& schema,
-                      const ParquetColumn& parquet = {});
+std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>& paths,
+                      const std::vector<FieldSchema>& schema, const ParquetColumn& parquet = {});
 
 }  // namespace bigquery_emulator_duckdb

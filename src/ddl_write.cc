@@ -189,7 +189,8 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
         ExpirationWithDefault(metadata.expiration_time, metadata.creation_time, dataset);
     // CREATE TABLE COPY and CLONE keep the source's default rounding mode even when it is unset,
     // and LIKE takes the dataset's then, as BigQuery answers.
-    if (metadata.default_rounding_mode.empty() && !definition.rows_from.has_value()) {
+    if (metadata.default_rounding_mode == RoundingMode::kUnspecified &&
+        !definition.rows_from.has_value()) {
       metadata.default_rounding_mode = dataset.default_rounding_mode;
     }
   }

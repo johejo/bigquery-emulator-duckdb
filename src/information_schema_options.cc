@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_join.h"
 #include "googlesql/public/strings.h"
+#include "src/field_schema.h"
 #include "src/information_schema_rows.h"
 
 namespace bigquery_emulator_duckdb::information_schema {
@@ -19,16 +20,16 @@ std::string StringOptionValue(const std::string& value) {
 // The options that metadata of a dataset, a table or a view sets, which are common to both.
 std::vector<Option> CommonOptions(const std::string& description, const std::string& friendly_name,
                                   const std::map<std::string, std::string>& labels,
-                                  const std::string& default_rounding_mode,
+                                  RoundingMode default_rounding_mode,
                                   const std::vector<std::string>& label_order,
                                   const std::map<std::string, std::string>& resource_tags,
                                   const std::vector<std::string>& tag_order) {
   std::vector<Option> options;
-  if (!default_rounding_mode.empty()) {
+  if (default_rounding_mode != RoundingMode::kUnspecified) {
     options.push_back({
         .name = "default_rounding_mode",
         .type = "STRING",
-        .value = StringOptionValue(default_rounding_mode),
+        .value = StringOptionValue(std::string(RoundingModeName(default_rounding_mode))),
     });
   }
   if (!description.empty()) {
