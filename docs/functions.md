@@ -50,7 +50,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 54 | 2 | 15 | 0 |
+| [Geography functions](#geography-functions) | 57 | 2 | 12 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -242,7 +242,7 @@ functions.
 | [`ST_BUFFER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_buffer) | Unsupported |  |  |
 | [`ST_BUFFERWITHTOLERANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_bufferwithtolerance) | Unsupported |  |  |
 | [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | Supported | S2 function |  |
-| [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | Unsupported |  |  |
+| [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | Supported | DuckDB aggregate / S2 function |  |
 | [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | Supported | S2 function |  |
 | [`ST_CLUSTERDBSCAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_clusterdbscan) | Unsupported |  |  |
 | [`ST_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_contains) | Supported | S2 function |  |
@@ -257,7 +257,7 @@ functions.
 | [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | Supported | S2 function |  |
 | [`ST_ENDPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_endpoint) | Supported | S2 function |  |
 | [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | Supported | S2 function |  |
-| [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | Unsupported |  |  |
+| [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | Supported | DuckDB aggregate / S2 function |  |
 | [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Supported | S2 function |  |
 | [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Unsupported |  |  |
 | [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | Unsupported |  |  |
@@ -296,7 +296,7 @@ functions.
 | [`ST_STARTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_startpoint) | Supported | S2 function |  |
 | [`ST_TOUCHES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_touches) | Supported | S2 function |  |
 | [`ST_UNION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union) | Supported | S2 function |  |
-| [`ST_UNION_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg) | Unsupported |  |  |
+| [`ST_UNION_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg) | Supported | DuckDB aggregate / S2 function |  |
 | [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | Supported | S2 function |  |
 | [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | Supported | S2 function |  |
 | [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | Supported | S2 function |  |

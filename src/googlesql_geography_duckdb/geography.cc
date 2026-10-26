@@ -53,6 +53,11 @@ namespace {
 // A GEOGRAPHY query value; see codec.h.
 constexpr duckdb_type kGeography = kBlob;
 
+// The functions over a list of values, which also finish aggregates.
+constexpr char kUnionArray[] = "bq_st_union_array";
+constexpr char kCentroidAggregate[] = "bq_st_centroid_agg";
+constexpr char kExtent[] = "bq_st_extent";
+
 absl::StatusOr<std::vector<Geography>> Decode(const std::vector<std::string>& values) {
   std::vector<Geography> result;
   result.reserve(values.size());
@@ -184,6 +189,12 @@ absl::StatusOr<std::optional<std::string>> UnionGeographies(
   return Encode(*result);
 }
 
+absl::StatusOr<std::optional<std::string>> CentroidAggregate(
+    const std::vector<std::string>& values) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<Geography> geographies, Decode(values));
+  return Encode(googlesql_geography::CentroidAggregate(geographies));
+}
+
 absl::StatusOr<std::string> MakeLine(const std::vector<std::string>& values) {
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<Geography> geographies, Decode(values));
   auto result = googlesql_geography::MakeLine(geographies);
@@ -214,23 +225,34 @@ void SetResult(duckdb_vector output, idx_t row, const BoxResult& result) {
   }
 }
 
+template <bool kList>
 void Bounds(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   const auto& options = *static_cast<const Options*>(duckdb_scalar_function_get_extra_info(info));
-  EachRow(info, input, output,
-          [&](const Arguments& args) -> absl::StatusOr<std::optional<BoxResult>> {
-            GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, DecodeGeography(args.String(0)));
-            const auto box = googlesql_geography::Bounds(geography, options);
-            if (!box) {
-              return std::nullopt;
-            }
-            return BoxResult{.box = *box};
-          });
+  EachRow(
+      info, input, output, [&](const Arguments& args) -> absl::StatusOr<std::optional<BoxResult>> {
+        std::optional<BoundingBox> box;
+        if constexpr (kList) {
+          GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<Geography> geographies,
+                                     Decode(args.Strings(0)));
+          box = googlesql_geography::Extent(geographies, options);
+        } else {
+          GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, DecodeGeography(args.String(0)));
+          box = googlesql_geography::Bounds(geography, options);
+        }
+        if (!box) {
+          return std::nullopt;
+        }
+        return BoxResult{.box = *box};
+      });
 }
 
-// The registered function owns a copy, so caller options may be temporary and different
-// databases can use different policies without sharing mutable state.
+// The bounds of a GEOGRAPHY, or with `kList` of a list of them. The registered function owns a
+// copy, so caller options may be temporary and different databases can use different policies
+// without sharing mutable state.
+template <bool kList>
 void RegisterBounds(duckdb_connection connection, const char* name, const Options& options) {
   const LogicalType geography(duckdb_create_logical_type(kGeography));
+  const LogicalType list(duckdb_create_list_type(geography.get()));
   const LogicalType dbl(duckdb_create_logical_type(kDouble));
   std::array<duckdb_logical_type, 4> fields = {dbl.get(), dbl.get(), dbl.get(), dbl.get()};
   std::array<const char*, 4> names = {"xmin", "ymin", "xmax", "ymax"};
@@ -238,9 +260,9 @@ void RegisterBounds(duckdb_connection connection, const char* name, const Option
   const Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
       duckdb_create_scalar_function());
   duckdb_scalar_function_set_name(scalar.get(), name);
-  duckdb_scalar_function_add_parameter(scalar.get(), geography.get());
+  duckdb_scalar_function_add_parameter(scalar.get(), kList ? list.get() : geography.get());
   duckdb_scalar_function_set_return_type(scalar.get(), box.get());
-  duckdb_scalar_function_set_function(scalar.get(), Bounds);
+  duckdb_scalar_function_set_function(scalar.get(), Bounds<kList>);
   duckdb_scalar_function_set_extra_info(scalar.get(), new Options(options),
                                         [](void* data) { delete static_cast<Options*>(data); });
   if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
@@ -292,6 +314,7 @@ void RegisterGeographyStorage(duckdb_connection connection) {
   RegisterCopy(connection, stored.get(), value.get(), 0);
 }
 
+using function_catalog::AggregateRule;
 using function_catalog::Arity;
 using function_catalog::FunctionDefinition;
 using function_catalog::Rule;
@@ -563,9 +586,9 @@ const Definitions& GeographyDefinitions() {
                  }>)
         .Call("ST_UNION", 2);
     {
-      auto& backend = definitions->Custom("bq_st_union_array", [](duckdb_connection connection,
-                                                                  const char* name,
-                                                                  const Options& /*options*/) {
+      auto& backend = definitions->Custom(kUnionArray, [](duckdb_connection connection,
+                                                          const char* name,
+                                                          const Options& /*options*/) {
         const LogicalType geography(duckdb_create_logical_type(kGeography));
         const LogicalType list(duckdb_create_list_type(geography.get()));
         Register(connection, name, {list.get()}, geography.get(),
@@ -659,7 +682,16 @@ const Definitions& GeographyDefinitions() {
         ->Scalar("bq_s2_cellidfrompoint", {kGeography, kBigint}, kBigint,
                  EachRow<Call<googlesql_geography::CellIdFromPoint>>)
         .Call("S2_CELLIDFROMPOINT", {1, 2}, {"30"});
-    definitions->Custom("bq_st_boundingbox", RegisterBounds).Call("ST_BOUNDINGBOX", 1);
+    definitions->Custom("bq_st_boundingbox", RegisterBounds<false>).Call("ST_BOUNDINGBOX", 1);
+    // The aggregates' finishes, over the non-NULL values that list() collects.
+    definitions->Custom(kCentroidAggregate, [](duckdb_connection connection, const char* name,
+                                               const Options& /*options*/) {
+      const LogicalType geography(duckdb_create_logical_type(kGeography));
+      const LogicalType list(duckdb_create_list_type(geography.get()));
+      Register(connection, name, {list.get()}, geography.get(),
+               EachRow<[](const Arguments& args) { return CentroidAggregate(args.Strings(0)); }>);
+    });
+    definitions->Custom(kExtent, RegisterBounds<true>);
     return definitions;
   }();
   return *kDefinitions;
@@ -681,6 +713,45 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& GeographyF
     return functions;
   }();
   return *kFunctions;
+}
+
+namespace {
+
+// An aggregate of the non-NULL values that list() collects, which the registered `kFunction`
+// finishes. ST_UNION_AGG unions them as ST_UNION does an array, which puts all the points first,
+// so none of these folds the values one at a time.
+template <const char* kFunction>
+FunctionDefinition<AggregateRule> ListAggregate() {
+  return {
+      .rules =
+          {
+              {
+                  .function = "list",
+                  .distinct = AggregateRule::Distinct::kUnsupported,
+                  .skip_nulls = true,
+                  .finish =
+                      [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                         const std::string& /*tail*/) {
+                        return std::string(kFunction) + "(" + sql + ")";
+                      },
+              },
+          },
+      // BigQuery takes none of them over a window.
+      .uses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsOver},
+  };
+}
+
+}  // namespace
+
+const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>&
+GeographyAggregates() {
+  static const auto* const kAggregates =
+      new std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>{
+          {"ST_UNION_AGG", ListAggregate<kUnionArray>()},
+          {"ST_CENTROID_AGG", ListAggregate<kCentroidAggregate>()},
+          {"ST_EXTENT", ListAggregate<kExtent>()},
+  };
+  return *kAggregates;
 }
 
 void RegisterGeographyFunctions(duckdb_connection connection,

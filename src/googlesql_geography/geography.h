@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -48,7 +49,9 @@ absl::StatusOr<Geography> SetOperation(const Geography& a, const Geography& b,
                                        S2BooleanOperation::OpType operation);
 absl::StatusOr<Geography> Boundary(const Geography& geography);
 std::optional<BoundingBox> Bounds(const Geography& geography, const Options& options);
+std::optional<BoundingBox> Extent(std::span<const Geography> geographies, const Options& options);
 absl::StatusOr<Geography> Centroid(const Geography& geography);
+std::optional<Geography> CentroidAggregate(const std::vector<Geography>& geographies);
 absl::StatusOr<double> Length(const Geography& geography, bool use_spheroid,
                               const std::string& function);
 absl::StatusOr<double> Measure(const Geography& geography, bool use_spheroid,
