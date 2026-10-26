@@ -216,14 +216,18 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
             SessionizeSchema)));
     // BigQuery functions that GoogleSQL does not ship, declared with the signatures the
     // translator supports.
+    googlesql::FunctionArgumentTypeOptions json_scope(googlesql::FunctionArgumentType::OPTIONAL);
+    json_scope.set_argument_name("json_scope", googlesql::kNamedOnly);
+    json_scope.set_default(googlesql::Value::String("JSON_VALUES"));
     catalog->AddOwnedFunction(new googlesql::Function(
         "contains_substr", kBigQueryGroup, googlesql::Function::SCALAR,
         {
             googlesql::FunctionSignature(
                 googlesql::FunctionArgumentType(googlesql::types::BoolType()),
                 {
+                    googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ARBITRARY),
                     googlesql::FunctionArgumentType(googlesql::types::StringType()),
-                    googlesql::FunctionArgumentType(googlesql::types::StringType()),
+                    googlesql::FunctionArgumentType(googlesql::types::StringType(), json_scope),
                 },
                 /*context_id=*/static_cast<int64_t>(0)),
         }));

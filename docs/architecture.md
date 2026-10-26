@@ -120,6 +120,15 @@ These libraries own input validation, computation and compatibility errors witho
 DuckDB. Their `googlesql_<feature>_duckdb` adapters handle registration and DuckDB representations.
 The `googlesql_` prefix denotes GoogleSQL-compatible semantics, including emulator implementations.
 Shared DuckDB registration and vector helpers live in [duckdb_functions](../src/duckdb_functions/).
+Where a backend function adapts GoogleSQL to a known BigQuery difference, such as CHR(0), FORMAT's
+specifiers or GENERATE_ARRAY's limit, the library takes a flag for that difference and defaults
+to GoogleSQL's behavior. The adapters read
+[`functions_duckdb::Options`](../src/googlesql_functions_duckdb/options.h) at registration and
+give each function only its own flags, as context the registration owns
+(`RegisterWithContext` and `ApplyWithContext` in [duckdb_functions](../src/duckdb_functions/)).
+[`BigQueryFunctionOptions()`](../src/function_options.h) selects every difference, and is the
+default of `Backend`, `Emulator` and `RegisterBackendFunctions`.
+
 ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapter receives
 connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
 GCS-backed metadata fetch, and [connection_id.cc](../src/connection_id.cc) normalizes connection IDs

@@ -9,12 +9,14 @@
 #include "src/googlesql_aead_duckdb/aead.h"
 #include "src/googlesql_functions_duckdb/bignumeric.h"
 #include "src/googlesql_functions_duckdb/cast.h"
+#include "src/googlesql_functions_duckdb/contains_substr.h"
 #include "src/googlesql_functions_duckdb/datetime.h"
 #include "src/googlesql_functions_duckdb/interval.h"
 #include "src/googlesql_functions_duckdb/json.h"
 #include "src/googlesql_functions_duckdb/math.h"
 #include "src/googlesql_functions_duckdb/objectref.h"
 #include "src/googlesql_functions_duckdb/objectref_options.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_functions_duckdb/percentile.h"
 #include "src/googlesql_functions_duckdb/range.h"
 #include "src/googlesql_functions_duckdb/string.h"
@@ -80,21 +82,23 @@ void RegisterBackendFunctions(duckdb_database database,
                               const udf::JavaScriptLimits& javascript,
                               const functions_duckdb::ObjectStorage& storage,
                               const udf::PythonOptions& python,
-                              const googlesql_geography::Options& geography) {
+                              const googlesql_geography::Options& geography,
+                              const functions_duckdb::Options& functions) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
   }
   RegisterSessionUser(connection.get(), session_user);
   RegisterSpannerQuery(connection.get());
-  functions_duckdb::RegisterBigNumericFunctions(connection.get());
-  functions_duckdb::RegisterMathFunctions(connection.get());
-  functions_duckdb::RegisterStringFunctions(connection.get());
+  functions_duckdb::RegisterBigNumericFunctions(connection.get(), functions);
+  functions_duckdb::RegisterMathFunctions(connection.get(), functions);
+  functions_duckdb::RegisterStringFunctions(connection.get(), functions);
   text_analysis_duckdb::RegisterTextAnalysisFunctions(connection.get());
   hll_duckdb::RegisterHllCountFunctions(connection.get());
-  functions_duckdb::RegisterDatetimeFunctions(connection.get());
+  functions_duckdb::RegisterDatetimeFunctions(connection.get(), functions);
   functions_duckdb::RegisterCastFunctions(connection.get());
-  functions_duckdb::RegisterJsonFunctions(connection.get());
+  functions_duckdb::RegisterJsonFunctions(connection.get(), functions);
+  functions_duckdb::RegisterContainsSubstr(connection.get());
   functions_duckdb::RegisterIntervalFunctions(connection.get());
   functions_duckdb::RegisterRangeFunctions(connection.get());
   // GEOGRAPHY behavior is selected by the caller, above the DuckDB adapter.

@@ -19,7 +19,9 @@
 #include "src/backend.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
+#include "src/function_options.h"
 #include "src/gcs.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/location.h"
 #include "src/project.h"
@@ -204,14 +206,15 @@ class Emulator {
   // With no data directory, registrations and data live in memory only. A nonempty
   // session_user enables SESSION_USER for every client; it and `connections`, which
   // EXTERNAL_QUERY reaches, are not persisted. JavaScript UDFs run under `javascript`.
-  // Geography bounds expand as in BigQuery unless geography.expand_bounding_box is false.
+  // Defaults select BigQuery function corrections and outward geography bounds.
   explicit Emulator(
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
       const udf::JavaScriptLimits& javascript = udf::JavaScriptLimits(),
       const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
       const udf::PythonOptions& python = udf::PythonOptions(),
-      const googlesql_geography::Options& geography = {.expand_bounding_box = true});
+      const googlesql_geography::Options& geography = {.expand_bounding_box = true},
+      const functions_duckdb::Options& functions = BigQueryFunctionOptions());
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 

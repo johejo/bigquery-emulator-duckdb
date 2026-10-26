@@ -1,9 +1,7 @@
 #include "src/googlesql_functions_duckdb/datetime.h"
 
 #include <bit>
-#include <cmath>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -27,6 +25,7 @@
 #include "src/duckdb_handle.h"
 #include "src/googlesql_functions/datetime.h"
 #include "src/googlesql_functions/format.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/interval.h"
 #include "src/type_mapping.h"
 
@@ -127,13 +126,8 @@ absl::StatusOr<googlesql::Value> FormatValue(duckdb_vector vector, idx_t row,
       return googlesql::Value::Bytes(VectorString(vector, row));
     case googlesql::TYPE_INT64:
       return googlesql::Value::Int64(VectorElement<int64_t>(vector, row));
-    case googlesql::TYPE_DOUBLE: {
-      // GoogleSQL prints the sign of a negative NaN when it preserves the sign of zero; BigQuery
-      // does not.
-      const auto value = VectorElement<double>(vector, row);
-      return googlesql::Value::Double(std::isnan(value) ? std::numeric_limits<double>::quiet_NaN()
-                                                        : value);
-    }
+    case googlesql::TYPE_DOUBLE:
+      return googlesql::Value::Double(VectorElement<double>(vector, row));
     case googlesql::TYPE_BOOL:
       return googlesql::Value::Bool(VectorElement<bool>(vector, row));
     case googlesql::TYPE_DATE:
@@ -225,9 +219,10 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
     }
     types.push_back(*format_type);
   }
+  const auto& options = FunctionContext<googlesql_functions::FormatOptions>(info);
   EachRow(
       info, input, output,
-      [&types](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+      [&types, &options](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
         if (arguments.IsNull(0)) {
           return std::nullopt;
         }
@@ -239,20 +234,21 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
           }
           values.push_back(*std::move(value));
         }
-        return googlesql_functions::Format(arguments.String(0), values);
+        return googlesql_functions::Format(arguments.String(0), values, options);
       },
       /*nulls=*/false);
 }
 
 }  // namespace
 
-void RegisterDatetimeFunctions(duckdb_connection connection) {
-  Register(connection, "bq_format_date", {kVarchar, kDate}, kVarchar, Apply<FormatDate>);
-  Register(connection, "bq_format_datetime", {kVarchar, kDatetime}, kVarchar,
-           Apply<FormatDatetime>);
+void RegisterDatetimeFunctions(duckdb_connection connection, const Options& options) {
+  RegisterWithContext(connection, "bq_format_date", {kVarchar, kDate}, kVarchar,
+                      ApplyWithContext<FormatDate>, options.unpadded_iso_year);
+  RegisterWithContext(connection, "bq_format_datetime", {kVarchar, kDatetime}, kVarchar,
+                      ApplyWithContext<FormatDatetime>, options.unpadded_iso_year);
   Register(connection, "bq_format_time", {kVarchar, kTime}, kVarchar, Apply<FormatTime>);
-  Register(connection, "bq_format_timestamp", {kVarchar, kTimestamp, kVarchar}, kVarchar,
-           Apply<FormatTimestamp>);
+  RegisterWithContext(connection, "bq_format_timestamp", {kVarchar, kTimestamp, kVarchar}, kVarchar,
+                      ApplyWithContext<FormatTimestamp>, options.unpadded_iso_year);
   Register(connection, "bq_parse_date", {kVarchar, kVarchar}, kDate, Apply<ParseDate>);
   Register(connection, "bq_parse_datetime", {kVarchar, kVarchar}, kDatetime, Apply<ParseDatetime>);
   Register(connection, "bq_parse_time", {kVarchar, kVarchar}, kTime, Apply<ParseTime>);
@@ -280,13 +276,19 @@ void RegisterDatetimeFunctions(duckdb_connection connection) {
            Apply<TimestampTrunc>);
   LogicalType const date(duckdb_create_logical_type(kDate));
   LogicalType const dates(duckdb_create_list_type(date.get()));
-  Register(connection, "bq_generate_date_array", {kDate, kDate, kBigint, kVarchar}, dates.get(),
-           Apply<GenerateDateArray>);
+  RegisterWithContext(connection, "bq_generate_date_array", {kDate, kDate, kBigint, kVarchar},
+                      dates.get(), ApplyWithContext<GenerateDateArray>,
+                      options.extended_array_limits);
   Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, Apply<DatetimeToString>);
   Register(connection, "bq_time_string", {kTime}, kVarchar, Apply<TimeToString>);
   Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar,
            Apply<TimestampToString>);
-  Register(connection, "bq_format", {kVarchar}, kVarchar, Format, /*nulls=*/false, DUCKDB_TYPE_ANY);
+  RegisterWithContext(connection, "bq_format", {kVarchar}, kVarchar, Format,
+                      googlesql_functions::FormatOptions{
+                          .adapt_specifiers = options.format_specifiers,
+                          .unsigned_nan = options.unsigned_nan,
+                      },
+                      /*nulls=*/false, DUCKDB_TYPE_ANY);
 }
 
 }  // namespace bigquery_emulator_duckdb::functions_duckdb

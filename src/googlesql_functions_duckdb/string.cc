@@ -26,6 +26,7 @@
 #include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_functions/string.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_functions_duckdb/string.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
@@ -269,7 +270,7 @@ void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
 
 }  // namespace
 
-void RegisterStringFunctions(duckdb_connection connection) {
+void RegisterStringFunctions(duckdb_connection connection, const Options& options) {
   namespace fn = googlesql::functions;
   // String functions, where DuckDB differs in case mapping, whitespace, errors and limits, or
   // has no BYTES overload.
@@ -317,7 +318,6 @@ void RegisterStringFunctions(duckdb_connection connection) {
                Apply<fn::StrPosOccurrenceBytes>,
            },
            {"bq_unicode", {kVarchar}, kBigint, Apply<fn::FirstCharToCodePoint>},
-           {"bq_chr", {kBigint}, kVarchar, Apply<Chr>},
            {"bq_left", {kVarchar, kBigint}, kVarchar, Apply<fn::LeftUtf8>},
            {"bq_left_bytes", {kBlob, kBigint}, kBlob, Apply<fn::LeftBytes>},
            {"bq_right", {kVarchar, kBigint}, kVarchar, Apply<fn::RightUtf8>},
@@ -393,6 +393,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
   Register(connection, "bq_from_base32", {kVarchar}, kBlob, Apply<FromBase32>);
   Register(connection, "bq_initcap", {kVarchar}, kVarchar, Initcap<true>);
   Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, Apply<DecimalString>);
+  RegisterWithContext(connection, "bq_chr", {kBigint}, kVarchar, ApplyWithContext<Chr>,
+                      options.chr_zero_is_empty);
   Register(connection, "bq_double_string", {kDouble}, kVarchar, Apply<DoubleString>);
   Register(connection, "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar, Initcap<false>);
   Register(connection, "bq_edit_distance", {kVarchar, kVarchar, kBigint}, kBigint,

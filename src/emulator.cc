@@ -19,6 +19,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/object_ref.h"
 #include "src/project.h"
@@ -57,7 +58,8 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::optional<std::string>& session_user,
                    const udf::JavaScriptLimits& javascript,
                    const std::vector<ExternalConnection>& connections,
-                   const udf::PythonOptions& python, const googlesql_geography::Options& geography)
+                   const udf::PythonOptions& python, const googlesql_geography::Options& geography,
+                   const functions_duckdb::Options& functions)
     : backend_(
           session_user, javascript,
           {
@@ -69,7 +71,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
               .has_connection =
                   [this](const std::string& key) { return connections_.conninfo.contains(key); },
           },
-          python, geography),
+          python, geography, functions),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
   for (const ExternalConnection& connection : connections) {

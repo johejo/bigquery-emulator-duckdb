@@ -3,6 +3,7 @@
 #   query NAME SQL                     probes SQL instead of the calls generated from the
 #                                      function's signatures; repeat it to cover each signature
 #                                      BigQuery documents
+#   extra_query NAME SQL               adds a call for a form signature generation cannot build
 #   note NAME TEXT                     shows TEXT in the Notes column, for a limit the probe's
 #                                      calls do not show; at most one per function
 #   sample TYPE | LITERAL              calls an argument of TYPE with LITERAL; an ARRAY or STRUCT
@@ -320,7 +321,15 @@ query TF_IDF SELECT TF_IDF(f, 10) OVER () FROM (SELECT ['a', 'b'] AS f)
 query TF_IDF SELECT TF_IDF(f, 10, 1) OVER () FROM (SELECT ['a', 'b'] AS f)
 
 # Limits the probe's calls do not show.
-note CONTAINS_SUBSTR Takes STRING only.
+# Searchable scalar types, containers and JSON scopes. BigQuery also accepts FLOAT64,
+# which its documented list of input types omits.
+values contains_substr | 'abc' | b'abc' | 2 | 1.5 | TRUE | NUMERIC '2' | BIGNUMERIC '2' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | [1, NULL] | STRUCT('abc' AS s, [1, 2] AS a) | STRUCT() | JSON '{"a":"abc"}' | INTERVAL 1 DAY | RANGE<DATE> '[2024-01-01, 2024-02-01)' | ST_GEOGPOINT(1, 2) | STRUCT(b'abc' AS b, 'abc' AS s)
+elements ^CONTAINS_SUBSTR\( | contains_substr
+extra_query CONTAINS_SUBSTR SELECT CONTAINS_SUBSTR(JSON '{"a":"abc"}', 'a', json_scope => 'JSON_KEYS')
+extra_query CONTAINS_SUBSTR SELECT CONTAINS_SUBSTR(JSON '{"a":"abc"}', 'a', json_scope => 'JSON_KEYS_AND_VALUES')
+extra_query CONTAINS_SUBSTR SELECT CONTAINS_SUBSTR(JSON 'null', 'null')
+extra_query CONTAINS_SUBSTR SELECT CONTAINS_SUBSTR('abc', 'a', json_scope => NULL)
+extra_query CONTAINS_SUBSTR SELECT CONTAINS_SUBSTR(JSON '{"a":"abc"}', 'a', json_scope => NULL)
 note SESSION_USER Requires --session-user; returns the configured identity for every client.
 
 note RANGE_SESSIONIZE See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits.

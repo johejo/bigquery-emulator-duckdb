@@ -1,8 +1,10 @@
 #include "src/googlesql_functions/format.h"
 
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -192,8 +194,18 @@ std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
 
 // FORMAT, including BigQuery specifier adaptations and errors quoting the original pattern.
 absl::StatusOr<std::optional<std::string>> Format(std::string_view pattern,
-                                                  const std::vector<googlesql::Value>& values) {
-  const std::optional<AdaptedFormat> adapted = AdaptFormat(pattern, values);
+                                                  const std::vector<googlesql::Value>& arguments,
+                                                  const FormatOptions& options) {
+  std::vector<googlesql::Value> values = arguments;
+  if (options.unsigned_nan) {
+    for (auto& value : values) {
+      if (!value.is_null() && value.type()->IsDouble() && std::isnan(value.double_value())) {
+        value = googlesql::Value::Double(std::numeric_limits<double>::quiet_NaN());
+      }
+    }
+  }
+  const std::optional<AdaptedFormat> adapted =
+      options.adapt_specifiers ? AdaptFormat(pattern, values) : std::nullopt;
   std::string out;
   bool is_null = false;
   const auto format = [&](std::string_view format_pattern,

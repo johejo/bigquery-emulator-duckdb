@@ -34,6 +34,7 @@
 #include "src/duckdb_functions/register.h"
 #include "src/duckdb_functions/scalar.h"
 #include "src/googlesql_functions_duckdb/bignumeric.h"
+#include "src/googlesql_functions_duckdb/options.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
 using namespace duckdb_functions;
@@ -179,9 +180,12 @@ void Correlation(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
 // as DuckDB's generate_series() does for INT64.
 constexpr int kMaxGeneratedArraySize = std::numeric_limits<int>::max();
 
-// GENERATE_ARRAY(start, end, step).
+// GENERATE_ARRAY(start, end, step), limited as GoogleSQL is unless `extended_limit` is set.
 absl::Status GenerateArray(BigNumericValue start, BigNumericValue end, BigNumericValue step,
-                           std::vector<BigNumericValue>* out) {
+                           bool extended_limit, std::vector<BigNumericValue>* out) {
+  if (!extended_limit) {
+    return fn::GenerateArray(start, end, step, out);
+  }
   return fn::GenerateArrayHelper<fn::ArrayGenTrait<BigNumericValue, BigNumericValue>,
                                  kMaxGeneratedArraySize>(start, end, step, out);
 }
@@ -312,7 +316,7 @@ void RegisterBigNumericTypes(duckdb_connection connection) {
 
 }  // namespace
 
-void RegisterBigNumericFunctions(duckdb_connection connection) {
+void RegisterBigNumericFunctions(duckdb_connection connection, const Options& options) {
   Register(connection, "bq_parse_bignumeric", {kVarchar}, kVarchar, Apply<fn::ParseBigNumeric>);
   Register(connection, "bq_bignumeric_add", {kVarchar, kVarchar}, kVarchar,
            Apply<fn::Add<BigNumericValue>>);
@@ -377,8 +381,8 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
        }) {
     Register(connection, name, {list.get()}, float64.get(), function);
   }
-  Register(connection, "bq_bignumeric_generate_array", {kVarchar, kVarchar, kVarchar}, list.get(),
-           Apply<GenerateArray>);
+  RegisterWithContext(connection, "bq_bignumeric_generate_array", {kVarchar, kVarchar, kVarchar},
+                      list.get(), ApplyWithContext<GenerateArray>, options.extended_array_limits);
   Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar,
            Apply<FromString, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar,

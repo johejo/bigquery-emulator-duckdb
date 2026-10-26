@@ -5,6 +5,7 @@
 
 #include "duckdb.h"
 #include "src/function_catalog/rules.h"
+#include "src/googlesql_functions_duckdb/options.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
 
@@ -13,6 +14,6 @@ const std::unordered_map<std::string_view,
                          function_catalog::FunctionDefinition<function_catalog::Rule>>&
 TrigonometricFunctions();
 
-void RegisterMathFunctions(duckdb_connection connection);
+void RegisterMathFunctions(duckdb_connection connection, const Options& options = {});
 
 }  // namespace bigquery_emulator_duckdb::functions_duckdb

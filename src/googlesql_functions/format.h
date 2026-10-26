@@ -13,7 +13,16 @@ class Value;
 
 namespace googlesql_functions {
 
+// Where FORMAT follows BigQuery rather than GoogleSQL.
+struct FormatOptions {
+  // Integer precision and grouping, and %t ending at NUL.
+  bool adapt_specifiers = false;
+  // No sign for a NaN in floating-point specifiers.
+  bool unsigned_nan = false;
+};
+
 absl::StatusOr<std::optional<std::string>> Format(std::string_view pattern,
-                                                  const std::vector<googlesql::Value>& values);
+                                                  const std::vector<googlesql::Value>& arguments,
+                                                  const FormatOptions& options);
 
 }  // namespace googlesql_functions

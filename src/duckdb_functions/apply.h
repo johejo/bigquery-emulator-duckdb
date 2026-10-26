@@ -199,9 +199,11 @@ struct Signature<R (*)(Parameters...)> {
   using Result = decltype(Codec<std::remove_cvref_t<Out>>::Write(std::declval<Out>()));
 };
 
-// The result of `kFunction` for the row's first kArity columns, NULL where its convention says.
-template <auto kFunction, std::size_t... I>
-auto Call(const Arguments& arguments, std::index_sequence<I...> /*columns*/)
+// The result of `kFunction` for the row's columns I, followed by `context`, NULL where its
+// convention says.
+template <auto kFunction, std::size_t... I, typename... Context>
+auto Call(const Arguments& arguments, std::index_sequence<I...> /*columns*/,
+          const Context&... context)
     -> absl::StatusOr<std::optional<typename Signature<decltype(kFunction)>::Result>> {
   using S = Signature<decltype(kFunction)>;
   using OutCodec = Codec<std::remove_cvref_t<typename S::Out>>;
@@ -212,7 +214,7 @@ auto Call(const Arguments& arguments, std::index_sequence<I...> /*columns*/)
     return status;
   }
   if constexpr (S::kConvention == Convention::kReturn) {
-    auto out = kFunction(*std::get<I>(values)...);
+    auto out = kFunction(*std::get<I>(values)..., context...);
     if constexpr (std::is_same_v<decltype(out), typename S::Out>) {
       return OutCodec::Write(std::move(out));
     } else {
@@ -224,16 +226,16 @@ auto Call(const Arguments& arguments, std::index_sequence<I...> /*columns*/)
   } else {
     typename S::Out out{};
     if constexpr (S::kConvention == Convention::kOutAndError) {
-      if (!kFunction(*std::get<I>(values)..., &out, &status)) {
+      if (!kFunction(*std::get<I>(values)..., context..., &out, &status)) {
         return status;
       }
     } else if constexpr (S::kConvention == Convention::kOut) {
-      if (status = kFunction(*std::get<I>(values)..., &out); !status.ok()) {
+      if (status = kFunction(*std::get<I>(values)..., context..., &out); !status.ok()) {
         return status;
       }
     } else {
       bool is_null = true;
-      if (status = kFunction(*std::get<I>(values)..., &out, &is_null); !status.ok()) {
+      if (status = kFunction(*std::get<I>(values)..., context..., &out, &is_null); !status.ok()) {
         return status;
       }
       if (is_null) {
@@ -258,6 +260,19 @@ void Apply(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector out
       result = std::nullopt;
     }
     return result;
+  });
+}
+
+// As Apply, but the C++ parameter after the SQL arguments is the context RegisterWithContext
+// gave the function, as GoogleSQL places options after inputs and before outputs.
+template <auto kFunction>
+void ApplyWithContext(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  using S = apply_internal::Signature<decltype(kFunction)>;
+  constexpr std::size_t kArity = S::kArity - 1;
+  using Context = S::template Parameter<kArity>;
+  const auto& context = *static_cast<const Context*>(duckdb_scalar_function_get_extra_info(info));
+  EachRow(info, input, output, [&context](const Arguments& arguments) {
+    return apply_internal::Call<kFunction>(arguments, std::make_index_sequence<kArity>(), context);
   });
 }
 

@@ -1,0 +1,272 @@
+# CONTAINS_SUBSTR examples and recursive search rules:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr
+
+SELECT CONTAINS_SUBSTR('the blue house', CONCAT('Blue ', 'house'))
+=> "true"
+
+SELECT CONTAINS_SUBSTR('\u2168', 'IX')
+=> "true"
+
+SELECT CONTAINS_SUBSTR((23, 35, 41), '35')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(('abc', ['def', 'ghi', 'jkl'], 'mno'), 'jk')
+=> "true"
+
+SELECT CONTAINS_SUBSTR((23, NULL, 41), '41')
+=> "true"
+
+SELECT CONTAINS_SUBSTR((23, NULL, 41), '35')
+=> null
+
+SELECT CONTAINS_SUBSTR((23, 35, 41), '99')
+=> "false"
+
+# Each leaf is searched independently, without joining field or element text.
+SELECT CONTAINS_SUBSTR(('ab', 'cd'), 'bc')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(['ab', 'cd'], 'bc')
+=> "false"
+
+SELECT CONTAINS_SUBSTR([NULL, 'Straße'], 'STRASSE')
+=> "true"
+
+SELECT CONTAINS_SUBSTR([NULL, 'abc'], 'xyz')
+=> null
+
+SELECT CONTAINS_SUBSTR(ARRAY<STRING>[], 'x')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(ARRAY<STRING>[], '')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(CAST(NULL AS ARRAY<STRING>), 'x')
+=> null
+
+SELECT CONTAINS_SUBSTR(CAST(NULL AS STRUCT<a STRING>), 'x')
+=> null
+
+SELECT CONTAINS_SUBSTR(STRUCT(CAST(NULL AS STRUCT<a STRING>) AS s, 'found' AS t), 'found')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(STRUCT(CAST(NULL AS STRUCT<a STRING>) AS s, 'other' AS t), 'found')
+=> null
+
+SELECT CONTAINS_SUBSTR([STRUCT('a' AS x, ['b', 'Ｃ'] AS y)], 'c')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(STRUCT('miss' AS x, 'found' AS x), 'found')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(STRUCT('other' AS field_name), 'field_name')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(STRUCT(), 'x')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(STRUCT(STRUCT() AS s, ['abc'] AS a), 'abc')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(r, 'toast') FROM (SELECT 'Avocado toast' AS breakfast, 'Tomato soup' AS lunch) AS r
+=> "true"
+
+# Scalar leaves are cast to STRING; spellings follow BigQuery's conversion rules.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_string
+SELECT CONTAINS_SUBSTR(-9223372036854775808, '-9223372036854775808')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(TRUE, 'TRUE')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(FALSE, 'true')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(NUMERIC '-123.450', '-123.45')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(BIGNUMERIC '123456789012345678901234567890123456789.123456789', '789.123456789')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(DATE '2024-02-29', '2024-02-29')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(TIME '12:34:56.123456', '12:34:56.123456')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(DATETIME '2024-02-29 12:34:56.123456', '2024-02-29 12:34:56.123456')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(TIMESTAMP '2024-02-29 12:34:56+00', '2024-02-29 12:34:56')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(CAST(NULL AS NUMERIC), 'x')
+=> null
+
+SELECT CONTAINS_SUBSTR([NUMERIC '12.5', NUMERIC '34.5'], '34.5')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(STRUCT(BIGNUMERIC '123.456' AS n, DATE '2024-02-29' AS d), '123.456')
+=> "true"
+
+# JSON scope examples from the CONTAINS_SUBSTR documentation.
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'lunch')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'lunch', json_scope => 'JSON_VALUES')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'lunch', json_scope => 'JSON_KEYS_AND_VALUES')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'lunch', json_scope => 'JSON_KEYS')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'soup', json_scope => 'JSON_KEYS')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":{"meal":["ＳＯＵＰ"]}}', 'soup')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":{"ＭＥＡＬ":["soup"]}}', 'meal', json_scope => 'JSON_KEYS')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(STRUCT(JSON '{"lunch":"soup"}' AS j), 'lunch', json_scope => 'JSON_KEYS')
+=> "true"
+
+SELECT CONTAINS_SUBSTR([JSON '{"lunch":"soup"}'], 'soup')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(CAST(NULL AS JSON), 'soup')
+=> null
+
+# json_scope has no effect on non-JSON fields.
+SELECT CONTAINS_SUBSTR(STRUCT('soup' AS s, JSON '{"lunch":"other"}' AS j), 'soup', json_scope => 'JSON_KEYS')
+=> "true"
+
+# Search text must be a non-NULL STRING constant expression.
+SELECT CONTAINS_SUBSTR('hello', NULL)
+=> error:
+
+SELECT CONTAINS_SUBSTR(b, b) FROM t WHERE a = 1
+=> error:
+
+SELECT CONTAINS_SUBSTR('hello', json_scope => 'JSON_VALUES')
+=> error:
+
+SELECT CONTAINS_SUBSTR('hello', 'hello', 'JSON_VALUES')
+=> error:
+
+SELECT CONTAINS_SUBSTR(JSON '"hello"', 'hello', json_scope => 'unknown')
+=> error:
+
+# Source: BigQuery answers to unverified/contains_substr.txt (2026-10-25).
+
+SELECT CONTAINS_SUBSTR(JSON 'null', 'null')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON 'null', 'x')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(JSON '[null, "abc"]', 'xyz')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(JSON '[null, "abc"]', 'abc')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '["abc", null]', 'abc')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '{"a":null}', 'null', json_scope => 'JSON_KEYS')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(JSON '123.450', '123.45')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON 'true', 'TRUE')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '1e30', '1e+30')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('abc', 'a', json_scope => NULL)
+=> "true"
+
+SELECT CONTAINS_SUBSTR('abc', 'a', json_scope => 'json_values')
+=> error: Invalid json_scope value 'json_values'.
+
+SELECT CONTAINS_SUBSTR(CAST(NULL AS STRING), 'a', json_scope => 'invalid')
+=> error: Invalid json_scope value 'invalid'.
+
+SELECT CONTAINS_SUBSTR('abc', 'a', json_scope => s) FROM UNNEST(['JSON_VALUES']) AS s
+=> "true"
+
+# BigQuery accepts FLOAT64 although the documented list of searchable input types omits it.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr
+
+SELECT CONTAINS_SUBSTR(1.25, '1.25')
+=> "true"
+
+# Source: additional BigQuery answers to unverified/contains_substr.txt (2026-10-25).
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'soup', json_scope => NULL)
+=> "true"
+
+SELECT CONTAINS_SUBSTR(JSON '{"lunch":"soup"}', 'lunch', json_scope => NULL)
+=> "false"
+
+SELECT CONTAINS_SUBSTR(STRUCT('soup' AS s, JSON '{"lunch":"other"}' AS j), 'lunch', json_scope => NULL)
+=> "false"
+
+# BigQuery FLOAT64 boundary observations.
+SELECT CONTAINS_SUBSTR(CAST('-0.0' AS FLOAT64), '-', json_scope => 'JSON_VALUES')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(CAST('NaN' AS FLOAT64), 'nan')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(CAST('-NaN' AS FLOAT64), '-')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(CAST('inf' AS FLOAT64), 'inf')
+=> "true"
+
+# Source: final BigQuery answers to unverified/contains_substr.txt (2026-10-25).
+# Unlisted primitive types yield NULL; SAFE. is not supported by this function.
+
+SELECT CONTAINS_SUBSTR(b'hello', 'hello')
+=> null
+
+SELECT CONTAINS_SUBSTR(STRUCT(b'hello' AS b), 'hello')
+=> null
+
+SELECT CONTAINS_SUBSTR(INTERVAL 1 DAY, '1')
+=> null
+
+SELECT CONTAINS_SUBSTR(RANGE<DATE> '[2024-01-01, 2024-02-01)', '2024')
+=> null
+
+SELECT CONTAINS_SUBSTR(ST_GEOGPOINT(1, 2), 'POINT')
+=> null
+
+SELECT SAFE.CONTAINS_SUBSTR('abc', NULL)
+=> error: SAFE with function contains_substr is not supported.
+
+SELECT SAFE.CONTAINS_SUBSTR(JSON '"hello"', 'hello', json_scope => 'unknown')
+=> error: SAFE with function contains_substr is not supported.
+
+# Recursive search combines the observed NULL leaves using the documented cross-field rules.
+SELECT CONTAINS_SUBSTR(STRUCT(b'hello' AS b, 'found' AS s), 'found')
+=> "true"
+
+SELECT CONTAINS_SUBSTR(STRUCT(b'hello' AS b, 'other' AS s), 'found')
+=> null
+
+SELECT CONTAINS_SUBSTR([b'hello'], 'hello')
+=> null
+
+SELECT CONTAINS_SUBSTR([1.25, NULL], '1.25')
+=> "true"
+
+SELECT CONTAINS_SUBSTR([JSON 'null'], 'null')
+=> "true"

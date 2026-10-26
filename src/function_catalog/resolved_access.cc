@@ -63,6 +63,11 @@ std::optional<bool> IsConstantExpression(const googlesql::ResolvedExpr& expr) {
   return constant.ok() ? std::optional<bool>(*constant) : std::nullopt;
 }
 
+bool IsNullLiteral(const googlesql::ResolvedExpr& expr) {
+  return expr.Is<googlesql::ResolvedLiteral>() &&
+         expr.GetAs<googlesql::ResolvedLiteral>()->value().is_null();
+}
+
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {
   if (!expr.Is<googlesql::ResolvedLiteral>()) {
     return std::nullopt;

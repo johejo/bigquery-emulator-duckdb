@@ -13,9 +13,10 @@ namespace bigquery_emulator_duckdb::duckdb_functions {
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_logical_type>& parameters, duckdb_logical_type result,
               duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
-              bool volatile_result) {
+              bool volatile_result, void* extra_info, duckdb_delete_callback_t destroy_extra_info) {
   Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> const scalar(
       duckdb_create_scalar_function());
+  duckdb_scalar_function_set_extra_info(scalar.get(), extra_info, destroy_extra_info);
   duckdb_scalar_function_set_name(scalar.get(), name);
   for (duckdb_logical_type parameter : parameters) {
     duckdb_scalar_function_add_parameter(scalar.get(), parameter);
@@ -40,7 +41,7 @@ void Register(duckdb_connection connection, const char* name,
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_type>& parameters, duckdb_logical_type result,
               duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
-              bool volatile_result) {
+              bool volatile_result, void* extra_info, duckdb_delete_callback_t destroy_extra_info) {
   std::vector<LogicalType> owned;
   std::vector<duckdb_logical_type> types;
   owned.reserve(parameters.size());
@@ -50,15 +51,17 @@ void Register(duckdb_connection connection, const char* name,
     // cppcheck-suppress useStlAlgorithm
     types.push_back(owned.emplace_back(duckdb_create_logical_type(parameter)).get());
   }
-  Register(connection, name, types, result, function, nulls, varargs, volatile_result);
+  Register(connection, name, types, result, function, nulls, varargs, volatile_result, extra_info,
+           destroy_extra_info);
 }
 
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_type>& parameters, duckdb_type result,
               duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
-              bool volatile_result) {
+              bool volatile_result, void* extra_info, duckdb_delete_callback_t destroy_extra_info) {
   LogicalType const type(duckdb_create_logical_type(result));
-  Register(connection, name, parameters, type.get(), function, nulls, varargs, volatile_result);
+  Register(connection, name, parameters, type.get(), function, nulls, varargs, volatile_result,
+           extra_info, destroy_extra_info);
 }
 
 }  // namespace bigquery_emulator_duckdb::duckdb_functions

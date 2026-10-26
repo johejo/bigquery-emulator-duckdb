@@ -590,6 +590,7 @@ cc_library(
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_functions_duckdb:bignumeric",
         "//src/googlesql_functions_duckdb:cast",
+        "//src/googlesql_functions_duckdb:contains_substr",
         "//src/googlesql_functions_duckdb:datetime",
         "//src/googlesql_functions_duckdb:interval",
         "//src/googlesql_functions_duckdb:json",
@@ -606,7 +607,9 @@ cc_library(
     ],
     linkstatic = True,
     deps = [
+        ":function_options",
         "//src/googlesql_functions_duckdb:objectref_options",
+        "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
         "//src/udf/javascript:limits",
         "//src/udf/python:options",
@@ -802,8 +805,10 @@ cc_library(
     ],
     deps = [
         ":field_schema",
+        ":function_options",
         ":result_rows",
         "//src/googlesql_functions_duckdb:objectref_options",
+        "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
         "//src/udf/javascript:limits",
         "//src/udf/python:options",
@@ -999,6 +1004,7 @@ cc_library(
         ":backend",
         ":external_query",
         ":field_schema",
+        ":function_options",
         ":gcs",
         ":location",
         ":project",
@@ -1007,6 +1013,7 @@ cc_library(
         ":routine",
         ":system_variables",
         ":table_metadata",
+        "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
         "//src/udf/javascript:limits",
         "//src/udf/python:options",
@@ -1489,4 +1496,33 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = ["@abseil-cpp//absl/strings"],
     linkstatic = True,
+)
+
+cc_library(
+    name = "function_options",
+    hdrs = ["src/function_options.h"],
+    deps = ["//src/googlesql_functions_duckdb:options"],
+)
+
+cc_test(
+    name = "function_options_test",
+    srcs = ["tests/function_options_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":duckdb_handle",
+        ":function_options",
+        "//src/googlesql_functions:format",
+        "//src/googlesql_functions_duckdb:bignumeric",
+        "//src/googlesql_functions_duckdb:datetime",
+        "//src/googlesql_functions_duckdb:json",
+        "//src/googlesql_functions_duckdb:math",
+        "//src/googlesql_functions_duckdb:options",
+        "//src/googlesql_functions_duckdb:string",
+        "//third_party/duckdb",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+    ],
 )

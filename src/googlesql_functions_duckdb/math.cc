@@ -29,6 +29,7 @@
 #include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
 #include "src/googlesql_functions_duckdb/math.h"
+#include "src/googlesql_functions_duckdb/options.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
 namespace fn = googlesql::functions;
@@ -186,17 +187,22 @@ void Distance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
 constexpr uint8_t kNumericScale = 9;
 
 // DuckDB has no NUMERIC or FLOAT64 generate_series overload. GoogleSQL supplies the
-// generation and validation, with BigQuery's documented 1,048,576-element limit.
+// generation and validation, with BigQuery's documented 1,048,576-element limit when
+// `extended_limit` is set.
 constexpr int kMaxGeneratedArraySize = 1048576;
 template <typename T>
-absl::Status GenerateArray(T start, T end, T step, std::vector<T>* out) {
+absl::Status GenerateArray(T start, T end, T step, bool extended_limit, std::vector<T>* out) {
+  if (!extended_limit) {
+    return fn::GenerateArray(start, end, step, out);
+  }
   return fn::GenerateArrayHelper<fn::ArrayGenTrait<T, T>, kMaxGeneratedArraySize>(start, end, step,
                                                                                   out);
 }
 
 // Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
-void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix) {
+void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix,
+                         bool extended_array_limit) {
   LogicalType const type(duckdb_create_decimal_type(38, kNumericScale));
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
@@ -209,8 +215,8 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
     Register(connection, (name + suffix).c_str(), {type.get()}, type.get(), function);
   }
   LogicalType const list(duckdb_create_list_type(type.get()));
-  Register(connection, "bq_generate_array_numeric", {type.get(), type.get(), type.get()},
-           list.get(), Apply<GenerateArray<T>>);
+  RegisterWithContext(connection, "bq_generate_array_numeric", {type.get(), type.get(), type.get()},
+                      list.get(), ApplyWithContext<GenerateArray<T>>, extended_array_limit);
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
   // constructor.
   const std::vector<duckdb_logical_type> two = {type.get(), type.get()};
@@ -245,7 +251,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& Trigonomet
   return *kFunctions;
 }
 
-void RegisterMathFunctions(duckdb_connection connection) {
+void RegisterMathFunctions(duckdb_connection connection, const Options& options) {
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
            {"bq_sqrt", Apply<fn::Sqrt<double>>},
@@ -264,9 +270,10 @@ void RegisterMathFunctions(duckdb_connection connection) {
   Register(connection, "bq_log", {kDouble, kDouble}, kDouble, Apply<fn::Logarithm<double>>);
   LogicalType const float64(duckdb_create_logical_type(kDouble));
   LogicalType const list(duckdb_create_list_type(float64.get()));
-  Register(connection, "bq_generate_array", {kDouble, kDouble, kDouble}, list.get(),
-           Apply<GenerateArray<double>>);
-  RegisterDecimalMath<googlesql::NumericValue>(connection, "_numeric");
+  RegisterWithContext(connection, "bq_generate_array", {kDouble, kDouble, kDouble}, list.get(),
+                      ApplyWithContext<GenerateArray<double>>, options.extended_array_limits);
+  RegisterDecimalMath<googlesql::NumericValue>(connection, "_numeric",
+                                               options.extended_array_limits);
   Register(connection, "bq_cosine_distance", {kAny, kAny}, kDouble, Distance<true>);
   Register(connection, "bq_euclidean_distance", {kAny, kAny}, kDouble, Distance<false>);
 }

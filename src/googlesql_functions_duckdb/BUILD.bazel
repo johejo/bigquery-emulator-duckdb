@@ -29,7 +29,10 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = ["//third_party/duckdb"],
+    deps = [
+        ":options",
+        "//third_party/duckdb",
+    ],
 )
 
 cc_library(
@@ -57,6 +60,7 @@ cc_library(
     linkstatic = True,
     visibility = ["//:__pkg__"],
     deps = [
+        ":options",
         "//src/function_catalog",
         "//third_party/duckdb",
     ],
@@ -85,7 +89,10 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = ["//third_party/duckdb"],
+    deps = [
+        ":options",
+        "//third_party/duckdb",
+    ],
 )
 
 cc_library(
@@ -135,6 +142,7 @@ cc_library(
     linkstatic = True,
     visibility = ["//:__pkg__"],
     deps = [
+        ":options",
         "//third_party/duckdb",
     ],
 )
@@ -145,25 +153,19 @@ cc_library(
     hdrs = ["json.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        "//:bignumeric",
+        ":any_arguments",
         "//:duckdb_handle",
-        "//:interval",
         "//:language_options",
-        "//:type_mapping",
         "//src/duckdb_functions:register",
         "//src/duckdb_functions:scalar",
-        "//src/googlesql_functions:datetime",
-        "@abseil-cpp//absl/numeric:int128",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/time",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:language_options",
-        "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
@@ -171,12 +173,14 @@ cc_library(
         "@googlesql//googlesql/public/functions:json_format",
         "@googlesql//googlesql/public/functions:json_internal",
         "@googlesql//googlesql/public/functions:to_json",
-        "@googlesql//googlesql/public/types",
-        "@nlohmann_json//:json",
+        "@nlohmann_json//:singleheader-json",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = ["//third_party/duckdb"],
+    deps = [
+        ":options",
+        "//third_party/duckdb",
+    ],
 )
 
 cc_library(
@@ -282,4 +286,60 @@ cc_library(
         ":objectref_options",
         "//third_party/duckdb",
     ],
+)
+
+cc_library(
+    name = "any_arguments",
+    srcs = ["any_arguments.cc"],
+    hdrs = ["any_arguments.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//:bignumeric",
+        "//:interval",
+        "//:language_options",
+        "//:type_mapping",
+        "//src/googlesql_functions:datetime",
+        "@abseil-cpp//absl/numeric:int128",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:json_value",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public:options_cc_proto",
+        "@nlohmann_json//:singleheader-json",
+    ],
+    linkstatic = True,
+    visibility = ["//src:__subpackages__"],
+    deps = [
+        "//:duckdb_handle",
+        "//third_party/duckdb",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+    ],
+)
+
+cc_library(
+    name = "contains_substr",
+    srcs = ["contains_substr.cc"],
+    hdrs = ["contains_substr.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":any_arguments",
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
+        "//src/googlesql_functions:contains_substr",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/base:status",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
+    name = "options",
+    hdrs = ["options.h"],
+    visibility = ["//:__pkg__"],
 )

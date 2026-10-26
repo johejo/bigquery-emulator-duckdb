@@ -82,8 +82,9 @@ std::string ExpandIsoYear(std::string_view format, absl::CivilDay day) {
 }  // namespace
 
 // FORMAT_DATE(format, date).
-absl::Status FormatDate(std::string_view format, int32_t date, std::string* out) {
-  if (format.find("%G") != std::string_view::npos) {
+absl::Status FormatDate(std::string_view format, int32_t date, bool unpadded_iso_year,
+                        std::string* out) {
+  if (unpadded_iso_year && format.find("%G") != std::string_view::npos) {
     return fn::FormatDateToString(ExpandIsoYear(format, absl::CivilDay(1970, 1, 1) + date), date,
                                   kFormatOptions, out);
   }
@@ -91,9 +92,10 @@ absl::Status FormatDate(std::string_view format, int32_t date, std::string* out)
 }
 
 // FORMAT_DATETIME(format, datetime).
-absl::Status FormatDatetime(std::string_view format, int64_t micros, std::string* out) {
+absl::Status FormatDatetime(std::string_view format, int64_t micros, bool unpadded_iso_year,
+                            std::string* out) {
   GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
-  if (format.find("%G") != std::string_view::npos) {
+  if (unpadded_iso_year && format.find("%G") != std::string_view::npos) {
     return fn::FormatDatetimeToStringWithOptions(
         ExpandIsoYear(format, absl::ToCivilDay(absl::FromUnixMicros(micros), absl::UTCTimeZone())),
         datetime, kFormatOptions, out);
@@ -108,9 +110,10 @@ absl::Status FormatTime(std::string_view format, int64_t micros, std::string* ou
 
 // FORMAT_TIMESTAMP(format, timestamp, time_zone).
 absl::Status FormatTimestamp(std::string_view format, int64_t micros, std::string_view time_zone,
-                             std::string* out) {
+                             bool unpadded_iso_year, std::string* out) {
   absl::TimeZone zone;
-  if (format.find("%G") != std::string_view::npos && fn::MakeTimeZone(time_zone, &zone).ok()) {
+  if (unpadded_iso_year && format.find("%G") != std::string_view::npos &&
+      fn::MakeTimeZone(time_zone, &zone).ok()) {
     return fn::FormatTimestampToString(
         ExpandIsoYear(format, absl::ToCivilDay(absl::FromUnixMicros(micros), zone)), micros,
         time_zone, kFormatOptions, out);
@@ -230,19 +233,25 @@ absl::Status TimestampTrunc(int64_t micros, std::string_view part, std::string_v
 }
 
 // GENERATE_DATE_ARRAY(start, end, INTERVAL step part), with BigQuery's documented
-// 1,048,576-element limit. Like BigQuery, each step adds to the previous element, so an element
-// clamped to the end of a shorter month moves the rest to that day.
+// 1,048,576-element limit when `extended_limit` is set. Like BigQuery, each step adds to the
+// previous element, so an element clamped to the end of a shorter month moves the rest to that day.
 absl::Status GenerateDateArray(int32_t start, int32_t end, int64_t step, std::string_view part,
-                               std::vector<int32_t>* out) {
+                               bool extended_limit, std::vector<int32_t>* out) {
   constexpr int kMaxGeneratedArraySize = 1048576;
   fn::DateTimestampPart unit = fn::DAY;
   if (!fn::DateTimestampPart_Parse(absl::AsciiStrToUpper(part), &unit)) {
     return absl::InvalidArgumentError("Unsupported date part");
   }
   std::vector<int64_t> dates;
-  GOOGLESQL_RETURN_IF_ERROR((fn::GenerateArrayHelper<fn::ArrayGenTrait<int64_t, fn::DateIncrement>,
-                                                     kMaxGeneratedArraySize>(
-      start, end, {.unit = unit, .value = step}, &dates)));
+  if (extended_limit) {
+    GOOGLESQL_RETURN_IF_ERROR(
+        (fn::GenerateArrayHelper<fn::ArrayGenTrait<int64_t, fn::DateIncrement>,
+                                 kMaxGeneratedArraySize>(start, end, {.unit = unit, .value = step},
+                                                         &dates)));
+  } else {
+    GOOGLESQL_RETURN_IF_ERROR(fn::GenerateArray<int64_t>(
+        start, end, fn::DateIncrement{.unit = unit, .value = step}, &dates));
+  }
   out->assign(dates.begin(), dates.end());
   return absl::OkStatus();
 }
