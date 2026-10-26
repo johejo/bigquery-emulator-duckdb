@@ -7,6 +7,7 @@ cc_library(
     srcs = [
         "geography.cc",
         "geojson.cc",
+        "input.cc",
         "parts.cc",
         "value.cc",
         "wkb.cc",
@@ -15,6 +16,7 @@ cc_library(
     hdrs = [
         "geography.h",
         "geojson.h",
+        "input.h",
         "options.h",
         "parts.h",
         "value.h",
@@ -25,6 +27,7 @@ cc_library(
     implementation_deps = [
         "//third_party/core_math",
         "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
         "@nlohmann_json//:json",

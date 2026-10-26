@@ -155,6 +155,53 @@ func TestProtobufTypes(t *testing.T) {
 	}
 }
 
+// GEOGRAPHY fields are protobuf strings of WKT or GeoJSON, at any depth.
+// https://cloud.google.com/bigquery/docs/supported-data-types
+func TestGeography(t *testing.T) {
+	rest, _, write := clients(t)
+	path := table(t, rest, "storage_write_geography", "id INT64, name STRING, g GEOGRAPHY, gs ARRAY<GEOGRAPHY>")
+	descriptor := writerSchema()
+	descriptor.Field = append(descriptor.Field,
+		&descriptorpb.FieldDescriptorProto{Name: proto.String("g"), Number: proto.Int32(3), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()},
+		&descriptorpb.FieldDescriptorProto{Name: proto.String("gs"), Number: proto.Int32(4), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum()})
+	geographies := func(id int64, values ...string) []byte {
+		data := row(id, "geography")
+		for i, value := range values {
+			number := protowire.Number(min(i+3, 4))
+			data = protowire.AppendString(protowire.AppendTag(data, number, protowire.BytesType), value)
+		}
+		return data
+	}
+	stream, err := write.AppendRows(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := appendRequest(path+"/streams/_default", true, nil,
+		geographies(1, "POINT(1 2)", `{"type": "Point", "coordinates": [3, 4]}`, "LINESTRING(0 0, 1 1)"))
+	request.GetProtoRows().WriterSchema.ProtoDescriptor = descriptor
+	if response := send(t, stream, request); response.GetError() != nil {
+		t.Fatal(response)
+	}
+	response := send(t, stream, appendRequest("", false, nil, geographies(2, "POINT(5 6)"), geographies(3, "POINT(1)")))
+	if response.GetError().GetCode() != int32(codes.InvalidArgument) || len(response.RowErrors) != 1 || response.RowErrors[0].Index != 1 {
+		t.Fatalf("invalid geography: %v", response)
+	}
+	closeAppend(t, stream)
+	wantVisible(t, rest, "storage_write_geography", 1)
+	rows, err := rest.Query(`SELECT ST_ASTEXT(g), ARRAY(SELECT ST_ASTEXT(x) FROM UNNEST(gs) AS x WITH OFFSET ORDER BY offset)
+	 FROM storage_write_geography.rows`).Read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values []bigquery.Value
+	if err := rows.Next(&values); err != nil {
+		t.Fatal(err)
+	}
+	if want := []bigquery.Value{"POINT(1 2)", []bigquery.Value{"POINT(3 4)", "LINESTRING(0 0, 1 1)"}}; !reflect.DeepEqual(values, want) {
+		t.Fatalf("geographies = %v, want %v", values, want)
+	}
+}
+
 // Column rounding modes apply when values are written, including nested fields. The ties are
 // BigQuery's DDL rounding_mode examples; precision overflow must reject the entire append.
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_option_list

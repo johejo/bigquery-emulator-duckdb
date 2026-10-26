@@ -17,6 +17,9 @@ import (
 	// Register BigQuery Storage Read/Write descriptors for dynamic protobuf JSON calls. No server
 	// reflection is required, and both unary RPCs and streaming RPCs use the same case format.
 	_ "cloud.google.com/go/bigquery/storage/apiv1/storagepb"
+	// Register google.rpc error details, such as the DebugInfo in an AppendRowsResponse's error,
+	// whose Any fields protobuf JSON can only write once their types resolve.
+	_ "google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"

@@ -25,10 +25,8 @@ namespace {
 
 using nlohmann::json;
 
-constexpr std::string_view kFailed = "ST_GeogFromGeoJSON failed: ";
-
 absl::Status Failed(std::string_view message) {
-  return absl::OutOfRangeError(std::string(kFailed) + std::string(message));
+  return absl::OutOfRangeError(std::string(kGeoJsonFailed) + std::string(message));
 }
 
 // Longitudes and latitudes in degrees, but without wrapping: BigQuery takes an edge from longitude
@@ -141,7 +139,7 @@ absl::StatusOr<Geography> ReadPolygon(const json& coordinates) {
       std::ranges::reverse(loop);
     }
   }
-  return BuildPolygon(loops, kFailed, /*oriented=*/true);
+  return BuildPolygon(loops, kGeoJsonFailed, /*oriented=*/true);
 }
 
 // A geometry type other than GeometryCollection, whose coordinates are one part as `read` reads

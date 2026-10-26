@@ -190,10 +190,10 @@ BigQuery loads as NULL.
 
 ### GEOGRAPHY values
 
-Loads and `tabledata.insertAll` take GEOGRAPHY values as WKT, GeoJSON or hex-encoded WKB, and
-Parquet loads also take binary WKB. Query parameters take only WKT. Query parameters, loads and
-`tabledata.insertAll` take a WKT or WKB polygon only where its shell runs counterclockwise and its
-holes clockwise, since BigQuery takes the region on the left of each ring. Additional limits are:
+Loads, `tabledata.insertAll` and Storage Write's protobuf strings take GEOGRAPHY values as WKT,
+GeoJSON or hex-encoded WKB, and Parquet loads also take binary WKB. Query parameters take only WKT.
+Query parameters, loads, `tabledata.insertAll` and Storage Write take a WKT or WKB polygon only
+where its shell runs counterclockwise and its holes clockwise, since BigQuery takes the region on the left of each ring. Additional limits are:
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
 - `ST_ASGEOJSON` is unsupported for shapes that cross the antimeridian or touch a pole.

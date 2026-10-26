@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "cases": {
+    "int64_field_of_string": {
+      "project": "johejo-sandbox",
+      "run": "vuic7xdjaurfm7viogaq6ewzw5",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "message": "The proto field mismatched with BigQuery field at Row.s, the proto field type int64, BigQuery field type STRING Entity: projects/johejo-sandbox/datasets/bqa_vuic7xdjaurfm7viogaq6ewzw5_int64_field_of_string/tables/t/streams/_default"
+            },
+            "messages": []
+          }
+        }
+      }
+    },
+    "invalid_geojson": {
+      "project": "johejo-sandbox",
+      "run": "4m3xuiksf5gqfwiujdaepqwvpp",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "error": {
+                "code": 3,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                    "detail": "INVALID_ARGUMENT: Cannot convert value {\"type\": \"Point\"} to GEOGRAPHY: Missing member 'coordinates' on field g. [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+                  }
+                ],
+                "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_invalid_geojson/tables/t/streams/_default"
+              },
+              "rowErrors": [
+                {
+                  "code": "FIELDS_ERROR",
+                  "message": "Cannot convert value {\"type\": \"Point\"} to GEOGRAPHY: Missing member 'coordinates' on field g."
+                }
+              ],
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_invalid_geojson/tables/t/streams/_default"
+            }
+          ]
+        }
+      }
+    },
+    "invalid_wkt": {
+      "project": "johejo-sandbox",
+      "run": "vuic7xdjaurfm7viogaq6ewzw5",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "error": {
+                "code": 3,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                    "detail": "INVALID_ARGUMENT: Cannot convert value POINT(1) to GEOGRAPHY: Expected latitude, but saw ')' at position 7. on field g. [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+                  }
+                ],
+                "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_vuic7xdjaurfm7viogaq6ewzw5_invalid_wkt/tables/t/streams/_default"
+              },
+              "rowErrors": [
+                {
+                  "code": "FIELDS_ERROR",
+                  "message": "Cannot convert value POINT(1) to GEOGRAPHY: Expected latitude, but saw ')' at position 7. on field g."
+                }
+              ],
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_vuic7xdjaurfm7viogaq6ewzw5_invalid_wkt/tables/t/streams/_default"
+            }
+          ]
+        }
+      }
+    },
+    "nested_invalid_wkt": {
+      "project": "johejo-sandbox",
+      "run": "4m3xuiksf5gqfwiujdaepqwvpp",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "error": {
+                "code": 3,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                    "detail": "INVALID_ARGUMENT: Cannot convert value POINT(1) to GEOGRAPHY: Expected latitude, but saw ')' at position 7. on field g. on field rec. [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+                  }
+                ],
+                "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_nested_invalid_wkt/tables/t/streams/_default"
+              },
+              "rowErrors": [
+                {
+                  "code": "FIELDS_ERROR",
+                  "message": "Cannot convert value POINT(1) to GEOGRAPHY: Expected latitude, but saw ')' at position 7. on field g. on field rec."
+                }
+              ],
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_nested_invalid_wkt/tables/t/streams/_default"
+            }
+          ]
+        }
+      }
+    },
+    "nested_string_field_of_int64": {
+      "project": "johejo-sandbox",
+      "run": "vuic7xdjaurfm7viogaq6ewzw5",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "message": "The proto field mismatched with BigQuery field at Row.Record.x, the proto field type string, BigQuery field type INTEGER Entity: projects/johejo-sandbox/datasets/bqa_vuic7xdjaurfm7viogaq6ewzw5_nested_string_field_of_int64/tables/t/streams/_default"
+            },
+            "messages": []
+          }
+        }
+      }
+    },
+    "string_field_of_int64": {
+      "project": "johejo-sandbox",
+      "run": "4m3xuiksf5gqfwiujdaepqwvpp",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "message": "The proto field mismatched with BigQuery field at Row.n, the proto field type string, BigQuery field type INTEGER Entity: projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_string_field_of_int64/tables/t/streams/_default"
+            },
+            "messages": []
+          }
+        }
+      }
+    },
+    "truncated_wkb_hex": {
+      "project": "johejo-sandbox",
+      "run": "4m3xuiksf5gqfwiujdaepqwvpp",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "error": {
+                "code": 3,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                    "detail": "INVALID_ARGUMENT: Cannot convert value 0101000000 to GEOGRAPHY: End of input while reading longitude; during WKB parsing on field g. [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+                  }
+                ],
+                "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_truncated_wkb_hex/tables/t/streams/_default"
+              },
+              "rowErrors": [
+                {
+                  "code": "FIELDS_ERROR",
+                  "message": "Cannot convert value 0101000000 to GEOGRAPHY: End of input while reading longitude; during WKB parsing on field g."
+                }
+              ],
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_4m3xuiksf5gqfwiujdaepqwvpp_truncated_wkb_hex/tables/t/streams/_default"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

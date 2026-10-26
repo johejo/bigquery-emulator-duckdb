@@ -118,6 +118,13 @@ TableReference ParseTable(const Emulator& emulator, std::string_view name) {
   };
 }
 
+// The error of an AppendRows response whose rows `stream` rejects, as BigQuery words it.
+std::string RowErrors(const std::string& stream) {
+  return "Errors found while processing rows. Please refer to the row_errors field for details. "
+         "The list may not be complete because of the size limitations. Entity: " +
+         stream;
+}
+
 std::string TablePath(const TableReference& table) {
   return "projects/" + table.project_id + "/datasets/" + table.dataset_id + "/tables/" +
          table.table_id;
@@ -794,9 +801,16 @@ class WriteService final : public pb::BigQueryWrite::Service {
         Fail(grpc::StatusCode::ALREADY_EXISTS,
              "A write stream can have only one active connection");
       }
-      auto decoder = std::make_unique<StorageProtoDecoder>(
-          request.proto_rows().writer_schema().proto_descriptor(), state->schema);
-      connection.decoder = std::move(decoder);
+      try {
+        connection.decoder = std::make_unique<StorageProtoDecoder>(
+            request.proto_rows().writer_schema().proto_descriptor(), state->schema);
+      } catch (const StorageFieldMismatch& error) {
+        throw ConnectionError(grpc::StatusCode::INVALID_ARGUMENT,
+                              "The proto field mismatched with BigQuery field at " + error.field +
+                                  ", the proto field type " + error.proto_type +
+                                  ", BigQuery field type " +
+                                  std::string(FieldTypeName(error.type)) + " Entity: " + name);
+      }
       connection.name = name;
       connection.storage_id = state->storage_id;
       connection.descriptor =
@@ -826,7 +840,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
       }
     }
     if (!response.row_errors().empty()) {
-      Fail(grpc::StatusCode::INVALID_ARGUMENT, "Invalid protobuf rows; no rows were appended");
+      Fail(grpc::StatusCode::INVALID_ARGUMENT, RowErrors(name));
     }
     const bool staging = state->metadata.type() != pb::WriteStream::COMMITTED;
     const auto errors =
@@ -838,7 +852,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
       row->set_message(error.message);
     }
     if (!errors.empty()) {
-      Fail(grpc::StatusCode::INVALID_ARGUMENT, "Invalid rows; no rows were appended");
+      Fail(grpc::StatusCode::INVALID_ARGUMENT, RowErrors(name));
     }
     if (!IsDefault(name)) {
       response.mutable_append_result()->mutable_offset()->set_value(state->count);
