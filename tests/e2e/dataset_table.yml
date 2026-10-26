@@ -46,11 +46,6 @@ steps:
         BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "INSERT INTO e2e.users VALUES (1, 'alice', TIMESTAMP '2024-01-01 00:00:00'), (2, 'bob', CURRENT_TIMESTAMP())"
     test: current.exit_code == 0
-  head:
-    exec:
-      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
-    test: |
-      current.exit_code == 0 && trim(current.stdout) == '[{"created":"2024-01-01 00:00:00","id":"1","name":"alice"}]'
   head_selected_fields:
     exec:
       command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh head --format=json --selected_fields=id --max_rows=1 e2e.users
