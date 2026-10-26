@@ -10,6 +10,5 @@ if [[ -z "${E2E_GO_TEST_JSON_DIR:-}" ]]; then
 fi
 
 mkdir -p "$E2E_GO_TEST_JSON_DIR"
-go test -json "$@" |
-  tee "$E2E_GO_TEST_JSON_DIR/$report_name.json" |
-  jq -j 'select(.Action == "output") | .Output'
+# gotestsum prints only failing tests' output, as go test does without -json.
+exec gotestsum --format pkgname --hide-summary=skipped --jsonfile "$E2E_GO_TEST_JSON_DIR/$report_name.json" -- "$@"

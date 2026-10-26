@@ -51,7 +51,7 @@ go-staticcheck:
 [positional-arguments]
 go-test *args:
     if [[ -n "${GO_TEST_JSON:-}" ]]; then \
-        {{ _test_env }} go test -json "$@" ./internal/... ./tools/... | tee "$GO_TEST_JSON" | {{ _test_env }} jq -j 'select(.Action == "output") | .Output'; \
+        {{ _test_env }} gotestsum --format pkgname --hide-summary=skipped --jsonfile "$GO_TEST_JSON" -- "$@" ./internal/... ./tools/...; \
     else \
         {{ _test_env }} go test "$@" ./internal/... ./tools/...; \
     fi

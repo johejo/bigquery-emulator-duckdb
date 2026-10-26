@@ -31,6 +31,7 @@
             fake-gcs-server
             go
             google-cloud-sdk
+            gotestsum
             jq
             postgresql
             mysql84
