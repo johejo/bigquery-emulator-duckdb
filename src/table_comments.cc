@@ -104,7 +104,7 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
   }
   // A view has no columns of its own to give a default rounding mode, and what BigQuery does with
   // one is not known.
-  if (!view.metadata.default_rounding_mode.empty()) {
+  if (view.metadata.default_rounding_mode != RoundingMode::kUnspecified) {
     throw ApiError::Unsupported("defaultRoundingMode on views");
   }
   json comment = view.metadata.ToJson();

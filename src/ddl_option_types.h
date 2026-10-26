@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -11,18 +12,52 @@ class Value;
 
 namespace bigquery_emulator_duckdb {
 
-// Types of the options the DDL handlers implement. tests/ddl_options_catalog_test.cc compares them
-// with tools/ddl_options.json, the catalog of BigQuery's options; they do not determine support.
-enum class DdlOptionType : uint8_t { kString, kBool, kFloat64, kTimestamp, kLabels };
+enum class DdlOptionContext : uint8_t {
+  kCreateTable,
+  kAlterTable,
+  kCreateSchema,
+  kAlterSchema,
+  kCreateView,
+  kCreateMaterializedView,
+  kCreateSnapshotTable,
+  kColumn,
+  kCreateFunction,
+  kCreateTableFunction,
+  kCreateProcedure,
+};
+enum class DdlOptionId : uint8_t {
+  kDescription,
+  kFriendlyName,
+  kLabels,
+  kTags,
+  kExpirationTimestamp,
+  kRequirePartitionFilter,
+  kDefaultRoundingMode,
+  kPartitionExpirationDays,
+  kKmsKeyName,
+  kDefaultTableExpirationDays,
+  kLocation,
+  kRoundingMode,
+  kRuntimeVersion,
+  kEntryPoint,
+  kStrictMode,
+};
+std::string_view DdlOptionContextName(DdlOptionContext context);
+std::string_view DdlOptionName(DdlOptionId option);
+std::optional<DdlOptionContext> ParseDdlOptionContext(std::string_view name);
+std::optional<DdlOptionId> ParseDdlOptionId(std::string_view name);
 
+// Types of the options the DDL handlers implement. The catalog test checks these
+// against BigQuery's option catalog; they do not determine support.
+enum class DdlOptionType : uint8_t { kString, kBool, kFloat64, kTimestamp, kLabels };
 struct DdlOptionDefinition {
-  std::string_view context;
-  std::string_view name;
+  DdlOptionContext context;
+  DdlOptionId name;
   DdlOptionType type;
 };
-
 std::span<const DdlOptionDefinition> DdlOptionDefinitions();
-const DdlOptionDefinition* FindDdlOption(std::string_view context, std::string_view name);
+const DdlOptionDefinition* FindDdlOption(DdlOptionContext context, DdlOptionId name);
+const DdlOptionDefinition* FindDdlOption(DdlOptionContext context, std::string_view name);
 const googlesql::Type* DdlOptionSqlType(DdlOptionType type);
 // Preserves the handlers' existing acceptance of untyped NULL and INT64 expiration days.
 bool DdlOptionValueMatches(DdlOptionType type, const googlesql::Value& value);

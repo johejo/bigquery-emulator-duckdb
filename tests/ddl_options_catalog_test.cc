@@ -84,7 +84,8 @@ std::string Problem(const json& catalog) {
     const std::string implementation = context.value("implementation", "");
     for (const auto& option : catalog.at("groups").at(context.at("group").get<std::string>())) {
       const std::string name = option.at("name");
-      const auto* definition = FindDdlOption(implementation, name);
+      const auto parsed = ParseDdlOptionContext(implementation);
+      const auto* definition = parsed ? FindDdlOption(*parsed, name) : nullptr;
       if (definition == nullptr || !Applies(context, name)) {
         continue;
       }
@@ -99,11 +100,13 @@ std::string Problem(const json& catalog) {
   }
   const auto definitions = DdlOptionDefinitions();
   const auto missing = std::ranges::find_if(definitions, [&](const auto& definition) {
-    return !covered.contains({std::string(definition.context), std::string(definition.name)});
+    return !covered.contains({std::string(DdlOptionContextName(definition.context)),
+                              std::string(DdlOptionName(definition.name))});
   });
   if (missing != definitions.end()) {
-    return "runtime option missing from catalog: " + std::string(missing->context) + "." +
-           std::string(missing->name);
+    return "runtime option missing from catalog: " +
+           std::string(DdlOptionContextName(missing->context)) + "." +
+           std::string(DdlOptionName(missing->name));
   }
   return "";
 }

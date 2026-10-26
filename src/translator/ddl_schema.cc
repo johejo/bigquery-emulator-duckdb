@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/ddl_option_types.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
@@ -60,7 +61,7 @@ std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt&
       return Unsupported(scope, "ALTER SCHEMA action " + action->node_kind_string());
     }
     if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
-                    "ALTER SCHEMA", scope, alteration.options)) {
+                    DdlOptionContext::kAlterSchema, scope, alteration.options)) {
       return std::nullopt;
     }
   }

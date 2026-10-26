@@ -80,7 +80,7 @@ struct OptionUpdates {
   std::map<std::string, std::string> removed_tags;
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
-  std::optional<std::string> default_rounding_mode = {};
+  std::optional<RoundingMode> default_rounding_mode = {};
 };
 
 // The routine a CREATE FUNCTION defines, which the emulator records next to its DuckDB macro.
@@ -111,7 +111,7 @@ struct RenameTableAction {
 struct ColumnOptionsAction {
   std::string name;
   std::optional<std::string> description = {};
-  std::optional<std::string> rounding_mode = {};
+  std::optional<RoundingMode> rounding_mode = {};
   bool if_exists = false;
 };
 

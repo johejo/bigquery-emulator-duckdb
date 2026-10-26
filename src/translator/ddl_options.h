@@ -3,10 +3,11 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "googlesql/public/value.h"
+#include "src/ddl_option_types.h"
+#include "src/field_schema.h"
 #include "src/table_metadata.h"
 
 namespace googlesql {
@@ -22,16 +23,22 @@ struct Scope;
 
 using Options = std::vector<std::unique_ptr<const googlesql::ResolvedOption>>;
 
-std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
-                                            std::string_view context, const Scope& scope);
+struct DecodedDdlOption {
+  DdlOptionId id;
+  googlesql::Value value;
+};
+
+// Resolves the option's name and validates and evaluates its assignment once.
+std::optional<DecodedDdlOption> DecodeDdlOption(const googlesql::ResolvedOption& option,
+                                                DdlOptionContext context, const Scope& scope);
 bool StringOption(const googlesql::Value& value, std::string& into);
 // Sets `into` to the rounding mode `value` names, or clears it for NULL. False for any other
 // value.
-bool RoundingModeOption(const googlesql::Value& value, std::string& into);
-std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
+bool RoundingModeOption(const googlesql::Value& value, RoundingMode& into);
+std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionContext statement,
                                              const Scope& scope, TableMetadata metadata = {});
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope);
-bool SetOptions(const Options& options, std::string_view statement, const Scope& scope,
+bool SetOptions(const Options& options, DdlOptionContext statement, const Scope& scope,
                 OptionUpdates& updates);
 
 }  // namespace bigquery_emulator_duckdb::translator

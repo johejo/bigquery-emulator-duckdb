@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <chrono>
 #include <cstddef>
@@ -15,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "googlesql/public/value.h"
@@ -30,6 +30,7 @@
 #include "src/extract.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/job_options.h"
 #include "src/load.h"
 #include "src/location.h"
 #include "src/parquet_metadata.h"
@@ -43,22 +44,6 @@
 
 namespace bigquery_emulator_duckdb {
 namespace {
-
-constexpr auto kLoadAndExtractFormats = std::to_array<std::string_view>({
-    "CSV",
-    "NEWLINE_DELIMITED_JSON",
-    "PARQUET",
-});
-
-constexpr auto kCommonExtractCompressions = std::to_array<std::string_view>({
-    "NONE",
-    "GZIP",
-});
-
-constexpr auto kParquetExtractCompressions = std::to_array<std::string_view>({
-    "SNAPPY",
-    "ZSTD",
-});
 
 using nlohmann::json;
 
@@ -150,7 +135,8 @@ void CheckCopySource(const CopyJob& copy, const TableReference& source,
   if (copy.operation == CopyOperation::kClone && snapshot) {
     throw ApiError::Unsupported(what + " of a table snapshot");
   }
-  if (copy.operation != CopyOperation::kCopy && !metadata.default_rounding_mode.empty()) {
+  if (copy.operation != CopyOperation::kCopy &&
+      metadata.default_rounding_mode != RoundingMode::kUnspecified) {
     throw ApiError::Unsupported(what + " of a table with a default rounding mode");
   }
 }
@@ -320,12 +306,10 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     UseDataset(location, load.destination_table);
 
     const json& config = load.configuration;
-    const std::string format = config.value("sourceFormat", "CSV");
-    if (std::ranges::find(kLoadAndExtractFormats, format) == kLoadAndExtractFormats.end()) {
-      throw ApiError::Invalid("Unsupported source format: " + format);
-    }
+    const FileFormat format = ParseLoadFormat(config);
     TemporaryFiles downloads;
-    std::vector<std::string> paths = StageLoadSources(config, format, gcs_client_, downloads);
+    std::vector<std::string> paths =
+        StageLoadSources(ParseLoadSourceUris(config), format, gcs_client_, downloads);
     // The destination's schema, or none when the load creates it.
     std::optional<std::vector<FieldSchema>> existing;
     try {
@@ -341,20 +325,18 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     if (requested_schema.empty() && existing.has_value()) {
       requested_schema = *existing;
     }
+    const LoadOptions options = ParseLoadOptions(format, config);
     ParquetColumn parquet;
-    if (format == "NEWLINE_DELIMITED_JSON") {
+    if (std::holds_alternative<JsonLoadOptions>(options)) {
       paths = StageJsonNumerics(paths, requested_schema, downloads);
-    } else if (format == "PARQUET") {
-      // bq names the option as the API's proto does, which BigQuery accepts too.
-      const json options = config.value("parquetOptions", json::object());
-      const bool list_inference =
-          options.value("enableListInference", options.value("enable_list_inference", false));
-      ParquetSources sources = StageParquetDecimals(paths, downloads, list_inference);
+    } else if (const auto* parquet_options = std::get_if<ParquetLoadOptions>(&options)) {
+      ParquetSources sources =
+          StageParquetDecimals(paths, downloads, parquet_options->enable_list_inference);
       paths = std::move(sources.paths);
       parquet = std::move(sources.columns);
       if (requested_schema.empty() && parquet.HasWideDecimal()) {
-        requested_schema = Prepare(LoadQuery(format, paths, config, {}, parquet)).schema;
-        DetectParquetDecimals(requested_schema, parquet, config);
+        requested_schema = Prepare(LoadQuery(options, paths, {}, parquet)).schema;
+        DetectParquetDecimals(requested_schema, parquet, ParseDecimalTargetTypes(config));
       }
     }
     auto read_schema = requested_schema;
@@ -365,7 +347,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         field = WithoutRoundingParameters(std::move(field));
       }
     }
-    std::string sql = LoadQuery(format, paths, config, read_schema, parquet);
+    std::string sql = LoadQuery(options, paths, read_schema, parquet);
     const QueryResult prepared = Prepare(sql);
     std::vector<FieldSchema> written =
         requested_schema.empty() ? prepared.schema : requested_schema;
@@ -543,24 +525,8 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     extract.configuration["sourceTable"]["projectId"] = extract.source_table.project_id;
     UseDataset(location, extract.source_table);
 
-    const json& config = extract.configuration;
-    const std::string format = config.value("destinationFormat", "CSV");
-    const std::string compression = config.value("compression", "NONE");
-    if (format == "AVRO") {
-      throw ApiError::Unsupported("Avro extracts");
-    }
-    if (std::ranges::find(kLoadAndExtractFormats, format) == kLoadAndExtractFormats.end()) {
-      throw ApiError::Invalid("Unsupported destination format: " + format);
-    }
-    const bool parquet = format == "PARQUET";
-    const bool supported_compression =
-        std::ranges::find(kCommonExtractCompressions, compression) !=
-            kCommonExtractCompressions.end() ||
-        (parquet && std::ranges::find(kParquetExtractCompressions, compression) !=
-                        kParquetExtractCompressions.end());
-    if (!supported_compression) {
-      throw ApiError::Invalid("Unsupported compression " + compression + " for " + format);
-    }
+    const ExtractEncoding encoding = ParseExtractEncoding(extract.configuration);
+    const bool parquet = encoding.format == FileFormat::kParquet;
     if (extract.destination_uris.size() != 1) {
       throw ApiError::Unsupported("multiple destination URIs");
     }
@@ -594,20 +560,25 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       Execute(std::format("COPY (SELECT {} FROM {}) TO {} (FORMAT parquet, COMPRESSION {})",
                           ParquetExtractColumns(table.schema), ReadTableRelation(backend_, source),
                           QuoteLiteral(path),
-                          compression == "NONE" ? "uncompressed" : ToLowerAscii(compression)));
+                          encoding.compression == ExtractCompression::kNone
+                              ? "uncompressed"
+                              : ToLowerAscii(ExtractCompressionName(encoding.compression))));
       AnnotateParquetBigNumerics(path, table.schema);
     } else {
       const QueryResult result = Execute("SELECT * FROM " + ReadTableRelation(backend_, source));
+      const ExtractFormatOptions options =
+          ParseExtractFormatOptions(encoding.format, extract.configuration);
+      const auto* csv = std::get_if<CsvExtractOptions>(&options);
       WriteTextExtract(
           table.schema, result.rows.size(),
           [&](size_t row, size_t column, const googlesql::Type* type) {
             return result.rows.GoogleSqlValue(row, column, type);
           },
           {
-              .json = format == "NEWLINE_DELIMITED_JSON",
-              .gzip = compression == "GZIP",
-              .field_delimiter = config.value("fieldDelimiter", ","),
-              .print_header = config.value("printHeader", true),
+              .json = std::holds_alternative<JsonExtractOptions>(options),
+              .gzip = encoding.compression == ExtractCompression::kGzip,
+              .field_delimiter = csv ? csv->field_delimiter : ",",
+              .print_header = csv ? csv->print_header : true,
           },
           path);
     }
@@ -746,7 +717,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     } else if (existing.has_value()) {
       definition.metadata.default_rounding_mode = existing->metadata.default_rounding_mode;
     } else if (copy) {
-      defaults.default_rounding_mode.clear();
+      defaults.default_rounding_mode = RoundingMode::kUnspecified;
     }
     std::ranges::move(CreateTableWrite(definition, defaults).metadata_statements,
                       std::back_inserter(statements));

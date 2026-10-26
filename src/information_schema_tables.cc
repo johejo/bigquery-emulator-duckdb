@@ -52,11 +52,21 @@ std::string ViewDdl(const std::string& project, const std::string& dataset,
 std::string PartitionId(const TableMetadata& metadata) {
   if (metadata.time_partitioning.has_value()) {
     const std::string column = QuoteIdentifier(metadata.time_partitioning->field);
-    const std::string& type = metadata.time_partitioning->type;
-    const std::string format = type == "HOUR"    ? "%Y%m%d%H"
-                               : type == "MONTH" ? "%Y%m"
-                               : type == "YEAR"  ? "%Y"
-                                                 : "%Y%m%d";
+    std::string format;
+    switch (metadata.time_partitioning->type) {
+      case TimePartitionUnit::kDay:
+        format = "%Y%m%d";
+        break;
+      case TimePartitionUnit::kHour:
+        format = "%Y%m%d%H";
+        break;
+      case TimePartitionUnit::kMonth:
+        format = "%Y%m";
+        break;
+      case TimePartitionUnit::kYear:
+        format = "%Y";
+        break;
+    }
     // Partition boundaries are in UTC, which DuckDB's session time zone is.
     return "CASE WHEN " + column + " IS NULL THEN '__NULL__' WHEN CAST(" + column +
            " AS DATE) NOT BETWEEN DATE '1960-01-01' AND DATE '2159-12-31' THEN "
@@ -84,15 +94,16 @@ absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
   if (!type.ok()) {
     return type.status();
   }
-  rows.push_back(Concat(identity, {
-                                      String(column),
-                                      String(path),
-                                      String(*type),
-                                      OptionalString(field.description),
-                                      kNull,
-                                      OptionalString(field.rounding_mode),
-                                      kEmptyArray,
-                                  }));
+  rows.push_back(
+      Concat(identity, {
+                           String(column),
+                           String(path),
+                           String(*type),
+                           OptionalString(field.description),
+                           kNull,
+                           OptionalString(std::string(RoundingModeName(field.rounding_mode))),
+                           kEmptyArray,
+                       }));
   for (const FieldSchema& child : field.fields) {
     if (absl::Status status =
             AppendFieldPaths(identity, column, path + "." + child.name, child, type_factory, rows);
@@ -321,32 +332,33 @@ absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
         if (!type.ok()) {
           return type.status();
         }
-        rows.push_back(Concat(Identity(dataset, table),
-                              {
-                                  String(field.name),
-                                  Int(static_cast<int64_t>(i) + 1),
-                                  String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
-                                  String(*type),
-                                  String("NEVER"),
-                                  kNull,
-                                  kNull,
-                                  String("NO"),
-                                  kNull,
-                                  String("NO"),
-                                  String("NO"),
-                                  kNull,
-                                  kNull,
-                                  OptionalString(field.default_value_expression),
-                                  OptionalString(field.rounding_mode),
-                                  kEmptyArray,
-                                  String("NO"),
-                                  kNull,
-                                  kNull,
-                                  kNull,
-                                  kNull,
-                                  kNull,
-                                  kNull,
-                              }));
+        rows.push_back(
+            Concat(Identity(dataset, table),
+                   {
+                       String(field.name),
+                       Int(static_cast<int64_t>(i) + 1),
+                       String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
+                       String(*type),
+                       String("NEVER"),
+                       kNull,
+                       kNull,
+                       String("NO"),
+                       kNull,
+                       String("NO"),
+                       String("NO"),
+                       kNull,
+                       kNull,
+                       OptionalString(field.default_value_expression),
+                       OptionalString(std::string(RoundingModeName(field.rounding_mode))),
+                       kEmptyArray,
+                       String("NO"),
+                       kNull,
+                       kNull,
+                       kNull,
+                       kNull,
+                       kNull,
+                       kNull,
+                   }));
       }
     }
   }

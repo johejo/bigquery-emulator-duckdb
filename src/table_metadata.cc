@@ -27,14 +27,35 @@ namespace bigquery_emulator_duckdb {
 
 using nlohmann::json;
 
-namespace {
+std::string_view TimePartitionUnitName(TimePartitionUnit unit) {
+  switch (unit) {
+    case TimePartitionUnit::kDay:
+      return "DAY";
+    case TimePartitionUnit::kHour:
+      return "HOUR";
+    case TimePartitionUnit::kMonth:
+      return "MONTH";
+    case TimePartitionUnit::kYear:
+      return "YEAR";
+  }
+  return "";
+}
 
-constexpr auto kTimePartitioningTypes = std::to_array<std::string_view>({
-    "DAY",
-    "HOUR",
-    "MONTH",
-    "YEAR",
-});
+std::optional<TimePartitionUnit> ParseTimePartitionUnit(std::string_view name) {
+  for (const auto unit : {
+           TimePartitionUnit::kDay,
+           TimePartitionUnit::kHour,
+           TimePartitionUnit::kMonth,
+           TimePartitionUnit::kYear,
+       }) {
+    if (name == TimePartitionUnitName(unit)) {
+      return unit;
+    }
+  }
+  return std::nullopt;
+}
+
+namespace {
 
 constexpr size_t kMaxLabels = 64;
 constexpr size_t kMaxLabelLength = 63;
@@ -124,14 +145,15 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
   if (!value.is_object()) {
     throw ApiError::Invalid("Field timePartitioning must be an object");
   }
+  const std::string name = StringValue(value.value("type", json()), "type");
+  const auto unit = ParseTimePartitionUnit(name);
   TimePartitioning partitioning{
-      .type = StringValue(value.value("type", json()), "type"),
       .field = StringValue(value.value("field", json()), "field"),
   };
-  if (std::ranges::find(kTimePartitioningTypes, partitioning.type) ==
-      kTimePartitioningTypes.end()) {
-    throw ApiError::Invalid("Invalid time partitioning type: " + partitioning.type);
+  if (!unit) {
+    throw ApiError::Invalid("Invalid time partitioning type: " + name);
   }
+  partitioning.type = *unit;
   if (partitioning.field.empty()) {
     throw ApiError::Unsupported("ingestion-time partitioning");
   }
@@ -248,7 +270,7 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch, b
   ValidateResourceTags(metadata.resource_tags);
   set("defaultRoundingMode", [&](const json& value) {
     const std::string mode = StringValue(value, "defaultRoundingMode");
-    std::optional<std::string> parsed = ParseRoundingMode(mode);
+    std::optional<RoundingMode> parsed = ParseRoundingMode(mode);
     if (!parsed.has_value()) {
       throw ApiError::Invalid("Invalid default rounding mode: " + mode);
     }
@@ -329,7 +351,7 @@ void ValidateTimePartitioning(const TimePartitioning& partitioning,
         "DATETIME. The type found is: {}.",
         FieldTypeName(field->type)));
   }
-  if (!time && partitioning.type == "HOUR") {
+  if (!time && partitioning.type == TimePartitionUnit::kHour) {
     throw ApiError::Invalid("A DATE field cannot be partitioned by HOUR: " + field->name);
   }
 }
@@ -406,7 +428,7 @@ json TableMetadata::ToJson() const {
   }
   if (time_partitioning.has_value()) {
     fields["timePartitioning"] = {
-        {"type", time_partitioning->type},
+        {"type", TimePartitionUnitName(time_partitioning->type)},
         {"field", time_partitioning->field},
     };
   }
@@ -432,8 +454,8 @@ json TableMetadata::ToJson() const {
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
-  if (!default_rounding_mode.empty()) {
-    fields["defaultRoundingMode"] = default_rounding_mode;
+  if (default_rounding_mode != RoundingMode::kUnspecified) {
+    fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
   if (expiration_time.has_value()) {
     fields["expirationTime"] = std::to_string(*expiration_time);
@@ -495,8 +517,8 @@ json DatasetMetadata::ToJson() const {
   if (default_table_expiration_ms.has_value()) {
     fields["defaultTableExpirationMs"] = std::to_string(*default_table_expiration_ms);
   }
-  if (!default_rounding_mode.empty()) {
-    fields["defaultRoundingMode"] = default_rounding_mode;
+  if (default_rounding_mode != RoundingMode::kUnspecified) {
+    fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
   if (!location.empty()) {
     fields["location"] = location;

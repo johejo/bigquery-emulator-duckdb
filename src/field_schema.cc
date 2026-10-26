@@ -229,8 +229,8 @@ json FieldSchema::ToJson() const {
   if (!default_value_expression.empty()) {
     field["defaultValueExpression"] = default_value_expression;
   }
-  if (!rounding_mode.empty()) {
-    field["roundingMode"] = rounding_mode;
+  if (rounding_mode != RoundingMode::kUnspecified) {
+    field["roundingMode"] = RoundingModeName(rounding_mode);
   }
   if (!policy_tags.empty()) {
     field["policyTags"] = {{"names", policy_tags}};
@@ -313,7 +313,7 @@ FieldSchema FieldSchemaFromJson(const json& value) {
   field.scale = Int64Member(value, "scale");
   field.default_value_expression = StringMember(value, "defaultValueExpression");
   const std::string mode = StringMember(value, "roundingMode");
-  std::optional<std::string> parsed = ParseRoundingMode(mode);
+  std::optional<RoundingMode> parsed = ParseRoundingMode(mode);
   if (!parsed.has_value()) {
     throw ApiError::Invalid("Invalid rounding mode for field " + field.name + ": " + mode);
   }
@@ -329,32 +329,46 @@ FieldSchema FieldSchemaFromJson(const json& value) {
   return field;
 }
 
-std::optional<std::string> ParseRoundingMode(const std::string& mode) {
-  if (mode == "ROUNDING_MODE_UNSPECIFIED") {
-    return "";
+std::string_view RoundingModeName(RoundingMode mode) {
+  switch (mode) {
+    case RoundingMode::kUnspecified:
+      return "";
+    case RoundingMode::kHalfAwayFromZero:
+      return "ROUND_HALF_AWAY_FROM_ZERO";
+    case RoundingMode::kHalfEven:
+      return "ROUND_HALF_EVEN";
   }
-  if (!mode.empty() && mode != kRoundHalfAwayFromZero && mode != kRoundHalfEven) {
-    return std::nullopt;
-  }
-  return mode;
+  return "";
 }
 
-void ApplyDefaultRoundingMode(FieldSchema& field, std::string_view mode) {
-  if (field.rounding_mode.empty() &&
+std::optional<RoundingMode> ParseRoundingMode(std::string_view mode) {
+  if (mode.empty() || mode == "ROUNDING_MODE_UNSPECIFIED") {
+    return RoundingMode::kUnspecified;
+  }
+  for (const auto candidate : {kRoundHalfAwayFromZero, kRoundHalfEven}) {
+    if (mode == RoundingModeName(candidate)) {
+      return candidate;
+    }
+  }
+  return std::nullopt;
+}
+
+void ApplyDefaultRoundingMode(FieldSchema& field, RoundingMode mode) {
+  if (field.rounding_mode == RoundingMode::kUnspecified &&
       (field.type == FieldType::kNumeric || field.type == FieldType::kBigNumeric)) {
     field.rounding_mode = mode;
   }
   ApplyDefaultRoundingMode(field.fields, mode);
 }
 
-void ApplyDefaultRoundingMode(std::vector<FieldSchema>& schema, std::string_view mode) {
+void ApplyDefaultRoundingMode(std::vector<FieldSchema>& schema, RoundingMode mode) {
   for (FieldSchema& field : schema) {
     ApplyDefaultRoundingMode(field, mode);
   }
 }
 
 void ApplyDefaultRoundingMode(const std::vector<FieldSchema>& current,
-                              std::vector<FieldSchema>& updated, std::string_view mode) {
+                              std::vector<FieldSchema>& updated, RoundingMode mode) {
   for (size_t i = 0; i < updated.size(); ++i) {
     if (i >= current.size()) {
       ApplyDefaultRoundingMode(updated.at(i), mode);
@@ -388,7 +402,7 @@ FieldSchema WithoutRoundingParameters(FieldSchema field) {
 
 void CheckRoundingModes(const std::vector<FieldSchema>& schema) {
   for (const FieldSchema& field : schema) {
-    if (!field.rounding_mode.empty() && field.type != FieldType::kNumeric &&
+    if (field.rounding_mode != RoundingMode::kUnspecified && field.type != FieldType::kNumeric &&
         field.type != FieldType::kBigNumeric) {
       throw ApiError::Unsupported("rounding modes on " + std::string(FieldTypeName(field.type)) +
                                   " fields");

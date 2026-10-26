@@ -45,7 +45,7 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr);
 
 // The name of a rounding mode, such as ROUND_HALF_EVEN, which is also an enum literal after
 // analysis.
-std::optional<std::string> RoundingMode(const googlesql::ResolvedExpr& expr);
+std::optional<std::string> RoundingModeOf(const googlesql::ResolvedExpr& expr);
 
 // The name of a NORMALIZE mode, such as NFKC.
 std::optional<std::string> NormalizeMode(const googlesql::ResolvedExpr& expr);

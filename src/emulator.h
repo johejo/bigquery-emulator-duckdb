@@ -112,7 +112,8 @@ struct LoadJob {
   TableReference destination_table;
   CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
   WriteDisposition write_disposition = WriteDisposition::kWriteAppend;
-  // The request's configuration.load, which also holds the source options.
+  // Wire configuration for jobs.get and uploads. Execution decodes it into typed
+  // options inside RunJob so configuration errors remain recorded job failures.
   nlohmann::json configuration;
 };
 
@@ -135,7 +136,7 @@ struct CopyJob {
 struct ExtractJob {
   TableReference source_table;
   std::vector<std::string> destination_uris;
-  // The request's configuration.extract, which also holds the format options.
+  // Wire configuration for jobs.get; execution decodes typed extract options.
   nlohmann::json configuration;
 };
 

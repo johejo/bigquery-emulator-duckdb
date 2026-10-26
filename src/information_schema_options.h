@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "src/field_schema.h"
 #include "src/information_schema_rows.h"
 
 namespace bigquery_emulator_duckdb::information_schema {
@@ -20,7 +21,7 @@ std::string StringOptionValue(const std::string& value);
 // The metadata options shared by datasets, tables and views.
 std::vector<Option> CommonOptions(const std::string& description, const std::string& friendly_name,
                                   const std::map<std::string, std::string>& labels,
-                                  const std::string& default_rounding_mode,
+                                  RoundingMode default_rounding_mode,
                                   const std::vector<std::string>& label_order,
                                   const std::map<std::string, std::string>& resource_tags,
                                   const std::vector<std::string>& tag_order);
