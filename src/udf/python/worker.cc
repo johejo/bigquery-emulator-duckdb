@@ -22,7 +22,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -217,13 +216,7 @@ void Worker::Wait(int16_t events, Clock::time_point deadline) const {
 void Worker::Start() {
   const std::string executable = Executable();
   std::unique_ptr<Runfiles> const files(Runfiles::Create(executable));
-  std::string worker = options_.worker;
-  if (worker.empty() && files) {
-    worker = files->Rlocation("_main/python_udf_worker");
-  }
-  if (worker.empty() || (!std::filesystem::exists(worker) && options_.worker.empty())) {
-    worker = (std::filesystem::path(executable).parent_path() / "python_udf_worker").string();
-  }
+  std::string worker = options_.worker.empty() ? executable : options_.worker;
   std::vector<std::string> environment;
 #ifdef __APPLE__
   char** const inherited = *_NSGetEnviron();
@@ -284,8 +277,12 @@ void Worker::Start() {
   posix_spawnattr_setpgroup(&attributes, 0);
   posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETPGROUP);
   std::string memory = std::to_string(options_.memory);
-  char* args[] = {worker.data(), memory.data(), nullptr};
-  const int error = posix_spawn(&pid_, worker.c_str(), &actions, &attributes, args, env.data());
+  std::string mode = "internal-python-worker";
+  char* internal_args[] = {worker.data(), mode.data(), memory.data(), nullptr};
+  char* external_args[] = {worker.data(), memory.data(), nullptr};
+  const int error =
+      posix_spawn(&pid_, worker.c_str(), &actions, &attributes,
+                  options_.worker.empty() ? internal_args : external_args, env.data());
   posix_spawnattr_destroy(&attributes);
   posix_spawn_file_actions_destroy(&actions);
   close(sockets[1]);

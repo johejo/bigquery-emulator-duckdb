@@ -227,8 +227,10 @@ calls typed `bq_py_*` scalar functions. Each DuckDB local function state starts 
 reuses its compiled functions across rows, and destroys it at query cleanup. Independent
 execution states use separate processes and Python globals.
 
-The `python_udf_worker` executable links the rules_python CPython 3.11 runtime; the main
-emulator does not link or initialize libpython. The worker uses the CPython C API for compilation,
+The emulator links the rules_python CPython 3.11 runtime and re-executes itself with
+the `internal-python-worker` subcommand for each worker. Only this internal mode initializes libpython,
+before any server or DuckDB initialization. An explicit `--python-worker` still starts an
+external executable with the memory limit as its only argument. The worker uses the CPython C API for compilation,
 argument conversion and calls. A private Unix socket carries newline-delimited JSON batches,
 with hex for BYTES and strings for floating-point values so nonfinite values survive transport.
 Definitions and argument schemas are sent once per worker, then referenced by worker-local IDs.

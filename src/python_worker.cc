@@ -1,4 +1,6 @@
-// Only this executable links libpython. The emulator never initializes an interpreter.
+// Only the internal worker mode initializes an interpreter.
+#include "src/python_worker.h"
+
 #include <Python.h>  // IWYU pragma: keep
 #include <fcntl.h>
 #ifndef __APPLE__
@@ -337,7 +339,7 @@ int Run(int argc, char** argv) {
 }
 }  // namespace
 
-int main(int argc, char** argv) {
+int bigquery_emulator_duckdb::PythonWorkerMain(int argc, char** argv) {
   try {
     return Run(argc, argv);
   } catch (const std::exception& error) {

@@ -160,10 +160,11 @@ just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 
 ## Python UDFs
 
-Persistent scalar Python UDFs run in a separate C++ worker linked to CPython 3.11's libpython.
-Bazel supplies the interpreter and standard library; no host Python installation is needed.
-Keep the binary's `.runfiles` directory alongside it when distributing the build. The worker
-and its Python runtime are runtime dependencies, so copying only the main binary is insufficient.
+Persistent scalar Python UDFs run in a separate process using the emulator's internal worker
+mode, linked to CPython 3.11's libpython. Bazel supplies the interpreter and standard library;
+no host Python installation is needed. Keep the binary's `.runfiles` directory alongside it
+when distributing the build. The Python runtime is a runtime dependency, so copying only the
+main binary is insufficient.
 
 ```sql
 CREATE FUNCTION ds.multiply(x FLOAT64, y FLOAT64)
@@ -179,7 +180,8 @@ The default timeout is 5 minutes per call, including initial worker startup, and
 memory limit is 256 MiB. On Linux this limits address space; on macOS the parent checks resident
 memory every 10 ms, so short allocations can exceed the limit between checks.
 `--python-timeout-ms MS` and `--python-memory-mib MIB` change
-these limits; both take positive integers. `--python-worker PATH` overrides the bundled worker.
+these limits; both take positive integers. `--python-worker PATH` selects an external worker
+instead of the internal worker mode.
 The same options work in `shell` mode. See [Python UDF limits](docs/compatibility.md#python-udfs).
 
 Workers run with the emulator user's filesystem and network permissions. Process separation
