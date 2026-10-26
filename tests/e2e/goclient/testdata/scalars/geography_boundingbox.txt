@@ -81,6 +81,10 @@ SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(10, 90))
 SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(-180, 0))
 => {"f":[{"v":"179.99999999999997"},{"v":"-4.9E-324"},{"v":"180.00000000000003"},{"v":"4.9E-324"}]}
 
+# Correctly rounded atan2 gives the longitude 9 one bit above it, which rounds down to 9.
+SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(9, 9)).xmin
+=> "9.0"
+
 # Source: BigQuery answers collected by the maintainer (edge and polygon rounding).
 SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0)'))
 => {"f":[{"v":"-4.9E-324"},{"v":"-3.883275617352508E-14"},{"v":"2.0000000000000004"},{"v":"3.883275617352508E-14"}]}

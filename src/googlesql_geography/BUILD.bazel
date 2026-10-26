@@ -7,18 +7,23 @@ cc_library(
     srcs = [
         "geography.cc",
         "geojson.cc",
+        "parts.cc",
         "value.cc",
+        "wkb.cc",
         "wkt.cc",
     ],
     hdrs = [
         "geography.h",
         "geojson.h",
         "options.h",
+        "parts.h",
         "value.h",
+        "wkb.h",
         "wkt.h",
     ],
     copts = ["-std=c++20"],
     implementation_deps = [
+        "//third_party/core_math",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",

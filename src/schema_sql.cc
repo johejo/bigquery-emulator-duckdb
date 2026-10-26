@@ -296,9 +296,9 @@ std::string CheckedWriteValue(const std::string& sql, const FieldSchema& field, 
          " END)[1]";
 }
 
-std::string StoredValue(const std::string& sql, const FieldSchema& field) {
-  return MapGeographies(CheckedWriteValue(sql, field), field, 0, [](const std::string& value) {
-    return "bq_geography_input(" + value + ")";
+std::string StoredValue(const std::string& sql, const FieldSchema& field, bool parquet) {
+  return MapGeographies(CheckedWriteValue(sql, field), field, 0, [&](const std::string& value) {
+    return (parquet ? "bq_parquet_geography_input(" : "bq_geography_input(") + value + ")";
   });
 }
 

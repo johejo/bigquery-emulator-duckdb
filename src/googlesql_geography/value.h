@@ -10,15 +10,18 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "s2/mutable_s2shape_index.h"
+#include "s2/r2.h"
 #include "s2/s2boolean_operation.h"
+#include "s2/s2latlng.h"
 #include "s2/s2point.h"
 #include "s2/s2polygon.h"
+#include "s2/s2projections.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
 
 namespace googlesql_geography {
 
-// Coordinates obtained from S2LatLng, preserving its floating-point behavior.
+// Coordinates in degrees, which ToPoint and ToS2Point convert to and from S2Point.
 struct Point {
   double longitude;
   double latitude;
@@ -55,8 +58,26 @@ Geography FullGeography();
 // -0 as 0.
 std::string Coordinate(double value, std::optional<int> precision = 15);
 
+// The conversions of S2LatLng, but with correctly rounded atan2, sin and cos, as BigQuery's
+// coordinates show, rather than the platform's math library, whose last bit can differ.
 S2Point ToS2Point(const Point& point);
+S2LatLng ToLatLng(const S2Point& point);
 Point ToPoint(const S2Point& point);
+
+// The plate carrée projection in degrees, converting as ToPoint and ToS2Point do.
+class DegreesProjection : public S2::Projection {
+ public:
+  [[nodiscard]] R2Point Project(const S2Point& p) const override;
+  [[nodiscard]] S2Point Unproject(const R2Point& p) const override;
+  [[nodiscard]] R2Point FromLatLng(const S2LatLng& ll) const override {
+    return plate_.FromLatLng(ll);
+  }
+  [[nodiscard]] S2LatLng ToLatLng(const R2Point& p) const override { return plate_.ToLatLng(p); }
+  [[nodiscard]] R2Point wrap_distance() const override { return plate_.wrap_distance(); }
+
+ private:
+  S2::PlateCarreeProjection plate_{180};
+};
 
 // The WKT BigQuery returns for `geography`, whose coordinates have 15 significant digits: one
 // point, linestring or polygon, a MULTIPOINT, MULTILINESTRING or MULTIPOLYGON of more than one,

@@ -211,6 +211,10 @@ SELECT S2_CELLIDFROMPOINT(ST_GEOGPOINT(-122, 47), level => 10)
 SELECT ST_X(ST_GEOGPOINT(0.1 + 0.2, 0))
 => "0.30000000000000004"
 
+# A coordinate is that of correctly rounded atan2, which here is one bit above 9.
+SELECT ST_X(ST_GEOGPOINT(9, 9))
+=> "9.000000000000002"
+
 # A stored GEOGRAPHY keeps its coordinates beyond the 15 significant digits of its WKT.
 CREATE TEMP TABLE points AS SELECT ST_GEOGPOINT(0.1 + 0.2, 0) AS g; SELECT ST_X(g) FROM points
 => "0.30000000000000004"

@@ -56,7 +56,6 @@
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
 #include "s2/s2polyline.h"
-#include "s2/s2projections.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
 #include "s2/s2shape_measures.h"
@@ -634,7 +633,7 @@ std::optional<BoundingBox> BoundsOf(std::span<const Geography> geographies, cons
   };
   for (const Geography& geography : geographies) {
     for (const S2Point& point : geography.points) {
-      add(S2LatLngRect::FromPoint(S2LatLng(point)));
+      add(S2LatLngRect::FromPoint(ToLatLng(point)));
     }
     for (const std::vector<S2Point>& line : geography.lines) {
       add(S2Polyline(line).GetRectBound());
@@ -865,7 +864,7 @@ std::string GeoJsonPoint(const S2Point& point) {
 // longitude the projection does not give, or that crosses the antimeridian, which the tessellator
 // continues beyond longitude 180 where BigQuery splits it.
 absl::StatusOr<std::string> GeoJsonChain(const std::vector<S2Point>& vertices) {
-  const S2::PlateCarreeProjection projection(180);
+  const DegreesProjection projection;
   const S2EdgeTessellator tessellator(&projection, S2Earth::MetersToAngle(10));
   std::vector<R2Point> projected;
   for (auto a = vertices.begin(); a != vertices.end() && std::next(a) != vertices.end(); ++a) {
@@ -904,8 +903,7 @@ absl::StatusOr<std::string> GeoJsonParts(const std::vector<Item>& items, std::st
 }  // namespace
 
 // BigQuery writes the parts of a geography as its WKT does, and adds vertices to keep each planar
-// edge within 10 meters of the geodesic one, as S2EdgeTessellator does; their last bits depend on
-// the platform's math library, such as one vertex of LINESTRING(0 0, 10 10) with macOS's atan2.
+// edge within 10 meters of the geodesic one, as S2EdgeTessellator does.
 absl::StatusOr<std::string> AsGeoJson(const Geography& geography) {
   if (geography.Full()) {
     return "{ \"type\": \"Polygon\", \"coordinates\": [ [ [180, 90], [-180, 90], [-180, -90], "

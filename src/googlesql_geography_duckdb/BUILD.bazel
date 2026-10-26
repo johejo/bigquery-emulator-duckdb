@@ -36,6 +36,7 @@ cc_library(
         "//src/duckdb_functions:scalar",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:type_cc_proto",
         "@s2geometry//:s2",

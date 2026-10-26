@@ -19,6 +19,7 @@
 #include "absl/types/span.h"
 #include "googlesql/base/status_macros.h"
 #include "s2/mutable_s2shape_index.h"
+#include "s2/r2.h"
 #include "s2/s1angle.h"
 #include "s2/s2boolean_operation.h"
 #include "s2/s2builder.h"
@@ -44,6 +45,7 @@
 #include "s2/s2polyline.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
+#include "third_party/core_math/core_math.h"
 
 namespace googlesql_geography {
 namespace {
@@ -139,12 +141,31 @@ std::string Coordinate(double value, std::optional<int> precision) {
 }
 
 S2Point ToS2Point(const Point& point) {
-  return S2LatLng::FromDegrees(point.latitude, point.longitude).ToPoint();
+  const double phi = S1Angle::Degrees(point.latitude).radians();
+  const double theta = S1Angle::Degrees(point.longitude).radians();
+  const double cos_phi = cr_cos(phi);
+  return {cr_cos(theta) * cos_phi, cr_sin(theta) * cos_phi, cr_sin(phi)};
+}
+
+S2LatLng ToLatLng(const S2Point& point) {
+  // As S2LatLng::Latitude and Longitude, whose "+ 0.0" turns -0 into 0.
+  return S2LatLng::FromRadians(
+      cr_atan2(point.z() + 0.0, std::sqrt((point.x() * point.x()) + (point.y() * point.y()))),
+      cr_atan2(point.y() + 0.0, point.x() + 0.0));
 }
 
 Point ToPoint(const S2Point& point) {
-  const S2LatLng latlng(point);
+  const S2LatLng latlng = ToLatLng(point);
   return {.longitude = latlng.lng().degrees(), .latitude = latlng.lat().degrees()};
+}
+
+R2Point DegreesProjection::Project(const S2Point& p) const {
+  const Point point = ToPoint(p);
+  return {point.longitude, point.latitude};
+}
+
+S2Point DegreesProjection::Unproject(const R2Point& p) const {
+  return ToS2Point({.longitude = std::remainder(p.x(), 360.0), .latitude = p.y()});
 }
 
 Geography PointGeography(const S2Point& point) {

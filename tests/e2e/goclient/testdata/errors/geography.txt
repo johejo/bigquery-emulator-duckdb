@@ -20,13 +20,13 @@ SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((175 0, -175 0, 180 5, 175 0))'))
 SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(0 80, 180 80)'))
 => error contains: The emulator does not support ST_ASGEOJSON of a LINESTRING that touches a pole
 
-# BigQuery reads WKB, as BYTES or hex-encoded in a STRING, which the emulator does not.
+# ST_GEOGFROMWKB's planar and oriented arguments are unsupported.
 
-SELECT ST_GEOGFROM('010100000000000000000000400000000000001040')
-=> error contains: The emulator does not support WKB GEOGRAPHY values
+SELECT ST_GEOGFROMWKB('010200000002000000feffffffffffef3f000000000000f03f01000000000008400000000000000040', planar => TRUE)
+=> error contains: The emulator does not support function ST_GEOGFROMWKB
 
-SELECT ST_GEOGFROM(FROM_HEX('010100000000000000000000400000000000001040'))
-=> error contains: The emulator does not support function ST_GEOGFROM
+SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000feffffffffffef3f000000000000f03f01000000000008400000000000000040'), oriented => TRUE)
+=> error contains: The emulator does not support function ST_GEOGFROMWKB
 
 SELECT ST_GEOGFROMGEOJSON('{"type": "Point", "coordinates": [1, 2]}', make_valid => TRUE)
 => error contains: The emulator does not support function ST_GEOGFROMGEOJSON
