@@ -1149,7 +1149,15 @@ cc_library(
     hdrs = ["src/httplib.h"],
     # The default backlog of 5 resets connections when clients open many at once, such as
     # parallel queries from a test suite. The kernel caps it at its own limit (SOMAXCONN).
-    defines = ["CPPHTTPLIB_LISTEN_BACKLOG=1024"],
+    # A server closing an idle connection races with a client sending its next request on it, which
+    # fails a POST with EOF. Outlast clients' idle timeouts, such as Go's 90s, so that clients close
+    # them first. Each connection holds a thread while open, so allow as many threads as clients
+    # keep idle connections.
+    defines = [
+        "CPPHTTPLIB_LISTEN_BACKLOG=1024",
+        "CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND=120",
+        "CPPHTTPLIB_THREAD_POOL_MAX_COUNT=1024",
+    ],
     deps = ["@cpp-httplib//:httplib"],
 )
 

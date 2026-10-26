@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -157,6 +158,7 @@ json QueryResult::SchemaToJson() const {
 
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
+  std::mutex ddl_mutex;
   Database(const std::optional<std::string>& session_user, const udf::JavaScriptLimits& javascript,
            const functions_duckdb::ObjectStorage& storage, const udf::PythonOptions& python,
            const googlesql_geography::Options& geography,
@@ -312,6 +314,9 @@ std::shared_ptr<const StorageSnapshot> Backend::ExecuteStorageRead(
 void Backend::ExecuteDdl(const std::string& sql,
                          const std::vector<std::string>& metadata_statements,
                          const std::string& skip_query, const std::vector<std::string>& setup) {
+  // DuckDB's IF NOT EXISTS does not resolve concurrent catalog writes. Keep the existence
+  // check, DDL and metadata in one serialized transaction, across all sessions of this database.
+  const std::scoped_lock lock(db_->ddl_mutex);
   const CallConnection connection = Connect();
   RunSetup(connection.get(), setup);
   const bool own_transaction = !session_ || !session_->in_transaction;
