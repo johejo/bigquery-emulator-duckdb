@@ -50,7 +50,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 57 | 2 | 12 | 0 |
+| [Geography functions](#geography-functions) | 58 | 3 | 10 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -259,8 +259,8 @@ functions.
 | [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | Supported | S2 function |  |
 | [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | Supported | DuckDB aggregate / S2 function |  |
 | [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Supported | S2 function |  |
-| [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Unsupported |  |  |
-| [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | Unsupported |  |  |
+| [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Partial | S2 function | Unsupported: WKB GEOGRAPHY values; function ST_GEOGFROM. |
+| [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
 | [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Supported | S2 function |  |
 | [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | Unsupported |  |  |
 | [`ST_GEOGPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpoint) | Supported | S2 function |  |

@@ -367,14 +367,17 @@ Geography FromPolygon(const S2Polygon& polygon) {
   return geography;
 }
 
-// The polygon of distinct rings, which must be valid: each encloses the smaller region, which a
-// hole removes from the shell's. An empty first ring is a full shell.
+// The polygon of distinct rings, which must be valid: each encloses the smaller region or, where
+// `oriented`, the one on its left, which a hole removes from the shell's. An empty first ring is a
+// full shell.
 absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& rings,
-                                   std::string_view failed) {
+                                   std::string_view failed, bool oriented) {
   GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::unique_ptr<S2Loop>> loops, Loops(rings, failed));
   std::vector<const S2Loop*> order;
   for (const std::unique_ptr<S2Loop>& loop : loops) {
-    loop->Normalize();
+    if (!oriented) {
+      loop->Normalize();
+    }
     order.push_back(loop.get());
   }
   S2Polygon polygon;
@@ -502,7 +505,7 @@ absl::StatusOr<std::optional<std::vector<std::vector<S2Point>>>> SnapVertices(
 }  // namespace
 
 absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& input,
-                                       std::string_view failed) {
+                                       std::string_view failed, bool oriented) {
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<std::vector<S2Point>> rings,
                              DistinctRings(input, failed));
   // BigQuery checks and normalizes each ring before snapping, and checks how the rings lie after.
@@ -513,13 +516,15 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
     normalized.emplace_back();
   }
   for (const std::unique_ptr<S2Loop>& loop : loops) {
-    loop->Normalize();
+    if (!oriented) {
+      loop->Normalize();
+    }
     const absl::Span<const S2Point> vertices = loop->vertices_span();
     normalized.emplace_back(vertices.begin(), vertices.end());
   }
   GOOGLESQL_ASSIGN_OR_RETURN(const std::optional<std::vector<std::vector<S2Point>>> snapped,
                              SnapVertices(normalized));
-  absl::StatusOr<Geography> polygon = Assemble(rings, failed);
+  absl::StatusOr<Geography> polygon = Assemble(rings, failed, oriented);
   if (!snapped) {
     return polygon;
   }
@@ -534,7 +539,7 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
   if (!rings.front().empty() && snapped->front().size() == 2) {
     return BuildLine(snapped->front());
   }
-  return Assemble(*snapped, failed);
+  return Assemble(*snapped, failed, oriented);
 }
 
 namespace {

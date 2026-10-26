@@ -103,6 +103,13 @@ values geojson | ST_GEOGFROMTEXT('fullglobe') | ST_GEOGPOINT(3, 5) | ST_GEOGFROM
 elements ^ST_ASGEOJSON\( | geojson | GEOGRAPHY
 values wkt | 'fullglobe' | 'POINT(3 5)' | 'GeometryCollection EMPTY' | 'LINESTRING(0 0, 1 1)' | 'POLYGON((0 0, 1 0, 0 1, 0 0))' | 'MULTIPOLYGON(((0 0, 1 0, 0 1, 0 0)), ((5 5, 6 5, 5 6, 5 5)))' | 'GEOMETRYCOLLECTION(POINT(9 9), LINESTRING(0 0, 1 1))'
 elements ^ST_GEOGFROMTEXT\( | wkt | STRING
+values geojson_text | '{"type": "Point", "coordinates": [3, 5]}' | '{"type": "GeometryCollection", "geometries": []}' | '{"type": "LineString", "coordinates": [[0, 0], [1, 1]]}' | '{"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [0, 1], [0, 0]]]}' | '{"type": "MultiPolygon", "coordinates": [[[[0, 0], [1, 0], [0, 1], [0, 0]]], [[[5, 5], [6, 5], [5, 6], [5, 5]]]]}' | '{"type": "GeometryCollection", "geometries": [{"type": "Point", "coordinates": [9, 9]}, {"type": "LineString", "coordinates": [[0, 0], [1, 1]]}]}'
+elements ^ST_GEOGFROMGEOJSON\( | geojson_text | STRING
+# ST_GEOGFROM reads a STRING as WKT, GeoJSON or hex-encoded WKB, and BYTES as WKB.
+values geogfrom_text | 'POINT(3 5)' | '{"type": "Point", "coordinates": [3, 5]}' | '010100000000000000000000400000000000001040'
+elements ^ST_GEOGFROM\( | geogfrom_text | STRING
+argument ^ST_GEOGFROM\( | BYTES | FROM_HEX('010100000000000000000000400000000000001040')
+note ST_GEOGFROMGEOJSON See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
 # BigQuery also measures nonempty points over the spheroid, which the emulator rejects.
 longest ^ST_DISTANCE\(

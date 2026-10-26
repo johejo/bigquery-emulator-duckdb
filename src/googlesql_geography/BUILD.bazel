@@ -6,11 +6,13 @@ cc_library(
     name = "googlesql_geography",
     srcs = [
         "geography.cc",
+        "geojson.cc",
         "value.cc",
         "wkt.cc",
     ],
     hdrs = [
         "geography.h",
+        "geojson.h",
         "options.h",
         "value.h",
         "wkt.h",
@@ -20,6 +22,7 @@ cc_library(
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
+        "@nlohmann_json//:json",
     ],
     linkstatic = True,
     visibility = ["//visibility:public"],
