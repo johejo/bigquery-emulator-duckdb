@@ -13,8 +13,10 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#ifndef __APPLE__
 #include <fstream>
 #include <limits>
+#endif
 #include <map>
 #include <memory>
 #include <stdexcept>
