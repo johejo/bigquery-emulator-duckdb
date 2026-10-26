@@ -353,9 +353,6 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
   for (const auto& [name, definition] : StaticBackendRules()) {
     functions.AddRules(name, definition, Implementation::kGoogleSQL);
   }
-  for (const auto& [name, definition] : BackendRules()) {
-    functions.AddRules(name, definition, Implementation::kGoogleSQL);
-  }
   for (const auto& [name, function] : kFunctionNames) {
     functions.Add(name, {
                             .translation = Translation::kRenamed,

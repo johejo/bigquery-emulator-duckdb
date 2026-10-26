@@ -1,25 +1,14 @@
 #include "src/translator/functions_backend.h"
 
 #include <array>
-#include <cstddef>
 #include <span>
-#include <string>
 #include <string_view>
-#include <vector>
 
-#include "src/duckdb_sql.h"
-#include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
-#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::Arity;
-using function_catalog::BigNumericOperator;
-using function_catalog::Concat;
-using function_catalog::Is;
-using function_catalog::Rule;
-using function_catalog::Same;
 using function_catalog::StaticCondition;
 using function_catalog::StaticRule;
 using function_catalog::TypeUse;
@@ -44,6 +33,8 @@ constexpr std::string_view kExactDefault[] = {"'exact'"};
 constexpr std::string_view kRoundDefault[] = {"'round'"};
 constexpr std::string_view kSpaceDefault[] = {"' '"};
 constexpr std::string_view kBytesSpaceDefault[] = {"encode(' ')"};
+constexpr std::string_view kJsonPathDefault[] = {"'$'"};
+constexpr std::string_view kTrueDefault[] = {"true"};
 
 // These helpers only assemble views of static data; they do not generate SQL or own strings.
 constexpr std::array<StaticRule, 2> StringBytes(Arity arity, std::string_view text,
@@ -77,58 +68,35 @@ constexpr StaticRule Json(Arity arity, std::string_view spelling,
   };
 }
 
-// GoogleSQL splits the RANGE into bounds, rejects unsupported steps and unbounded ends,
-// and keeps the last partial subrange by default.
-std::vector<Rule> GenerateRangeArray() {
-  const auto bound = [](std::string_view name) {
-    return "struct_extract($1, " + QuoteLiteral(name) + ")";
-  };
+// JSON_QUERY and the other extractions of STRING or JSON.
+constexpr std::array<StaticRule, 2> JsonExtract(std::string_view json, std::string_view text) {
   return {
       {
-          .arity = {2, 3},
-          .spelling = "list_transform([bq_generate_range_array(" + bound(kRangeStart) + ", " +
-                      bound(kRangeEnd) +
-                      ", $2, $3)], lambda _b: list_transform(range(1, len(_b)), " +
-                      "lambda _i: struct_pack(" + QuoteIdentifier(kRangeStart) + " := _b[_i], " +
-                      QuoteIdentifier(kRangeEnd) + " := _b[_i + 1])))[1]",
-          .defaults = {"true"},
-      },
-  };
-}
-
-std::vector<Rule> Float64(std::string_view function, std::size_t arity = 1) {
-  return Same(function, arity, {Is(1, {TYPE_DOUBLE})});
-}
-
-// JSON_QUERY and the other extractions of STRING or JSON. `standard` selects JSONPath syntax.
-std::vector<Rule> JsonExtract(std::string_view function, bool standard, bool json_result) {
-  const std::string flag = standard ? "true" : "false";
-  const std::string of_json =
-      std::string(function) + "_json(CAST($1 AS VARCHAR), $2, " + flag + ")";
-  return {
-      {
-          .arity = {1, 2},
-          .spelling = json_result ? "json(" + of_json + ")" : of_json,
-          .conditions = {Is(1, {TYPE_JSON})},
-          .defaults = {"'$'"},
-      },
-      {
-          .arity = {1, 2},
-          .spelling = std::string(function) + "($1, $2, " + flag + ")",
-          .conditions = {Is(1, {TYPE_STRING})},
-          .defaults = {"'$'"},
+          Json({1, 2}, json, kJsonPathDefault),
+          {
+              .arity = {1, 2},
+              .spelling = text,
+              .conditions = ArgumentType<TYPE_STRING>::kFirst,
+              .defaults = kJsonPathDefault,
+          },
       },
   };
 }
 
 // Decimal overloads retain precision rather than going through FLOAT64.
-std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
-  const std::string function = "bq_" + std::string(name);
-  return Concat({
-      {BigNumericOperator("bq_bignumeric_" + std::string(name), arity)},
-      Float64(function, arity),
-      Same(function + "_numeric", arity, {Is(1, {TYPE_NUMERIC})}),
-  });
+constexpr std::array<StaticRule, 3> Numbers(Arity arity, std::string_view bignumeric,
+                                            std::string_view floating, std::string_view numeric) {
+  return {
+      {
+          {
+              .arity = arity,
+              .spelling = bignumeric,
+              .conditions = ArgumentType<TYPE_BIGNUMERIC>::kFirst,
+          },
+          {.arity = arity, .spelling = floating, .conditions = ArgumentType<TYPE_DOUBLE>::kFirst},
+          {.arity = arity, .spelling = numeric, .conditions = ArgumentType<TYPE_NUMERIC>::kFirst},
+      },
+  };
 }
 
 // Without explicit characters, trim Unicode whitespace rather than DuckDB's spaces.
@@ -464,7 +432,86 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
   static constexpr StaticRule kJsonStripNulls[] = {
       Json(4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))"),
   };
+  // DuckDB returns infinities where BigQuery raises errors, such as EXP(1000).
+  static constexpr auto kSqrt =
+      Numbers(1, "CAST(bq_bignumeric_sqrt(CAST($1 AS VARCHAR)) AS BIGNUM)", "bq_sqrt($1)",
+              "bq_sqrt_numeric($1)");
+  static constexpr auto kCbrt =
+      Numbers(1, "CAST(bq_bignumeric_cbrt(CAST($1 AS VARCHAR)) AS BIGNUM)", "bq_cbrt($1)",
+              "bq_cbrt_numeric($1)");
+  static constexpr auto kPow =
+      Numbers(2, "CAST(bq_bignumeric_pow(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+              "bq_pow($1, $2)", "bq_pow_numeric($1, $2)");
+  static constexpr auto kExp = Numbers(1, "CAST(bq_bignumeric_exp(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                                       "bq_exp($1)", "bq_exp_numeric($1)");
+  static constexpr auto kLn = Numbers(1, "CAST(bq_bignumeric_ln(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                                      "bq_ln($1)", "bq_ln_numeric($1)");
+  static constexpr auto kLog10 =
+      Numbers(1, "CAST(bq_bignumeric_log10(CAST($1 AS VARCHAR)) AS BIGNUM)", "bq_log10($1)",
+              "bq_log10_numeric($1)");
+  static constexpr auto kLogBinary =
+      Numbers(2, "CAST(bq_bignumeric_log(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+              "bq_log($1, $2)", "bq_log_numeric($1, $2)");
+  static constexpr std::array kLog = {
+      kLn.at(0), kLn.at(1), kLn.at(2), kLogBinary.at(0), kLogBinary.at(1), kLogBinary.at(2),
+  };
+  // GoogleSQL splits the RANGE into bounds, rejects unsupported steps and unbounded ends,
+  // and keeps the last partial subrange by default.
+  static constexpr StaticRule kGenerateRangeArray[] = {
+      {
+          .arity = {2, 3},
+          .spelling = "list_transform([bq_generate_range_array(struct_extract($1, '$start'), "
+                      "struct_extract($1, '$end'), $2, $3)], lambda _b: "
+                      "list_transform(range(1, len(_b)), lambda _i: "
+                      "struct_pack(\"$start\" := _b[_i], \"$end\" := _b[_i + 1])))[1]",
+          .defaults = kTrueDefault,
+      },
+  };
+  // The final boolean selects standard JSONPath syntax.
+  static constexpr auto kJsonQuery = JsonExtract(
+      "json(bq_json_query_json(CAST($1 AS VARCHAR), $2, true))", "bq_json_query($1, $2, true)");
+  static constexpr auto kJsonExtract = JsonExtract(
+      "json(bq_json_query_json(CAST($1 AS VARCHAR), $2, false))", "bq_json_query($1, $2, false)");
+  static constexpr auto kJsonValue = JsonExtract(
+      "bq_json_value_json(CAST($1 AS VARCHAR), $2, true)", "bq_json_value($1, $2, true)");
+  static constexpr auto kJsonExtractScalar = JsonExtract(
+      "bq_json_value_json(CAST($1 AS VARCHAR), $2, false)", "bq_json_value($1, $2, false)");
+  static constexpr auto kJsonQueryArray =
+      JsonExtract("bq_json_query_array_json(CAST($1 AS VARCHAR), $2, true)",
+                  "bq_json_query_array($1, $2, true)");
+  static constexpr auto kJsonExtractArray =
+      JsonExtract("bq_json_query_array_json(CAST($1 AS VARCHAR), $2, false)",
+                  "bq_json_query_array($1, $2, false)");
+  static constexpr auto kJsonValueArray =
+      JsonExtract("bq_json_value_array_json(CAST($1 AS VARCHAR), $2, true)",
+                  "bq_json_value_array($1, $2, true)");
+  static constexpr auto kJsonExtractStringArray =
+      JsonExtract("bq_json_value_array_json(CAST($1 AS VARCHAR), $2, false)",
+                  "bq_json_value_array($1, $2, false)");
   static constexpr function_catalog::StaticNamedDefinition<StaticRule> kRules[] = {
+      {"SQRT", {.rules = kSqrt, .uses = {TypeUse::kBigNumeric}}},
+      {"CBRT", {.rules = kCbrt, .uses = {TypeUse::kBigNumeric}}},
+      {"POW", {.rules = kPow, .uses = {TypeUse::kBigNumeric}}},
+      {"POWER", {.rules = kPow, .uses = {TypeUse::kBigNumeric}}},
+      {"EXP", {.rules = kExp, .uses = {TypeUse::kBigNumeric}}},
+      {"LN", {.rules = kLn, .uses = {TypeUse::kBigNumeric}}},
+      {"LOG10", {.rules = kLog10, .uses = {TypeUse::kBigNumeric}}},
+      {"LOG", {.rules = kLog, .uses = {TypeUse::kBigNumeric}}},
+      {
+          "GENERATE_RANGE_ARRAY",
+          {
+              .rules = kGenerateRangeArray,
+              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBuildsOrReadsRange},
+          },
+      },
+      {"JSON_QUERY", {.rules = kJsonQuery}},
+      {"JSON_EXTRACT", {.rules = kJsonExtract}},
+      {"JSON_VALUE", {.rules = kJsonValue}},
+      {"JSON_EXTRACT_SCALAR", {.rules = kJsonExtractScalar}},
+      {"JSON_QUERY_ARRAY", {.rules = kJsonQueryArray}},
+      {"JSON_EXTRACT_ARRAY", {.rules = kJsonExtractArray}},
+      {"JSON_VALUE_ARRAY", {.rules = kJsonValueArray}},
+      {"JSON_EXTRACT_STRING_ARRAY", {.rules = kJsonExtractStringArray}},
       {"$INTERVAL", {.rules = kInterval, .uses = {TypeUse::kBuildsOrReadsInterval}}},
       {"MAKE_INTERVAL", {.rules = kMakeInterval, .uses = {TypeUse::kBuildsOrReadsInterval}}},
       {"JUSTIFY_HOURS", {.rules = kJustifyHours, .uses = {TypeUse::kBuildsOrReadsInterval}}},
@@ -562,40 +609,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       {"LAX_STRING", {.rules = kLaxString}},
       {"JSON_KEYS", {.rules = kJsonKeys, .uses = {TypeUse::kRejectsSafe}}},
       {"JSON_STRIP_NULLS", {.rules = kJsonStripNulls}},
-  };
-  return kRules;
-}
-
-// Only rules whose builders generate SQL strings need runtime-owned storage.
-std::span<const function_catalog::NamedDefinition<Rule>> BackendRules() {
-  static const function_catalog::NamedDefinition<Rule> kRules[] = {
-      // DuckDB returns infinities where BigQuery raises errors, such as EXP(1000).
-      {"SQRT", {.rules = Numbers("sqrt"), .uses = {TypeUse::kBigNumeric}}},
-      {"CBRT", {.rules = Numbers("cbrt"), .uses = {TypeUse::kBigNumeric}}},
-      {"POW", {.rules = Numbers("pow", 2), .uses = {TypeUse::kBigNumeric}}},
-      {"POWER", {.rules = Numbers("pow", 2), .uses = {TypeUse::kBigNumeric}}},
-      {"EXP", {.rules = Numbers("exp"), .uses = {TypeUse::kBigNumeric}}},
-      {"LN", {.rules = Numbers("ln"), .uses = {TypeUse::kBigNumeric}}},
-      {"LOG10", {.rules = Numbers("log10"), .uses = {TypeUse::kBigNumeric}}},
-      {
-          "LOG",
-          {.rules = Concat({Numbers("ln"), Numbers("log", 2)}), .uses = {TypeUse::kBigNumeric}},
-      },
-      {
-          "GENERATE_RANGE_ARRAY",
-          {
-              .rules = GenerateRangeArray(),
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBuildsOrReadsRange},
-          },
-      },
-      {"JSON_QUERY", {.rules = JsonExtract("bq_json_query", true, true)}},
-      {"JSON_EXTRACT", {.rules = JsonExtract("bq_json_query", false, true)}},
-      {"JSON_VALUE", {.rules = JsonExtract("bq_json_value", true, false)}},
-      {"JSON_EXTRACT_SCALAR", {.rules = JsonExtract("bq_json_value", false, false)}},
-      {"JSON_QUERY_ARRAY", {.rules = JsonExtract("bq_json_query_array", true, false)}},
-      {"JSON_EXTRACT_ARRAY", {.rules = JsonExtract("bq_json_query_array", false, false)}},
-      {"JSON_VALUE_ARRAY", {.rules = JsonExtract("bq_json_value_array", true, false)}},
-      {"JSON_EXTRACT_STRING_ARRAY", {.rules = JsonExtract("bq_json_value_array", false, false)}},
   };
   return kRules;
 }

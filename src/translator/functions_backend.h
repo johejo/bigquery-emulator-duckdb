@@ -6,7 +6,6 @@
 
 namespace bigquery_emulator_duckdb::translator {
 
-std::span<const function_catalog::NamedDefinition<function_catalog::Rule>> BackendRules();
 std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticRule>>
 StaticBackendRules();
 
