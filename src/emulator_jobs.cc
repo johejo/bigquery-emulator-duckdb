@@ -332,12 +332,16 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       paths = StageJsonNumerics(paths, requested_schema, downloads);
     } else if (const auto* parquet_options = std::get_if<ParquetLoadOptions>(&options)) {
       ParquetSources sources =
-          StageParquetDecimals(paths, downloads, parquet_options->enable_list_inference);
+          StageParquetSources(paths, downloads, parquet_options->enable_list_inference);
       paths = std::move(sources.paths);
       parquet = std::move(sources.columns);
-      if (requested_schema.empty() && parquet.HasWideDecimal()) {
+      if (requested_schema.empty() &&
+          (parquet.HasWideDecimal() ||
+           std::ranges::any_of(parquet.children, [](const auto& column) {
+             return column.edges != ParquetColumn::Edges::kNone;
+           }))) {
         requested_schema = Prepare(LoadQuery(options, paths, {}, parquet)).schema;
-        DetectParquetDecimals(requested_schema, parquet, ParseDecimalTargetTypes(config));
+        DetectParquetSchema(requested_schema, parquet, ParseDecimalTargetTypes(config));
       }
     }
     auto read_schema = requested_schema;

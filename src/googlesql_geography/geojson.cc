@@ -15,9 +15,7 @@
 #include "googlesql/base/status_macros.h"
 #include "nlohmann/json.hpp"
 #include "s2/r2.h"
-#include "s2/s2earth.h"
-#include "s2/s2edge_tessellator.h"
-#include "s2/s2point.h"
+#include "src/googlesql_geography/planar.h"
 #include "src/googlesql_geography/value.h"
 
 namespace googlesql_geography {
@@ -73,17 +71,6 @@ absl::StatusOr<std::vector<R2Point>> ReadPositions(const json& positions) {
   return result;
 }
 
-// The vertices of the geodesic edges that follow the planar edges between `positions`, as
-// ST_ASGEOJSON's tessellator adds them the other way.
-std::vector<S2Point> Unproject(const std::vector<R2Point>& positions) {
-  const S2EdgeTessellator tessellator(&Projection(), S2Earth::MetersToAngle(10));
-  std::vector<S2Point> vertices;
-  for (size_t i = 0; i + 1 < positions.size(); ++i) {
-    tessellator.AppendUnprojected(positions.at(i), positions.at(i + 1), &vertices);
-  }
-  return vertices;
-}
-
 absl::StatusOr<Geography> ReadPoint(const json& coordinates) {
   GOOGLESQL_ASSIGN_OR_RETURN(const R2Point position, ReadPosition(coordinates));
   return PointGeography(Projection().Unproject(position));
@@ -91,55 +78,19 @@ absl::StatusOr<Geography> ReadPoint(const json& coordinates) {
 
 absl::StatusOr<Geography> ReadLine(const json& coordinates) {
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<R2Point> positions, ReadPositions(coordinates));
-  if (positions.size() < 2) {
-    return Failed("Linestring should have at least two points, but had " +
-                  Points(positions.size()));
-  }
-  return BuildLine(Unproject(positions));
-}
-
-// Twice the signed area `ring` encloses on the plane, positive where it runs counterclockwise.
-double PlanarArea(const std::vector<R2Point>& ring) {
-  double area = 0;
-  for (size_t i = 0; i + 1 < ring.size(); ++i) {
-    area += ring.at(i).CrossProd(ring.at(i + 1));
-  }
-  return area;
+  return PlanarLine(positions, kGeoJsonFailed);
 }
 
 // A polygon is the region its rings enclose on the plane. Each loop runs as the ring does, and
 // where the ring runs clockwise, in reverse as S2Loop::Invert reverses it, so that the region it
 // adds or removes lies on its left.
 absl::StatusOr<Geography> ReadPolygon(const json& coordinates) {
-  if (coordinates.empty()) {
-    return Failed("Polygon should have shell");
-  }
-  std::vector<std::vector<S2Point>> loops;
+  std::vector<std::vector<R2Point>> rings;
   for (const json& ring : coordinates) {
-    GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<R2Point> positions, ReadPositions(ring));
-    if (positions.size() < 4) {
-      return Failed("Polygon loop should have at least four vertices, but only had " +
-                    std::to_string(positions.size()));
-    }
-    if (positions.front() != positions.back()) {
-      return Failed("Polygon loop should be a closed ring (last point the same as first)");
-    }
-    // An edge along a pole collapses to it, as in ST_ASGEOJSON's full polygon, which BigQuery
-    // reads back as the full polygon.
-    for (size_t i = 0; i + 1 < positions.size(); ++i) {
-      if (std::abs(positions.at(i).y()) == 90 && positions.at(i + 1).y() == positions.at(i).y() &&
-          positions.at(i + 1).x() != positions.at(i).x()) {
-        return absl::UnimplementedError(
-            "The emulator does not support GeoJSON polygons with an edge along a pole");
-      }
-    }
-    std::vector<S2Point>& loop = loops.emplace_back(Unproject(positions));
-    loop.pop_back();
-    if (PlanarArea(positions) < 0) {
-      std::ranges::reverse(loop);
-    }
+    GOOGLESQL_ASSIGN_OR_RETURN(auto positions, ReadPositions(ring));
+    rings.push_back(std::move(positions));
   }
-  return BuildPolygon(loops, kGeoJsonFailed, /*oriented=*/true);
+  return PlanarPolygon(rings, kGeoJsonFailed);
 }
 
 // A geometry type other than GeometryCollection, whose coordinates are one part as `read` reads

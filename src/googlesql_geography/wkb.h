@@ -13,10 +13,11 @@ namespace googlesql_geography {
 // builds them, where a point whose coordinates are both NaN is empty. Z and M coordinates are
 // errors, and EWKB's SRID must be WGS84's. With `oriented`, as loads read WKB, polygons are taken
 // as ReadWkt takes them. `failed` prefixes the errors, which end saying whether parsing or the
-// geography failed, as BigQuery's do.
+// geography failed, as BigQuery's do. `planar` builds GeoParquet's planar edges directly from
+// the decoded coordinates, without normalizing longitudes or converting through a text format.
 absl::StatusOr<Geography> ReadWkb(std::string_view bytes,
                                   std::string_view failed = "ST_GeogFromWKB failed: ",
-                                  bool oriented = false);
+                                  bool oriented = false, bool planar = false);
 
 // The little-endian WKB of `geography`: one point, linestring or polygon, a MULTIPOINT,
 // MULTILINESTRING or MULTIPOLYGON of more than one, and a GEOMETRYCOLLECTION of each of them where

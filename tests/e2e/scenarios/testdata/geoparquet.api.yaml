@@ -1,7 +1,7 @@
 version: 1
 description: >-
   Ordinary Parquet WKB with an explicit GEOGRAPHY schema uses spherical edges.
-  This is the passing control for the GeoParquet cases under known_bugs/.
+  This is the ordinary WKB control for the GeoParquet edge interpretation cases.
 # Sources: https://cloud.google.com/bigquery/docs/geospatial-data#loading_geoparquet_files
 # https://geoparquet.org/releases/v1.0.0/ (edges defaults to planar; omitted crs is CRS84).
 # Expectations derive from BigQuery observations in the adjacent answers sidecar.

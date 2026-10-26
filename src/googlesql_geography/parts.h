@@ -26,4 +26,7 @@ struct Part {
 absl::StatusOr<Geography> BuildParts(std::vector<Part> parts, bool oriented,
                                      std::string_view failed);
 
+// Build WKB's decoded coordinates with planar rather than geodesic edges.
+absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts, std::string_view failed);
+
 }  // namespace googlesql_geography

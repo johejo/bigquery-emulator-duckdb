@@ -36,6 +36,9 @@ func testScenarios(t *testing.T, pattern string, knownBug bool) {
 		t.Fatal(err)
 	}
 	if len(paths) == 0 {
+		if knownBug {
+			t.Skip("no known API compatibility bugs")
+		}
 		t.Fatal("no API compatibility scenarios found")
 	}
 	for _, path := range paths {

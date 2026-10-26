@@ -1,7 +1,4 @@
 version: 1
-# Known incompatibilities: inferred GeoParquet GEOMETRY becomes STRING rather than GEOGRAPHY;
-# an explicit GEOGRAPHY schema loads planar edges as great-circle arcs without tessellation.
-# TestKnownBugs requires a mismatch and fails once a case is fixed, so it can be promoted.
 description: >-
   Observe GeoParquet edge interpretation, schema inference and vertex insertion.
   Compare omitted edges, explicit planar and spherical edges with ordinary WKB.

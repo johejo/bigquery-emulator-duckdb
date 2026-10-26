@@ -32,4 +32,4 @@ SELECT ST_GEOGFROMGEOJSON('{"type": "Point", "coordinates": [1, 2]}', make_valid
 # collapse to them, which the emulator does not take.
 
 SELECT ST_GEOGFROMGEOJSON('{"type": "Polygon", "coordinates": [[[180, 90], [-180, 90], [-180, -90], [180, -90], [180, 90]]]}')
-=> error contains: The emulator does not support GeoJSON polygons with an edge along a pole
+=> error contains: The emulator does not support planar polygons with an edge along a pole
