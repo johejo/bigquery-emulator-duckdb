@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <iterator>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -210,6 +211,56 @@ std::vector<std::string> AggregateArguments(const AggregateRule& rule,
 
 std::string AggregateOrder(const AggregateRule& rule, const std::vector<std::string>& arguments) {
   return rule.order.empty() ? "" : Substitute(rule.order, arguments);
+}
+
+namespace {
+
+std::vector<Condition> OwnConditions(std::span<const StaticCondition> conditions) {
+  std::vector<Condition> result;
+  result.reserve(conditions.size());
+  std::ranges::transform(
+      conditions, std::back_inserter(result), [](const StaticCondition& condition) {
+        return Condition{
+            .argument = condition.argument,
+            .types = {condition.types.begin(), condition.types.end()},
+            .date_parts = {condition.date_parts.begin(), condition.date_parts.end()},
+            .rounding_mode = condition.rounding_mode,
+        };
+      });
+  return result;
+}
+
+}  // namespace
+
+Rule Own(const StaticRule& rule) {
+  return {
+      .arity = rule.arity,
+      .spelling = std::string(rule.spelling),
+      .conditions = OwnConditions(rule.conditions),
+      .defaults = {rule.defaults.begin(), rule.defaults.end()},
+      .errors = {rule.errors.begin(), rule.errors.end()},
+      .implementation = rule.implementation,
+  };
+}
+
+AggregateRule Own(const StaticAggregateRule& rule) {
+  return {
+      .function = rule.function,
+      .type = rule.type,
+      .conditions = OwnConditions(rule.conditions),
+      .arguments = {rule.arguments.begin(), rule.arguments.end()},
+      .order = rule.order,
+      .defaults = {rule.defaults.begin(), rule.defaults.end()},
+      .nulls = rule.nulls,
+      .distinct = rule.distinct,
+      .limit = rule.limit,
+      .skip_nulls = rule.skip_nulls,
+      .carries = rule.carries,
+      .finish = rule.finish,
+      .finish_after_scan = rule.finish_after_scan,
+      .order_by_argument_error = rule.order_by_argument_error,
+      .constant_arguments = {rule.constant_arguments.begin(), rule.constant_arguments.end()},
+  };
 }
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

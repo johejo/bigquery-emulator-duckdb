@@ -569,19 +569,19 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
   if (!status.ok()) {
     // These errors have been checked against BigQuery, including their location format: the
     // first line of the caret message, with " [at 1:29]" written as " at [1:29]".
-    static constexpr std::array<std::string_view, 7> kChecked = {
-        "Casting between arrays with incompatible element types",
-        "First argument (key type) in function KEYS.NEW_KEYSET",
-        "Argument 2 to BIGQUERYGOOGLESQL:TF_IDF ",
-        "Argument 3 to BIGQUERYGOOGLESQL:TF_IDF ",
-        "Analytic function BIGQUERYGOOGLESQL:TF_IDF ",
-        "Window ORDER BY is not allowed for analytic function tf_idf",
-        "Window framing clause is not allowed for analytic function tf_idf",
-    };
     const std::string_view message = status.message();
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
-        kChecked, [&](std::string_view prefix) { return message.starts_with(prefix); });
+        std::array<std::string_view, 7>{
+            "Casting between arrays with incompatible element types",
+            "First argument (key type) in function KEYS.NEW_KEYSET",
+            "Argument 2 to BIGQUERYGOOGLESQL:TF_IDF ",
+            "Argument 3 to BIGQUERYGOOGLESQL:TF_IDF ",
+            "Analytic function BIGQUERYGOOGLESQL:TF_IDF ",
+            "Window ORDER BY is not allowed for analytic function tf_idf",
+            "Window framing clause is not allowed for analytic function tf_idf",
+        },
+        [&](std::string_view prefix) { return message.starts_with(prefix); });
     // Of the invalid casts, those to JSON have been checked.
     checked = checked || (line.starts_with("Invalid cast from ") &&
                           line.find(" to JSON [at ") != std::string::npos);

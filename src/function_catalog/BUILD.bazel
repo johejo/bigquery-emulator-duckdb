@@ -18,6 +18,7 @@ cc_library(
         "resolved_access.h",
         "rule_builders.h",
         "rules.h",
+        "static_definitions.h",
     ],
     copts = ["-std=c++20"],
     implementation_deps = [

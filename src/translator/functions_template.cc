@@ -5,21 +5,28 @@
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
+#include "src/function_catalog/static_definitions.h"
 #include "src/translator/handlers.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::Define;
+using function_catalog::DefinitionViews;
+
 using function_catalog::Rule;
+using function_catalog::StaticCondition;
+using function_catalog::StaticRule;
 
 using function_catalog::ArgumentMode;
 using function_catalog::Arity;
@@ -28,7 +35,6 @@ using function_catalog::BigNumericOperator;
 using function_catalog::Concat;
 using function_catalog::Condition;
 using function_catalog::FloatCompare;
-using function_catalog::FunctionDefinition;
 using function_catalog::Implementation;
 using function_catalog::Is;
 using function_catalog::Part;
@@ -645,202 +651,779 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 
 }  // namespace
 
-// Functions implemented by DuckDB SQL templates.
-const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRules() {
-  static const auto* const kRules = new std::unordered_map<std::string_view,
-                                                           FunctionDefinition<Rule>>{
+// Literal templates have immutable backing arrays; generated SQL stays in TemplateRules().
+std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTemplateRules() {
+  static constexpr googlesql::TypeKind kElementTypes[] = {TYPE_GRAPH_ELEMENT};
+  static constexpr googlesql::TypeKind kPathTypes[] = {TYPE_GRAPH_PATH};
+  static constexpr StaticCondition kElement[] = {{.argument = 1, .types = kElementTypes}};
+  static constexpr StaticCondition kPath[] = {{.argument = 1, .types = kPathTypes}};
+  static constexpr StaticCondition kEndpoints[] = {
+      {.argument = 1, .types = kElementTypes},
+      {.argument = 2, .types = kElementTypes},
+  };
+  static constexpr std::string_view kEndpointErrors[] = {
+      "'The emulator does not support graph endpoint predicates with NULL operands'",
+  };
+  static constexpr googlesql::TypeKind kStringTypes[] = {TYPE_STRING};
+  static constexpr googlesql::TypeKind kBytesTypes[] = {TYPE_BYTES};
+  static constexpr googlesql::TypeKind kInt64Types[] = {TYPE_INT64};
+  static constexpr googlesql::TypeKind kNumericTypes[] = {TYPE_NUMERIC};
+  static constexpr googlesql::TypeKind kDoubleTypes[] = {TYPE_DOUBLE};
+  static constexpr googlesql::TypeKind kBigNumericTypes[] = {TYPE_BIGNUMERIC};
+  static constexpr googlesql::TypeKind kCivilTypes[] = {TYPE_DATE, TYPE_DATETIME};
+  static constexpr StaticCondition kString[] = {{.argument = 1, .types = kStringTypes}};
+  static constexpr StaticCondition kBytes[] = {{.argument = 1, .types = kBytesTypes}};
+  static constexpr StaticCondition kInt64[] = {{.argument = 1, .types = kInt64Types}};
+  static constexpr StaticCondition kNumeric[] = {{.argument = 1, .types = kNumericTypes}};
+  static constexpr StaticCondition kDouble[] = {{.argument = 1, .types = kDoubleTypes}};
+  static constexpr StaticCondition kBigNumeric[] = {{.argument = 1, .types = kBigNumericTypes}};
+  static constexpr StaticCondition kCivil[] = {{.argument = 1, .types = kCivilTypes}};
+  static constexpr StaticCondition kStringDelimiter[] = {{.argument = 2, .types = kStringTypes}};
+  static constexpr StaticCondition kBytesDelimiter[] = {{.argument = 2, .types = kBytesTypes}};
+  static constexpr StaticCondition kInt64Sequence[] = {
+      {.argument = 1, .types = kInt64Types},
+      {.argument = 2, .types = kInt64Types},
+      {.argument = 3, .types = kInt64Types},
+  };
+  static constexpr std::string_view kLikeErrors[] = {"'LIKE pattern ends with a backslash'"};
+  static constexpr function_catalog::TypeRejection kDistinctRejections[] = {
       {
-          "$IS_SOURCE_NODE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                              "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
-                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
-                          .defaults = {},
-                          .errors =
-                              {
-                                  "'The emulator does not support graph endpoint predicates with "
-                                  "NULL "
-                                  "operands'",
-                              },
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .types = kStructTypes,
+          .message = "IS DISTINCT FROM can't be used with arguments of type STRUCT",
       },
+  };
+  static constexpr function_catalog::TypeRejection kNotDistinctRejections[] = {
       {
-          "$IS_DEST_NODE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                                      "struct_extract($1, '$id') = struct_extract($2, "
-                                      "'$destination_id') END",
-                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
-                          .defaults = {},
-                          .errors =
-                              {
-                                  "'The emulator does not support graph endpoint predicates with "
-                                  "NULL "
-                                  "operands'",
-                              },
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .types = kStructTypes,
+          .message = "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
       },
-      {
-          "LABELS",
+  };
+  static constexpr ArgumentMode kInArrayModes[] = {
+      ArgumentMode::kExpression,
+      ArgumentMode::kIntervalArrayKeys,
+  };
+  static constexpr std::string_view kDateFromUnixDateErrors[] = {
+      "'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1",
+  };
+  static constexpr std::string_view kErrorMessages[] = {
+      "coalesce($1, 'ERROR function called with NULL value')",
+  };
+  static constexpr std::string_view kOneDefault[] = {"1"};
+  static constexpr std::string_view kBigNumericOneDefault[] = {
+      "CAST('100000000000000000000000000000000000000' AS BIGNUM)",
+  };
+  static constexpr std::string_view kSequenceErrors[] = {"'Sequence step cannot be 0.'"};
+  static constexpr googlesql::TypeKind kDateTypes[] = {TYPE_DATE};
+  static constexpr googlesql::TypeKind kDatetimeTypes[] = {TYPE_DATETIME};
+  static constexpr googlesql::TypeKind kTimestampTypes[] = {TYPE_TIMESTAMP};
+  static constexpr googlesql::TypeKind kTimeTypes[] = {TYPE_TIME};
+  static constexpr StaticCondition kInterval[] = {{.argument = 1, .types = kIntervalTypes}};
+  static constexpr StaticCondition kIntervals[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kDateInterval[] = {
+      {.argument = 1, .types = kDateTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kIntervalDate[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kDateTypes},
+  };
+  static constexpr StaticCondition kDates[] = {
+      {.argument = 1, .types = kDateTypes},
+      {.argument = 2, .types = kDateTypes},
+  };
+  static constexpr StaticCondition kDatetime[] = {{.argument = 1, .types = kDatetimeTypes}};
+  static constexpr StaticCondition kDatetimeSecond[] = {{.argument = 2, .types = kDatetimeTypes}};
+  static constexpr StaticCondition kDatetimeInterval[] = {
+      {.argument = 1, .types = kDatetimeTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kTimestamp[] = {{.argument = 1, .types = kTimestampTypes}};
+  static constexpr StaticCondition kTimestampSecond[] = {{.argument = 2, .types = kTimestampTypes}};
+  static constexpr StaticCondition kTimestampInterval[] = {
+      {.argument = 1, .types = kTimestampTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kTime[] = {{.argument = 1, .types = kTimeTypes}};
+  static constexpr StaticCondition kIntervalInt64[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kInt64Types},
+  };
+  static constexpr StaticCondition kInt64Interval[] = {
+      {.argument = 1, .types = kInt64Types},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr function_catalog::TypeRejection kMultiplyRejections[] = {
+      {.types = kIntervalDoubleTypes, .message = "No matching signature for operator *"},
+      {.types = kDoubleIntervalTypes, .message = "No matching signature for operator *"},
+  };
+  static constexpr std::string_view kDivisionErrors[] = {"'division by zero'"};
+  static constexpr std::string_view kModErrors[] = {
+      "'division by zero: MOD(' || $1 || ', ' || $2 || ')'",
+  };
+  static constexpr std::string_view kDivErrors[] = {"'division by zero: ' || $1 || ' / ' || $2"};
+  static constexpr auto kRulesBacking = std::tuple{
+      // A backslash escapes the character after it, and must not end the pattern. BYTES are
+      // unsupported, since DuckDB's LIKE takes only VARCHAR.
+
+      Define("$LIKE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
+                                 "THEN !1 ELSE "
+                                 "($1 LIKE $2 ESCAPE '\\') END",
+                     .conditions = kString,
+                     .errors = kLikeErrors,
+                 },
+             }),
+
+      Define("$IS_DISTINCT_FROM",
+             {
+                 {.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"},
+             },
+             {
+                 .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+                 .type_rejections = kDistinctRejections,
+             }),
+
+      Define("$IS_NOT_DISTINCT_FROM",
+             {
+                 {.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"},
+             },
+             {
+                 .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+                 .type_rejections = kNotDistinctRejections,
+             }),
+
+      Define("$IS_NULL", {{.arity = 1, .spelling = "($1 IS NULL)"}},
+             {
+                 .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+             }),
+      // Operators stay expressions that CASE and IF can short-circuit. GoogleSQL adds an
+      // INTERVAL's months, days and time in turn, checking each step's range; see
+      // src/googlesql_functions_duckdb/interval.cc.
+      Define(
+          "$ADD",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$labels')",
-                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_add(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_add_intervals($1, $2)", .conditions = kIntervals},
+              {.arity = 2, .spelling = "bq_add_date_interval($1, $2)", .conditions = kDateInterval},
+              {.arity = 2, .spelling = "bq_add_date_interval($2, $1)", .conditions = kIntervalDate},
+              {.arity = 2, .spelling = "bq_add_datetime_interval($1, $2)", .conditions = kDatetime},
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_datetime_interval($2, $1)",
+                  .conditions = kDatetimeSecond,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_timestamp_interval($1, $2)",
+                  .conditions = kTimestamp,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_timestamp_interval($2, $1)",
+                  .conditions = kTimestampSecond,
+              },
+              {.arity = 2, .spelling = "($1 + $2)"},
           },
-      },
-      {
-          "NODES",
+          {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      // - subtracts an INTERVAL as + adds its negation.
+      Define(
+          "$SUBTRACT",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$nodes')",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_subtract(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) "
+                      "AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_subtract_intervals($1, $2)", .conditions = kInterval},
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_date_interval($1, $2)",
+                  .conditions = kDateInterval,
+              },
+              {.arity = 2, .spelling = "bq_subtract_dates($1, $2)", .conditions = kDates},
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_datetime_interval($1, $2)",
+                  .conditions = kDatetimeInterval,
+              },
+              {.arity = 2, .spelling = "bq_subtract_datetimes($1, $2)", .conditions = kDatetime},
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_timestamp_interval($1, $2)",
+                  .conditions = kTimestampInterval,
+              },
+              {.arity = 2, .spelling = "bq_subtract_timestamps($1, $2)", .conditions = kTimestamp},
+              {.arity = 2, .spelling = "bq_subtract_times($1, $2)", .conditions = kTime},
+              {.arity = 2, .spelling = "($1 - $2)"},
           },
-      },
-      {
-          "EDGES",
+          {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      // DuckDB multiplies DECIMAL(38, 9) into DECIMAL(38, 18), overflowing past 20
+      // integer digits, and divides as DOUBLE; GoogleSQL computes the NUMERIC result.
+      Define("$MULTIPLY",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CAST(bq_bignumeric_multiply(CAST($1 AS VARCHAR), CAST($2 AS "
+                                 "VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 2, .spelling = "bq_multiply_numeric($1, $2)", .conditions = kNumeric},
+                 // Reject FLOAT64 operands as BigQuery does.
+                 {
+                     .arity = 2,
+                     .spelling = "bq_multiply_interval($1, $2)",
+                     .conditions = kIntervalInt64,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_multiply_interval($2, $1)",
+                     .conditions = kInt64Interval,
+                 },
+                 {.arity = 2, .spelling = "($1 * $2)"},
+             },
+             {
+                 .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
+                 .type_rejections = kMultiplyRejections,
+             }),
+      // DuckDB would return infinity on division by zero.
+      Define(
+          "$DIVIDE",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$edges')",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+              {
+                  .arity = 2,
+                  .spelling = "CAST(bq_bignumeric_divide(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) "
+                              "AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_divide_numeric($1, $2)", .conditions = kNumeric},
+              {.arity = 2, .spelling = "bq_divide_interval($1, $2)", .conditions = kIntervalInt64},
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE "
+                      "$1 / $2 END",
+                  .errors = kDivisionErrors,
+              },
           },
-      },
-      {
-          "PATH_FIRST",
+          {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      Define("$UNARY_MINUS",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_bignumeric_negate(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 1, .spelling = "(-$1)"},
+             },
+             {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      // SAFE_DIVIDE makes the zero divisor disappear.
+      Define("SAFE_DIVIDE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CAST(bq_bignumeric_safe_divide(CAST($1 AS VARCHAR), CAST($2 AS "
+                                 "VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 2, .spelling = "bq_safe_divide_numeric($1, $2)", .conditions = kNumeric},
+                 {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
+             },
+             {.uses = {TypeUse::kBigNumeric}}),
+      // DuckDB returns NULL on a zero divisor, and MOD(INT64_MIN, -1) overflows instead of 0.
+      Define(
+          "MOD",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$nodes')[1]",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_mod(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "WHEN $2 = -1 THEN 0 ELSE mod($1, $2) END",
+                  .conditions = kInt64,
+                  .errors = kModErrors,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "ELSE mod($1, $2) END",
+                  .errors = kModErrors,
+              },
           },
-      },
-      {
-          "PATH_LAST",
+          {.uses = {TypeUse::kBigNumeric}}),
+      // DuckDB's divide() of DECIMAL returns DOUBLE; GoogleSQL computes the exact quotient.
+      Define(
+          "DIV",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$nodes')[-1]",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_div(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_div_numeric($1, $2)", .conditions = kNumeric},
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "ELSE divide($1, $2) END",
+                  .conditions = kInt64,
+                  .errors = kDivErrors,
+              },
           },
-      },
-      {
-          "PATH_LENGTH",
+          {.uses = {TypeUse::kBigNumeric}}),
+      // DuckDB's sign() is 0 for NaN.
+      Define("SIGN",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_bignumeric_sign(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {
+                     .arity = 1,
+                     .spelling = "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END",
+                     .conditions = kDouble,
+                 },
+                 {.arity = 1, .spelling = "sign($1)"},
+             },
+             {.uses = {TypeUse::kBigNumeric}}),
+      Define("ABS",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_bignumeric_abs(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 1, .spelling = "abs($1)"},
+             },
+             {.uses = {TypeUse::kBigNumeric}}),
+      Define("$IS_TRUE", {{.arity = 1, .spelling = "($1 IS TRUE)"}}),
+      Define("$IS_FALSE", {{.arity = 1, .spelling = "($1 IS FALSE)"}}),
+      Define("$NOT", {{.arity = 1, .spelling = "(NOT $1)"}}),
+      Define("$BITWISE_NOT", {{.arity = 1, .spelling = "(~$1)"}}),
+      Define("$BITWISE_AND", {{.arity = 2, .spelling = "($1 & $2)"}}),
+      Define("$BITWISE_OR", {{.arity = 2, .spelling = "($1 | $2)"}}),
+      Define("$BITWISE_XOR", {{.arity = 2, .spelling = "xor($1, $2)"}}),
+
+      // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL
+      // array.
+      Define("$IN_ARRAY",
+             {
+                 {.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"},
+             },
+             {
+                 .uses =
+                     {
+                         TypeUse::kCompares,
+                         TypeUse::kComparesIntervalKeys,
+                         TypeUse::kComparesStructsWithInterval,
+                         TypeUse::kBigNumeric,
+                     },
+                 .argument_modes = kInArrayModes,
+                 .struct_handler = StructComparison,
+             }),
+
+      Define("IEEE_DIVIDE",
+             {
+                 {.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"},
+             }),
+      // DuckDB cannot cast an empty BLOB to BIT.
+
+      Define("BIT_COUNT",
+             {
+                 {.arity = 1, .spelling = "bit_count($1)", .conditions = kInt64},
+                 {
+                     .arity = 1,
+                     .spelling = "CASE WHEN octet_length($1) = 0 THEN 0 ELSE "
+                                 "bit_count(CAST($1 AS BIT)) END",
+                     .conditions = kBytes,
+                 },
+             }),
+
+      Define("TIME_TRUNC",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)",
+                 },
+             }),
+      Define("CURRENT_DATE", {{.arity = 0, .spelling = "CURRENT_DATE"}}),
+      Define("CURRENT_TIME", {{.arity = 0, .spelling = "CURRENT_TIME"}}),
+      Define("CURRENT_TIMESTAMP", {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}),
+
+      Define("CURRENT_DATETIME",
+             {
+                 {.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"},
+             }),
+      // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
+
+      Define("TIMESTAMP",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "bq_string_to_timestamp($1, false)",
+                     .conditions = kString,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_string_to_timestamp_in($1, $2)",
+                     .conditions = kString,
+                 },
+                 {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
+                 // A civil time in the given zone.
+                 {
+                     .arity = 2,
+                     .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
+                     .conditions = kCivil,
+                 },
+             }),
+      // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
+      // truncates toward zero.
+
+      Define("UNIX_SECONDS",
+             {
+                 {.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"},
+             }),
+
+      Define("UNIX_MILLIS",
+             {
+                 {.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"},
+             }),
+
+      Define("UNIX_DATE",
+             {
+                 {.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"},
+             }),
+
+      Define(
+          "DATE_FROM_UNIX_DATE",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "len(struct_extract($1, '$edges'))",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
-      {
+              {
+                  .arity = 1,
+                  .spelling = "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
+                              "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
+                  .errors = kDateFromUnixDateErrors,
+              },
+          }),
+      // Strings. The other string functions are GoogleSQL's, at least for BYTES; see
+      // BackendRules().
+
+      Define("LENGTH",
+             {
+                 {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
+                 {.arity = 1, .spelling = "length($1)"},
+             }),
+
+      Define("BYTE_LENGTH",
+             {
+                 {.arity = 1, .spelling = "strlen($1)", .conditions = kString},
+                 {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
+             }),
+      // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
+      Define("MD5", {{.arity = 1, .spelling = "unhex(md5($1))"}}),
+      Define("SHA1", {{.arity = 1, .spelling = "unhex(sha1($1))"}}),
+      Define("SHA256", {{.arity = 1, .spelling = "unhex(sha256($1))"}}),
+      Define("TO_HEX", {{.arity = 1, .spelling = "lower(hex($1))"}}),
+
+      Define("FROM_HEX",
+             {
+                 {.arity = 1, .spelling = "unhex($1)", .conditions = kString},
+             }),
+      Define("TO_BASE64", {{.arity = 1, .spelling = "to_base64($1)"}}),
+
+      Define("FROM_BASE64",
+             {
+                 {.arity = 1, .spelling = "from_base64($1)", .conditions = kString},
+             }),
+
+      Define("ERROR",
+             {
+                 {.arity = 1, .spelling = "!1", .errors = kErrorMessages},
+             },
+             {
+                 .uses =
+                     {
+                         TypeUse::kBuildsOrReadsInterval,
+                         TypeUse::kBuildsOrReadsRange,
+                         TypeUse::kRejectsSafe,
+                         TypeUse::kBigNumeric,
+                     },
+             }),
+
+      Define("ARRAY_REVERSE", {{.arity = 1, .spelling = "list_reverse($1)"}},
+             {
+                 .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
+             }),
+      // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
+
+      Define(
+          "BAG_OF_WORDS",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
+                              "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = "
+                              "1 OR "
+                              "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, "
+                              "lambda "
+                              "_r, _k: struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + "
+                              "1], "
+                              "len(_s) + 1) - _r)))[1])[1]",
+              },
+          }),
+      // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
+      // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
+
+      Define(
+          "ARRAY_TO_STRING",
+          {
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                              "ELSE list_aggr($1, 'string_agg', $2) END",
+                  .conditions = kStringDelimiter,
+              },
+              {
+                  .arity = 3,
+                  .spelling = "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN "
+                              "'' "
+                              "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
+                              "'string_agg', $2) END",
+                  .conditions = kStringDelimiter,
+              },
+              // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
+              // ||, starting from NULL when the delimiter or NULL text is NULL.
+              {
+                  .arity = 2,
+                  .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
+                              "_a, _e, _i: "
+                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                              "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
+                  .conditions = kBytesDelimiter,
+              },
+              {
+                  .arity = 3,
+                  .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, "
+                              "$3)), lambda _a, "
+                              "_e, _i: "
+                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE CAST('' "
+                              "AS BLOB) END)",
+                  .conditions = kBytesDelimiter,
+              },
+          }),
+      // generate_series() has no floating point overload, and returns an empty list for a zero
+      // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
+
+      Define("GENERATE_ARRAY",
+             {
+                 {
+                     .arity = {2, 3},
+                     .spelling = "bq_generate_array_numeric($1, $2, $3)",
+                     .conditions = kNumeric,
+                     .defaults = kOneDefault,
+                     .implementation = Implementation::kGoogleSQL,
+                 },
+                 {
+                     .arity = {2, 3},
+                     .spelling = "bq_generate_array($1, $2, $3)",
+                     .conditions = kDouble,
+                     .defaults = kOneDefault,
+                     .implementation = Implementation::kGoogleSQL,
+                 },
+                 {
+                     .arity = {2, 3},
+                     .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), "
+                                 "CAST($2 AS VARCHAR), CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS "
+                                 "BIGNUM))",
+                     .conditions = kBigNumeric,
+                     .defaults = kBigNumericOneDefault,
+                     .implementation = Implementation::kGoogleSQL,
+                 },
+                 {
+                     .arity = {2, 3},
+                     .spelling = "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
+                     .conditions = kInt64Sequence,
+                     .defaults = kOneDefault,
+                     .errors = kSequenceErrors,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kBigNumeric},
+             }),
+
+      Define("$IS_SOURCE_NODE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                                 "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
+                     .conditions = kEndpoints,
+                     .errors = kEndpointErrors,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("$IS_DEST_NODE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                                 "struct_extract($1, '$id') = struct_extract($2, "
+                                 "'$destination_id') END",
+                     .conditions = kEndpoints,
+                     .errors = kEndpointErrors,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("LABELS",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "struct_extract($1, '$labels')",
+                     .conditions = kElement,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("NODES",
+             {
+                 {.arity = 1, .spelling = "struct_extract($1, '$nodes')", .conditions = kPath},
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("EDGES",
+             {
+                 {.arity = 1, .spelling = "struct_extract($1, '$edges')", .conditions = kPath},
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("PATH_FIRST",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "struct_extract($1, '$nodes')[1]",
+                     .conditions = kPath,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("PATH_LAST",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "struct_extract($1, '$nodes')[-1]",
+                     .conditions = kPath,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("PATH_LENGTH",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "len(struct_extract($1, '$edges'))",
+                     .conditions = kPath,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define(
           "IS_ACYCLIC",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
                               "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+                  .conditions = kPath,
+              },
           },
-      },
-      {
+          {
+              .uses = {TypeUse::kGraphValues},
+          }),
+
+      Define(
           "IS_TRAIL",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
                               "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+                  .conditions = kPath,
+              },
           },
-      },
-      {
+          {
+              .uses = {TypeUse::kGraphValues},
+          }),
+
+      Define(
           "IS_SIMPLE",
           {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
-                              "struct_extract(n, "
-                              "'$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
-                              "len(struct_extract($1, "
-                              "'$nodes')) > 1 AND struct_extract(struct_extract($1, '$nodes')[1], "
-                              "'$id') = "
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                              "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes')) - "
+                              "CASE "
+                              "WHEN "
+                              "len(struct_extract($1, '$nodes')) > 1 AND "
+                              "struct_extract(struct_extract($1, '$nodes')[1], '$id') = "
                               "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE "
-                              "0 "
-                              "END",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
+                              "0 END",
+                  .conditions = kPath,
+              },
           },
-      },
-      {
-          "IF",
           {
-              .rules = {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}},
-              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
-          },
-      },
+              .uses = {TypeUse::kGraphValues},
+          }),
+
+      Define("IF",
+             {
+                 {.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"},
+             },
+             {
+                 .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+             }),
+  };
+  static constexpr auto kRules = DefinitionViews(kRulesBacking);
+  return kRules;
+}
+
+// Functions implemented by DuckDB SQL templates, including runtime-generated spellings.
+std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
+  static const function_catalog::NamedDefinition<Rule> kRules[] = {
       // Avoid DuckDB v2's NULLIF macro binder; repeated arguments are bound once by Expand.
       {
           "NULLIF",
@@ -868,192 +1451,6 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                           .message = "Unsupported type in function NULL_IF",
                       },
                   },
-          },
-      },
-      // Operators. Division binds its operands once, as every rule does, and stays an
-      // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
-      // GoogleSQL adds an INTERVAL's months, days and time in turn, and fails where a step leaves
-      // the range; see src/googlesql_functions_duckdb/interval.cc.
-      {
-          "$ADD",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_add", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_intervals($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_date_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_date_interval($2, $1)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_DATE})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_datetime_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATETIME})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_datetime_interval($2, $1)",
-                          .conditions = {Is(2, {TYPE_DATETIME})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_timestamp_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_timestamp_interval($2, $1)",
-                          .conditions = {Is(2, {TYPE_TIMESTAMP})},
-                      },
-                      {.arity = 2, .spelling = "($1 + $2)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
-      // - subtracts an INTERVAL as + adds its negation.
-      {
-          "$SUBTRACT",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_subtract", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_intervals($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_date_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_dates($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_DATE})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_datetime_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATETIME}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_datetimes($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATETIME})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_timestamp_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIMESTAMP}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_timestamps($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_times($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIME})},
-                      },
-                      {.arity = 2, .spelling = "($1 - $2)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB multiplies DECIMAL(38, 9) values into a DECIMAL(38, 18), which overflows past 20
-      // integer digits, and divides them as DOUBLE values; GoogleSQL computes the NUMERIC result,
-      // rounded half away from zero.
-      {
-          "$MULTIPLY",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_multiply", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_multiply_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      // See src/googlesql_functions_duckdb/interval.cc; the registered type
-                      // rejections reject FLOAT64 operands as BigQuery does.
-                      {
-                          .arity = 2,
-                          .spelling = "bq_multiply_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_multiply_interval($2, $1)",
-                          .conditions = {Is(1, {TYPE_INT64}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {.arity = 2, .spelling = "($1 * $2)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kIntervalDoubleTypes,
-                          .message = "No matching signature for operator *",
-                      },
-                      {
-                          .types = kDoubleIntervalTypes,
-                          .message = "No matching signature for operator *",
-                      },
-                  },
-          },
-      },
-      {
-          "$DIVIDE",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_divide", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_divide_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      // See src/googlesql_functions_duckdb/interval.cc.
-                      {
-                          .arity = 2,
-                          .spelling = "bq_divide_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
-                              "ELSE $1 / $2 "
-                              "END",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors = {"'division by zero'"},
-                      },
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
-      {
-          "$UNARY_MINUS",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_negate", 1),
-                      {.arity = 1, .spelling = "(-$1)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
           },
       },
       {
@@ -1128,86 +1525,8 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
           },
       },
-      // A backslash escapes the character after it, and must not end the pattern. BYTES are
-      // unsupported, since DuckDB's LIKE takes only VARCHAR.
-      {
-          "$LIKE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
-                                      "THEN !1 ELSE "
-                                      "($1 LIKE $2 ESCAPE '\\') END",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                          .defaults = {},
-                          .errors = {"'LIKE pattern ends with a backslash'"},
-                      },
-                  },
-          },
-      },
-      {
-          "$IS_DISTINCT_FROM",
-          {
-              .rules = {{.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"}},
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kStructTypes,
-                          .message = "IS DISTINCT FROM can't be used with arguments of type STRUCT",
-                      },
-                  },
-          },
-      },
-      {
-          "$IS_NOT_DISTINCT_FROM",
-          {
-              .rules = {{.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"}},
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kStructTypes,
-                          .message =
-                              "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
-                      },
-                  },
-          },
-      },
-      {
-          "$IS_NULL",
-          {
-              .rules = {{.arity = 1, .spelling = "($1 IS NULL)"}},
-              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
-          },
-      },
-      {"$IS_TRUE", {.rules = {{.arity = 1, .spelling = "($1 IS TRUE)"}}}},
-      {"$IS_FALSE", {.rules = {{.arity = 1, .spelling = "($1 IS FALSE)"}}}},
-      {"$NOT", {.rules = {{.arity = 1, .spelling = "(NOT $1)"}}}},
-      {"$BITWISE_NOT", {.rules = {{.arity = 1, .spelling = "(~$1)"}}}},
-      {"$BITWISE_AND", {.rules = {{.arity = 2, .spelling = "($1 & $2)"}}}},
-      {"$BITWISE_OR", {.rules = {{.arity = 2, .spelling = "($1 | $2)"}}}},
-      {"$BITWISE_XOR", {.rules = {{.arity = 2, .spelling = "xor($1, $2)"}}}},
       {"$BITWISE_LEFT_SHIFT", {.rules = Shift("<<")}},
       {"$BITWISE_RIGHT_SHIFT", {.rules = Shift(">>")}},
-      // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
-      {
-          "$IN_ARRAY",
-          {
-              .rules = {{.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"}},
-              .uses =
-                  {
-                      TypeUse::kCompares,
-                      TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructsWithInterval,
-                      TypeUse::kBigNumeric,
-                  },
-              .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
-              .struct_handler = StructComparison,
-          },
-      },
       {
           "$ARRAY_AT_OFFSET",
           {
@@ -1237,105 +1556,6 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           },
       },
 
-      // A division by zero is an error in BigQuery and +Inf in DuckDB, so SAFE_DIVIDE has to
-      // make the zero itself disappear.
-      {
-          "SAFE_DIVIDE",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_safe_divide", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_safe_divide_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      {
-          "IEEE_DIVIDE",
-          {.rules = {{.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
-      },
-      // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
-      // in DuckDB where it is 0 in BigQuery.
-      {
-          "MOD",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_mod", 2),
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
-                              "WHEN $2 = -1 "
-                              "THEN 0 "
-                              "ELSE mod($1, $2) END",
-                          .conditions = {Is(1, {TYPE_INT64})},
-                          .defaults = {},
-                          .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
-                              "ELSE mod($1, "
-                              "$2) END",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
-                      },
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB's divide() of DECIMAL values returns a DOUBLE; GoogleSQL computes the exact
-      // NUMERIC quotient and checks overflow.
-      {
-          "DIV",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_div", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_div_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 "
-                                      "THEN !1 ELSE "
-                                      "divide($1, $2) "
-                                      "END",
-                          .conditions = {Is(1, {TYPE_INT64})},
-                          .defaults = {},
-                          .errors = {"'division by zero: ' || $1 || ' / ' || $2"},
-                      },
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB's sign() is 0 for NaN.
-      {
-          "SIGN",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_sign", 1),
-                      {
-                          .arity = 1,
-                          .spelling = "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END",
-                          .conditions = {Is(1, {TYPE_DOUBLE})},
-                      },
-                      {.arity = 1, .spelling = "sign($1)"},
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
       // DuckDB takes the digits as an INTEGER.
       // DuckDB rounds halfway values away from zero, and its round_even() goes through
       // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
@@ -1376,41 +1596,9 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               .uses = {TypeUse::kBigNumeric},
           },
       },
-      {
-          "ABS",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_abs", 1),
-                      {.arity = 1, .spelling = "abs($1)"},
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
       {"CEIL", {.rules = IntegralRound("ceil"), .uses = {TypeUse::kBigNumeric}}},
       {"CEILING", {.rules = IntegralRound("ceil"), .uses = {TypeUse::kBigNumeric}}},
       {"FLOOR", {.rules = IntegralRound("floor"), .uses = {TypeUse::kBigNumeric}}},
-      // DuckDB cannot cast an empty BLOB to BIT.
-      {
-          "BIT_COUNT",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "bit_count($1)",
-                          .conditions = {Is(1, {TYPE_INT64})},
-                      },
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 "
-                              "AS BIT)) END",
-                          .conditions = {Is(1, {TYPE_BYTES})},
-                      },
-                  },
-          },
-      },
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
@@ -1523,28 +1711,9 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
           },
       },
-      {
-          "TIME_TRUNC",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)",
-                      },
-                  },
-          },
-      },
       {"LAST_DAY", {.rules = LastDay()}},
 
       // Constructors and conversions between the civil types and TIMESTAMP.
-      {"CURRENT_DATE", {.rules = {{.arity = 0, .spelling = "CURRENT_DATE"}}}},
-      {"CURRENT_TIME", {.rules = {{.arity = 0, .spelling = "CURRENT_TIME"}}}},
-      {"CURRENT_TIMESTAMP", {.rules = {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}}},
-      {
-          "CURRENT_DATETIME",
-          {.rules = {{.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"}}},
-      },
       {"$EXTRACT_DATE", {.rules = Civil("DATE")}},
       {"$EXTRACT_TIME", {.rules = Civil("TIME")}},
       {"$EXTRACT_DATETIME", {.rules = Civil("TIMESTAMP")}},
@@ -1572,179 +1741,12 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               }),
           },
       },
-      // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
-      {
-          "TIMESTAMP",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "bq_string_to_timestamp($1, false)",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_string_to_timestamp_in($1, $2)",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                      },
-                      {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
-                      // A civil time in the given zone.
-                      {
-                          .arity = 2,
-                          .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
-                          .conditions = {Is(1, {TYPE_DATE, TYPE_DATETIME})},
-                      },
-                  },
-          },
-      },
 
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
       // to arrive at the instant BigQuery means.
-      // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
-      // truncates toward zero.
-      {
-          "UNIX_SECONDS",
-          {.rules = {{.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"}}},
-      },
-      {
-          "UNIX_MILLIS",
-          {.rules = {{.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"}}},
-      },
-      {
-          "UNIX_DATE",
-          {.rules = {{.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"}}},
-      },
       {"TIMESTAMP_SECONDS", {.rules = FromUnixTime("to_timestamp($1)", 1000000)}},
       {"TIMESTAMP_MILLIS", {.rules = FromUnixTime("(epoch_ms($1) AT TIME ZONE 'UTC')", 1000)}},
       {"TIMESTAMP_MICROS", {.rules = FromUnixTime("(make_timestamp($1) AT TIME ZONE 'UTC')", 1)}},
-      {
-          "DATE_FROM_UNIX_DATE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
-                              "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors =
-                              {"'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1"},
-                      },
-                  },
-          },
-      },
-
-      // Strings. The other string functions are GoogleSQL's, at least for BYTES; see
-      // BackendRules().
-      {
-          "LENGTH",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "octet_length($1)",
-                          .conditions = {Is(1, {TYPE_BYTES})},
-                      },
-                      {.arity = 1, .spelling = "length($1)"},
-                  },
-          },
-      },
-      {
-          "BYTE_LENGTH",
-          {
-              .rules =
-                  {
-                      {.arity = 1, .spelling = "strlen($1)", .conditions = {Is(1, {TYPE_STRING})}},
-                      {
-                          .arity = 1,
-                          .spelling = "octet_length($1)",
-                          .conditions = {Is(1, {TYPE_BYTES})},
-                      },
-                  },
-          },
-      },
-      // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
-      {"MD5", {.rules = {{.arity = 1, .spelling = "unhex(md5($1))"}}}},
-      {"SHA1", {.rules = {{.arity = 1, .spelling = "unhex(sha1($1))"}}}},
-      {"SHA256", {.rules = {{.arity = 1, .spelling = "unhex(sha256($1))"}}}},
-      {"TO_HEX", {.rules = {{.arity = 1, .spelling = "lower(hex($1))"}}}},
-      {
-          "FROM_HEX",
-          {.rules = {{.arity = 1, .spelling = "unhex($1)", .conditions = {Is(1, {TYPE_STRING})}}}},
-      },
-      {"TO_BASE64", {.rules = {{.arity = 1, .spelling = "to_base64($1)"}}}},
-      {
-          "FROM_BASE64",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "from_base64($1)",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                      },
-                  },
-          },
-      },
-
-      {
-          "ERROR",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "!1",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors = {"coalesce($1, 'ERROR function called with NULL value')"},
-                      },
-                  },
-              .uses =
-                  {
-                      TypeUse::kBuildsOrReadsInterval,
-                      TypeUse::kBuildsOrReadsRange,
-                      TypeUse::kRejectsSafe,
-                      TypeUse::kBigNumeric,
-                  },
-          },
-      },
-      {
-          "ARRAY_REVERSE",
-          {
-              .rules = {{.arity = 1, .spelling = "list_reverse($1)"}},
-              .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
-          },
-      },
-      // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
-      {
-          "BAG_OF_WORDS",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
-                              "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = "
-                              "1 "
-                              "OR "
-                              "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, "
-                              "lambda "
-                              "_r, _k: "
-                              "struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], "
-                              "len(_s) "
-                              "+ 1) "
-                              "- "
-                              "_r)))[1])[1]",
-                      },
-                  },
-          },
-      },
       {
           "RANGE_BUCKET",
           {
@@ -1769,102 +1771,8 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           {.rules = {{.arity = 2, .spelling = Overlap()}}, .uses = {TypeUse::kBuildsOrReadsRange}},
       },
       {"RANGE_INTERSECT", {.rules = RangeIntersect(), .uses = {TypeUse::kBuildsOrReadsRange}}},
-      // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
-      // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
-      {
-          "ARRAY_TO_STRING",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                                      "ELSE list_aggr($1, 'string_agg', $2) END",
-                          .conditions = {Is(2, {TYPE_STRING})},
-                      },
-                      {
-                          .arity = 3,
-                          .spelling =
-                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN "
-                              "'' "
-                              "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
-                              "'string_agg', $2) END",
-                          .conditions = {Is(2, {TYPE_STRING})},
-                      },
-                      // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
-                      // ||, starting from NULL when the delimiter or NULL text is NULL.
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
-                              "_a, _e, _i: "
-                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                              "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
-                          .conditions = {Is(2, {TYPE_BYTES})},
-                      },
-                      {
-                          .arity = 3,
-                          .spelling =
-                              "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda "
-                              "_a, _e, _i: "
-                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL "
-                              "ELSE CAST('' AS BLOB) END)",
-                          .conditions = {Is(2, {TYPE_BYTES})},
-                      },
-                  },
-          },
-      },
-      // generate_series() has no floating point overload, and returns an empty list for a zero
-      // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
-      {
-          "GENERATE_ARRAY",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = {2, 3},
-                          .spelling = "bq_generate_array_numeric($1, $2, $3)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                          .defaults = {"1"},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = {2, 3},
-                          .spelling = "bq_generate_array($1, $2, $3)",
-                          .conditions = {Is(1, {TYPE_DOUBLE})},
-                          .defaults = {"1"},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = {2, 3},
-                          .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS "
-                                      "VARCHAR), CAST($2 AS "
-                                      "VARCHAR), "
-                                      "CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
-                          .conditions = {Is(1, {TYPE_BIGNUMERIC})},
-                          .defaults = {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = {2, 3},
-                          .spelling =
-                              "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
-                          .conditions =
-                              {
-                                  Is(1, {TYPE_INT64}),
-                                  Is(2, {TYPE_INT64}),
-                                  Is(3, {TYPE_INT64}),
-                              },
-                          .defaults = {"1"},
-                          .errors = {"'Sequence step cannot be 0.'"},
-                      },
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
   };
-  return *kRules;
+  return kRules;
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

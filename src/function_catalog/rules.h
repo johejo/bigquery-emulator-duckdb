@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/type.pb.h"
@@ -52,41 +53,57 @@ struct Arity {
   // A bare count reads best in the table.
   // cppcheck-suppress noExplicitConstructor
   // NOLINTNEXTLINE(google-explicit-constructor,cppcoreguidelines-explicit-constructor,misc-explicit-constructor)
-  Arity(std::size_t count) : min(count), max(count) {}
+  constexpr Arity(std::size_t count) : min(count), max(count) {}
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the order reads as a range.
-  Arity(std::size_t min, std::size_t max) : min(min), max(max) {}
+  constexpr Arity(std::size_t min, std::size_t max) : min(min), max(max) {}
 
   std::size_t min;
   std::size_t max;
 };
 
+// Owning rules are built at runtime; static rules only refer to immutable backing arrays.
+template <typename T>
+using OwnedRuleList = std::vector<T>;
+template <typename T>
+using StaticRuleList = std::span<const T>;
+
 // What argument `argument` (counted from 1) has to be for a rule to apply. A condition on an
 // optional argument the call leaves out holds.
-struct Condition {
-  std::size_t argument;
+template <template <typename> typename List>
+struct BasicCondition {
+  std::size_t argument = 0;
   // Any of these types; empty accepts any type.
-  std::vector<googlesql::TypeKind> types = {};
+  List<googlesql::TypeKind> types = {};
   // Any of these date parts; empty accepts any argument.
-  std::vector<std::string_view> date_parts = {};
+  List<std::string_view> date_parts = {};
   // This rounding mode.
   std::optional<std::string_view> rounding_mode = {};
 };
 
+using Condition = BasicCondition<OwnedRuleList>;
+using StaticCondition = BasicCondition<StaticRuleList>;
+
 // A DuckDB spelling of a BigQuery function. In the spelling, $n is argument n, #n argument n,
 // which has to be a date part, as a lower case string literal, and !n raises error n. An argument
 // that the spelling uses more than once is evaluated once, so volatile arguments stay consistent.
-struct Rule {
-  Arity arity;
-  std::string spelling;
-  std::vector<Condition> conditions = {};
+template <typename Text, template <typename> typename List>
+struct BasicRule {
+  Arity arity = 0;
+  Text spelling;
+  List<BasicCondition<List>> conditions = {};
   // The spellings of the optional arguments, from the first one past arity.min on.
-  std::vector<std::string_view> defaults = {};
+  List<std::string_view> defaults = {};
   // The messages of the errors the spelling raises, as DuckDB string expressions that may use
   // the arguments. Under SAFE. the errors are NULL instead.
-  std::vector<std::string> errors = {};
+  List<Text> errors = {};
   // Overrides the rule table's implementation when this overload uses another backend.
   std::optional<Implementation> implementation = {};
 };
+
+using Rule = BasicRule<std::string, OwnedRuleList>;
+using StaticRule = BasicRule<std::string_view, StaticRuleList>;
+
+Rule Own(const StaticRule& rule);
 
 // An aggregate or analytic argument that BigQuery requires to be a constant expression.
 struct ConstantArgument {
@@ -97,7 +114,7 @@ struct ConstantArgument {
 };
 
 // A DuckDB aggregate or window function that implements a BigQuery one.
-struct AggregateRule {
+struct AggregateOptions {
   // How the function treats IGNORE NULLS and RESPECT NULLS.
   enum class Nulls : std::uint8_t {
     // It respects NULLs, and IGNORE NULLS is unsupported.
@@ -128,18 +145,21 @@ struct AggregateRule {
     // The first non-NULL values of the list STRING_AGG joins.
     kJoin,
   };
+};
 
+template <template <typename> typename List>
+struct BasicAggregateRule : AggregateOptions {
   std::string_view function;
   // The type the first argument has to have; TYPE_UNKNOWN accepts any.
   googlesql::TypeKind type = googlesql::TYPE_UNKNOWN;
   // What the other arguments have to be; only their types count.
-  std::vector<Condition> conditions = {};
+  List<BasicCondition<List>> conditions = {};
   // The DuckDB arguments, with $n for argument n, when they differ from the BigQuery ones.
-  std::vector<std::string_view> arguments = {};
+  List<std::string_view> arguments = {};
   // The order of the DuckDB call, with $n for argument n, when the BigQuery call has none.
   std::string_view order = {};
   // The spellings of the arguments a call leaves out, by position; empty for none.
-  std::vector<std::string_view> defaults = {};
+  List<std::string_view> defaults = {};
   Nulls nulls = Nulls::kRespect;
   Distinct distinct = Distinct::kAllowed;
   Limit limit = Limit::kUnsupported;
@@ -158,8 +178,14 @@ struct AggregateRule {
   // Reject ORDER BY of the first argument alone, or any ORDER BY with DISTINCT, with this
   // error. Other order keys, including ones combined with the first argument, remain allowed.
   std::string_view order_by_argument_error = {};
-  std::vector<ConstantArgument> constant_arguments = {};
+  List<ConstantArgument> constant_arguments = {};
 };
+
+using AggregateRule = BasicAggregateRule<OwnedRuleList>;
+using StaticAggregateRule = BasicAggregateRule<StaticRuleList>;
+
+// Copy a static definition into catalog-owned storage at the registration boundary.
+AggregateRule Own(const StaticAggregateRule& rule);
 
 // What functions do with values of a type that DuckDB holds in another type, such as a RANGE in a
 // STRUCT, and other per-function differences from GoogleSQL. A type takes the uses whose
@@ -247,14 +273,25 @@ struct ScalarCall;
 using Handler = std::optional<std::string> (*)(const ScalarCall&);
 
 // A function's overloads and type behavior, declared together in its rule table.
-template <typename RuleType>
+template <typename RuleType, template <typename> typename List = OwnedRuleList>
 struct FunctionDefinition {
-  std::vector<RuleType> rules;
+  List<RuleType> rules = {};
   TypeUses uses = {};
-  std::vector<ArgumentMode> argument_modes = {};
+  List<ArgumentMode> argument_modes = {};
   // Overrides the usual translation when the first argument is a STRUCT.
   Handler struct_handler = nullptr;
-  std::vector<TypeRejection> type_rejections = {};
+  List<TypeRejection> type_rejections = {};
 };
+
+// All backing arrays must outlive the definition and any catalog using its string views.
+template <typename RuleType>
+using StaticFunctionDefinition = FunctionDefinition<RuleType, StaticRuleList>;
+
+// Definition lists are enumerated during registration, not searched by name.
+template <typename RuleType, template <typename> typename List = OwnedRuleList>
+using NamedDefinition = std::pair<std::string_view, FunctionDefinition<RuleType, List>>;
+
+template <typename RuleType>
+using StaticNamedDefinition = NamedDefinition<RuleType, StaticRuleList>;
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

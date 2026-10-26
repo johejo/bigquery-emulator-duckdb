@@ -81,8 +81,13 @@ struct FunctionEntry {
 class Catalog {
  public:
   void Add(std::string_view name, FunctionEntry entry);
-  void AddRules(std::string_view name, const FunctionDefinition<Rule>& definition,
+  void AddRules(std::string_view name, FunctionDefinition<Rule> definition,
                 Implementation fallback);
+  void AddRules(std::string_view name, const StaticFunctionDefinition<StaticRule>& definition,
+                Implementation fallback);
+  void AddAggregates(std::string_view name,
+                     const StaticFunctionDefinition<StaticAggregateRule>& definition,
+                     Translation translation, std::optional<Implementation> backend = {});
   [[nodiscard]] const FunctionEntry* Find(std::string_view upper_name) const;
   [[nodiscard]] bool HasTypeUse(std::string_view upper_name, TypeUse use) const;
   [[nodiscard]] std::optional<std::string> Translate(std::string_view upper_name,

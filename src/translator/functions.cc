@@ -344,10 +344,13 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
 }  // namespace
 
 void AddBuiltinFunctions(function_catalog::Catalog& functions) {
+  for (const auto& [name, definition] : StaticTemplateRules()) {
+    functions.AddRules(name, definition, Implementation::kSQL);
+  }
   for (const auto& [name, definition] : TemplateRules()) {
     functions.AddRules(name, definition, Implementation::kSQL);
   }
-  for (const auto& [name, definition] : BackendRules()) {
+  for (const auto& [name, definition] : StaticBackendRules()) {
     functions.AddRules(name, definition, Implementation::kGoogleSQL);
   }
   for (const auto& [name, function] : kFunctionNames) {
@@ -392,22 +395,10 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                         });
   }
   for (const auto& [name, definition] : Aggregates()) {
-    functions.Add(name, {
-                            .translation = Translation::kAggregate,
-                            .uses = definition.uses,
-                            .implementations = {Implementation::kAggregate},
-                            .type_rejections = definition.type_rejections,
-                            .aggregates = definition.rules,
-                        });
+    functions.AddAggregates(name, definition, Translation::kAggregate);
   }
   for (const auto& [name, definition] : Analytics()) {
-    functions.Add(name, {
-                            .translation = Translation::kAnalytic,
-                            .uses = definition.uses,
-                            .implementations = {Implementation::kAnalytic},
-                            .type_rejections = definition.type_rejections,
-                            .aggregates = definition.rules,
-                        });
+    functions.AddAggregates(name, definition, Translation::kAnalytic);
   }
 }
 
