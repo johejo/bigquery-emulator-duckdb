@@ -725,7 +725,331 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
   static constexpr StaticRule kIf[] = {
       {.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"},
   };
+  static constexpr googlesql::TypeKind kStringTypes[] = {TYPE_STRING};
+  static constexpr googlesql::TypeKind kBytesTypes[] = {TYPE_BYTES};
+  static constexpr googlesql::TypeKind kInt64Types[] = {TYPE_INT64};
+  static constexpr googlesql::TypeKind kNumericTypes[] = {TYPE_NUMERIC};
+  static constexpr googlesql::TypeKind kDoubleTypes[] = {TYPE_DOUBLE};
+  static constexpr googlesql::TypeKind kBigNumericTypes[] = {TYPE_BIGNUMERIC};
+  static constexpr googlesql::TypeKind kCivilTypes[] = {TYPE_DATE, TYPE_DATETIME};
+  static constexpr StaticCondition kString[] = {{.argument = 1, .types = kStringTypes}};
+  static constexpr StaticCondition kBytes[] = {{.argument = 1, .types = kBytesTypes}};
+  static constexpr StaticCondition kInt64[] = {{.argument = 1, .types = kInt64Types}};
+  static constexpr StaticCondition kNumeric[] = {{.argument = 1, .types = kNumericTypes}};
+  static constexpr StaticCondition kDouble[] = {{.argument = 1, .types = kDoubleTypes}};
+  static constexpr StaticCondition kBigNumeric[] = {{.argument = 1, .types = kBigNumericTypes}};
+  static constexpr StaticCondition kCivil[] = {{.argument = 1, .types = kCivilTypes}};
+  static constexpr StaticCondition kStringDelimiter[] = {{.argument = 2, .types = kStringTypes}};
+  static constexpr StaticCondition kBytesDelimiter[] = {{.argument = 2, .types = kBytesTypes}};
+  static constexpr StaticCondition kInt64Sequence[] = {
+      {.argument = 1, .types = kInt64Types},
+      {.argument = 2, .types = kInt64Types},
+      {.argument = 3, .types = kInt64Types},
+  };
+  static constexpr std::string_view kLikeErrors[] = {"'LIKE pattern ends with a backslash'"};
+  // A backslash escapes the character after it, and must not end the pattern. BYTES are
+  // unsupported, since DuckDB's LIKE takes only VARCHAR.
+  static constexpr StaticRule kLike[] = {
+      {
+          .arity = 2,
+          .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
+                      "THEN !1 ELSE "
+                      "($1 LIKE $2 ESCAPE '\\') END",
+          .conditions = kString,
+          .errors = kLikeErrors,
+      },
+  };
+  static constexpr StaticRule kIsDistinctFrom[] = {
+      {.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"},
+  };
+  static constexpr StaticRule kIsNotDistinctFrom[] = {
+      {.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"},
+  };
+  static constexpr function_catalog::TypeRejection kDistinctRejections[] = {
+      {
+          .types = kStructTypes,
+          .message = "IS DISTINCT FROM can't be used with arguments of type STRUCT",
+      },
+  };
+  static constexpr function_catalog::TypeRejection kNotDistinctRejections[] = {
+      {
+          .types = kStructTypes,
+          .message = "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
+      },
+  };
+  static constexpr StaticRule kIsNull[] = {{.arity = 1, .spelling = "($1 IS NULL)"}};
+  static constexpr StaticRule kIsTrue[] = {{.arity = 1, .spelling = "($1 IS TRUE)"}};
+  static constexpr StaticRule kIsFalse[] = {{.arity = 1, .spelling = "($1 IS FALSE)"}};
+  static constexpr StaticRule kNot[] = {{.arity = 1, .spelling = "(NOT $1)"}};
+  static constexpr StaticRule kBitwiseNot[] = {{.arity = 1, .spelling = "(~$1)"}};
+  static constexpr StaticRule kBitwiseAnd[] = {{.arity = 2, .spelling = "($1 & $2)"}};
+  static constexpr StaticRule kBitwiseOr[] = {{.arity = 2, .spelling = "($1 | $2)"}};
+  static constexpr StaticRule kBitwiseXor[] = {{.arity = 2, .spelling = "xor($1, $2)"}};
+  // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
+  static constexpr StaticRule kInArray[] = {
+      {.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"},
+  };
+  static constexpr ArgumentMode kInArrayModes[] = {
+      ArgumentMode::kExpression,
+      ArgumentMode::kIntervalArrayKeys,
+  };
+  static constexpr StaticRule kIeeeDivide[] = {
+      {.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"},
+  };
+  // DuckDB cannot cast an empty BLOB to BIT.
+  static constexpr StaticRule kBitCount[] = {
+      {.arity = 1, .spelling = "bit_count($1)", .conditions = kInt64},
+      {
+          .arity = 1,
+          .spelling = "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
+          .conditions = kBytes,
+      },
+  };
+  static constexpr StaticRule kTimeTrunc[] = {
+      {.arity = 2, .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)"},
+  };
+  static constexpr StaticRule kCurrentDate[] = {{.arity = 0, .spelling = "CURRENT_DATE"}};
+  static constexpr StaticRule kCurrentTime[] = {{.arity = 0, .spelling = "CURRENT_TIME"}};
+  static constexpr StaticRule kCurrentTimestamp[] = {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}};
+  static constexpr StaticRule kCurrentDatetime[] = {
+      {.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"},
+  };
+  // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
+  static constexpr StaticRule kTimestamp[] = {
+      {.arity = 1, .spelling = "bq_string_to_timestamp($1, false)", .conditions = kString},
+      {.arity = 2, .spelling = "bq_string_to_timestamp_in($1, $2)", .conditions = kString},
+      {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
+      // A civil time in the given zone.
+      {
+          .arity = 2,
+          .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
+          .conditions = kCivil,
+      },
+  };
+  // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
+  // truncates toward zero.
+  static constexpr StaticRule kUnixSeconds[] = {
+      {.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"},
+  };
+  static constexpr StaticRule kUnixMillis[] = {
+      {.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"},
+  };
+  static constexpr StaticRule kUnixDate[] = {
+      {.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"},
+  };
+  static constexpr std::string_view kDateFromUnixDateErrors[] = {
+      "'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1",
+  };
+  static constexpr StaticRule kDateFromUnixDate[] = {
+      {
+          .arity = 1,
+          .spelling = "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
+                      "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
+          .errors = kDateFromUnixDateErrors,
+      },
+  };
+  // Strings. The other string functions are GoogleSQL's, at least for BYTES; see BackendRules().
+  static constexpr StaticRule kLength[] = {
+      {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
+      {.arity = 1, .spelling = "length($1)"},
+  };
+  static constexpr StaticRule kByteLength[] = {
+      {.arity = 1, .spelling = "strlen($1)", .conditions = kString},
+      {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
+  };
+  // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
+  static constexpr StaticRule kMd5[] = {{.arity = 1, .spelling = "unhex(md5($1))"}};
+  static constexpr StaticRule kSha1[] = {{.arity = 1, .spelling = "unhex(sha1($1))"}};
+  static constexpr StaticRule kSha256[] = {{.arity = 1, .spelling = "unhex(sha256($1))"}};
+  static constexpr StaticRule kToHex[] = {{.arity = 1, .spelling = "lower(hex($1))"}};
+  static constexpr StaticRule kFromHex[] = {
+      {.arity = 1, .spelling = "unhex($1)", .conditions = kString},
+  };
+  static constexpr StaticRule kToBase64[] = {{.arity = 1, .spelling = "to_base64($1)"}};
+  static constexpr StaticRule kFromBase64[] = {
+      {.arity = 1, .spelling = "from_base64($1)", .conditions = kString},
+  };
+  static constexpr std::string_view kErrorMessages[] = {
+      "coalesce($1, 'ERROR function called with NULL value')",
+  };
+  static constexpr StaticRule kError[] = {
+      {.arity = 1, .spelling = "!1", .errors = kErrorMessages},
+  };
+  static constexpr StaticRule kArrayReverse[] = {{.arity = 1, .spelling = "list_reverse($1)"}};
+  // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
+  static constexpr StaticRule kBagOfWords[] = {
+      {
+          .arity = 1,
+          .spelling = "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
+                      "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = 1 OR "
+                      "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, lambda "
+                      "_r, _k: struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], "
+                      "len(_s) + 1) - _r)))[1])[1]",
+      },
+  };
+  // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
+  // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
+  static constexpr StaticRule kArrayToString[] = {
+      {
+          .arity = 2,
+          .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                      "ELSE list_aggr($1, 'string_agg', $2) END",
+          .conditions = kStringDelimiter,
+      },
+      {
+          .arity = 3,
+          .spelling = "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                      "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
+                      "'string_agg', $2) END",
+          .conditions = kStringDelimiter,
+      },
+      // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
+      // ||, starting from NULL when the delimiter or NULL text is NULL.
+      {
+          .arity = 2,
+          .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda _a, _e, _i: "
+                      "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                      "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
+          .conditions = kBytesDelimiter,
+      },
+      {
+          .arity = 3,
+          .spelling =
+              "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda _a, _e, _i: "
+              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
+          .conditions = kBytesDelimiter,
+      },
+  };
+  static constexpr std::string_view kOneDefault[] = {"1"};
+  static constexpr std::string_view kBigNumericOneDefault[] = {
+      "CAST('100000000000000000000000000000000000000' AS BIGNUM)",
+  };
+  static constexpr std::string_view kSequenceErrors[] = {"'Sequence step cannot be 0.'"};
+  // generate_series() has no floating point overload, and returns an empty list for a zero
+  // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
+  static constexpr StaticRule kGenerateArray[] = {
+      {
+          .arity = {2, 3},
+          .spelling = "bq_generate_array_numeric($1, $2, $3)",
+          .conditions = kNumeric,
+          .defaults = kOneDefault,
+          .implementation = Implementation::kGoogleSQL,
+      },
+      {
+          .arity = {2, 3},
+          .spelling = "bq_generate_array($1, $2, $3)",
+          .conditions = kDouble,
+          .defaults = kOneDefault,
+          .implementation = Implementation::kGoogleSQL,
+      },
+      {
+          .arity = {2, 3},
+          .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), "
+                      "CAST($2 AS VARCHAR), CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
+          .conditions = kBigNumeric,
+          .defaults = kBigNumericOneDefault,
+          .implementation = Implementation::kGoogleSQL,
+      },
+      {
+          .arity = {2, 3},
+          .spelling = "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
+          .conditions = kInt64Sequence,
+          .defaults = kOneDefault,
+          .errors = kSequenceErrors,
+      },
+  };
   static constexpr function_catalog::StaticNamedDefinition<StaticRule> kRules[] = {
+      {"$LIKE", {.rules = kLike}},
+      {
+          "$IS_DISTINCT_FROM",
+          {
+              .rules = kIsDistinctFrom,
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .type_rejections = kDistinctRejections,
+          },
+      },
+      {
+          "$IS_NOT_DISTINCT_FROM",
+          {
+              .rules = kIsNotDistinctFrom,
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .type_rejections = kNotDistinctRejections,
+          },
+      },
+      {
+          "$IS_NULL",
+          {
+              .rules = kIsNull,
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {"$IS_TRUE", {.rules = kIsTrue}},
+      {"$IS_FALSE", {.rules = kIsFalse}},
+      {"$NOT", {.rules = kNot}},
+      {"$BITWISE_NOT", {.rules = kBitwiseNot}},
+      {"$BITWISE_AND", {.rules = kBitwiseAnd}},
+      {"$BITWISE_OR", {.rules = kBitwiseOr}},
+      {"$BITWISE_XOR", {.rules = kBitwiseXor}},
+      {
+          "$IN_ARRAY",
+          {
+              .rules = kInArray,
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesStructsWithInterval,
+                      TypeUse::kBigNumeric,
+                  },
+              .argument_modes = kInArrayModes,
+              .struct_handler = StructComparison,
+          },
+      },
+      {"IEEE_DIVIDE", {.rules = kIeeeDivide}},
+      {"BIT_COUNT", {.rules = kBitCount}},
+      {"TIME_TRUNC", {.rules = kTimeTrunc}},
+      {"CURRENT_DATE", {.rules = kCurrentDate}},
+      {"CURRENT_TIME", {.rules = kCurrentTime}},
+      {"CURRENT_TIMESTAMP", {.rules = kCurrentTimestamp}},
+      {"CURRENT_DATETIME", {.rules = kCurrentDatetime}},
+      {"TIMESTAMP", {.rules = kTimestamp}},
+      {"UNIX_SECONDS", {.rules = kUnixSeconds}},
+      {"UNIX_MILLIS", {.rules = kUnixMillis}},
+      {"UNIX_DATE", {.rules = kUnixDate}},
+      {"DATE_FROM_UNIX_DATE", {.rules = kDateFromUnixDate}},
+      {"LENGTH", {.rules = kLength}},
+      {"BYTE_LENGTH", {.rules = kByteLength}},
+      {"MD5", {.rules = kMd5}},
+      {"SHA1", {.rules = kSha1}},
+      {"SHA256", {.rules = kSha256}},
+      {"TO_HEX", {.rules = kToHex}},
+      {"FROM_HEX", {.rules = kFromHex}},
+      {"TO_BASE64", {.rules = kToBase64}},
+      {"FROM_BASE64", {.rules = kFromBase64}},
+      {
+          "ERROR",
+          {
+              .rules = kError,
+              .uses =
+                  {
+                      TypeUse::kBuildsOrReadsInterval,
+                      TypeUse::kBuildsOrReadsRange,
+                      TypeUse::kRejectsSafe,
+                      TypeUse::kBigNumeric,
+                  },
+          },
+      },
+      {
+          "ARRAY_REVERSE",
+          {
+              .rules = kArrayReverse,
+              .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
+          },
+      },
+      {"BAG_OF_WORDS", {.rules = kBagOfWords}},
+      {"ARRAY_TO_STRING", {.rules = kArrayToString}},
+      {"GENERATE_ARRAY", {.rules = kGenerateArray, .uses = {TypeUse::kBigNumeric}}},
       {"$IS_SOURCE_NODE", {.rules = kSource, .uses = {TypeUse::kGraphValues}}},
       {"$IS_DEST_NODE", {.rules = kDestination, .uses = {TypeUse::kGraphValues}}},
       {"LABELS", {.rules = kLabels, .uses = {TypeUse::kGraphValues}}},
@@ -1035,86 +1359,8 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
               .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
           },
       },
-      // A backslash escapes the character after it, and must not end the pattern. BYTES are
-      // unsupported, since DuckDB's LIKE takes only VARCHAR.
-      {
-          "$LIKE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
-                                      "THEN !1 ELSE "
-                                      "($1 LIKE $2 ESCAPE '\\') END",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                          .defaults = {},
-                          .errors = {"'LIKE pattern ends with a backslash'"},
-                      },
-                  },
-          },
-      },
-      {
-          "$IS_DISTINCT_FROM",
-          {
-              .rules = {{.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"}},
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kStructTypes,
-                          .message = "IS DISTINCT FROM can't be used with arguments of type STRUCT",
-                      },
-                  },
-          },
-      },
-      {
-          "$IS_NOT_DISTINCT_FROM",
-          {
-              .rules = {{.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"}},
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kStructTypes,
-                          .message =
-                              "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
-                      },
-                  },
-          },
-      },
-      {
-          "$IS_NULL",
-          {
-              .rules = {{.arity = 1, .spelling = "($1 IS NULL)"}},
-              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
-          },
-      },
-      {"$IS_TRUE", {.rules = {{.arity = 1, .spelling = "($1 IS TRUE)"}}}},
-      {"$IS_FALSE", {.rules = {{.arity = 1, .spelling = "($1 IS FALSE)"}}}},
-      {"$NOT", {.rules = {{.arity = 1, .spelling = "(NOT $1)"}}}},
-      {"$BITWISE_NOT", {.rules = {{.arity = 1, .spelling = "(~$1)"}}}},
-      {"$BITWISE_AND", {.rules = {{.arity = 2, .spelling = "($1 & $2)"}}}},
-      {"$BITWISE_OR", {.rules = {{.arity = 2, .spelling = "($1 | $2)"}}}},
-      {"$BITWISE_XOR", {.rules = {{.arity = 2, .spelling = "xor($1, $2)"}}}},
       {"$BITWISE_LEFT_SHIFT", {.rules = Shift("<<")}},
       {"$BITWISE_RIGHT_SHIFT", {.rules = Shift(">>")}},
-      // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
-      {
-          "$IN_ARRAY",
-          {
-              .rules = {{.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"}},
-              .uses =
-                  {
-                      TypeUse::kCompares,
-                      TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructsWithInterval,
-                      TypeUse::kBigNumeric,
-                  },
-              .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
-              .struct_handler = StructComparison,
-          },
-      },
       {
           "$ARRAY_AT_OFFSET",
           {
@@ -1161,10 +1407,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   },
               .uses = {TypeUse::kBigNumeric},
           },
-      },
-      {
-          "IEEE_DIVIDE",
-          {.rules = {{.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
       },
       // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
       // in DuckDB where it is 0 in BigQuery.
@@ -1297,27 +1539,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
       {"CEIL", {.rules = IntegralRound("ceil"), .uses = {TypeUse::kBigNumeric}}},
       {"CEILING", {.rules = IntegralRound("ceil"), .uses = {TypeUse::kBigNumeric}}},
       {"FLOOR", {.rules = IntegralRound("floor"), .uses = {TypeUse::kBigNumeric}}},
-      // DuckDB cannot cast an empty BLOB to BIT.
-      {
-          "BIT_COUNT",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "bit_count($1)",
-                          .conditions = {Is(1, {TYPE_INT64})},
-                      },
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 "
-                              "AS BIT)) END",
-                          .conditions = {Is(1, {TYPE_BYTES})},
-                      },
-                  },
-          },
-      },
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
@@ -1430,28 +1651,9 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   {WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
           },
       },
-      {
-          "TIME_TRUNC",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)",
-                      },
-                  },
-          },
-      },
       {"LAST_DAY", {.rules = LastDay()}},
 
       // Constructors and conversions between the civil types and TIMESTAMP.
-      {"CURRENT_DATE", {.rules = {{.arity = 0, .spelling = "CURRENT_DATE"}}}},
-      {"CURRENT_TIME", {.rules = {{.arity = 0, .spelling = "CURRENT_TIME"}}}},
-      {"CURRENT_TIMESTAMP", {.rules = {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}}},
-      {
-          "CURRENT_DATETIME",
-          {.rules = {{.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"}}},
-      },
       {"$EXTRACT_DATE", {.rules = Civil("DATE")}},
       {"$EXTRACT_TIME", {.rules = Civil("TIME")}},
       {"$EXTRACT_DATETIME", {.rules = Civil("TIMESTAMP")}},
@@ -1479,179 +1681,12 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
               }),
           },
       },
-      // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
-      {
-          "TIMESTAMP",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "bq_string_to_timestamp($1, false)",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_string_to_timestamp_in($1, $2)",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                      },
-                      {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
-                      // A civil time in the given zone.
-                      {
-                          .arity = 2,
-                          .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
-                          .conditions = {Is(1, {TYPE_DATE, TYPE_DATETIME})},
-                      },
-                  },
-          },
-      },
 
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
       // to arrive at the instant BigQuery means.
-      // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
-      // truncates toward zero.
-      {
-          "UNIX_SECONDS",
-          {.rules = {{.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"}}},
-      },
-      {
-          "UNIX_MILLIS",
-          {.rules = {{.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"}}},
-      },
-      {
-          "UNIX_DATE",
-          {.rules = {{.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"}}},
-      },
       {"TIMESTAMP_SECONDS", {.rules = FromUnixTime("to_timestamp($1)", 1000000)}},
       {"TIMESTAMP_MILLIS", {.rules = FromUnixTime("(epoch_ms($1) AT TIME ZONE 'UTC')", 1000)}},
       {"TIMESTAMP_MICROS", {.rules = FromUnixTime("(make_timestamp($1) AT TIME ZONE 'UTC')", 1)}},
-      {
-          "DATE_FROM_UNIX_DATE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
-                              "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors =
-                              {"'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1"},
-                      },
-                  },
-          },
-      },
-
-      // Strings. The other string functions are GoogleSQL's, at least for BYTES; see
-      // BackendRules().
-      {
-          "LENGTH",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "octet_length($1)",
-                          .conditions = {Is(1, {TYPE_BYTES})},
-                      },
-                      {.arity = 1, .spelling = "length($1)"},
-                  },
-          },
-      },
-      {
-          "BYTE_LENGTH",
-          {
-              .rules =
-                  {
-                      {.arity = 1, .spelling = "strlen($1)", .conditions = {Is(1, {TYPE_STRING})}},
-                      {
-                          .arity = 1,
-                          .spelling = "octet_length($1)",
-                          .conditions = {Is(1, {TYPE_BYTES})},
-                      },
-                  },
-          },
-      },
-      // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
-      {"MD5", {.rules = {{.arity = 1, .spelling = "unhex(md5($1))"}}}},
-      {"SHA1", {.rules = {{.arity = 1, .spelling = "unhex(sha1($1))"}}}},
-      {"SHA256", {.rules = {{.arity = 1, .spelling = "unhex(sha256($1))"}}}},
-      {"TO_HEX", {.rules = {{.arity = 1, .spelling = "lower(hex($1))"}}}},
-      {
-          "FROM_HEX",
-          {.rules = {{.arity = 1, .spelling = "unhex($1)", .conditions = {Is(1, {TYPE_STRING})}}}},
-      },
-      {"TO_BASE64", {.rules = {{.arity = 1, .spelling = "to_base64($1)"}}}},
-      {
-          "FROM_BASE64",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "from_base64($1)",
-                          .conditions = {Is(1, {TYPE_STRING})},
-                      },
-                  },
-          },
-      },
-
-      {
-          "ERROR",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "!1",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors = {"coalesce($1, 'ERROR function called with NULL value')"},
-                      },
-                  },
-              .uses =
-                  {
-                      TypeUse::kBuildsOrReadsInterval,
-                      TypeUse::kBuildsOrReadsRange,
-                      TypeUse::kRejectsSafe,
-                      TypeUse::kBigNumeric,
-                  },
-          },
-      },
-      {
-          "ARRAY_REVERSE",
-          {
-              .rules = {{.arity = 1, .spelling = "list_reverse($1)"}},
-              .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
-          },
-      },
-      // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
-      {
-          "BAG_OF_WORDS",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
-                              "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = "
-                              "1 "
-                              "OR "
-                              "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, "
-                              "lambda "
-                              "_r, _k: "
-                              "struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], "
-                              "len(_s) "
-                              "+ 1) "
-                              "- "
-                              "_r)))[1])[1]",
-                      },
-                  },
-          },
-      },
       {
           "RANGE_BUCKET",
           {
@@ -1676,100 +1711,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           {.rules = {{.arity = 2, .spelling = Overlap()}}, .uses = {TypeUse::kBuildsOrReadsRange}},
       },
       {"RANGE_INTERSECT", {.rules = RangeIntersect(), .uses = {TypeUse::kBuildsOrReadsRange}}},
-      // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
-      // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
-      {
-          "ARRAY_TO_STRING",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                                      "ELSE list_aggr($1, 'string_agg', $2) END",
-                          .conditions = {Is(2, {TYPE_STRING})},
-                      },
-                      {
-                          .arity = 3,
-                          .spelling =
-                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN "
-                              "'' "
-                              "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
-                              "'string_agg', $2) END",
-                          .conditions = {Is(2, {TYPE_STRING})},
-                      },
-                      // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
-                      // ||, starting from NULL when the delimiter or NULL text is NULL.
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
-                              "_a, _e, _i: "
-                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                              "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
-                          .conditions = {Is(2, {TYPE_BYTES})},
-                      },
-                      {
-                          .arity = 3,
-                          .spelling =
-                              "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda "
-                              "_a, _e, _i: "
-                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL "
-                              "ELSE CAST('' AS BLOB) END)",
-                          .conditions = {Is(2, {TYPE_BYTES})},
-                      },
-                  },
-          },
-      },
-      // generate_series() has no floating point overload, and returns an empty list for a zero
-      // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
-      {
-          "GENERATE_ARRAY",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = {2, 3},
-                          .spelling = "bq_generate_array_numeric($1, $2, $3)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                          .defaults = {"1"},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = {2, 3},
-                          .spelling = "bq_generate_array($1, $2, $3)",
-                          .conditions = {Is(1, {TYPE_DOUBLE})},
-                          .defaults = {"1"},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = {2, 3},
-                          .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS "
-                                      "VARCHAR), CAST($2 AS "
-                                      "VARCHAR), "
-                                      "CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
-                          .conditions = {Is(1, {TYPE_BIGNUMERIC})},
-                          .defaults = {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = {2, 3},
-                          .spelling =
-                              "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
-                          .conditions =
-                              {
-                                  Is(1, {TYPE_INT64}),
-                                  Is(2, {TYPE_INT64}),
-                                  Is(3, {TYPE_INT64}),
-                              },
-                          .defaults = {"1"},
-                          .errors = {"'Sequence step cannot be 0.'"},
-                      },
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
   };
   return kRules;
 }
