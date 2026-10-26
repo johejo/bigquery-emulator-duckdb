@@ -33,7 +33,7 @@ rejected.
 | --- | --- | --- |
 | `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: property graph creation modes or options. |
 | `DROP PROPERTY GRAPH` | Partial | Unsupported: this DROP PROPERTY GRAPH form. |
-| `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph search prefixes, costs or hints. |
+| `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints. |
 
 ## Queries
 

@@ -576,9 +576,14 @@ std::string AppendWalk(const std::string& left, const std::string& right) {
 
 std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, const Scope& scope,
                                   const googlesql::GraphPathType* path_type = nullptr) {
-  if (path.search_prefix() != nullptr || path.path_cost() != nullptr || !path.hint_list().empty() ||
-      !path.path_hint_list().empty()) {
-    return Unsupported(scope, "graph search prefixes, costs or hints");
+  if (path.path_cost() != nullptr || !path.hint_list().empty() || !path.path_hint_list().empty()) {
+    return Unsupported(scope, "graph costs or hints");
+  }
+  if (path.search_prefix() != nullptr &&
+      (path.search_prefix()->path_count() != nullptr ||
+       (path.search_prefix()->type() != googlesql::ResolvedGraphPathSearchPrefix::ANY &&
+        path.search_prefix()->type() != googlesql::ResolvedGraphPathSearchPrefix::SHORTEST))) {
+    return Unsupported(scope, "this graph search prefix");
   }
   const auto mode = path.path_mode() == nullptr ? googlesql::ResolvedGraphPathMode::WALK
                                                 : path.path_mode()->path_mode();
@@ -792,6 +797,19 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
         mode == googlesql::ResolvedGraphPathMode::TRAIL ? "q._graph_edges" : "q._graph_nodes";
     result->sql = "SELECT q.*" + result->From() + " WHERE list_unique(" + values + ") = length(" +
                   values + ")";
+  }
+  if (path.search_prefix() != nullptr) {
+    // Select independently for each pair of element identities, after matching
+    // the entire path and its subpath modes. Count edges, not repetitions.
+    // MATCH's WHERE and joins to other patterns are applied by GraphScan later.
+    const std::string order =
+        path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::SHORTEST
+            ? " ORDER BY length(q._graph_edges)"
+            : "";
+    result->sql =
+        "SELECT q.*" + result->From() +
+        R"( QUALIFY row_number() OVER (PARTITION BY q._graph_head."$id", q._graph_tail."$id")" +
+        order + ") = 1";
   }
   if (path.path() != nullptr) {
     const auto& column = path.path()->column();
