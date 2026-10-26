@@ -736,7 +736,8 @@ FunctionDefinition<AggregateRule> ListAggregate() {
                       },
               },
           },
-      .uses = {TypeUse::kBuildsOrReadsGeography},
+      // BigQuery takes none of them over a window.
+      .uses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsOver},
   };
 }
 

@@ -608,12 +608,13 @@ absl::StatusOr<Geography> Boundary(const Geography& geography) {
   return boundary;
 }
 
-std::optional<BoundingBox> Bounds(const Geography& geography, const Options& options) {
-  return Extent(std::span(&geography, 1), options);
-}
+namespace {
 
-// The bounds of all the parts of `geographies` together, which no empty geography changes.
-std::optional<BoundingBox> Extent(std::span<const Geography> geographies, const Options& options) {
+// The bounds of all the parts of `geographies` together, which no empty geography changes. With
+// `extent`, as ST_EXTENT has them, longitudes that the smallest interval covers over 180 or more
+// degrees become all of them.
+std::optional<BoundingBox> BoundsOf(std::span<const Geography> geographies, const Options& options,
+                                    bool extent) {
   if (std::ranges::all_of(geographies, &Geography::Empty)) {
     return std::nullopt;
   }
@@ -659,6 +660,11 @@ std::optional<BoundingBox> Extent(std::span<const Geography> geographies, const 
     }
     end = std::max(end, hi);
   }
+  if (extent && box.xmax - box.xmin >= 180) {
+    box.xmin = -180;
+    box.xmax = 180;
+    gap = 0;
+  }
   // BigQuery rounds each bound outward by one representable degree value, including zero,
   // whose neighbors are subnormal. Full longitude intervals and the poles stay in range.
   if (!options.expand_bounding_box) {
@@ -672,6 +678,16 @@ std::optional<BoundingBox> Extent(std::span<const Geography> geographies, const 
   box.ymin = std::max(-90.0, std::nextafter(box.ymin, -infinity));
   box.ymax = std::min(90.0, std::nextafter(box.ymax, infinity));
   return box;
+}
+
+}  // namespace
+
+std::optional<BoundingBox> Bounds(const Geography& geography, const Options& options) {
+  return BoundsOf(std::span(&geography, 1), options, /*extent=*/false);
+}
+
+std::optional<BoundingBox> Extent(std::span<const Geography> geographies, const Options& options) {
+  return BoundsOf(geographies, options, /*extent=*/true);
 }
 
 // The highest dimension of the parts of a geography, -1 for the empty geography.
