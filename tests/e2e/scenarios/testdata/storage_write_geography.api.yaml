@@ -1,12 +1,12 @@
 version: 1
 description: >-
-  Record how Storage Write's AppendRows takes GEOGRAPHY values. BigQuery documents a protobuf
-  string of WKT or GeoJSON (https://cloud.google.com/bigquery/docs/supported-data-types); these
-  cases check what it leaves open: polygon orientation, hex-encoded WKB, which tabledata.insertAll
-  takes, a BYTES field, and the row error of an invalid value. Each row is a serialized `g` field.
+  Storage Write's AppendRows takes GEOGRAPHY values as protobuf strings. BigQuery documents WKT and
+  GeoJSON (https://cloud.google.com/bigquery/docs/supported-data-types); it also takes hex-encoded
+  WKB, as tabledata.insertAll does. The expectations are BigQuery's answers in the sidecar. Each
+  row is a serialized `g` field.
 vars:
   dataset: bqa_${run}_${case}
-  type: TYPE_STRING
+  stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
 templates:
   append:
     steps:
@@ -30,20 +30,19 @@ templates:
         grpc:
           method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
           headers:
-            x-goog-request-params: write_stream=projects/${project}/datasets/${dataset}/tables/t/streams/_default
+            x-goog-request-params: write_stream=${stream}
           requests:
-            - writeStream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+            - writeStream: ${stream}
               protoRows:
                 writerSchema:
                   protoDescriptor:
                     name: Row
                     field:
-                      - {name: g, number: 1, label: LABEL_OPTIONAL, type: '${type}'}
+                      - {name: g, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
                 rows:
                   serializedRows: ['${row}']
         observe:
           messages: /messages
-          error: /error
       - name: read
         rest:
           method: POST
@@ -61,24 +60,98 @@ templates:
         rest:
           method: DELETE
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (g GEOGRAPHY)
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema:
+                  protoDescriptor:
+                    name: Row
+                    field:
+                      - {name: g, number: 1, label: LABEL_OPTIONAL, type: '${type}'}
+                rows:
+                  serializedRows: ['${row}']
+        expectFailure: true
+        observe:
+          code: /code
+          error: /error
+          messages: /messages
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
 cases:
-  # POLYGON((0 0, 0 1, 1 1, 1 0, 0 0)), whose shell runs clockwise.
+  # POLYGON((0 0, 0 1, 1 1, 1 0, 0 0)), whose shell runs clockwise. BigQuery stores the region on
+  # its left, the rest of the globe, with ST_AREA 5.100537090814215E14 (see the sidecar). The
+  # emulator rejects it as a deliberate limit; see docs/compatibility.md#geography-values.
   - name: wkt_clockwise_polygon
     template: append
     vars: {row: CiJQT0xZR09OKCgwIDAsIDAgMSwgMSAxLCAxIDAsIDAgMCkp}
-  # The same ring as GeoJSON.
+    expect:
+      append:
+        messages:
+          - error: {code: 3, message: Invalid rows; no rows were appended}
+            rowErrors:
+              - code: FIELDS_ERROR
+                message: >-
+                  The emulator does not support GEOGRAPHY values of polygons whose shell runs
+                  clockwise or whose holes run counterclockwise
+            writeStream: '${stream}'
+      read:
+        jobComplete: true
+  # The same ring as GeoJSON, whose interior is the planar one.
   - name: geojson_clockwise_polygon
     template: append
     vars: {row: Ck57InR5cGUiOiAiUG9seWdvbiIsICJjb29yZGluYXRlcyI6IFtbWzAsIDBdLCBbMCwgMV0sIFsxLCAxXSwgWzEsIDBdLCBbMCwgMF1dXX0=}
+    expect:
+      append:
+        messages: [{appendResult: {}, writeStream: '${stream}'}]
+      read:
+        jobComplete: true
+        rows: [{f: [{v: 'POLYGON((1 0, 1 1, 0 1, 0 0, 1 0))'}, {v: '1.2364036567076418E10'}]}]
   # POINT(1 2) as hex-encoded WKB: 0101000000000000000000f03f0000000000000040.
   - name: wkb_hex_string
     template: append
     vars: {row: CiowMTAxMDAwMDAwMDAwMDAwMDAwMDAwZjAzZjAwMDAwMDAwMDAwMDAwNDA=}
+    expect:
+      append:
+        messages: [{appendResult: {}, writeStream: '${stream}'}]
+      read:
+        jobComplete: true
+        rows: [{f: [{v: 'POINT(1 2)'}, {v: '0.0'}]}]
   # POINT(1 2) as binary WKB in a BYTES field.
   - name: wkb_bytes_field
-    template: append
+    template: rejected
     vars: {type: TYPE_BYTES, row: ChUBAQAAAAAAAAAAAPA/AAAAAAAAAEA=}
-  # POINT(1).
-  - name: invalid_wkt
-    template: append
-    vars: {row: CghQT0lOVCgxKQ==}
+    expect:
+      append:
+        code: InvalidArgument
+        error:
+          code: 3
+          message: >-
+            The proto field mismatched with BigQuery field at Row.g, the proto field type bytes,
+            BigQuery field type GEOGRAPHY Entity: ${stream}
+        messages: []

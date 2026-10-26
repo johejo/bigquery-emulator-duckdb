@@ -794,9 +794,16 @@ class WriteService final : public pb::BigQueryWrite::Service {
         Fail(grpc::StatusCode::ALREADY_EXISTS,
              "A write stream can have only one active connection");
       }
-      auto decoder = std::make_unique<StorageProtoDecoder>(
-          request.proto_rows().writer_schema().proto_descriptor(), state->schema);
-      connection.decoder = std::move(decoder);
+      try {
+        connection.decoder = std::make_unique<StorageProtoDecoder>(
+            request.proto_rows().writer_schema().proto_descriptor(), state->schema);
+      } catch (const StorageFieldMismatch& error) {
+        throw ConnectionError(
+            grpc::StatusCode::INVALID_ARGUMENT,
+            "The proto field mismatched with BigQuery field at " + error.field +
+                ", the proto field type " + error.proto_type + ", BigQuery field type " +
+                pb::TableFieldSchema::Type_Name(StorageType(error.type)) + " Entity: " + name);
+      }
       connection.name = name;
       connection.storage_id = state->storage_id;
       connection.descriptor =

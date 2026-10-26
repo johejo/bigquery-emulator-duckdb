@@ -123,7 +123,11 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
     if (field.type == FieldType::kJson || field.type == FieldType::kInterval) {
       throw ApiError::Invalid("Storage Write does not support JSON or INTERVAL input");
     }
-    if (input.is_repeated() != (field.mode == FieldMode::kRepeated) || !ProtoType(field, input)) {
+    if (!ProtoType(field, input)) {
+      throw StorageFieldMismatch(std::string(input.full_name()), std::string(input.type_name()),
+                                 field.type);
+    }
+    if (input.is_repeated() != (field.mode == FieldMode::kRepeated)) {
       throw ApiError::Invalid("Writer schema type does not match field: " + field.name);
     }
     if (field.type == FieldType::kRecord) {

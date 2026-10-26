@@ -1,0 +1,80 @@
+version: 1
+description: >-
+  Record Storage Write's AppendRows errors for GEOGRAPHY values and writer schema types. BigQuery
+  ends the connection for a BYTES field of a GEOGRAPHY column with "The proto field mismatched
+  with BigQuery field at Row.g, the proto field type bytes, BigQuery field type GEOGRAPHY Entity:
+  <stream>" (tests/e2e/scenarios/testdata/storage_write_geography.api.yaml); these cases check the
+  type names for other columns and the field name of a nested field, and the row error of an
+  invalid GEOGRAPHY value.
+vars:
+  dataset: bqa_${run}_${case}
+  stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+  nested: []
+templates:
+  append:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema:
+                  protoDescriptor:
+                    name: Row
+                    field: ['${field}']
+                    nestedType: '${nested}'
+                rows:
+                  serializedRows: ['${row}']
+        observe:
+          messages: /messages
+          error: /error
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  # POINT(1) in a string field.
+  - name: invalid_wkt
+    template: append
+    vars:
+      columns: g GEOGRAPHY
+      field: {name: g, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CghQT0lOVCgxKQ==
+  # 1 in an int64 field of a STRING column.
+  - name: int64_field_of_string
+    template: append
+    vars:
+      columns: s STRING
+      field: {name: s, number: 1, label: LABEL_OPTIONAL, type: TYPE_INT64}
+      row: CAE=
+  # 'a' in a string field of the INT64 field x of a STRUCT column rec.
+  - name: nested_string_field_of_int64
+    template: append
+    vars:
+      columns: rec STRUCT<x INT64>
+      field: {name: rec, number: 1, label: LABEL_OPTIONAL, type: TYPE_MESSAGE, typeName: .Row.Record}
+      nested:
+        - name: Record
+          field:
+            - {name: x, number: 1, label: LABEL_OPTIONAL, type: TYPE_STRING}
+      row: CgMKAWE=

@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "cases": {
+    "geojson_clockwise_polygon": {
+      "project": "johejo-sandbox",
+      "run": "a4ch7pd2ri5gjlek7e2rtvdfwo",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_a4ch7pd2ri5gjlek7e2rtvdfwo_geojson_clockwise_polygon/tables/t/streams/_default"
+            }
+          ]
+        },
+        "read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POLYGON((1 0, 1 1, 0 1, 0 0, 1 0))"
+                },
+                {
+                  "v": "1.2364036567076418E10"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "wkb_bytes_field": {
+      "project": "johejo-sandbox",
+      "run": "a4ch7pd2ri5gjlek7e2rtvdfwo",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "message": "The proto field mismatched with BigQuery field at Row.g, the proto field type bytes, BigQuery field type GEOGRAPHY Entity: projects/johejo-sandbox/datasets/bqa_a4ch7pd2ri5gjlek7e2rtvdfwo_wkb_bytes_field/tables/t/streams/_default"
+            },
+            "messages": []
+          }
+        }
+      }
+    },
+    "wkb_hex_string": {
+      "project": "johejo-sandbox",
+      "run": "a4ch7pd2ri5gjlek7e2rtvdfwo",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_a4ch7pd2ri5gjlek7e2rtvdfwo_wkb_hex_string/tables/t/streams/_default"
+            }
+          ]
+        },
+        "read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POINT(1 2)"
+                },
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "wkt_clockwise_polygon": {
+      "project": "johejo-sandbox",
+      "run": "a4ch7pd2ri5gjlek7e2rtvdfwo",
+      "steps": {
+        "append": {
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_a4ch7pd2ri5gjlek7e2rtvdfwo_wkt_clockwise_polygon/tables/t/streams/_default"
+            }
+          ]
+        },
+        "read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))"
+                },
+                {
+                  "v": "5.100537090814215E14"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
