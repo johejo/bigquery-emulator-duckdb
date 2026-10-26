@@ -1,0 +1,82 @@
+# Search prefixes select one path for each pair of endpoint identities.
+# Expected results follow BigQuery's documented partitioning and shortest-edge rules.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_search_prefix
+# FinGraph edges: 10:1->2, 11:2->1, 12:1->1, 13:1->2. Node 3 is isolated.
+# Never assert which path is chosen when several paths qualify.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]->(b:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT STRING_AGG(CONCAT(CAST(src AS STRING), ':', CAST(dst AS STRING), ':', CAST(hops AS STRING)), ',' ORDER BY src, dst) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person)-[:Knows]->{1,2}(b:Person) RETURN a.id AS src, b.id AS dst, PATH_LENGTH(p) AS hops)
+=> "1:1:1,1:2:1,2:1:1,2:2:2"
+
+# The documented shortest-path example starts on blocked account 16.
+SELECT STRING_AGG(CONCAT(CAST(src AS STRING), ':', CAST(hops AS STRING), ':', CAST(dst AS STRING)), ',' ORDER BY dst) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY SHORTEST (a:Account WHERE a.is_blocked)-[e:Transfers]->{1,4}(b:Account) RETURN a.id AS src, ARRAY_LENGTH(e) AS hops, b.id AS dst)
+=> "16:2:7,16:2:16,16:1:20"
+
+# A mode on a subpath restricts candidates before selecting a shortest path.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (ACYCLIC (a:Person)-[:Knows]->{1,2}(b:Person)) RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (TRAIL (a:Person)-[:Knows]->{2}(b:Person)) RETURN COUNTIF(NOT IS_TRAIL(p)) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST ((a:Person)-[:Knows]->(b:Person)-[:Knows]->(c:Person)){1,2} RETURN SUM(PATH_LENGTH(p)) AS result)
+=> "8"
+
+# Zero-edge paths win for identical endpoints; the isolated node still has one.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person)-[:Knows]->{0,2}(b:Person) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person)-[:Knows]->{0,2}(b:Person) RETURN SUM(PATH_LENGTH(p)) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person) RETURN SUM(PATH_LENGTH(p)) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person WHERE a.id = 3)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "0"
+
+# Reversing direction preserves the endpoint partitions; undirected self-loops count once.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person)<-[:Knows]-{1,2}(b:Person) RETURN SUM(PATH_LENGTH(p)) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]-(b:Person) RETURN COUNT(*) AS result)
+=> "3"
+
+# Node identity uses hidden keys, every composite component, and the element table.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH ANY (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH ANY (a:Compound)-[:CompoundEdge]->(b:Compound) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH ANY (a:Author)-[:Knows]->(b:Reader) RETURN COUNT(*) AS result)
+=> "3"
+
+# Endpoint joins preserve independently selected paths, including OPTIONAL MATCH.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]->{1,2}(b:Person), ANY (b)-[:Knows]->{1,2}(c:Person) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH ANY SHORTEST (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST (a:Person)-[:Knows]->{1,2}(b:Person) MATCH (b)-[:Owns]->(c:Account) RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST (a:Person)-[:Knows]->{1,2}(a) RETURN COUNT(*) AS result)
+=> "2"
+
+# MATCH WHERE filters the selected paths; an inline edge filter restricts candidates.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person)-[:Knows]->{1,2}(b:Person) WHERE PATH_LENGTH(p) = 2 RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST (a:Person)-[e:Knows WHERE e.id = 12]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "1"
+
+# A search prefix and a mode cannot appear on the same path pattern.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST TRAIL (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> error:
+
+# Only endpoints may be reused outside a prefixed pattern in the same MATCH.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_search_prefix
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]->(mid:Person)-[:Knows]->(b:Person), (mid)-[:Owns]->(c:Account) RETURN COUNT(*) AS result)
+=> error:
+
+# A parenthesized path filter restricts candidates before the search prefix.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#parenthesized_path_pattern
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST ((a:Person)-[e:Knows]->{1,2}(b:Person) WHERE ARRAY_LENGTH(e) = 2) RETURN SUM(PATH_LENGTH(p)) AS result)
+=> "8"
+
+# Selected group variables and the selected path describe the same ordered traversal.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN COUNTIF(ARRAY_LENGTH(e) = PATH_LENGTH(p) AND ARRAY_LENGTH(NODES(p)) = ARRAY_LENGTH(e) + 1 AND EDGES(p)[OFFSET(0)].id = e[OFFSET(0)].id) AS result)
+=> "4"
