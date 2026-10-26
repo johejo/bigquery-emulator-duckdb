@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "nlohmann/json_fwd.hpp"
+#include "src/extract_options.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -30,23 +31,13 @@ enum class DecimalTargetType : uint8_t { kNumeric, kBigNumeric, kString };
 std::vector<DecimalTargetType> ParseDecimalTargetTypes(const nlohmann::json& configuration);
 
 // JSON is retained separately on the job for jobs.get; execution uses these types.
-enum class ExtractCompression : uint8_t { kNone, kGzip, kSnappy, kZstd };
-std::string_view ExtractCompressionName(ExtractCompression compression);
-struct CsvExtractOptions {
-  std::string field_delimiter = ",";
-  bool print_header = true;
-};
-struct JsonExtractOptions {};
-struct ParquetExtractOptions {};
 struct ExtractEncoding {
   FileFormat format = FileFormat::kCsv;
   ExtractCompression compression = ExtractCompression::kNone;
 };
 ExtractEncoding ParseExtractEncoding(const nlohmann::json& configuration);
-using ExtractFormatOptions =
-    std::variant<CsvExtractOptions, JsonExtractOptions, ParquetExtractOptions>;
 // Text fields are decoded after reading the source, preserving job validation order.
-ExtractFormatOptions ParseExtractFormatOptions(FileFormat format,
-                                               const nlohmann::json& configuration);
+TextExtractFormatOptions ParseTextExtractFormatOptions(FileFormat format,
+                                                       const nlohmann::json& configuration);
 
 }  // namespace bigquery_emulator_duckdb

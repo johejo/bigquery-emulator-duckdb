@@ -7,6 +7,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/extract_options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -94,19 +95,6 @@ std::vector<DecimalTargetType> ParseDecimalTargetTypes(const nlohmann::json& con
   }
   return result;
 }
-std::string_view ExtractCompressionName(ExtractCompression compression) {
-  switch (compression) {
-    case ExtractCompression::kNone:
-      return "NONE";
-    case ExtractCompression::kGzip:
-      return "GZIP";
-    case ExtractCompression::kSnappy:
-      return "SNAPPY";
-    case ExtractCompression::kZstd:
-      return "ZSTD";
-  }
-  return "";
-}
 ExtractEncoding ParseExtractEncoding(const nlohmann::json& config) {
   const std::string name = config.value("destinationFormat", "CSV");
   const std::string compression = config.value("compression", "NONE");
@@ -135,7 +123,8 @@ ExtractEncoding ParseExtractEncoding(const nlohmann::json& config) {
   }
   return {.format = *format, .compression = *parsed};
 }
-ExtractFormatOptions ParseExtractFormatOptions(FileFormat format, const nlohmann::json& config) {
+TextExtractFormatOptions ParseTextExtractFormatOptions(FileFormat format,
+                                                       const nlohmann::json& config) {
   switch (format) {
     case FileFormat::kCsv:
       return CsvExtractOptions{
@@ -148,7 +137,7 @@ ExtractFormatOptions ParseExtractFormatOptions(FileFormat format, const nlohmann
       (void)config.value("printHeader", true);
       return JsonExtractOptions{};
     case FileFormat::kParquet:
-      return ParquetExtractOptions{};
+      throw ApiError::Invalid("Parquet is not a text extract format");
   }
   return JsonExtractOptions{};
 }
