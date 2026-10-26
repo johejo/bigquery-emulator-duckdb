@@ -35,20 +35,8 @@ func TestColumnRoundingModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
-	read := func(sql string) [][]bigquery.Value {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		return readRows(t, rows)
-	}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
+	run, read := p.run, p.read
 
 	for _, sql := range []string{
 		`CREATE TABLE t (id INT64,
@@ -293,26 +281,8 @@ func TestDefaultRoundingModes(t *testing.T) {
 	dataset := client.Dataset("go_default_rounding_mode")
 	_ = dataset.DeleteWithContents(ctx)
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
-	mustRun := func(sql string) {
-		t.Helper()
-		if err := run(sql); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
-	read := func(sql string) [][]bigquery.Value {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		return readRows(t, rows)
-	}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
+	run, mustRun, read := p.run, p.mustRun, p.read
 	// The rounding modes tables.get reports for the fields of `table`, by path.
 	modes := func(table string) map[string]bigquery.RoundingMode {
 		t.Helper()

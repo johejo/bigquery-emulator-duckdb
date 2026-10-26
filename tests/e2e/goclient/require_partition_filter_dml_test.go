@@ -65,7 +65,7 @@ func TestRequirePartitionFilterDML(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-			p := creationPaths{t: t, client: client, dataset: dataset}
+			p := datasetQueries{t: t, client: client, dataset: dataset}
 			for _, table := range []string{"target", "source"} {
 				required := table == "target" || c.sourceRequired
 				p.mustRun(fmt.Sprintf("CREATE TABLE %s (day DATE, other_day DATE, id INT64, v INT64) PARTITION BY day OPTIONS (require_partition_filter = %t)", table, required))

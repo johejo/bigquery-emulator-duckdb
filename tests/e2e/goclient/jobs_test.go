@@ -163,7 +163,7 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 
 	never := client.Query("SELECT 1 AS a")
 	never.Dst = dataset.Table("dest")

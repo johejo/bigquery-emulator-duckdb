@@ -21,7 +21,7 @@ func TestTruncateTableAndDryRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE t AS SELECT id, CAST(id AS STRING) AS name FROM UNNEST([1, 2]) AS id")
 
 	for _, sql := range []string{

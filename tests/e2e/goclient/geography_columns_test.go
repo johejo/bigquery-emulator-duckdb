@@ -43,7 +43,7 @@ func TestGeographyColumns(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
 		{Name: "g", Type: bigquery.GeographyFieldType},
@@ -221,7 +221,7 @@ func TestGeographyParquetWkb(t *testing.T) {
 	if err := loadParquet(ctx, dataset.Table("places"), source, schema); err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	if got, want := p.read(`SELECT id, ST_ASTEXT(g), ARRAY(SELECT ST_ASTEXT(e) FROM UNNEST(gs) AS e)
 		FROM places ORDER BY id`), [][]bigquery.Value{
 		{int64(1), "POINT(2 4)", []bigquery.Value{"POINT(2 4)"}},

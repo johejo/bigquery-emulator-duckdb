@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -25,65 +24,7 @@ type tableView struct {
 }
 
 type creationPaths struct {
-	t       *testing.T
-	client  *bigquery.Client
-	dataset *bigquery.Dataset
-}
-
-func (p creationPaths) run(sql string) error {
-	p.t.Helper()
-	_, _, err := runScript(p.t, p.client, p.dataset.DatasetID, sql)
-	return err
-}
-
-func (p creationPaths) mustRun(sql string) {
-	p.t.Helper()
-	if err := p.run(sql); err != nil {
-		p.t.Fatalf("%s: %v", sql, err)
-	}
-}
-
-func (p creationPaths) query(sql string, table string, disposition bigquery.TableWriteDisposition) error {
-	p.t.Helper()
-	query := p.client.Query(sql)
-	query.Dst = p.dataset.Table(table)
-	query.WriteDisposition = disposition
-	return wait(context.Background(), query)
-}
-
-func (p creationPaths) load(table, rows string, schema bigquery.Schema,
-	disposition bigquery.TableWriteDisposition) error {
-	p.t.Helper()
-	source := bigquery.NewReaderSource(strings.NewReader(rows))
-	source.SourceFormat = bigquery.JSON
-	source.Schema = schema
-	loader := p.dataset.Table(table).LoaderFrom(source)
-	loader.WriteDisposition = disposition
-	return wait(context.Background(), loader)
-}
-
-func (p creationPaths) copy(table string, disposition bigquery.TableWriteDisposition,
-	sources ...string) error {
-	p.t.Helper()
-	var tables []*bigquery.Table
-	for _, source := range sources {
-		tables = append(tables, p.dataset.Table(source))
-	}
-	copier := p.dataset.Table(table).CopierFrom(tables...)
-	copier.WriteDisposition = disposition
-	return wait(context.Background(), copier)
-}
-
-func (p creationPaths) read(sql string, parameters ...bigquery.QueryParameter) [][]bigquery.Value {
-	p.t.Helper()
-	query := p.client.Query(sql)
-	query.DefaultDatasetID = p.dataset.DatasetID
-	query.Parameters = parameters
-	rows, err := query.Read(context.Background())
-	if err != nil {
-		p.t.Fatalf("%s: %v", sql, err)
-	}
-	return readRows(p.t, rows)
+	datasetQueries
 }
 
 func (p creationPaths) view(table string) tableView {
@@ -154,7 +95,7 @@ func TestTableCreationPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 
 	// A string literal default keeps its quotes in defaultValueExpression
 	// (https://cloud.google.com/bigquery/docs/default-values).
@@ -205,7 +146,7 @@ func TestTableCreationPaths(t *testing.T) {
 		{"copy_defaults", func() error { return p.copy("copy_defaults", bigquery.WriteEmpty, "ddl") }, declared, nil, "none"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			p := creationPaths{t: t, client: client, dataset: dataset}
+			p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 			if err := c.create(); err != nil {
 				t.Fatal(err)
 			}
@@ -273,7 +214,7 @@ func TestWritesToExistingTables(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	p.mustRun(`CREATE TABLE target (id INT64 OPTIONS (description = 'key'), name STRING DEFAULT 'none', tags ARRAY<STRING>)
 	  OPTIONS (description = 'the table', labels = [('env', 'dev')])`)
 	p.mustRun("CREATE TABLE narrow (id INT64, tags ARRAY<STRING>)")
@@ -361,7 +302,7 @@ func TestFailedReplacementsKeepTheTable(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	p.mustRun(`CREATE TABLE keep (id INT64 NOT NULL OPTIONS (description = 'key'), name STRING DEFAULT 'none')
 	  OPTIONS (description = 'the table', friendly_name = 'Keep', labels = [('env', 'dev')])`)
 	p.mustRun("INSERT keep (id) VALUES (1)")

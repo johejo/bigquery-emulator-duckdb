@@ -20,7 +20,7 @@ func TestCreateTableAsSelectColumnModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	p.mustRun(`CREATE TABLE source (id INT64 NOT NULL, name STRING)`)
 	p.mustRun(`INSERT source VALUES (1, 'one')`)
 	p.mustRun(`CREATE TABLE inferred AS SELECT * FROM source`)
@@ -75,7 +75,7 @@ func TestAlterTableAddColumnModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	for _, table := range []string{"empty", "populated"} {
 		p.mustRun("CREATE TABLE " + table + " (id INT64)")
 	}
@@ -114,7 +114,7 @@ func TestCreateTableAsSelectNestedColumnModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	columns := `(r STRUCT<x INT64 NOT NULL, s STRUCT<y STRING NOT NULL>>, a ARRAY<STRUCT<x INT64 NOT NULL>>)`
 	values := `SELECT STRUCT(1 AS renamed, STRUCT('ok' AS renamed) AS renamed_s), [STRUCT(2 AS renamed)] FROM UNNEST([0])`
 	p.mustRun("CREATE TABLE source " + columns)

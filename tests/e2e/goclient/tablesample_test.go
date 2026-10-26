@@ -23,7 +23,7 @@ func TestTableSampleQueryParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	const rowCount int64 = 65536
 	p.mustRun("CREATE TABLE t AS SELECT id FROM UNNEST(GENERATE_ARRAY(1, 65536)) AS id")
 

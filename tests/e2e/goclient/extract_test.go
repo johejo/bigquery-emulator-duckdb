@@ -143,7 +143,7 @@ func TestExtract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun(`CREATE TABLE scalars AS SELECT
 	  1 AS i, 2.5 AS f, NUMERIC '1.5' AS n, TRUE AS b, b'ab' AS bt,
 	  TIMESTAMP '2020-01-02 03:04:05.12 UTC' AS ts, DATETIME '2020-01-02 03:04:05.5' AS dt,
@@ -277,7 +277,7 @@ func TestExtractErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE scalars AS SELECT 1 AS i")
 	p.mustRun("CREATE TABLE nested AS SELECT STRUCT(1 AS x) AS r")
 	p.mustRun("CREATE VIEW v AS SELECT 1 AS i")

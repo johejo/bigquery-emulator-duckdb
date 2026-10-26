@@ -20,7 +20,7 @@ func TestColumnLengthWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	columns := `(s STRING(3) NOT NULL, b BYTES(3), r STRUCT<label STRING(3)>, a ARRAY<STRING(3)>)`
 	values := `SELECT '日本語' AS s, b'abc' AS b, STRUCT('abc' AS renamed) AS r, ['abc', ''] AS a FROM UNNEST([0])`
 	p.mustRun("CREATE TABLE defaulted (s STRING(3) DEFAULT 'abc')")
@@ -174,7 +174,7 @@ func TestColumnLengthLoadBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE json_bytes (b BYTES(3), r STRUCT<b BYTES(3)>, a ARRAY<BYTES(3)>)")
 	p.mustRun("CREATE TABLE csv_bytes (b BYTES(3))")
 	load := func(table, data string, format bigquery.DataFormat, fails bool) {

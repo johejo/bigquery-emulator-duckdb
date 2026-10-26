@@ -42,7 +42,7 @@ func TestGCSLoadWildcards(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	carol, dave := []bigquery.Value{int64(3), "carol"}, []bigquery.Value{int64(4), "dave"}
 
 	for _, c := range []struct {
@@ -87,7 +87,7 @@ func TestGCSLoadErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	table := dataset.Table("t")
 	if err := loadGCS(ctx, table, people, "", "gs://load-fixtures/nested/people.jsonl"); err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestGzipLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	table := dataset.Table("t")
 
 	file, err := os.Open("../gcs/load-fixtures/compressed/people.csv.gz")
@@ -165,7 +165,7 @@ func TestBigNumericTextLoads(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	p := creationPaths{t: t, client: client, dataset: dataset}
+	p := datasetQueries{t: t, client: client, dataset: dataset}
 	const maxNumeric = "99999999999999999999999999999.999999999"
 	load := func(table string, format bigquery.DataFormat, data string, schema bigquery.Schema) error {
 		source := bigquery.NewReaderSource(strings.NewReader(data))
