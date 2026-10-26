@@ -45,7 +45,6 @@ cc_library(
             "-lncurses",
             "-lpanel",
             "-ledit",
-            "-lz",
             "-framework CoreFoundation",
             "-framework SystemConfiguration",
             "-Wl,-export_dynamic",
@@ -61,5 +60,6 @@ cc_library(
     deps = [
         ":libpython",
         "@openssl//:ssl",
+        "@zlib",
     ],
 )
