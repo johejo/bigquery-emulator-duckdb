@@ -21,9 +21,10 @@ INTERVAL columns, parameterized decimals, and JSON and GEOGRAPHY columns in Arro
 
 ## Write limitations
 
-Protobuf scalar fields, STRUCTs and repeated fields are supported. Column defaults, parameterized
-STRING and BYTES columns, custom protobuf annotations, JSON, GEOGRAPHY and INTERVAL input and schema
-evolution are unsupported.
+Protobuf scalar fields, STRUCTs and repeated fields are supported. GEOGRAPHY fields take strings
+as `tabledata.insertAll` does; see [GEOGRAPHY values](compatibility.md#geography-values). Column
+defaults, parameterized STRING and BYTES columns, custom protobuf annotations, JSON and INTERVAL
+input and schema evolution are unsupported.
 
 Create a new stream after changing a table schema. Default streams established before a schema
 change require restarting the process. Tables persisted without creation metadata cannot return

@@ -1,0 +1,84 @@
+version: 1
+description: >-
+  Record how Storage Write's AppendRows takes GEOGRAPHY values. BigQuery documents a protobuf
+  string of WKT or GeoJSON (https://cloud.google.com/bigquery/docs/supported-data-types); these
+  cases check what it leaves open: polygon orientation, hex-encoded WKB, which tabledata.insertAll
+  takes, a BYTES field, and the row error of an invalid value. Each row is a serialized `g` field.
+vars:
+  dataset: bqa_${run}_${case}
+  type: TYPE_STRING
+templates:
+  append:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (g GEOGRAPHY)
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=projects/${project}/datasets/${dataset}/tables/t/streams/_default
+          requests:
+            - writeStream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+              protoRows:
+                writerSchema:
+                  protoDescriptor:
+                    name: Row
+                    field:
+                      - {name: g, number: 1, label: LABEL_OPTIONAL, type: '${type}'}
+                rows:
+                  serializedRows: ['${row}']
+        observe:
+          messages: /messages
+          error: /error
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT ST_ASTEXT(g) AS g, ST_AREA(g) AS area FROM `${project}.${dataset}.t`
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe:
+          jobComplete: /body/jobComplete
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  # POLYGON((0 0, 0 1, 1 1, 1 0, 0 0)), whose shell runs clockwise.
+  - name: wkt_clockwise_polygon
+    template: append
+    vars: {row: CiJQT0xZR09OKCgwIDAsIDAgMSwgMSAxLCAxIDAsIDAgMCkp}
+  # The same ring as GeoJSON.
+  - name: geojson_clockwise_polygon
+    template: append
+    vars: {row: Ck57InR5cGUiOiAiUG9seWdvbiIsICJjb29yZGluYXRlcyI6IFtbWzAsIDBdLCBbMCwgMV0sIFsxLCAxXSwgWzEsIDBdLCBbMCwgMF1dXX0=}
+  # POINT(1 2) as hex-encoded WKB: 0101000000000000000000f03f0000000000000040.
+  - name: wkb_hex_string
+    template: append
+    vars: {row: CiowMTAxMDAwMDAwMDAwMDAwMDAwMDAwZjAzZjAwMDAwMDAwMDAwMDAwNDA=}
+  # POINT(1 2) as binary WKB in a BYTES field.
+  - name: wkb_bytes_field
+    template: append
+    vars: {type: TYPE_BYTES, row: ChUBAQAAAAAAAAAAAPA/AAAAAAAAAEA=}
+  # POINT(1).
+  - name: invalid_wkt
+    template: append
+    vars: {row: CghQT0lOVCgxKQ==}
