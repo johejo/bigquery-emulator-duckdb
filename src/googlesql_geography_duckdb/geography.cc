@@ -509,60 +509,25 @@ const Definitions& GeographyDefinitions() {
         .Call("ST_GEOGFROMGEOJSON", 1);
     // ST_GEOGFROMWKB and ST_GEOGFROM read BYTES as WKB, and ST_GEOGFROMWKB reads a STRING as its
     // hex and ST_GEOGFROM as WKT, GeoJSON or hex WKB.
-    const auto of_type = [](const BackendDefinition& backend, googlesql::TypeKind type) {
-      return std::vector<Rule>{
-          {
-              .arity = 1,
-              .spelling = backend.Invoke("$1"),
-              .conditions = {{.argument = 1, .types = {type}}},
-          },
-      };
-    };
     {
-      auto& backend =
-          definitions->Scalar("bq_st_geogfromwkb", {kBlob}, kGeography, EachRow<GeogFromWkb>);
-      backend.Sql("ST_GEOGFROMWKB", of_type(backend, googlesql::TYPE_BYTES));
+      definitions->Scalar("bq_st_geogfromwkb", {kBlob}, kGeography, EachRow<GeogFromWkb>);
     }
     {
-      auto& backend =
-          definitions->Scalar("bq_st_geogfrombytes", {kBlob}, kGeography, EachRow<GeogFromBytes>);
-      backend.Sql("ST_GEOGFROM", of_type(backend, googlesql::TYPE_BYTES));
+      definitions->Scalar("bq_st_geogfrombytes", {kBlob}, kGeography, EachRow<GeogFromBytes>);
     }
     {
-      auto& backend = definitions->Scalar("bq_st_geogfromhexwkb", {kVarchar}, kGeography,
-                                          EachRow<GeogFromHexWkb>);
-      backend.Sql("ST_GEOGFROMWKB", of_type(backend, googlesql::TYPE_STRING));
+      definitions->Scalar("bq_st_geogfromhexwkb", {kVarchar}, kGeography, EachRow<GeogFromHexWkb>);
     }
     {
-      auto& backend =
-          definitions->Scalar("bq_st_geogfrom", {kVarchar}, kGeography, EachRow<GeogFrom>);
-      backend.Sql("ST_GEOGFROM", of_type(backend, googlesql::TYPE_STRING));
+      definitions->Scalar("bq_st_geogfrom", {kVarchar}, kGeography, EachRow<GeogFrom>);
     }
     {
-      auto& backend =
-          definitions->Scalar("bq_st_geogfromwkb_oriented", {kBlob, kBoolean, kBoolean, kBoolean},
-                              kGeography, EachRow<GeogFromOrientedWkb<false>>);
-      backend.Sql("ST_GEOGFROMWKB",
-                  {
-                      {
-                          .arity = 4,
-                          .spelling = backend.Invoke("$1, $2, $3, $4"),
-                          .conditions = {{.argument = 1, .types = {googlesql::TYPE_BYTES}}},
-                      },
-                  });
+      definitions->Scalar("bq_st_geogfromwkb_oriented", {kBlob, kBoolean, kBoolean, kBoolean},
+                          kGeography, EachRow<GeogFromOrientedWkb<false>>);
     }
     {
-      auto& backend = definitions->Scalar("bq_st_geogfromhexwkb_oriented",
-                                          {kVarchar, kBoolean, kBoolean, kBoolean}, kGeography,
-                                          EachRow<GeogFromOrientedWkb<true>>);
-      backend.Sql("ST_GEOGFROMWKB",
-                  {
-                      {
-                          .arity = 4,
-                          .spelling = backend.Invoke("$1, $2, $3, $4"),
-                          .conditions = {{.argument = 1, .types = {googlesql::TYPE_STRING}}},
-                      },
-                  });
+      definitions->Scalar("bq_st_geogfromhexwkb_oriented", {kVarchar, kBoolean, kBoolean, kBoolean},
+                          kGeography, EachRow<GeogFromOrientedWkb<true>>);
     }
     definitions->Scalar("bq_geography_input", {kVarchar}, kGeography, EachRow<GeographyInput>);
     definitions->Scalar("bq_parquet_geography_input", {kVarchar}, kGeography,
@@ -623,12 +588,8 @@ const Definitions& GeographyDefinitions() {
                  EachRow<Call<googlesql_geography::HausdorffDistance>>)
         .Call("ST_HAUSDORFFDISTANCE", {2, 3}, {"false"});
     {
-      auto& backend =
-          definitions->Scalar("bq_st_hausdorffdwithin", {kGeography, kGeography, kBoolean, kDouble},
-                              kBoolean, EachRow<Call<googlesql_geography::HausdorffDWithin>>);
-      backend.Sql(
-          "ST_HAUSDORFFDWITHIN",
-          {{.arity = {3, 4}, .spelling = backend.Invoke("$1, $2, $4, $3"), .defaults = {"false"}}});
+      definitions->Scalar("bq_st_hausdorffdwithin", {kGeography, kGeography, kBoolean, kDouble},
+                          kBoolean, EachRow<Call<googlesql_geography::HausdorffDWithin>>);
     }
     definitions
         ->Scalar("bq_st_closestpoint", {kGeography, kGeography, kBoolean, kVarchar}, kGeography,
@@ -647,12 +608,10 @@ const Definitions& GeographyDefinitions() {
                  EachRow<Call<googlesql_geography::Equals>>)
         .Call("ST_EQUALS", 2);
     {
-      auto& backend = definitions
-                          ->Scalar("bq_st_intersects", {kGeography, kGeography}, kBoolean,
-                                   EachRow<Call<googlesql_geography::Intersects>>)
-                          .Call("ST_INTERSECTS", 2);
-      backend.Sql("ST_DISJOINT",
-                  {{.arity = 2, .spelling = "(NOT " + backend.Invoke("$1, $2") + ")"}});
+      definitions
+          ->Scalar("bq_st_intersects", {kGeography, kGeography}, kBoolean,
+                   EachRow<Call<googlesql_geography::Intersects>>)
+          .Call("ST_INTERSECTS", 2);
     }
     definitions
         ->Scalar("bq_st_intersection", {kGeography, kGeography}, kGeography,
@@ -671,18 +630,16 @@ const Definitions& GeographyDefinitions() {
                  EachRow<Call<googlesql_geography::Touches>>)
         .Call("ST_TOUCHES", 2);
     {
-      auto& backend = definitions
-                          ->Scalar("bq_st_covers", {kGeography, kGeography}, kBoolean,
-                                   EachRow<Call<googlesql_geography::Covers>>)
-                          .Call("ST_COVERS", 2);
-      backend.Sql("ST_COVEREDBY", {{.arity = 2, .spelling = backend.Invoke("$2, $1")}});
+      definitions
+          ->Scalar("bq_st_covers", {kGeography, kGeography}, kBoolean,
+                   EachRow<Call<googlesql_geography::Covers>>)
+          .Call("ST_COVERS", 2);
     }
     {
-      auto& backend = definitions
-                          ->Scalar("bq_st_contains", {kGeography, kGeography}, kBoolean,
-                                   EachRow<Call<googlesql_geography::Contains>>)
-                          .Call("ST_CONTAINS", 2);
-      backend.Sql("ST_WITHIN", {{.arity = 2, .spelling = backend.Invoke("$2, $1")}});
+      definitions
+          ->Scalar("bq_st_contains", {kGeography, kGeography}, kBoolean,
+                   EachRow<Call<googlesql_geography::Contains>>)
+          .Call("ST_CONTAINS", 2);
     }
     definitions->Scalar("bq_st_x", {kGeography}, kDouble, EachRow<Call<googlesql_geography::X>>)
         .Call("ST_X", 1);
@@ -737,90 +694,55 @@ const Definitions& GeographyDefinitions() {
         ->Scalar("bq_st_exteriorring", {kGeography}, kGeography,
                  EachRow<Call<googlesql_geography::ExteriorRing>>)
         .Call("ST_EXTERIORRING", 1);
-    definitions
-        ->Scalar("bq_st_makepolygon", {kGeography}, kGeography,
-                 EachRow<[](const Arguments& args) { return MakePolygon({args.String(0)}); }>)
-        .Call("ST_MAKEPOLYGON", 1);
+    definitions->Scalar(
+        "bq_st_makepolygon", {kGeography}, kGeography,
+        EachRow<[](const Arguments& args) { return MakePolygon({args.String(0)}); }>);
     {
       auto& backend = definitions->Scalar("bq_st_pointn", {kGeography, kBigint}, kGeography,
                                           EachRow<Call<googlesql_geography::PointN>>);
-      backend.Sql("ST_STARTPOINT", {{.arity = 1, .spelling = backend.Invoke("$1, 1")}});
-      backend.Sql("ST_ENDPOINT", {{.arity = 1, .spelling = backend.Invoke("$1, -1")}});
-      backend.Sql("ST_POINTN", {{.arity = 2, .spelling = backend.Invoke("$1, $2")}});
+      backend.Call("ST_POINTN", 2);
     }
-    definitions
-        ->Scalar("bq_st_makeline", {kGeography, kGeography}, kGeography,
-                 EachRow<[](const Arguments& args) {
-                   return MakeLine({args.String(0), args.String(1)});
-                 }>)
-        .Call("ST_MAKELINE", 2);
-    definitions
-        ->Scalar("bq_st_union", {kGeography, kGeography}, kGeography,
-                 EachRow<[](const Arguments& args) {
-                   return UnionGeographies({args.String(0), args.String(1)});
-                 }>)
-        .Call("ST_UNION", 2);
+    definitions->Scalar(
+        "bq_st_makeline", {kGeography, kGeography}, kGeography,
+        EachRow<[](const Arguments& args) { return MakeLine({args.String(0), args.String(1)}); }>);
+    definitions->Scalar("bq_st_union", {kGeography, kGeography}, kGeography,
+                        EachRow<[](const Arguments& args) {
+                          return UnionGeographies({args.String(0), args.String(1)});
+                        }>);
     {
-      auto& backend = definitions->Custom(kUnionArray, [](duckdb_connection connection,
-                                                          const char* name,
-                                                          const Options& /*options*/) {
+      definitions->Custom(kUnionArray, [](duckdb_connection connection, const char* name,
+                                          const Options& /*options*/) {
         const LogicalType geography(duckdb_create_logical_type(kGeography));
         const LogicalType list(duckdb_create_list_type(geography.get()));
         Register(connection, name, {list.get()}, geography.get(),
                  EachRow<[](const Arguments& args) { return UnionGeographies(args.Strings(0)); }>);
       });
-      backend.Sql("ST_UNION",
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = backend.Invoke(
-                              "list_filter($1, lambda geography: geography IS NOT NULL)"),
-                      },
-                  });
     }
     {
-      auto& backend = definitions->Custom(
-          "bq_st_makeline_array",
-          [](duckdb_connection connection, const char* name, const Options& /*options*/) {
-            const LogicalType geography(duckdb_create_logical_type(kGeography));
-            const LogicalType list(duckdb_create_list_type(geography.get()));
-            Register(connection, name, {list.get()}, geography.get(),
-                     EachRow<[](const Arguments& args) { return MakeLine(args.Strings(0)); }>);
-          });
-      backend.Sql("ST_MAKELINE",
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE " +
-                                      backend.Invoke("$1") + " END",
-                      },
-                  });
+      definitions->Custom("bq_st_makeline_array", [](duckdb_connection connection, const char* name,
+                                                     const Options& /*options*/) {
+        const LogicalType geography(duckdb_create_logical_type(kGeography));
+        const LogicalType list(duckdb_create_list_type(geography.get()));
+        Register(connection, name, {list.get()}, geography.get(),
+                 EachRow<[](const Arguments& args) { return MakeLine(args.Strings(0)); }>);
+      });
     }
     {
-      auto& backend = definitions->Custom(
-          "bq_st_makepolygon_holes",
-          [](duckdb_connection connection, const char* name, const Options& /*options*/) {
-            const LogicalType geography(duckdb_create_logical_type(kGeography));
-            const LogicalType list(duckdb_create_list_type(geography.get()));
-            Register(connection, name,
-                     std::vector<duckdb_logical_type>{geography.get(), list.get()}, geography.get(),
-                     EachRow<[](const Arguments& args) {
-                       std::vector<std::string> rings = args.Strings(1);
-                       rings.insert(rings.begin(), args.String(0));
-                       return MakePolygon(rings);
-                     }>);
-          });
-      backend.Sql("ST_MAKEPOLYGON",
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN list_count($2) <> len($2) THEN NULL ELSE " +
-                                      backend.Invoke("$1, $2") + " END",
-                      },
-                  });
+      definitions->Custom("bq_st_makepolygon_holes", [](duckdb_connection connection,
+                                                        const char* name,
+                                                        const Options& /*options*/) {
+        const LogicalType geography(duckdb_create_logical_type(kGeography));
+        const LogicalType list(duckdb_create_list_type(geography.get()));
+        Register(connection, name, std::vector<duckdb_logical_type>{geography.get(), list.get()},
+                 geography.get(), EachRow<[](const Arguments& args) {
+                   std::vector<std::string> rings = args.Strings(1);
+                   rings.insert(rings.begin(), args.String(0));
+                   return MakePolygon(rings);
+                 }>);
+      });
     }
     {
-      auto& backend = definitions->Custom(
+      definitions->Custom(
           "bq_st_makepolygonoriented",
           [](duckdb_connection connection, const char* name, const Options& /*options*/) {
             const LogicalType geography(duckdb_create_logical_type(kGeography));
@@ -830,36 +752,16 @@ const Definitions& GeographyDefinitions() {
                        return MakePolygon(args.Strings(0), /*oriented=*/true);
                      }>);
           });
-      backend.Sql(
-          "ST_MAKEPOLYGONORIENTED",
-          {
-              {
-                  .arity = 1,
-                  .spelling = "CASE WHEN len($1) = 0 OR list_count($1) <> len($1) THEN NULL ELSE " +
-                              backend.Invoke("$1") + " END",
-              },
-          });
     }
     {
-      auto& backend = definitions->Custom("bq_st_dump", [](duckdb_connection connection,
-                                                           const char* name,
-                                                           const Options& /*options*/) {
+      definitions->Custom("bq_st_dump", [](duckdb_connection connection, const char* name,
+                                           const Options& /*options*/) {
         const LogicalType geography(duckdb_create_logical_type(kGeography));
         const LogicalType list(duckdb_create_list_type(geography.get()));
         const LogicalType bigint(duckdb_create_logical_type(kBigint));
         Register(connection, name, std::vector<duckdb_logical_type>{geography.get(), bigint.get()},
                  list.get(), EachRow<Call<googlesql_geography::Dump>>);
       });
-      backend.Sql("ST_DUMP",
-                  {
-                      {.arity = 1, .spelling = backend.Invoke("$1, -1")},
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $2 IS NULL THEN CASE WHEN $1 IS NULL THEN "
-                                      "NULL ELSE []::BLOB[] END ELSE " +
-                                      backend.Invoke("$1, $2") + " END",
-                      },
-                  });
     }
     definitions
         ->Custom("bq_st_interiorrings",
@@ -878,33 +780,22 @@ const Definitions& GeographyDefinitions() {
         ->Scalar("bq_s2_cellidfrompoint", {kGeography, kBigint}, kBigint,
                  EachRow<Call<googlesql_geography::CellIdFromPoint>>)
         .Call("S2_CELLIDFROMPOINT", {1, 2}, {"30"});
-    definitions
-        ->Custom("bq_s2_coveringcellids",
-                 [](duckdb_connection connection, const char* name, const Options& /*options*/) {
-                   const LogicalType geography(duckdb_create_logical_type(kGeography));
-                   const LogicalType bigint(duckdb_create_logical_type(kBigint));
-                   const LogicalType number(duckdb_create_logical_type(kDouble));
-                   const LogicalType list(duckdb_create_list_type(bigint.get()));
-                   Register(connection, name,
-                            std::vector<duckdb_logical_type>{
-                                geography.get(),
-                                bigint.get(),
-                                bigint.get(),
-                                bigint.get(),
-                                number.get(),
-                            },
-                            list.get(), EachRow<Call<googlesql_geography::CoveringCellIds>>);
-                 })
-        .Sql(
-            "S2_COVERINGCELLIDS",
-            {
-                {
-                    .arity = {1, 5},
-                    .spelling = "coalesce(bq_s2_coveringcellids($1, $2, $3, $4, $5), []::BIGINT[])",
-                    .defaults = {"0", "30", "8", "0.0"},
-                },
-            },
-            {TypeUse::kRejectsSafe});
+    definitions->Custom("bq_s2_coveringcellids", [](duckdb_connection connection, const char* name,
+                                                    const Options& /*options*/) {
+      const LogicalType geography(duckdb_create_logical_type(kGeography));
+      const LogicalType bigint(duckdb_create_logical_type(kBigint));
+      const LogicalType number(duckdb_create_logical_type(kDouble));
+      const LogicalType list(duckdb_create_list_type(bigint.get()));
+      Register(connection, name,
+               std::vector<duckdb_logical_type>{
+                   geography.get(),
+                   bigint.get(),
+                   bigint.get(),
+                   bigint.get(),
+                   number.get(),
+               },
+               list.get(), EachRow<Call<googlesql_geography::CoveringCellIds>>);
+    });
     definitions->Custom("bq_st_boundingbox", RegisterBounds<false>).Call("ST_BOUNDINGBOX", 1);
     // The aggregates' finishes, over the non-NULL values that list() collects.
     definitions->Custom(kCentroidAggregate, [](duckdb_connection connection, const char* name,
@@ -921,6 +812,124 @@ const Definitions& GeographyDefinitions() {
 }
 
 }  // namespace
+
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticRule>>
+StaticGeographyFunctions() {
+  static constexpr TypeUses kUses = {TypeUse::kBuildsOrReadsGeography};
+  static constexpr googlesql::TypeKind kBytes[] = {googlesql::TYPE_BYTES};
+  static constexpr googlesql::TypeKind kString[] = {googlesql::TYPE_STRING};
+  static constexpr function_catalog::StaticCondition kBytesArgument[] = {
+      {.argument = 1, .types = kBytes},
+  };
+  static constexpr function_catalog::StaticCondition kStringArgument[] = {
+      {.argument = 1, .types = kString},
+  };
+  static constexpr std::string_view kFalse[] = {"false"};
+  static constexpr std::string_view kCoveringDefaults[] = {"0", "30", "8", "0.0"};
+  static constexpr auto kRulesBacking = std::tuple{
+      Define(
+          "ST_GEOGFROMWKB",
+          {
+              {.arity = 1, .spelling = "bq_st_geogfromwkb($1)", .conditions = kBytesArgument},
+              {.arity = 1, .spelling = "bq_st_geogfromhexwkb($1)", .conditions = kStringArgument},
+              {
+                  .arity = 4,
+                  .spelling = "bq_st_geogfromwkb_oriented($1, $2, $3, $4)",
+                  .conditions = kBytesArgument,
+              },
+              {
+                  .arity = 4,
+                  .spelling = "bq_st_geogfromhexwkb_oriented($1, $2, $3, $4)",
+                  .conditions = kStringArgument,
+              },
+          },
+          {.uses = kUses}),
+      Define("ST_GEOGFROM",
+             {
+                 {.arity = 1, .spelling = "bq_st_geogfrombytes($1)", .conditions = kBytesArgument},
+                 {.arity = 1, .spelling = "bq_st_geogfrom($1)", .conditions = kStringArgument},
+             },
+             {.uses = kUses}),
+      Define("ST_HAUSDORFFDWITHIN",
+             {
+                 {
+                     .arity = {3, 4},
+                     .spelling = "bq_st_hausdorffdwithin($1, $2, $4, $3)",
+                     .defaults = kFalse,
+                 },
+             },
+             {.uses = kUses}),
+      Define("ST_DISJOINT", {{.arity = 2, .spelling = "(NOT bq_st_intersects($1, $2))"}},
+             {.uses = kUses}),
+      Define("ST_COVEREDBY", {{.arity = 2, .spelling = "bq_st_covers($2, $1)"}}, {.uses = kUses}),
+      Define("ST_WITHIN", {{.arity = 2, .spelling = "bq_st_contains($2, $1)"}}, {.uses = kUses}),
+      Define("ST_STARTPOINT", {{.arity = 1, .spelling = "bq_st_pointn($1, 1)"}}, {.uses = kUses}),
+      Define("ST_ENDPOINT", {{.arity = 1, .spelling = "bq_st_pointn($1, -1)"}}, {.uses = kUses}),
+      Define(
+          "ST_UNION",
+          {
+              {.arity = 2, .spelling = "bq_st_union($1, $2)"},
+              {
+                  .arity = 1,
+                  .spelling =
+                      "bq_st_union_array(list_filter($1, lambda geography: geography IS NOT NULL))",
+              },
+          },
+          {.uses = kUses}),
+      Define("ST_MAKELINE",
+             {
+                 {.arity = 2, .spelling = "bq_st_makeline($1, $2)"},
+                 {
+                     .arity = 1,
+                     .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE "
+                                 "bq_st_makeline_array($1) END",
+                 },
+             },
+             {.uses = kUses}),
+      Define("ST_MAKEPOLYGON",
+             {
+                 {.arity = 1, .spelling = "bq_st_makepolygon($1)"},
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN list_count($2) <> len($2) THEN NULL ELSE "
+                                 "bq_st_makepolygon_holes($1, $2) END",
+                 },
+             },
+             {.uses = kUses}),
+      Define(
+          "ST_MAKEPOLYGONORIENTED",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "CASE WHEN len($1) = 0 OR list_count($1) <> len($1) THEN NULL ELSE "
+                              "bq_st_makepolygonoriented($1) END",
+              },
+          },
+          {.uses = kUses}),
+      Define("ST_DUMP",
+             {
+                 {.arity = 1, .spelling = "bq_st_dump($1, -1)"},
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN $2 IS NULL THEN CASE WHEN $1 IS NULL THEN "
+                                 "NULL ELSE []::BLOB[] END ELSE bq_st_dump($1, $2) END",
+                 },
+             },
+             {.uses = kUses}),
+      Define(
+          "S2_COVERINGCELLIDS",
+          {
+              {
+                  .arity = {1, 5},
+                  .spelling = "coalesce(bq_s2_coveringcellids($1, $2, $3, $4, $5), []::BIGINT[])",
+                  .defaults = kCoveringDefaults,
+              },
+          },
+          {.uses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsSafe}}),
+  };
+  static constexpr auto kRules = DefinitionViews(kRulesBacking);
+  return kRules;
+}
 
 const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& GeographyFunctions() {
   static const auto* const kFunctions = [] {

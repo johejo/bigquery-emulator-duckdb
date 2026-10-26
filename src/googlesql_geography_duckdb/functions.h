@@ -8,7 +8,11 @@
 
 namespace bigquery_emulator_duckdb::geography_duckdb {
 
-// SQL translations from the same definitions that register the DuckDB implementations.
+// Fixed SQL translations, backed by constexpr definitions.
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticRule>>
+StaticGeographyFunctions();
+
+// Runtime-generated translations from the definitions that register the DuckDB implementations.
 const std::unordered_map<std::string_view,
                          function_catalog::FunctionDefinition<function_catalog::Rule>>&
 GeographyFunctions();

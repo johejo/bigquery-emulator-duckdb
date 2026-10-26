@@ -15,6 +15,9 @@ const function_catalog::Catalog& EmulatorFunctionCatalog() {
     for (const auto& [name, definition] : functions_duckdb::TrigonometricFunctions()) {
       functions->AddRules(name, definition, function_catalog::Implementation::kGoogleSQL);
     }
+    for (const auto& [name, definition] : geography_duckdb::StaticGeographyFunctions()) {
+      functions->AddRules(name, definition, function_catalog::Implementation::kS2);
+    }
     for (const auto& [name, definition] : geography_duckdb::GeographyFunctions()) {
       functions->AddRules(name, definition, function_catalog::Implementation::kS2);
     }
