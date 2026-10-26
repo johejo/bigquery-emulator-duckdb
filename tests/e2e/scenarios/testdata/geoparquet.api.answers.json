@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "cases": {
+    "ordinary_wkb_explicit_geography": {
+      "project": "johejo-sandbox",
+      "run": "2hvgio4ysq7qmztcgf4xvaann2",
+      "steps": {
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "geometry": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "POINT(-60 60)"
+                },
+                {
+                  "v": "POINT(60 60)"
+                },
+                {
+                  "v": "POINT(0 73.897886248014)"
+                },
+                {
+                  "v": "1545376.8675010777"
+                },
+                {
+                  "v": "5706289.358316397"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "vertices",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "start_point",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "end_point",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "midpoint",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "planar_midpoint_distance_m",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "length_m",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "equals_spherical_wkt",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "load": {
+          "httpStatus": 200
+        },
+        "table": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "g",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

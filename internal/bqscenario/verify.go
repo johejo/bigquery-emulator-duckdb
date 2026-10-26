@@ -10,6 +10,19 @@ import (
 	"time"
 )
 
+// MismatchError reports a completed scenario whose observations differ from its expectation.
+// Verify returns it directly only when setup, execution and cleanup succeeded.
+// Known-bug tests can distinguish a compatibility mismatch from an operational failure.
+// A rejected observed request is also an observation, as in answer collection.
+type MismatchError struct {
+	Case             string
+	Actual, Expected json.RawMessage
+}
+
+func (err *MismatchError) Error() string {
+	return fmt.Sprintf("%s: observations differ\n got: %s\nwant: %s", err.Case, err.Actual, err.Expected)
+}
+
 func decodeJSON(data []byte, value any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
@@ -71,7 +84,11 @@ func (file *File) Verify(ctx context.Context, c Case, project, run string, timeo
 		return errors.Join(err, cleanupErr)
 	}
 	if !bytes.Equal(actual, expected) {
-		return errors.Join(fmt.Errorf("%s: observations differ\n got: %s\nwant: %s", c.Name, actual, expected), cleanupErr)
+		mismatch := &MismatchError{Case: c.Name, Actual: actual, Expected: expected}
+		if cleanupErr != nil {
+			return errors.Join(mismatch, cleanupErr)
+		}
+		return mismatch
 	}
 	return cleanupErr
 }

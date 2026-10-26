@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -112,6 +113,17 @@ func (transport *Transport) rest(ctx context.Context, original RESTRequest, vars
 	request, err := expandedRequest(original, vars)
 	if err != nil {
 		return Response{}, err
+	}
+	if request.UploadBase64 != nil {
+		if request.Upload != nil {
+			return Response{}, errors.New("upload and uploadBase64 are mutually exclusive")
+		}
+		media, err := base64.StdEncoding.DecodeString(*request.UploadBase64)
+		if err != nil {
+			return Response{}, fmt.Errorf("uploadBase64: %w", err)
+		}
+		text := string(media)
+		request.Upload = &text
 	}
 	path, err := url.Parse(request.Path)
 	if err != nil {

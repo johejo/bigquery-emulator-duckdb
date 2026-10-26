@@ -12,6 +12,17 @@ import (
 )
 
 func TestScenarios(t *testing.T) {
+	testScenarios(t, "testdata/*.api.y*ml", false)
+}
+
+// As with compliance known errors, a fixed case must be promoted rather than silently passing.
+// An execution or cleanup error is not evidence of a known compatibility mismatch.
+func TestKnownBugs(t *testing.T) {
+	testScenarios(t, "testdata/known_bugs/*.api.y*ml", true)
+}
+
+func testScenarios(t *testing.T, pattern string, knownBug bool) {
+	t.Helper()
 	endpoint := os.Getenv("BQ_EMULATOR_API")
 	if endpoint == "" {
 		t.Skip("run just e2e")
@@ -20,7 +31,7 @@ func TestScenarios(t *testing.T) {
 	if project == "" {
 		project = "test"
 	}
-	paths, err := filepath.Glob("testdata/*.api.y*ml")
+	paths, err := filepath.Glob(pattern)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +53,16 @@ func TestScenarios(t *testing.T) {
 							t.Error(err)
 						}
 					})
-					if err := file.Verify(t.Context(), c, project, strings.ToLower(rand.Text()), 2*time.Minute, transport.Call); err != nil {
+					err := file.Verify(t.Context(), c, project, strings.ToLower(rand.Text()), 2*time.Minute, transport.Call)
+					if knownBug {
+						if err == nil {
+							t.Fatal("known bug now passes; move this case to testdata/")
+						}
+						if _, ok := err.(*bqscenario.MismatchError); !ok {
+							t.Fatal(err)
+						}
+						t.Log(err)
+					} else if err != nil {
 						t.Fatal(err)
 					}
 				})

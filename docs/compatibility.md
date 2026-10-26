@@ -26,6 +26,10 @@ Copies across dataset locations are unsupported. To retrieve, cancel or delete a
 
 Loads and extracts also accept local paths. Their limits are:
 
+- GeoParquet metadata is not honored. Schema inference can load geometry columns as STRING
+  rather than GEOGRAPHY, and an explicit GEOGRAPHY schema interprets planar edges as great-circle
+  arcs without adding vertices. Such loads can succeed with incorrect types or shapes; do not
+  rely on them for GeoParquet compatibility.
 - Parquet DECIMAL values wider than 38 digits require BIGNUMERIC; schema detection selects it
   only when `decimalTargetTypes` includes it.
 - Parquet files with differing schemas cannot load if one contains a nullable LIST or a

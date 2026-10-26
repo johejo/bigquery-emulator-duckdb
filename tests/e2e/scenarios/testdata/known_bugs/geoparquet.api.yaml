@@ -1,0 +1,127 @@
+version: 1
+# Known incompatibilities: inferred GeoParquet GEOMETRY becomes STRING rather than GEOGRAPHY;
+# an explicit GEOGRAPHY schema loads planar edges as great-circle arcs without tessellation.
+# TestKnownBugs requires a mismatch and fails once a case is fixed, so it can be promoted.
+description: >-
+  Observe GeoParquet edge interpretation, schema inference and vertex insertion.
+  Compare omitted edges, explicit planar and spherical edges with ordinary WKB.
+# Sources: https://cloud.google.com/bigquery/docs/geospatial-data#loading_geoparquet_files
+# https://geoparquet.org/releases/v1.0.0/ (edges defaults to planar; omitted crs is CRS84).
+# Expectations derive from BigQuery observations in the adjacent answers sidecar.
+# Numeric checks use those observations with 1e-6 degree / 1 cm tolerances; the original
+# raw values remain in the sidecar. Exact WKT formatting and floating-point bits are not asserted.
+# Each embedded Parquet contains one WKB LINESTRING(-60 60,60 60), generated with DuckDB 2.0.0:
+# COPY (SELECT ST_AsWKB('LINESTRING(-60 60,60 60)'::GEOMETRY) AS g) TO 'fixture.parquet'
+# (FORMAT PARQUET, COMPRESSION UNCOMPRESSED, KV_METADATA {geo: '<metadata below>'});
+# Metadata: {"version":"1.0.0","primary_column":"g","columns":{"g":{
+# "encoding":"WKB","geometry_types":["LineString"]}}}
+# Add "edges":"planar" or "edges":"spherical" inside columns.g for those cases.
+# For ordinary WKB, omit KV_METADATA entirely. Base64-encode the file without newlines.
+# This long constant-latitude segment distinguishes planar edges from a single great-circle arc.
+vars:
+  dataset: bqa_${run}_${case}
+  load_config:
+    destinationTable: {projectId: "${project}", datasetId: "${dataset}", tableId: edges}
+    sourceFormat: PARQUET
+    autodetect: true
+  default_media: UEFSMRUAFVoVWiwVAhUAFQYVBgAAKQAAAAECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AFQIZLDUAGA1kdWNrZGJfc2NoZW1hFQIAFQwlABgBZwAWAhkcGRwmABwVDBkVABkYAWcVABYCFnwWfCYIPBgpAQIAAAACAAAAAAAAAAAATsAAAAAAAABOQAAAAAAAAE5AAAAAAAAATkAYKQECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AFgAoKQECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AGCkBAgAAAAIAAAAAAAAAAABOwAAAAAAAAE5AAAAAAAAATkAAAAAAAABOQBERABkcFQAVABUCAAAAFnwWAiYIFnwAGRwYA2dlbxhreyJ2ZXJzaW9uIjoiMS4wLjAiLCJwcmltYXJ5X2NvbHVtbiI6ImciLCJjb2x1bW5zIjp7ImciOnsiZW5jb2RpbmciOiJXS0IiLCJnZW9tZXRyeV90eXBlcyI6WyJMaW5lU3RyaW5nIl19fX0AGChEdWNrREIgdmVyc2lvbiB2Mi4wLjAgKGJ1aWxkIGQ1NGNiYmUzZGYpGRwcAAAApwEAAFBBUjE=
+  planar_media: UEFSMRUAFVoVWiwVAhUAFQYVBgAAKQAAAAECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AFQIZLDUAGA1kdWNrZGJfc2NoZW1hFQIAFQwlABgBZwAWAhkcGRwmABwVDBkVABkYAWcVABYCFnwWfCYIPBgpAQIAAAACAAAAAAAAAAAATsAAAAAAAABOQAAAAAAAAE5AAAAAAAAATkAYKQECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AFgAoKQECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AGCkBAgAAAAIAAAAAAAAAAABOwAAAAAAAAE5AAAAAAAAATkAAAAAAAABOQBERABkcFQAVABUCAAAAFnwWAiYIFnwAGRwYA2dlbxh8eyJ2ZXJzaW9uIjoiMS4wLjAiLCJwcmltYXJ5X2NvbHVtbiI6ImciLCJjb2x1bW5zIjp7ImciOnsiZW5jb2RpbmciOiJXS0IiLCJnZW9tZXRyeV90eXBlcyI6WyJMaW5lU3RyaW5nIl0sImVkZ2VzIjoicGxhbmFyIn19fQAYKER1Y2tEQiB2ZXJzaW9uIHYyLjAuMCAoYnVpbGQgZDU0Y2JiZTNkZikZHBwAAAC4AQAAUEFSMQ==
+  spherical_media: UEFSMRUAFVoVWiwVAhUAFQYVBgAAKQAAAAECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AFQIZLDUAGA1kdWNrZGJfc2NoZW1hFQIAFQwlABgBZwAWAhkcGRwmABwVDBkVABkYAWcVABYCFnwWfCYIPBgpAQIAAAACAAAAAAAAAAAATsAAAAAAAABOQAAAAAAAAE5AAAAAAAAATkAYKQECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AFgAoKQECAAAAAgAAAAAAAAAAAE7AAAAAAAAATkAAAAAAAABOQAAAAAAAAE5AGCkBAgAAAAIAAAAAAAAAAABOwAAAAAAAAE5AAAAAAAAATkAAAAAAAABOQBERABkcFQAVABUCAAAAFnwWAiYIFnwAGRwYA2dlbxh/eyJ2ZXJzaW9uIjoiMS4wLjAiLCJwcmltYXJ5X2NvbHVtbiI6ImciLCJjb2x1bW5zIjp7ImciOnsiZW5jb2RpbmciOiJXS0IiLCJnZW9tZXRyeV90eXBlcyI6WyJMaW5lU3RyaW5nIl0sImVkZ2VzIjoic3BoZXJpY2FsIn19fQAYKER1Y2tEQiB2ZXJzaW9uIHYyLjAuMCAoYnVpbGQgZDU0Y2JiZTNkZikZHBwAAAC7AQAAUEFSMQ==
+templates:
+  load_and_inspect:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {projectId: "${project}", datasetId: "${dataset}"}
+            location: US
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: "${project}", location: US}
+            configuration:
+              load: "${load_config}"
+          uploadBase64: "${media}"
+        bind: {job: /body/jobReference/jobId}
+        observe: {httpStatus: /status}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe:
+          status: /body/status
+          outputRows: /body/statistics/load/outputRows
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/edges
+        observe: {schema: /body/schema, numRows: /body/numRows}
+      - name: geometry
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: |
+              SELECT
+                ST_NUMPOINTS(g) AS vertices,
+                ST_EQUALS(ST_STARTPOINT(g), ST_GEOGPOINT(-60, 60)) AS start_matches,
+                ST_EQUALS(ST_ENDPOINT(g), ST_GEOGPOINT(60, 60)) AS end_matches,
+                ABS(ST_Y(ST_LINEINTERPOLATEPOINT(g, 0.5)) - ${midpoint_latitude}) < 0.000001 AS midpoint_matches,
+                ABS(ST_DISTANCE(ST_GEOGPOINT(0, 60), g) - ${distance_m}) < 0.01 AS distance_matches,
+                ABS(ST_LENGTH(g) - ${length_m}) < 0.01 AS length_matches,
+                ST_EQUALS(g, ST_GEOGFROMTEXT('LINESTRING(-60 60,60 60)')) AS equals_spherical_wkt
+              FROM `${project}.${dataset}.edges`
+        observe:
+          jobComplete: /body/jobComplete
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: geoparquet_default_edges
+    expect: {"completed_load":{"outputRows":"1","status":{"state":"DONE"}},"geometry":{"jobComplete":true,"rows":[{"f":[{"v":"513"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"false"}]}]},"load":{"httpStatus":200},"table":{"numRows":"1","schema":{"fields":[{"mode":"REQUIRED","name":"g","type":"GEOGRAPHY"}]}}}
+    template: load_and_inspect
+    vars:
+      midpoint_latitude: 60
+      distance_m: 0.0
+      length_m: 6671702.581943242
+      media: "${default_media}"
+  - name: geoparquet_planar_edges
+    expect: {"completed_load":{"outputRows":"1","status":{"state":"DONE"}},"geometry":{"jobComplete":true,"rows":[{"f":[{"v":"513"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"false"}]}]},"load":{"httpStatus":200},"table":{"numRows":"1","schema":{"fields":[{"mode":"REQUIRED","name":"g","type":"GEOGRAPHY"}]}}}
+    template: load_and_inspect
+    vars:
+      midpoint_latitude: 60
+      distance_m: 0.0
+      length_m: 6671702.581943242
+      media: "${planar_media}"
+  - name: geoparquet_spherical_edges
+    expect: {"completed_load":{"outputRows":"1","status":{"state":"DONE"}},"geometry":{"jobComplete":true,"rows":[{"f":[{"v":"2"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"}]}]},"load":{"httpStatus":200},"table":{"numRows":"1","schema":{"fields":[{"mode":"REQUIRED","name":"g","type":"GEOGRAPHY"}]}}}
+    template: load_and_inspect
+    vars:
+      midpoint_latitude: 73.897886248014
+      distance_m: 1545376.8675010777
+      length_m: 5706289.358316397
+      media: "${spherical_media}"
+  - name: geoparquet_default_explicit_geography
+    expect: {"completed_load":{"outputRows":"1","status":{"state":"DONE"}},"geometry":{"jobComplete":true,"rows":[{"f":[{"v":"513"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"true"},{"v":"false"}]}]},"load":{"httpStatus":200},"table":{"numRows":"1","schema":{"fields":[{"mode":"NULLABLE","name":"g","type":"GEOGRAPHY"}]}}}
+    template: load_and_inspect
+    vars:
+      midpoint_latitude: 60
+      distance_m: 0.0
+      length_m: 6671702.581943242
+      media: "${default_media}"
+      load_config:
+        destinationTable: {projectId: "${project}", datasetId: "${dataset}", tableId: edges}
+        sourceFormat: PARQUET
+        schema: {fields: [{name: g, type: GEOGRAPHY}]}

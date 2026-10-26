@@ -95,6 +95,13 @@ promotion: a resource or account restriction may have prevented the intended ope
 Keep SDK behavior, binary decoding, concurrency and process lifecycle tests in Go, and one-cell
 SQL checks in `scalars/*.txt`.
 
+Verified API cases that expose an unfixed incompatibility go in
+`tests/e2e/scenarios/testdata/known_bugs/`, with BigQuery-derived `expect` values, their answer
+sidecars and comments naming the mismatch. `TestKnownBugs` runs them alongside the normal E2E
+scenarios and requires an observation mismatch; execution and cleanup errors still fail. A case
+that starts matching BigQuery fails the known-bug test and must move to the normal `testdata/`.
+Do not change its expectation to the emulator's incorrect result.
+
 ## API scenario fields
 
 A file contains `version: 1`, optional `description` and `vars`, and a `cases` array. Each case has
@@ -170,6 +177,9 @@ CSV or JSON Lines media in `upload`; `body` is the job metadata:
 ```
 
 This sends `multipart/related` with JSON metadata and inline media; it requires no GCS bucket.
+For binary media such as Parquet, use `uploadBase64` instead of `upload`; its standard base64
+value is decoded after variable expansion and sent as raw bytes. The two fields are mutually
+exclusive.
 Use `until` on a subsequent REST GET to poll for completion:
 
 ```json
