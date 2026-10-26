@@ -81,6 +81,29 @@ std::optional<googlesql::TypeParameters> ColumnTypeParameters(
   return *std::move(parameters);
 }
 
+bool ApplyColumnOption(DdlOptionId name, const googlesql::Value& value, FieldSchema& field) {
+  switch (name) {
+    case DdlOptionId::kDescription:
+      return StringOption(value, field.description);
+    case DdlOptionId::kRoundingMode:
+      return RoundingModeOption(value, field.rounding_mode);
+    default:
+      return false;
+  }
+}
+
+bool ApplyColumnOption(DdlOptionId name, const googlesql::Value& value,
+                       ColumnOptionsAction& action) {
+  switch (name) {
+    case DdlOptionId::kDescription:
+      return StringOption(value, action.description.emplace());
+    case DdlOptionId::kRoundingMode:
+      return RoundingModeOption(value, action.rounding_mode.emplace());
+    default:
+      return false;
+  }
+}
+
 // Records NOT NULL as REQUIRED and the description and rounding mode in OPTIONS on `field`, and
 // the same for the fields of a struct. Other column options are unsupported.
 bool ApplyAnnotations(const googlesql::Type* type,
@@ -93,10 +116,7 @@ bool ApplyAnnotations(const googlesql::Type* type,
     const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
     const std::optional<googlesql::Value> value =
         OptionValue(*option, DdlOptionContext::kColumn, scope);
-    if (!value.has_value() ||
-        !((name == DdlOptionId::kDescription && StringOption(*value, field.description)) ||
-          (name == DdlOptionId::kRoundingMode &&
-           RoundingModeOption(*value, field.rounding_mode)))) {
+    if (!value || !name || !ApplyColumnOption(*name, *value, field)) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -172,10 +192,7 @@ bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsA
     const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
     const std::optional<googlesql::Value> value =
         OptionValue(*option, DdlOptionContext::kColumn, scope);
-    if (!value.has_value() || !((name == DdlOptionId::kDescription &&
-                                 StringOption(*value, action.description.emplace())) ||
-                                (name == DdlOptionId::kRoundingMode &&
-                                 RoundingModeOption(*value, action.rounding_mode.emplace())))) {
+    if (!value || !name || !ApplyColumnOption(*name, *value, action)) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -204,6 +221,12 @@ bool ValidDefaultValue(const googlesql::Value& value, bool array_element) {
   return true;
 }
 
+// A cast without formatting, an extended conversion or SAFE error handling.
+bool IsPlainCast(const googlesql::ResolvedCast& cast) {
+  return cast.format() == nullptr && cast.time_zone() == nullptr &&
+         cast.extended_cast() == nullptr && !cast.return_null_on_error();
+}
+
 // GoogleSQL resolves more expressions than BigQuery allows for defaults. Restrict SET
 // DEFAULT to literals, constructors and the documented functions, including non-NULL arrays.
 bool SupportedDefaultExpression(const googlesql::ResolvedExpr& expression, const Scope& scope,
@@ -218,8 +241,7 @@ bool SupportedDefaultExpression(const googlesql::ResolvedExpr& expression, const
   }
   if (expression.Is<googlesql::ResolvedCast>()) {
     const auto& cast = *expression.GetAs<googlesql::ResolvedCast>();
-    if (cast.format() == nullptr && cast.time_zone() == nullptr &&
-        cast.extended_cast() == nullptr && !cast.return_null_on_error()) {
+    if (IsPlainCast(cast)) {
       return SupportedDefaultExpression(*cast.expr(), scope,
                                         array_element || cast.type()->IsArray());
     }
@@ -248,8 +270,7 @@ std::optional<std::string> ColumnDefaultSql(const googlesql::ResolvedColumnDefau
   const googlesql::ResolvedExpr* expression = value.expression();
   if (expression->Is<googlesql::ResolvedCast>()) {
     const auto* cast = expression->GetAs<googlesql::ResolvedCast>();
-    if (cast->format() == nullptr && cast->time_zone() == nullptr &&
-        cast->extended_cast() == nullptr && !cast->return_null_on_error()) {
+    if (IsPlainCast(*cast)) {
       expression = cast->expr();
     }
   }
@@ -272,8 +293,7 @@ std::optional<googlesql::Value> DefaultLiteral(const googlesql::ResolvedExpr& ex
   }
   if (expression.Is<googlesql::ResolvedCast>()) {
     const auto& cast = *expression.GetAs<googlesql::ResolvedCast>();
-    if (cast.format() == nullptr && cast.time_zone() == nullptr &&
-        cast.extended_cast() == nullptr && !cast.return_null_on_error()) {
+    if (IsPlainCast(cast)) {
       if (const auto literal = DefaultLiteral(*cast.expr())) {
         const auto value = googlesql::CastValue(*literal, absl::UTCTimeZone(),
                                                 googlesql::LanguageOptions(), cast.type());

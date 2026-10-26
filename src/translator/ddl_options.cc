@@ -202,6 +202,82 @@ bool LocationOption(const googlesql::Value& value, std::string& into) {
   return true;
 }
 
+bool ApplyTableOption(DdlOptionId name, const googlesql::Value& value, bool table,
+                      TableMetadata& metadata) {
+  using enum DdlOptionId;
+  switch (name) {
+    case kRequirePartitionFilter:
+      return table && BoolOption(value, metadata.require_partition_filter);
+    case kPartitionExpirationDays:
+    case kKmsKeyName:
+      return table && value.is_null();
+    case kDescription:
+      return StringOption(value, metadata.description);
+    case kFriendlyName:
+      return StringOption(value, metadata.friendly_name);
+    case kLabels:
+      return LabelsOption(value, metadata.labels, metadata.label_order);
+    case kTags:
+      return TagsOption(value, metadata.resource_tags, metadata.tag_order);
+    case kExpirationTimestamp:
+      return ExpirationOption(value, metadata.expiration_time);
+    case kDefaultRoundingMode:
+      return table && RoundingModeOption(value, metadata.default_rounding_mode);
+    default:
+      return false;
+  }
+}
+
+bool ApplySchemaOption(DdlOptionId name, const googlesql::Value& value, DatasetMetadata& metadata) {
+  using enum DdlOptionId;
+  switch (name) {
+    case kDescription:
+      return StringOption(value, metadata.description);
+    case kFriendlyName:
+      return StringOption(value, metadata.friendly_name);
+    case kLabels:
+      return LabelsOption(value, metadata.labels, metadata.label_order);
+    case kTags:
+      return TagsOption(value, metadata.resource_tags, metadata.tag_order);
+    case kDefaultTableExpirationDays:
+      return DaysOption(value, metadata.default_table_expiration_ms);
+    case kDefaultRoundingMode:
+      return RoundingModeOption(value, metadata.default_rounding_mode);
+    case kLocation:
+      return LocationOption(value, metadata.location);
+    default:
+      return false;
+  }
+}
+
+bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptionContext statement,
+                       OptionUpdates& updates) {
+  using enum DdlOptionId;
+  const bool table = statement == DdlOptionContext::kAlterTable;
+  const bool schema = statement == DdlOptionContext::kAlterSchema;
+  switch (name) {
+    case kRequirePartitionFilter:
+      return table && BoolOption(value, updates.require_partition_filter.emplace());
+    case kDescription:
+      return StringOption(value, updates.description.emplace());
+    case kFriendlyName:
+      return StringOption(value, updates.friendly_name.emplace());
+    case kLabels:
+      return LabelsOption(value, updates.labels.emplace(), updates.label_order);
+    case kTags:
+      return TagsOption(value, updates.resource_tags.emplace(), updates.tag_order);
+    case kExpirationTimestamp:
+      return table && ExpirationOption(value, updates.expiration_time.emplace());
+    case kDefaultTableExpirationDays:
+      return schema && DaysOption(value, updates.default_table_expiration_ms.emplace());
+    case kDefaultRoundingMode:
+      return (table || schema) &&
+             RoundingModeOption(value, updates.default_rounding_mode.emplace());
+    default:
+      return false;
+  }
+}
+
 }  // namespace
 
 // The value an option of `object`, such as a table, assigns: a literal, or a constant expression,
@@ -275,24 +351,11 @@ bool RoundingModeOption(const googlesql::Value& value, RoundingMode& into) {
 // rounding mode.
 std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionContext statement,
                                              const Scope& scope, TableMetadata metadata) {
-  using enum DdlOptionId;
+  const bool table = statement == DdlOptionContext::kCreateTable;
   for (const auto& option : options) {
     const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
     const auto value = OptionValue(*option, statement, scope);
-    const bool table = statement == DdlOptionContext::kCreateTable;
-    const bool applied =
-        value &&
-        ((table && name == kRequirePartitionFilter &&
-          BoolOption(*value, metadata.require_partition_filter)) ||
-         (table && value->is_null() && (name == kPartitionExpirationDays || name == kKmsKeyName)) ||
-         (name == kDescription && StringOption(*value, metadata.description)) ||
-         (name == kFriendlyName && StringOption(*value, metadata.friendly_name)) ||
-         (name == kLabels && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
-         (name == kTags && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
-         (name == kExpirationTimestamp && ExpirationOption(*value, metadata.expiration_time)) ||
-         (table && name == kDefaultRoundingMode &&
-          RoundingModeOption(*value, metadata.default_rounding_mode)));
-    if (!applied) {
+    if (!value || !name || !ApplyTableOption(*name, *value, table, metadata)) {
       return Unsupported(
           scope, std::string(DdlOptionContextName(statement)) + " option " + option->name());
     }
@@ -304,23 +367,11 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
 // location the OPTIONS of a CREATE SCHEMA set. The other options are unsupported, since they change
 // how BigQuery treats the dataset's tables. Throws ApiError for a location BigQuery does not have.
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
-  using enum DdlOptionId;
   DatasetMetadata metadata;
   for (const auto& option : options) {
     const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
     const auto value = OptionValue(*option, DdlOptionContext::kCreateSchema, scope);
-    const bool applied =
-        value &&
-        ((name == kDescription && StringOption(*value, metadata.description)) ||
-         (name == kFriendlyName && StringOption(*value, metadata.friendly_name)) ||
-         (name == kLabels && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
-         (name == kTags && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
-         (name == kDefaultTableExpirationDays &&
-          DaysOption(*value, metadata.default_table_expiration_ms)) ||
-         (name == kDefaultRoundingMode &&
-          RoundingModeOption(*value, metadata.default_rounding_mode)) ||
-         (name == kLocation && LocationOption(*value, metadata.location)));
-    if (!applied) {
+    if (!value || !name || !ApplySchemaOption(*name, *value, metadata)) {
       return Unsupported(scope, "CREATE SCHEMA option " + option->name());
     }
   }
@@ -334,7 +385,6 @@ bool SetOptions(const Options& options, DdlOptionContext statement, const Scope&
                 OptionUpdates& updates) {
   using enum DdlOptionId;
   bool tags_seen = false;
-  const bool table = statement == DdlOptionContext::kAlterTable;
   const bool schema = statement == DdlOptionContext::kAlterSchema;
   for (const auto& option : options) {
     const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
@@ -361,22 +411,7 @@ bool SetOptions(const Options& options, DdlOptionContext statement, const Scope&
       }
       continue;
     }
-    const bool applied =
-        value &&
-        ((table && name == kRequirePartitionFilter &&
-          BoolOption(*value, updates.require_partition_filter.emplace())) ||
-         (name == kDescription && StringOption(*value, updates.description.emplace())) ||
-         (name == kFriendlyName && StringOption(*value, updates.friendly_name.emplace())) ||
-         (name == kLabels && LabelsOption(*value, updates.labels.emplace(), updates.label_order)) ||
-         (name == kTags &&
-          TagsOption(*value, updates.resource_tags.emplace(), updates.tag_order)) ||
-         (table && name == kExpirationTimestamp &&
-          ExpirationOption(*value, updates.expiration_time.emplace())) ||
-         (schema && name == kDefaultTableExpirationDays &&
-          DaysOption(*value, updates.default_table_expiration_ms.emplace())) ||
-         ((table || schema) && name == kDefaultRoundingMode &&
-          RoundingModeOption(*value, updates.default_rounding_mode.emplace())));
-    if (!applied) {
+    if (!value || !name || !ApplyOptionUpdate(*name, *value, statement, updates)) {
       return fail();
     }
   }
