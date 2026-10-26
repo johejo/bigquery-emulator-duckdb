@@ -177,7 +177,8 @@ SELECT ds.multiply(2, 10);
 ```
 
 The default timeout is 5 minutes per call, including initial worker startup, and the worker's
-memory limit is 256 MiB. On Linux this limits address space; on macOS the parent checks resident
+memory limit is 256 MiB. On Linux this limits additional address space above the worker's
+startup mappings, including Python initialization; on macOS the parent checks total resident
 memory every 10 ms, so short allocations can exceed the limit between checks.
 `--python-timeout-ms MS` and `--python-memory-mib MIB` change
 these limits; both take positive integers. `--python-worker PATH` selects an external worker

@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <fstream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -294,7 +296,22 @@ int Run(int argc, char** argv) {
 #ifndef __APPLE__
   // macOS enforces its resident-memory limit in the parent instead.
   const rlim_t memory = std::stoull(argv[1]);
-  const rlimit limit{.rlim_cur = memory, .rlim_max = memory};
+  rlim_t pages = 0;
+  {
+    std::ifstream usage("/proc/self/statm");
+    if (!(usage >> pages)) {
+      throw std::runtime_error("Cannot read Python worker address space usage");
+    }
+  }
+  const auto page_size = sysconf(_SC_PAGESIZE);
+  if (page_size <= 0 ||
+      pages > (std::numeric_limits<rlim_t>::max() - memory) / static_cast<rlim_t>(page_size)) {
+    throw std::runtime_error("Invalid Python worker address space limit");
+  }
+  // Re-exec maps the entire emulator, including code Python never calls. Budget
+  // additional address space above those startup mappings, before Python initializes.
+  const rlim_t ceiling = (pages * static_cast<rlim_t>(page_size)) + memory;
+  const rlimit limit{.rlim_cur = ceiling, .rlim_max = ceiling};
   if (setrlimit(RLIMIT_AS, &limit) != 0) {
     throw std::runtime_error("Cannot set Python worker memory limit");
   }

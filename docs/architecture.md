@@ -241,5 +241,7 @@ acknowledges each completed scalar call; the parent renews the call deadline on 
 requiring a round trip before the next row. An error stops the batch and fails the query.
 Standard input, output and error point to the null device, separately from the protocol socket.
 The parent polls nonblocking I/O against a call deadline and kills the worker process group on cleanup, then
-waits for its child. On Linux, address space limits apply before Python initializes. On macOS,
+waits for its child. On Linux, the worker reads its initial address space from `/proc/self/statm`
+and sets `RLIMIT_AS` to that baseline plus the configured budget before Python initializes.
+This excludes the emulator executable and its startup mappings from the budget. On macOS,
 where Darwin rejects `RLIMIT_AS`, the parent samples the worker's resident memory while polling.
