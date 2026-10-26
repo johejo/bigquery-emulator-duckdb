@@ -44,24 +44,12 @@ func (p creationPaths) mustRun(sql string) {
 	}
 }
 
-func (p creationPaths) wait(job *bigquery.Job, err error) error {
-	p.t.Helper()
-	if err != nil {
-		return err
-	}
-	status, err := job.Wait(context.Background())
-	if err != nil {
-		return err
-	}
-	return status.Err()
-}
-
 func (p creationPaths) query(sql string, table string, disposition bigquery.TableWriteDisposition) error {
 	p.t.Helper()
 	query := p.client.Query(sql)
 	query.Dst = p.dataset.Table(table)
 	query.WriteDisposition = disposition
-	return p.wait(query.Run(context.Background()))
+	return wait(context.Background(), query)
 }
 
 func (p creationPaths) load(table, rows string, schema bigquery.Schema,
@@ -72,7 +60,7 @@ func (p creationPaths) load(table, rows string, schema bigquery.Schema,
 	source.Schema = schema
 	loader := p.dataset.Table(table).LoaderFrom(source)
 	loader.WriteDisposition = disposition
-	return p.wait(loader.Run(context.Background()))
+	return wait(context.Background(), loader)
 }
 
 func (p creationPaths) copy(table string, disposition bigquery.TableWriteDisposition,
@@ -84,7 +72,7 @@ func (p creationPaths) copy(table string, disposition bigquery.TableWriteDisposi
 	}
 	copier := p.dataset.Table(table).CopierFrom(tables...)
 	copier.WriteDisposition = disposition
-	return p.wait(copier.Run(context.Background()))
+	return wait(context.Background(), copier)
 }
 
 func (p creationPaths) read(sql string, parameters ...bigquery.QueryParameter) [][]bigquery.Value {

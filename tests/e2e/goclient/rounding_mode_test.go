@@ -22,21 +22,6 @@ func (r jsonRow) Save() (map[string]bigquery.Value, string, error) {
 	return r, bigquery.NoDedupeID, nil
 }
 
-// wait runs a job and returns its error.
-func wait(ctx context.Context, runner interface {
-	Run(context.Context) (*bigquery.Job, error)
-}) error {
-	job, err := runner.Run(ctx)
-	if err != nil {
-		return err
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	return status.Err()
-}
-
 // Columns keep the rounding mode that DDL and tables.insert give them, and DML rounds the values
 // it writes to a parameterized column with it. The expected values are the examples of BigQuery's
 // DDL reference (2.25 and -2.25 to one digit) and of its RoundingMode enum (1.5 and 2.5 to none).

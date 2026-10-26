@@ -168,7 +168,7 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 	never := client.Query("SELECT 1 AS a")
 	never.Dst = dataset.Table("dest")
 	never.CreateDisposition = bigquery.CreateNever
-	err := p.wait(never.Run(ctx))
+	err := wait(ctx, never)
 	if err == nil || !strings.Contains(err.Error(), "Not found: Table") {
 		t.Errorf("CREATE_NEVER for a missing table: got %v, want Not found", err)
 	}
@@ -207,7 +207,7 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 		"CREATE TABLE go_destination_edges.duplicates AS (SELECT 1 AS a, 2 AS a)",
 		"CREATE VIEW go_destination_edges.duplicates AS (SELECT 1 AS a, 2 AS a)",
 	} {
-		if err := p.wait(client.Query(sql).Run(ctx)); err == nil {
+		if err := wait(ctx, client.Query(sql)); err == nil {
 			t.Errorf("%s: succeeded", sql)
 		}
 	}

@@ -20,11 +20,38 @@ func runScript(t *testing.T, client *bigquery.Client, dataset, sql string) (*big
 	if err != nil {
 		return nil, nil, err
 	}
+	status, err := waitJob(ctx, job)
+	return job, status, err
+}
+
+// waitJob preserves the status for tests that inspect job statistics.
+func waitJob(ctx context.Context, job *bigquery.Job) (*bigquery.JobStatus, error) {
 	status, err := job.Wait(ctx)
 	if err != nil {
-		return job, nil, err
+		return nil, err
 	}
-	return job, status, status.Err()
+	return status, status.Err()
+}
+
+// wait runs a query, load, copy or extract job and returns its error.
+func wait(ctx context.Context, runner interface {
+	Run(context.Context) (*bigquery.Job, error)
+}) error {
+	job, err := runner.Run(ctx)
+	if err != nil {
+		return err
+	}
+	return runJob(ctx, job, nil)
+}
+
+// runJob checks a Run result and waits for completion. Tests can keep the job
+// alongside the returned error when they need to inspect its output.
+func runJob(ctx context.Context, job *bigquery.Job, err error) error {
+	if err != nil {
+		return err
+	}
+	_, err = waitJob(ctx, job)
+	return err
 }
 
 func newClient(t *testing.T) *bigquery.Client {

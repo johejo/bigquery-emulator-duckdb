@@ -72,19 +72,6 @@ func writeParquet(t *testing.T, fields []arrow.Field, columns []arrow.Array) str
 	return path
 }
 
-func runJob(ctx context.Context, job interface {
-	Wait(context.Context) (*bigquery.JobStatus, error)
-}, err error) error {
-	if err != nil {
-		return err
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	return status.Err()
-}
-
 func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigquery.Schema,
 	targets ...bigquery.DecimalTargetType) error {
 	source := bigquery.NewGCSReference(path)
@@ -93,8 +80,7 @@ func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigq
 	source.Schema = s
 	loader := table.LoaderFrom(source)
 	loader.DecimalTargetTypes = targets
-	job, err := loader.Run(ctx)
-	return runJob(ctx, job, err)
+	return wait(ctx, loader)
 }
 
 // A Parquet DECIMAL loads into BIGNUMERIC exactly, at any depth, whether it is as wide as
@@ -246,8 +232,7 @@ func TestBigNumericParquet(t *testing.T) {
 	destination := bigquery.NewGCSReference(extracted)
 	destination.DestinationFormat = bigquery.Parquet
 	extractor := dataset.Table("loaded").ExtractorTo(destination)
-	job, err := extractor.Run(ctx)
-	if err := runJob(ctx, job, err); err != nil {
+	if err := wait(ctx, extractor); err != nil {
 		t.Fatalf("extract: %v", err)
 	}
 	reader, err := file.OpenParquetFile(extracted, false)
