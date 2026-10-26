@@ -14,7 +14,7 @@ const std::unordered_map<std::string_view,
 GeographyFunctions();
 
 // ST_UNION_AGG, ST_CENTROID_AGG and ST_EXTENT, whose finishes call the registered functions.
-std::span<const function_catalog::NamedDefinition<function_catalog::AggregateRule>>
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
 GeographyAggregates();
 
 }  // namespace bigquery_emulator_duckdb::geography_duckdb

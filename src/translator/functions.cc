@@ -344,6 +344,9 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
 }  // namespace
 
 void AddBuiltinFunctions(function_catalog::Catalog& functions) {
+  for (const auto& [name, definition] : StaticTemplateRules()) {
+    functions.AddRules(name, definition, Implementation::kSQL);
+  }
   for (const auto& [name, definition] : TemplateRules()) {
     functions.AddRules(name, definition, Implementation::kSQL);
   }
@@ -395,13 +398,7 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                         });
   }
   for (const auto& [name, definition] : Aggregates()) {
-    functions.Add(name, {
-                            .translation = Translation::kAggregate,
-                            .uses = definition.uses,
-                            .implementations = {Implementation::kAggregate},
-                            .type_rejections = definition.type_rejections,
-                            .aggregates = definition.rules,
-                        });
+    functions.AddAggregates(name, definition, Translation::kAggregate);
   }
   for (const auto& [name, definition] : Analytics()) {
     functions.AddAggregates(name, definition, Translation::kAnalytic);

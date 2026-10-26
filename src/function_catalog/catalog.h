@@ -87,7 +87,7 @@ class Catalog {
                 Implementation fallback);
   void AddAggregates(std::string_view name,
                      const StaticFunctionDefinition<StaticAggregateRule>& definition,
-                     Translation translation);
+                     Translation translation, std::optional<Implementation> backend = {});
   [[nodiscard]] const FunctionEntry* Find(std::string_view upper_name) const;
   [[nodiscard]] bool HasTypeUse(std::string_view upper_name, TypeUse use) const;
   [[nodiscard]] std::optional<std::string> Translate(std::string_view upper_name,

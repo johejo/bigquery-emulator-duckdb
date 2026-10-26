@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -99,7 +100,7 @@ void Catalog::AddRules(std::string_view name,
 
 void Catalog::AddAggregates(std::string_view name,
                             const StaticFunctionDefinition<StaticAggregateRule>& definition,
-                            Translation translation) {
+                            Translation translation, std::optional<Implementation> backend) {
   FunctionEntry entry{
       .translation = translation,
       .uses = definition.uses,
@@ -112,6 +113,9 @@ void Catalog::AddAggregates(std::string_view name,
       .struct_handler = definition.struct_handler,
       .type_rejections = {definition.type_rejections.begin(), definition.type_rejections.end()},
   };
+  if (backend) {
+    entry.implementations.push_back(*backend);
+  }
   entry.aggregates.reserve(definition.rules.size());
   for (const auto& rule : definition.rules) {
     entry.aggregates.push_back(Own(rule));

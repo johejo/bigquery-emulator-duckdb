@@ -22,6 +22,18 @@ namespace {
 
 constexpr std::array kIntervalTypes = {googlesql::TYPE_INTERVAL};
 constexpr std::array kRangeTypes = {googlesql::TYPE_RANGE};
+constexpr std::string_view kValueArgument[] = {"$1"};
+constexpr std::string_view kBigNumericValueArgument[] = {"CAST($1 AS VARCHAR)"};
+constexpr std::string_view kBigNumericPairArgument[] = {
+    "CAST($1 AS VARCHAR) || ',' || CAST($2 AS VARCHAR)",
+};
+constexpr std::string_view kTopSumArguments[] = {"{'value': $1, 'weight': $2}"};
+
+template <googlesql::TypeKind kType>
+struct ArgumentType {
+  static constexpr std::array kTypes = {kType};
+  static constexpr StaticCondition kSecond[] = {{.argument = 2, .types = kTypes}};
+};
 
 // histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting the
 // (count, value) structs descending puts the most frequent first, and no rows give NULL.
@@ -85,11 +97,11 @@ std::string TopSum(const std::string& sql, const std::vector<std::string>& argum
 }
 
 template <googlesql::TypeKind kWeight>
-AggregateRule TopSumRule() {
+constexpr StaticAggregateRule TopSumRule() {
   return {
       .function = "list",
-      .conditions = {{.argument = 2, .types = {kWeight}}},
-      .arguments = {"{'value': $1, 'weight': $2}"},
+      .conditions = ArgumentType<kWeight>::kSecond,
+      .arguments = kTopSumArguments,
       .distinct = AggregateRule::Distinct::kUnsupported,
       .finish = TopSum<kWeight>,
       .finish_after_scan = true,
@@ -117,15 +129,11 @@ std::string BigNumericSum(const std::string& sql, const std::vector<std::string>
 // arguments is collected as the units of both joined by a comma, which is NULL where either is
 // NULL.
 template <const char* kFunction>
-AggregateRule BigNumericAggregate(std::size_t arity) {
+constexpr StaticAggregateRule BigNumericAggregate(std::size_t arity) {
   return {
       .function = "list",
       .type = googlesql::TYPE_BIGNUMERIC,
-      .arguments =
-          {
-              arity == 1 ? "CAST($1 AS VARCHAR)"
-                         : "CAST($1 AS VARCHAR) || ',' || CAST($2 AS VARCHAR)",
-          },
+      .arguments = arity == 1 ? kBigNumericValueArgument : kBigNumericPairArgument,
       .skip_nulls = true,
       .finish =
           [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
@@ -146,7 +154,7 @@ constexpr char kBigNumericCovarSamp[] = "bq_bignumeric_covar_samp";
 // as GoogleSQL does from the non-NULL values that list() collects. DuckDB's DISTINCT would keep any
 // of equal values, such as a month and 30 days, so the DISTINCT functions keep the first of them.
 template <const char* kFunction>
-AggregateRule IntervalAggregate(
+constexpr StaticAggregateRule IntervalAggregate(
     AggregateRule::Distinct distinct = AggregateRule::Distinct::kAllowed) {
   return {
       .function = "list",
@@ -178,22 +186,29 @@ std::string ExtractSketch(const std::string& sql, const std::vector<std::string>
 
 // HLL_COUNT.INIT over values of `type`, or of any type but BIGNUMERIC for TYPE_UNKNOWN. It takes a
 // BIGNUMERIC as the VARCHAR of its units.
-AggregateRule HllCountInit(googlesql::TypeKind type) {
+constexpr std::string_view kHllArguments[] = {"$1", "$2"};
+constexpr std::string_view kBigNumericHllArguments[] = {"CAST($1 AS VARCHAR)", "$2"};
+constexpr std::string_view kHllDefaults[] = {"", "15"};
+constexpr std::string_view kApproxCountArguments[] = {"$1", "15"};
+constexpr std::string_view kBigNumericApproxCountArguments[] = {"CAST($1 AS VARCHAR)", "15"};
+
+constexpr StaticAggregateRule HllCountInit(googlesql::TypeKind type) {
   const bool bignumeric = type == googlesql::TYPE_BIGNUMERIC;
   return {
       .function = bignumeric ? "bq_hll_count_init_bignumeric" : "bq_hll_count_init",
       .type = type,
-      .arguments = {bignumeric ? "CAST($1 AS VARCHAR)" : "$1", "$2"},
-      .defaults = {"", "15"},
+      .arguments = bignumeric ? kBigNumericHllArguments : kHllArguments,
+      .defaults = kHllDefaults,
       .distinct = AggregateRule::Distinct::kUnsupported,
   };
 }
 
 // APPROX_COUNT_DISTINCT over values of `type`, which BigQuery estimates as HLL_COUNT.INIT's
 // sketch at its default precision.
-AggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
-  AggregateRule rule = HllCountInit(type);
-  rule.arguments.at(1) = "15";
+constexpr StaticAggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
+  StaticAggregateRule rule = HllCountInit(type);
+  rule.arguments =
+      type == googlesql::TYPE_BIGNUMERIC ? kBigNumericApproxCountArguments : kApproxCountArguments;
   rule.distinct = AggregateRule::Distinct::kAllowed;
   rule.finish = ExtractSketch;
   return rule;
@@ -202,92 +217,229 @@ AggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
 // Aggregate functions, which also take a window.
 }  // namespace
 
-std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
+std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Aggregates() {
   using enum AggregateRule::Nulls;
   using enum AggregateRule::Limit;
-  static const function_catalog::NamedDefinition<AggregateRule> kAggregates[] = {
+  static constexpr std::string_view kIntervalKey[] = {"bq_interval_key($1)"};
+  static constexpr std::string_view kStar[] = {"*"};
+  static constexpr std::string_view kIntervalValueAndKey[] = {"$1", "bq_interval_key($1)"};
+  static constexpr std::string_view kIntervalSecondKey[] = {"$1", "bq_interval_key($2)"};
+  static constexpr std::string_view kQuantileArguments[] = {
+      "$1",
+      "list_transform(range($2 + 1), lambda i: i / $2)",
+  };
+  static constexpr std::string_view kHexArguments[] = {"hex($1)", "hex($2)"};
+  static constexpr std::string_view kHexDefaults[] = {"", "unhex('2C')"};
+  static constexpr std::string_view kCountIfArguments[] = {"CASE WHEN $1 THEN TRUE END"};
+  static constexpr StaticAggregateRule kCount[] = {
+      {.function = "count", .type = googlesql::TYPE_INTERVAL, .arguments = kIntervalKey},
+      {.function = "count"},
+  };
+  static constexpr StaticAggregateRule kCountStar[] = {{.function = "count", .arguments = kStar}};
+  static constexpr StaticAggregateRule kSum[] = {
+      {.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
+      IntervalAggregate<kIntervalSumDistinct>(AggregateRule::Distinct::kRequired),
+      IntervalAggregate<kIntervalSum>(),
+      {.function = "sum"},
+  };
+  static constexpr StaticAggregateRule kAvg[] = {
+      BigNumericAggregate<kBigNumericAvg>(1),
+      IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
+      IntervalAggregate<kIntervalAvg>(),
+      {.function = "avg"},
+  };
+  static constexpr StaticAggregateRule kMin[] = {
+      {.function = "arg_min", .type = googlesql::TYPE_INTERVAL, .arguments = kIntervalValueAndKey},
+      {.function = "min"},
+  };
+  static constexpr StaticAggregateRule kMax[] = {
+      {.function = "arg_max", .type = googlesql::TYPE_INTERVAL, .arguments = kIntervalValueAndKey},
+      {.function = "max"},
+  };
+  static constexpr StaticAggregateRule kAnyValue[] = {{.function = "any_value", .carries = true}};
+  static constexpr StaticAggregateRule kArrayAgg[] = {
+      {
+          .function = "list",
+          .type = googlesql::TYPE_INTERVAL,
+          .nulls = kFilter,
+          .distinct = AggregateRule::Distinct::kRequired,
+          .limit = kSliceFinished,
+          .finish = IntervalDistinct,
+          .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
+      },
+      {
+          .function = "list",
+          .type = googlesql::TYPE_INTERVAL,
+          .nulls = kFilter,
+          .limit = kSlice,
+          .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
+      },
+      {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
+  };
+  static constexpr StaticAggregateRule kArrayConcatAgg[] = {
+      {.function = "list", .limit = kSlice, .skip_nulls = true, .carries = true, .finish = Flatten},
+  };
+  static constexpr StaticAggregateRule kHllInit[] = {
+      HllCountInit(googlesql::TYPE_BIGNUMERIC),
+      HllCountInit(googlesql::TYPE_UNKNOWN),
+  };
+  static constexpr StaticAggregateRule kHllMergePartial[] = {
+      {.function = "bq_hll_count_merge_partial"},
+  };
+  static constexpr StaticAggregateRule kHllMerge[] = {
+      {.function = "bq_hll_count_merge_partial", .finish = ExtractSketch},
+  };
+  static constexpr StaticAggregateRule kApproxCountDistinct[] = {
+      ApproxCountDistinct(googlesql::TYPE_INT64),
+      ApproxCountDistinct(googlesql::TYPE_STRING),
+      ApproxCountDistinct(googlesql::TYPE_BYTES),
+      ApproxCountDistinct(googlesql::TYPE_NUMERIC),
+      ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
+      {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
+  };
+  static constexpr StaticAggregateRule kApproxQuantiles[] = {
+      {.function = "quantile_disc", .arguments = kQuantileArguments, .nulls = kIgnore},
+  };
+  static constexpr StaticAggregateRule kApproxTopCount[] = {
+      {
+          .function = "histogram",
+          .arguments = kValueArgument,
+          .distinct = AggregateRule::Distinct::kUnsupported,
+          .finish = TopCount,
+      },
+  };
+  static constexpr StaticAggregateRule kApproxTopSum[] = {
+      TopSumRule<googlesql::TYPE_INT64>(),
+      TopSumRule<googlesql::TYPE_NUMERIC>(),
+      TopSumRule<googlesql::TYPE_BIGNUMERIC>(),
+      TopSumRule<googlesql::TYPE_DOUBLE>(),
+  };
+  static constexpr StaticAggregateRule kMaxBy[] = {
+      {
+          .function = "arg_max_null",
+          .conditions = ArgumentType<googlesql::TYPE_INTERVAL>::kSecond,
+          .arguments = kIntervalSecondKey,
+          .carries = true,
+      },
+      {.function = "arg_max_null", .carries = true},
+  };
+  static constexpr StaticAggregateRule kMinBy[] = {
+      {
+          .function = "arg_min_null",
+          .conditions = ArgumentType<googlesql::TYPE_INTERVAL>::kSecond,
+          .arguments = kIntervalSecondKey,
+          .carries = true,
+      },
+      {.function = "arg_min_null", .carries = true},
+  };
+  static constexpr StaticAggregateRule kStringAgg[] = {
+      {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
+      {
+          .function = "string_agg",
+          .type = googlesql::TYPE_BYTES,
+          .arguments = kHexArguments,
+          .defaults = kHexDefaults,
+          .limit = kJoin,
+          .finish = Unhex,
+      },
+  };
+  static constexpr StaticAggregateRule kCountIf[] = {
+      {.function = "count", .arguments = kCountIfArguments},
+  };
+  static constexpr StaticAggregateRule kLogicalAnd[] = {{.function = "bool_and"}};
+  static constexpr StaticAggregateRule kLogicalOr[] = {{.function = "bool_or"}};
+  static constexpr StaticAggregateRule kBitAnd[] = {{.function = "bit_and"}};
+  static constexpr StaticAggregateRule kBitOr[] = {{.function = "bit_or"}};
+  static constexpr StaticAggregateRule kBitXor[] = {{.function = "bit_xor"}};
+  static constexpr StaticAggregateRule kStddevSamp[] = {
+      BigNumericAggregate<kBigNumericStdDevSamp>(1),
+      {.function = "stddev_samp"},
+  };
+  static constexpr StaticAggregateRule kStddevPop[] = {
+      BigNumericAggregate<kBigNumericStdDevPop>(1),
+      {.function = "stddev_pop"},
+  };
+  static constexpr StaticAggregateRule kVarSamp[] = {
+      BigNumericAggregate<kBigNumericVarSamp>(1),
+      {.function = "var_samp"},
+  };
+  static constexpr StaticAggregateRule kVarPop[] = {
+      BigNumericAggregate<kBigNumericVarPop>(1),
+      {.function = "var_pop"},
+  };
+  static constexpr StaticAggregateRule kCorr[] = {
+      BigNumericAggregate<kBigNumericCorr>(2),
+      {.function = "corr"},
+  };
+  static constexpr StaticAggregateRule kCovarPop[] = {
+      BigNumericAggregate<kBigNumericCovarPop>(2),
+      {.function = "covar_pop"},
+  };
+  static constexpr StaticAggregateRule kCovarSamp[] = {
+      BigNumericAggregate<kBigNumericCovarSamp>(2),
+      {.function = "covar_samp"},
+  };
+  static constexpr function_catalog::TypeRejection kApproxCountRejections[] = {
+      {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for hll_count.init."},
+      {.types = kRangeTypes, .message = "Unsupported type RANGE for hll_count.init."},
+  };
+  static constexpr function_catalog::TypeRejection kApproxQuantileRejections[] = {
+      {
+          .types = kIntervalTypes,
+          .message = "Unsupported type INTERVAL for aggregate function approx_quantiles",
+      },
+  };
+  static constexpr function_catalog::TypeRejection kTopCountRejections[] = {
+      {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for approx_top_count_shard."},
+      {.types = kRangeTypes, .message = "Unsupported type RANGE for approx_top_count_shard."},
+  };
+  static constexpr function_catalog::TypeRejection kTopSumRejections[] = {
+      {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for approx_top_sum_shard."},
+      {.types = kRangeTypes, .message = "Unsupported type RANGE for approx_top_sum_shard."},
+  };
+  static constexpr function_catalog::StaticNamedDefinition<StaticAggregateRule> kAggregates[] = {
       // INTERVAL values compare by their keys; among equal values, MIN and MAX return the
       // first, as BigQuery does.
       {
           "COUNT",
           {
-              .rules =
-                  {
-                      {
-                          .function = "count",
-                          .type = googlesql::TYPE_INTERVAL,
-                          .arguments = {"bq_interval_key($1)"},
-                      },
-                      {.function = "count"},
-                  },
+              .rules = kCount,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
-      {"$COUNT_STAR", {.rules = {{.function = "count", .arguments = {"*"}}}}},
+      {"$COUNT_STAR", {.rules = kCountStar}},
       {
           "SUM",
           {
-              .rules =
-                  {
-                      {
-                          .function = "sum",
-                          .type = googlesql::TYPE_BIGNUMERIC,
-                          .finish = BigNumericSum,
-                      },
-                      IntervalAggregate<kIntervalSumDistinct>(AggregateRule::Distinct::kRequired),
-                      IntervalAggregate<kIntervalSum>(),
-                      {.function = "sum"},
-                  },
+              .rules = kSum,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "AVG",
           {
-              .rules =
-                  {
-                      BigNumericAggregate<kBigNumericAvg>(1),
-                      IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
-                      IntervalAggregate<kIntervalAvg>(),
-                      {.function = "avg"},
-                  },
+              .rules = kAvg,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "MIN",
           {
-              .rules =
-                  {
-                      {
-                          .function = "arg_min",
-                          .type = googlesql::TYPE_INTERVAL,
-                          .arguments = {"$1", "bq_interval_key($1)"},
-                      },
-                      {.function = "min"},
-                  },
+              .rules = kMin,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
       {
           "MAX",
           {
-              .rules =
-                  {
-                      {
-                          .function = "arg_max",
-                          .type = googlesql::TYPE_INTERVAL,
-                          .arguments = {"$1", "bq_interval_key($1)"},
-                      },
-                      {.function = "max"},
-                  },
+              .rules = kMax,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
       {
           "ANY_VALUE",
           {
-              .rules = {{.function = "any_value", .carries = true}},
+              .rules = kAnyValue,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
@@ -297,26 +449,7 @@ std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
       {
           "ARRAY_AGG",
           {
-              .rules =
-                  {
-                      {
-                          .function = "list",
-                          .type = googlesql::TYPE_INTERVAL,
-                          .nulls = kFilter,
-                          .distinct = AggregateRule::Distinct::kRequired,
-                          .limit = kSliceFinished,
-                          .finish = IntervalDistinct,
-                          .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
-                      },
-                      {
-                          .function = "list",
-                          .type = googlesql::TYPE_INTERVAL,
-                          .nulls = kFilter,
-                          .limit = kSlice,
-                          .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
-                      },
-                      {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
-                  },
+              .rules = kArrayAgg,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
@@ -324,41 +457,28 @@ std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
       {
           "ARRAY_CONCAT_AGG",
           {
-              .rules =
-                  {
-                      {
-                          .function = "list",
-                          .limit = kSlice,
-                          .skip_nulls = true,
-                          .carries = true,
-                          .finish = Flatten,
-                      },
-                  },
+              .rules = kArrayConcatAgg,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "HLL_COUNT.INIT",
           {
-              .rules =
-                  {
-                      HllCountInit(googlesql::TYPE_BIGNUMERIC),
-                      HllCountInit(googlesql::TYPE_UNKNOWN),
-                  },
+              .rules = kHllInit,
               .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
           },
       },
       {
           "HLL_COUNT.MERGE_PARTIAL",
           {
-              .rules = {{.function = "bq_hll_count_merge_partial"}},
+              .rules = kHllMergePartial,
               .uses = {TypeUse::kRejectsOver},
           },
       },
       {
           "HLL_COUNT.MERGE",
           {
-              .rules = {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}},
+              .rules = kHllMerge,
               .uses = {TypeUse::kRejectsOver},
           },
       },
@@ -366,27 +486,9 @@ std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
       {
           "APPROX_COUNT_DISTINCT",
           {
-              .rules =
-                  {
-                      ApproxCountDistinct(googlesql::TYPE_INT64),
-                      ApproxCountDistinct(googlesql::TYPE_STRING),
-                      ApproxCountDistinct(googlesql::TYPE_BYTES),
-                      ApproxCountDistinct(googlesql::TYPE_NUMERIC),
-                      ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
-                      {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
-                  },
+              .rules = kApproxCountDistinct,
               .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
-              .type_rejections =
-                  {
-                      {
-                          .types = kIntervalTypes,
-                          .message = "Unsupported type INTERVAL for hll_count.init.",
-                      },
-                      {
-                          .types = kRangeTypes,
-                          .message = "Unsupported type RANGE for hll_count.init.",
-                      },
-                  },
+              .type_rejections = kApproxCountRejections,
           },
       },
       // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
@@ -394,74 +496,26 @@ std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
       {
           "APPROX_QUANTILES",
           {
-              .rules =
-                  {
-                      {
-                          .function = "quantile_disc",
-                          .arguments = {"$1", "list_transform(range($2 + 1), lambda i: i / $2)"},
-                          .nulls = kIgnore,
-                      },
-                  },
+              .rules = kApproxQuantiles,
               .uses = {TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kIntervalTypes,
-                          .message =
-                              "Unsupported type INTERVAL for aggregate function approx_quantiles",
-                      },
-                  },
+              .type_rejections = kApproxQuantileRejections,
           },
       },
       // histogram() takes only the values; TopCount() applies the count afterwards.
       {
           "APPROX_TOP_COUNT",
           {
-              .rules =
-                  {
-                      {
-                          .function = "histogram",
-                          .arguments = {"$1"},
-                          .distinct = AggregateRule::Distinct::kUnsupported,
-                          .finish = TopCount,
-                      },
-                  },
+              .rules = kApproxTopCount,
               .uses = {TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kIntervalTypes,
-                          .message = "Unsupported type INTERVAL for approx_top_count_shard.",
-                      },
-                      {
-                          .types = kRangeTypes,
-                          .message = "Unsupported type RANGE for approx_top_count_shard.",
-                      },
-                  },
+              .type_rejections = kTopCountRejections,
           },
       },
       {
           "APPROX_TOP_SUM",
           {
-              .rules =
-                  {
-                      TopSumRule<googlesql::TYPE_INT64>(),
-                      TopSumRule<googlesql::TYPE_NUMERIC>(),
-                      TopSumRule<googlesql::TYPE_BIGNUMERIC>(),
-                      TopSumRule<googlesql::TYPE_DOUBLE>(),
-                  },
+              .rules = kApproxTopSum,
               .uses = {TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kIntervalTypes,
-                          .message = "Unsupported type INTERVAL for approx_top_sum_shard.",
-                      },
-                      {
-                          .types = kRangeTypes,
-                          .message = "Unsupported type RANGE for approx_top_sum_shard.",
-                      },
-                  },
+              .type_rejections = kTopSumRejections,
           },
       },
       // The _null variants return a NULL x instead of skipping its row. INTERVAL values of y
@@ -469,32 +523,14 @@ std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
       {
           "MAX_BY",
           {
-              .rules =
-                  {
-                      {
-                          .function = "arg_max_null",
-                          .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
-                          .arguments = {"$1", "bq_interval_key($2)"},
-                          .carries = true,
-                      },
-                      {.function = "arg_max_null", .carries = true},
-                  },
+              .rules = kMaxBy,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
       {
           "MIN_BY",
           {
-              .rules =
-                  {
-                      {
-                          .function = "arg_min_null",
-                          .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
-                          .arguments = {"$1", "bq_interval_key($2)"},
-                          .carries = true,
-                      },
-                      {.function = "arg_min_null", .carries = true},
-                  },
+              .rules = kMinBy,
               .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
       },
@@ -503,88 +539,77 @@ std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
       {
           "STRING_AGG",
           {
-              .rules =
-                  {
-                      {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
-                      {
-                          .function = "string_agg",
-                          .type = googlesql::TYPE_BYTES,
-                          .arguments = {"hex($1)", "hex($2)"},
-                          .defaults = {"", "unhex('2C')"},
-                          .limit = kJoin,
-                          .finish = Unhex,
-                      },
-                  },
+              .rules = kStringAgg,
           },
       },
       // COUNT counts only TRUE after converting FALSE and NULL to NULL, and returns 0
       // for empty inputs and window frames. DISTINCT still counts TRUE at most once.
-      {"COUNTIF", {.rules = {{.function = "count", .arguments = {"CASE WHEN $1 THEN TRUE END"}}}}},
-      {"LOGICAL_AND", {.rules = {{.function = "bool_and"}}}},
-      {"LOGICAL_OR", {.rules = {{.function = "bool_or"}}}},
-      {"BIT_AND", {.rules = {{.function = "bit_and"}}}},
-      {"BIT_OR", {.rules = {{.function = "bit_or"}}}},
-      {"BIT_XOR", {.rules = {{.function = "bit_xor"}}}},
+      {"COUNTIF", {.rules = kCountIf}},
+      {"LOGICAL_AND", {.rules = kLogicalAnd}},
+      {"LOGICAL_OR", {.rules = kLogicalOr}},
+      {"BIT_AND", {.rules = kBitAnd}},
+      {"BIT_OR", {.rules = kBitOr}},
+      {"BIT_XOR", {.rules = kBitXor}},
       {
           "STDDEV",
           {
-              .rules = {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}},
+              .rules = kStddevSamp,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "STDDEV_SAMP",
           {
-              .rules = {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}},
+              .rules = kStddevSamp,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "STDDEV_POP",
           {
-              .rules = {BigNumericAggregate<kBigNumericStdDevPop>(1), {.function = "stddev_pop"}},
+              .rules = kStddevPop,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "VARIANCE",
           {
-              .rules = {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}},
+              .rules = kVarSamp,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "VAR_SAMP",
           {
-              .rules = {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}},
+              .rules = kVarSamp,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "VAR_POP",
           {
-              .rules = {BigNumericAggregate<kBigNumericVarPop>(1), {.function = "var_pop"}},
+              .rules = kVarPop,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "CORR",
           {
-              .rules = {BigNumericAggregate<kBigNumericCorr>(2), {.function = "corr"}},
+              .rules = kCorr,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "COVAR_POP",
           {
-              .rules = {BigNumericAggregate<kBigNumericCovarPop>(2), {.function = "covar_pop"}},
+              .rules = kCovarPop,
               .uses = {TypeUse::kBigNumeric},
           },
       },
       {
           "COVAR_SAMP",
           {
-              .rules = {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}},
+              .rules = kCovarSamp,
               .uses = {TypeUse::kBigNumeric},
           },
       },
@@ -630,22 +655,13 @@ std::string PercentileDisc(const std::string& sql, const std::vector<std::string
          "))";
 }
 
-constexpr std::string_view kValueArgument[] = {"$1"};
-constexpr std::string_view kBigNumericValueArgument[] = {"CAST($1 AS VARCHAR)"};
-
-template <googlesql::TypeKind kPercentile>
-struct PercentileCondition {
-  static constexpr std::array kTypes = {kPercentile};
-  static constexpr StaticCondition kConditions[] = {{.argument = 2, .types = kTypes}};
-};
-
 // PERCENTILE_DISC of values of `type`, for a percentile of `kPercentile`.
 template <googlesql::TypeKind kPercentile>
 constexpr StaticAggregateRule PercentileDiscRule(googlesql::TypeKind type) {
   return {
       .function = "list",
       .type = type,
-      .conditions = PercentileCondition<kPercentile>::kConditions,
+      .conditions = ArgumentType<kPercentile>::kSecond,
       .arguments = kValueArgument,
       .order = type == googlesql::TYPE_DOUBLE ? kFloatPercentileOrder : kPercentileOrder,
       .nulls = AggregateRule::Nulls::kFilterUnlessRespected,

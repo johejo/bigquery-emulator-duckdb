@@ -20,6 +20,8 @@
 namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::Rule;
+using function_catalog::StaticCondition;
+using function_catalog::StaticRule;
 
 using function_catalog::ArgumentMode;
 using function_catalog::Arity;
@@ -644,201 +646,108 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 
 }  // namespace
 
-// Functions implemented by DuckDB SQL templates.
-std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
-  static const function_catalog::NamedDefinition<Rule> kRules[] = {
+// Literal templates have immutable backing arrays; generated SQL stays in TemplateRules().
+std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTemplateRules() {
+  static constexpr googlesql::TypeKind kElementTypes[] = {TYPE_GRAPH_ELEMENT};
+  static constexpr googlesql::TypeKind kPathTypes[] = {TYPE_GRAPH_PATH};
+  static constexpr StaticCondition kElement[] = {{.argument = 1, .types = kElementTypes}};
+  static constexpr StaticCondition kPath[] = {{.argument = 1, .types = kPathTypes}};
+  static constexpr StaticCondition kEndpoints[] = {
+      {.argument = 1, .types = kElementTypes},
+      {.argument = 2, .types = kElementTypes},
+  };
+  static constexpr std::string_view kEndpointErrors[] = {
+      "'The emulator does not support graph endpoint predicates with NULL operands'",
+  };
+  static constexpr StaticRule kSource[] = {
       {
-          "$IS_SOURCE_NODE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                              "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
-                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
-                          .defaults = {},
-                          .errors =
-                              {
-                                  "'The emulator does not support graph endpoint predicates with "
-                                  "NULL "
-                                  "operands'",
-                              },
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .arity = 2,
+          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                      "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
+          .conditions = kEndpoints,
+          .errors = kEndpointErrors,
       },
+  };
+  static constexpr StaticRule kDestination[] = {
       {
-          "$IS_DEST_NODE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                                      "struct_extract($1, '$id') = struct_extract($2, "
-                                      "'$destination_id') END",
-                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
-                          .defaults = {},
-                          .errors =
-                              {
-                                  "'The emulator does not support graph endpoint predicates with "
-                                  "NULL "
-                                  "operands'",
-                              },
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .arity = 2,
+          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                      "struct_extract($1, '$id') = struct_extract($2, '$destination_id') END",
+          .conditions = kEndpoints,
+          .errors = kEndpointErrors,
       },
+  };
+  static constexpr StaticRule kLabels[] = {
+      {.arity = 1, .spelling = "struct_extract($1, '$labels')", .conditions = kElement},
+  };
+  static constexpr StaticRule kNodes[] = {
+      {.arity = 1, .spelling = "struct_extract($1, '$nodes')", .conditions = kPath},
+  };
+  static constexpr StaticRule kEdges[] = {
+      {.arity = 1, .spelling = "struct_extract($1, '$edges')", .conditions = kPath},
+  };
+  static constexpr StaticRule kPathFirst[] = {
+      {.arity = 1, .spelling = "struct_extract($1, '$nodes')[1]", .conditions = kPath},
+  };
+  static constexpr StaticRule kPathLast[] = {
+      {.arity = 1, .spelling = "struct_extract($1, '$nodes')[-1]", .conditions = kPath},
+  };
+  static constexpr StaticRule kPathLength[] = {
+      {.arity = 1, .spelling = "len(struct_extract($1, '$edges'))", .conditions = kPath},
+  };
+  static constexpr StaticRule kIsAcyclic[] = {
       {
-          "LABELS",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$labels')",
-                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .arity = 1,
+          .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                      "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
+          .conditions = kPath,
       },
+  };
+  static constexpr StaticRule kIsTrail[] = {
       {
-          "NODES",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$nodes')",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .arity = 1,
+          .spelling = "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
+                      "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
+          .conditions = kPath,
       },
+  };
+  static constexpr StaticRule kIsSimple[] = {
       {
-          "EDGES",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$edges')",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
+          .arity = 1,
+          .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                      "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
+                      "len(struct_extract($1, '$nodes')) > 1 AND "
+                      "struct_extract(struct_extract($1, '$nodes')[1], '$id') = "
+                      "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE 0 END",
+          .conditions = kPath,
       },
-      {
-          "PATH_FIRST",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$nodes')[1]",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
-      {
-          "PATH_LAST",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "struct_extract($1, '$nodes')[-1]",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
-      {
-          "PATH_LENGTH",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling = "len(struct_extract($1, '$edges'))",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
-      {
-          "IS_ACYCLIC",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
-                              "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
-      {
-          "IS_TRAIL",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
-                              "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
-      {
-          "IS_SIMPLE",
-          {
-              .rules =
-                  {
-                      {
-                          .arity = 1,
-                          .spelling =
-                              "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
-                              "struct_extract(n, "
-                              "'$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
-                              "len(struct_extract($1, "
-                              "'$nodes')) > 1 AND struct_extract(struct_extract($1, '$nodes')[1], "
-                              "'$id') = "
-                              "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE "
-                              "0 "
-                              "END",
-                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-                      },
-                  },
-              .uses = {TypeUse::kGraphValues},
-          },
-      },
+  };
+  static constexpr StaticRule kIf[] = {
+      {.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"},
+  };
+  static constexpr function_catalog::StaticNamedDefinition<StaticRule> kRules[] = {
+      {"$IS_SOURCE_NODE", {.rules = kSource, .uses = {TypeUse::kGraphValues}}},
+      {"$IS_DEST_NODE", {.rules = kDestination, .uses = {TypeUse::kGraphValues}}},
+      {"LABELS", {.rules = kLabels, .uses = {TypeUse::kGraphValues}}},
+      {"NODES", {.rules = kNodes, .uses = {TypeUse::kGraphValues}}},
+      {"EDGES", {.rules = kEdges, .uses = {TypeUse::kGraphValues}}},
+      {"PATH_FIRST", {.rules = kPathFirst, .uses = {TypeUse::kGraphValues}}},
+      {"PATH_LAST", {.rules = kPathLast, .uses = {TypeUse::kGraphValues}}},
+      {"PATH_LENGTH", {.rules = kPathLength, .uses = {TypeUse::kGraphValues}}},
+      {"IS_ACYCLIC", {.rules = kIsAcyclic, .uses = {TypeUse::kGraphValues}}},
+      {"IS_TRAIL", {.rules = kIsTrail, .uses = {TypeUse::kGraphValues}}},
+      {"IS_SIMPLE", {.rules = kIsSimple, .uses = {TypeUse::kGraphValues}}},
       {
           "IF",
-          {
-              .rules = {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}},
-              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
-          },
+          {.rules = kIf, .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric}},
       },
+  };
+  return kRules;
+}
+
+// Functions implemented by DuckDB SQL templates, including runtime-generated spellings.
+std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
+  static const function_catalog::NamedDefinition<Rule> kRules[] = {
       // Avoid DuckDB v2's NULLIF macro binder; repeated arguments are bound once by Expand.
       {
           "NULLIF",

@@ -753,33 +753,32 @@ namespace {
 // finishes. ST_UNION_AGG unions them as ST_UNION does an array, which puts all the points first,
 // so none of these folds the values one at a time.
 template <const char* kFunction>
-FunctionDefinition<AggregateRule> ListAggregate() {
-  return {
-      .rules =
-          {
-              {
-                  .function = "list",
-                  .distinct = AggregateRule::Distinct::kUnsupported,
-                  .skip_nulls = true,
-                  .finish =
-                      [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
-                         const std::string& /*tail*/) {
-                        return std::string(kFunction) + "(" + sql + ")";
-                      },
-              },
-          },
-      // BigQuery takes none of them over a window.
-      .uses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsOver},
-  };
-}
+constexpr function_catalog::StaticAggregateRule kListAggregate[] = {
+    {
+        .function = "list",
+        .distinct = AggregateRule::Distinct::kUnsupported,
+        .skip_nulls = true,
+        .finish =
+            [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
+               const std::string& /*tail*/) { return std::string(kFunction) + "(" + sql + ")"; },
+    },
+};
+
+// BigQuery takes none of them over a window.
+constexpr TypeUses kAggregateUses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsOver};
 
 }  // namespace
 
-std::span<const function_catalog::NamedDefinition<AggregateRule>> GeographyAggregates() {
-  static const function_catalog::NamedDefinition<AggregateRule> kAggregates[] = {
-      {"ST_UNION_AGG", ListAggregate<kUnionArray>()},
-      {"ST_CENTROID_AGG", ListAggregate<kCentroidAggregate>()},
-      {"ST_EXTENT", ListAggregate<kExtent>()},
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
+GeographyAggregates() {
+  static constexpr function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>
+      kAggregates[] = {
+          {"ST_UNION_AGG", {.rules = kListAggregate<kUnionArray>, .uses = kAggregateUses}},
+          {
+              "ST_CENTROID_AGG",
+              {.rules = kListAggregate<kCentroidAggregate>, .uses = kAggregateUses},
+          },
+          {"ST_EXTENT", {.rules = kListAggregate<kExtent>, .uses = kAggregateUses}},
   };
   return kAggregates;
 }
