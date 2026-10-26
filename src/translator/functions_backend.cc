@@ -1,9 +1,9 @@
 #include "src/translator/functions_backend.h"
 
 #include <cstddef>
+#include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "src/duckdb_sql.h"
@@ -18,10 +18,11 @@ using function_catalog::Rule;
 using function_catalog::Arity;
 using function_catalog::BigNumericOperator;
 using function_catalog::Concat;
-using function_catalog::FunctionDefinition;
 using function_catalog::Is;
 using function_catalog::Part;
 using function_catalog::Same;
+using function_catalog::StaticCondition;
+using function_catalog::StaticRule;
 using function_catalog::TypeUse;
 
 namespace {
@@ -51,41 +52,45 @@ std::vector<Rule> GenerateRangeArray() {
 
 // STRING and BYTES use GoogleSQL's position, length and NULL semantics. An omitted length
 // takes the rest of the input.
-std::vector<Rule> Substr() {
-  return {
-      {
-          .arity = {2, 3},
-          .spelling = "bq_substr($1, $2, $3)",
-          .conditions = {Is(1, {TYPE_STRING})},
-          .defaults = {"9223372036854775807"},
-      },
-      {
-          .arity = {2, 3},
-          .spelling = "bq_substr_bytes($1, $2, $3)",
-          .conditions = {Is(1, {TYPE_BYTES})},
-          .defaults = {"9223372036854775807"},
-      },
-  };
-}
+constexpr googlesql::TypeKind kStringTypes[] = {TYPE_STRING};
+constexpr googlesql::TypeKind kBytesTypes[] = {TYPE_BYTES};
+constexpr StaticCondition kStringInput[] = {{.argument = 1, .types = kStringTypes}};
+constexpr StaticCondition kBytesInput[] = {{.argument = 1, .types = kBytesTypes}};
+constexpr std::string_view kSubstrDefaults[] = {"9223372036854775807"};
+constexpr StaticRule kSubstr[] = {
+    {
+        .arity = {2, 3},
+        .spelling = "bq_substr($1, $2, $3)",
+        .conditions = kStringInput,
+        .defaults = kSubstrDefaults,
+    },
+    {
+        .arity = {2, 3},
+        .spelling = "bq_substr_bytes($1, $2, $3)",
+        .conditions = kBytesInput,
+        .defaults = kSubstrDefaults,
+    },
+};
 
 // FORMAT_DATE, FORMAT_DATETIME and FORMAT_TIMESTAMP, by the type of the value. A TIMESTAMP is
 // formatted in the given time zone, by default UTC.
-std::vector<Rule> FormatDateTime() {
-  return {
-      {.arity = 2, .spelling = "bq_format_date($1, $2)", .conditions = {Is(2, {TYPE_DATE})}},
-      {
-          .arity = 2,
-          .spelling = "bq_format_datetime($1, $2)",
-          .conditions = {Is(2, {TYPE_DATETIME})},
-      },
-      {
-          .arity = {2, 3},
-          .spelling = "bq_format_timestamp($1, $2, $3)",
-          .conditions = {Is(2, {TYPE_TIMESTAMP})},
-          .defaults = {"'UTC'"},
-      },
-  };
-}
+constexpr googlesql::TypeKind kDateTypes[] = {TYPE_DATE};
+constexpr googlesql::TypeKind kDateTimeTypes[] = {TYPE_DATETIME};
+constexpr googlesql::TypeKind kTimestampTypes[] = {TYPE_TIMESTAMP};
+constexpr StaticCondition kDateValue[] = {{.argument = 2, .types = kDateTypes}};
+constexpr StaticCondition kDateTimeValue[] = {{.argument = 2, .types = kDateTimeTypes}};
+constexpr StaticCondition kTimestampValue[] = {{.argument = 2, .types = kTimestampTypes}};
+constexpr std::string_view kUtcDefault[] = {"'UTC'"};
+constexpr StaticRule kFormatDateTime[] = {
+    {.arity = 2, .spelling = "bq_format_date($1, $2)", .conditions = kDateValue},
+    {.arity = 2, .spelling = "bq_format_datetime($1, $2)", .conditions = kDateTimeValue},
+    {
+        .arity = {2, 3},
+        .spelling = "bq_format_timestamp($1, $2, $3)",
+        .conditions = kTimestampValue,
+        .defaults = kUtcDefault,
+    },
+};
 
 // A FLOAT64 function of `arity` arguments that src/backend_functions.cc registers.
 std::vector<Rule> Float64(std::string_view function, std::size_t arity = 1) {
@@ -175,11 +180,22 @@ std::vector<Rule> Pad(const std::string& function) {
 
 }  // namespace
 
+std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBackendRules() {
+  static constexpr function_catalog::StaticNamedDefinition<StaticRule> kRules[] = {
+      {"SUBSTR", {.rules = kSubstr}},
+      {"SUBSTRING", {.rules = kSubstr}},
+      {"FORMAT_DATE", {.rules = kFormatDateTime}},
+      {"FORMAT_DATETIME", {.rules = kFormatDateTime}},
+      {"FORMAT_TIMESTAMP", {.rules = kFormatDateTime}},
+  };
+  return kRules;
+}
+
 // Functions implemented by templates that call GoogleSQL's own implementations, which
 // src/backend_functions.cc registers as bq_* DuckDB functions.
-const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRules() {
-  static const auto* const kRules =
-      new std::unordered_map<std::string_view, FunctionDefinition<Rule>>{
+std::span<const function_catalog::NamedDefinition<Rule>> BackendRules() {
+  static const function_catalog::NamedDefinition<Rule> kRules[] =
+      {
           // Construct and normalize separate interval components through GoogleSQL.
           {
               "$INTERVAL",
@@ -360,8 +376,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
                       },
               },
           },
-          {"SUBSTR", {.rules = Substr()}},
-          {"SUBSTRING", {.rules = Substr()}},
+
           {
               "SPLIT",
               {
@@ -404,9 +419,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
           // Formatting and parsing dates and times. DuckDB's strftime() and strptime() differ in
           // the format elements, in how leniently they parse and in their errors. FORMAT_DATE,
           // FORMAT_DATETIME and FORMAT_TIMESTAMP each also take the other two types.
-          {"FORMAT_DATE", {.rules = FormatDateTime()}},
-          {"FORMAT_DATETIME", {.rules = FormatDateTime()}},
-          {"FORMAT_TIMESTAMP", {.rules = FormatDateTime()}},
+
           {"FORMAT_TIME", {.rules = {{.arity = 2, .spelling = "bq_format_time($1, $2)"}}}},
           {"PARSE_DATE", {.rules = {{.arity = 2, .spelling = "bq_parse_date($1, $2)"}}}},
           {"PARSE_DATETIME", {.rules = {{.arity = 2, .spelling = "bq_parse_datetime($1, $2)"}}}},
@@ -934,7 +947,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
               },
           },
   };
-  return *kRules;
+  return kRules;
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

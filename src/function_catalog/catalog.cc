@@ -68,17 +68,55 @@ void Catalog::Add(std::string_view name, FunctionEntry entry) {
   }
 }
 
-void Catalog::AddRules(std::string_view name, const FunctionDefinition<Rule>& definition,
+void Catalog::AddRules(std::string_view name, FunctionDefinition<Rule> definition,
                        Implementation fallback) {
   Add(name, {
                 .translation = Translation::kRules,
                 .uses = definition.uses,
                 .implementations = Implementations(definition.rules, fallback),
-                .rules = definition.rules,
-                .argument_modes = definition.argument_modes,
+                .rules = std::move(definition.rules),
+                .argument_modes = std::move(definition.argument_modes),
                 .struct_handler = definition.struct_handler,
-                .type_rejections = definition.type_rejections,
+                .type_rejections = std::move(definition.type_rejections),
             });
+}
+
+void Catalog::AddRules(std::string_view name,
+                       const StaticFunctionDefinition<StaticRule>& definition,
+                       Implementation fallback) {
+  FunctionDefinition<Rule> owned{
+      .uses = definition.uses,
+      .argument_modes = {definition.argument_modes.begin(), definition.argument_modes.end()},
+      .struct_handler = definition.struct_handler,
+      .type_rejections = {definition.type_rejections.begin(), definition.type_rejections.end()},
+  };
+  owned.rules.reserve(definition.rules.size());
+  for (const auto& rule : definition.rules) {
+    owned.rules.push_back(Own(rule));
+  }
+  AddRules(name, std::move(owned), fallback);
+}
+
+void Catalog::AddAggregates(std::string_view name,
+                            const StaticFunctionDefinition<StaticAggregateRule>& definition,
+                            Translation translation) {
+  FunctionEntry entry{
+      .translation = translation,
+      .uses = definition.uses,
+      .implementations =
+          {
+              translation == Translation::kAnalytic ? Implementation::kAnalytic
+                                                    : Implementation::kAggregate,
+          },
+      .argument_modes = {definition.argument_modes.begin(), definition.argument_modes.end()},
+      .struct_handler = definition.struct_handler,
+      .type_rejections = {definition.type_rejections.begin(), definition.type_rejections.end()},
+  };
+  entry.aggregates.reserve(definition.rules.size());
+  for (const auto& rule : definition.rules) {
+    entry.aggregates.push_back(Own(rule));
+  }
+  Add(name, std::move(entry));
 }
 
 bool Catalog::HasTypeUse(std::string_view upper_name, TypeUse use) const {

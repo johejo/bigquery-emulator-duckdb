@@ -5,9 +5,9 @@
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -28,7 +28,6 @@ using function_catalog::BigNumericOperator;
 using function_catalog::Concat;
 using function_catalog::Condition;
 using function_catalog::FloatCompare;
-using function_catalog::FunctionDefinition;
 using function_catalog::Implementation;
 using function_catalog::Is;
 using function_catalog::Part;
@@ -646,9 +645,8 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 }  // namespace
 
 // Functions implemented by DuckDB SQL templates.
-const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRules() {
-  static const auto* const kRules = new std::unordered_map<std::string_view,
-                                                           FunctionDefinition<Rule>>{
+std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
+  static const function_catalog::NamedDefinition<Rule> kRules[] = {
       {
           "$IS_SOURCE_NODE",
           {
@@ -1864,7 +1862,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           },
       },
   };
-  return *kRules;
+  return kRules;
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

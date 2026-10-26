@@ -8,6 +8,7 @@
 #include <functional>
 #include <iterator>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -774,15 +775,13 @@ FunctionDefinition<AggregateRule> ListAggregate() {
 
 }  // namespace
 
-const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>&
-GeographyAggregates() {
-  static const auto* const kAggregates =
-      new std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>{
-          {"ST_UNION_AGG", ListAggregate<kUnionArray>()},
-          {"ST_CENTROID_AGG", ListAggregate<kCentroidAggregate>()},
-          {"ST_EXTENT", ListAggregate<kExtent>()},
+std::span<const function_catalog::NamedDefinition<AggregateRule>> GeographyAggregates() {
+  static const function_catalog::NamedDefinition<AggregateRule> kAggregates[] = {
+      {"ST_UNION_AGG", ListAggregate<kUnionArray>()},
+      {"ST_CENTROID_AGG", ListAggregate<kCentroidAggregate>()},
+      {"ST_EXTENT", ListAggregate<kExtent>()},
   };
-  return *kAggregates;
+  return kAggregates;
 }
 
 void RegisterGeographyFunctions(duckdb_connection connection,

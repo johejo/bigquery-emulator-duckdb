@@ -2,9 +2,9 @@
 
 #include <array>
 #include <cstddef>
+#include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "src/function_catalog/rules.h"
@@ -12,8 +12,10 @@
 namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::AggregateRule;
-using function_catalog::FunctionDefinition;
+using function_catalog::ConstantArgument;
 using function_catalog::Raise;
+using function_catalog::StaticAggregateRule;
+using function_catalog::StaticCondition;
 using function_catalog::TypeUse;
 
 namespace {
@@ -200,11 +202,10 @@ AggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
 // Aggregate functions, which also take a window.
 }  // namespace
 
-const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& Aggregates() {
+std::span<const function_catalog::NamedDefinition<AggregateRule>> Aggregates() {
   using enum AggregateRule::Nulls;
   using enum AggregateRule::Limit;
-  static const auto* const kAggregates = new std::unordered_map<std::string_view,
-                                                                FunctionDefinition<AggregateRule>>{
+  static const function_catalog::NamedDefinition<AggregateRule> kAggregates[] = {
       // INTERVAL values compare by their keys; among equal values, MIN and MAX return the
       // first, as BigQuery does.
       {
@@ -588,7 +589,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
           },
       },
   };
-  return *kAggregates;
+  return kAggregates;
 }
 
 namespace {
@@ -629,14 +630,23 @@ std::string PercentileDisc(const std::string& sql, const std::vector<std::string
          "))";
 }
 
+constexpr std::string_view kValueArgument[] = {"$1"};
+constexpr std::string_view kBigNumericValueArgument[] = {"CAST($1 AS VARCHAR)"};
+
+template <googlesql::TypeKind kPercentile>
+struct PercentileCondition {
+  static constexpr std::array kTypes = {kPercentile};
+  static constexpr StaticCondition kConditions[] = {{.argument = 2, .types = kTypes}};
+};
+
 // PERCENTILE_DISC of values of `type`, for a percentile of `kPercentile`.
 template <googlesql::TypeKind kPercentile>
-AggregateRule PercentileDiscRule(googlesql::TypeKind type) {
+constexpr StaticAggregateRule PercentileDiscRule(googlesql::TypeKind type) {
   return {
       .function = "list",
       .type = type,
-      .conditions = {{.argument = 2, .types = {kPercentile}}},
-      .arguments = {"$1"},
+      .conditions = PercentileCondition<kPercentile>::kConditions,
+      .arguments = kValueArgument,
       .order = type == googlesql::TYPE_DOUBLE ? kFloatPercentileOrder : kPercentileOrder,
       .nulls = AggregateRule::Nulls::kFilterUnlessRespected,
       .finish = PercentileDisc<kPercentile>,
@@ -653,145 +663,113 @@ std::string TfIdf(const std::string& sql, const std::vector<std::string>& argume
 // Functions that only take a window.
 }  // namespace
 
-const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& Analytics() {
+std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Analytics() {
   using enum AggregateRule::Nulls;
-  static const auto* const kAnalytics =
-      new std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>{
-          {"ROW_NUMBER", {.rules = {{.function = "row_number"}}}},
-          {"RANK", {.rules = {{.function = "rank"}}}},
-          {"DENSE_RANK", {.rules = {{.function = "dense_rank"}}}},
-          {"PERCENT_RANK", {.rules = {{.function = "percent_rank"}}}},
-          {"CUME_DIST", {.rules = {{.function = "cume_dist"}}}},
-          {"NTILE", {.rules = {{.function = "ntile"}}}},
-          {
-              "LAG",
-              {
-                  .rules =
-                      {
-                          {
-                              .function = "lag",
-                              .carries = true,
-                              .constant_arguments =
-                                  {
-                                      {
-                                          .argument = 3,
-                                          .description = "default expression",
-                                          .message = "The third argument (the default expression) "
-                                                     "to LAG must be constant",
-                                      },
-                                  },
-                          },
-                      },
-                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
-              },
-          },
-          {
-              "LEAD",
-              {
-                  .rules =
-                      {
-                          {
-                              .function = "lead",
-                              .carries = true,
-                              .constant_arguments =
-                                  {
-                                      {
-                                          .argument = 3,
-                                          .description = "default expression",
-                                          .message = "The third argument (the default expression) "
-                                                     "to LEAD must be constant",
-                                      },
-                                  },
-                          },
-                      },
-                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
-              },
-          },
-          {
-              "FIRST_VALUE",
-              {
-                  .rules = {{.function = "first_value", .nulls = kModifier, .carries = true}},
-                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
-              },
-          },
-          {
-              "LAST_VALUE",
-              {
-                  .rules = {{.function = "last_value", .nulls = kModifier, .carries = true}},
-                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
-              },
-          },
-          {
-              "NTH_VALUE",
-              {
-                  .rules = {{.function = "nth_value", .nulls = kModifier, .carries = true}},
-                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
-              },
-          },
-          {
-              "PERCENTILE_CONT",
-              {
-                  .rules =
-                      {
-                          {
-                              .function = "list",
-                              .type = googlesql::TYPE_DOUBLE,
-                              .arguments = {"$1"},
-                              .order = kFloatPercentileOrder,
-                              .nulls = kFilterUnlessRespected,
-                              .finish = PercentileCont<googlesql::TYPE_DOUBLE>,
-                          },
-                          {
-                              .function = "list",
-                              .type = googlesql::TYPE_NUMERIC,
-                              .arguments = {"$1"},
-                              .order = kPercentileOrder,
-                              .nulls = kFilterUnlessRespected,
-                              .finish = PercentileCont<googlesql::TYPE_NUMERIC>,
-                          },
-                          {
-                              .function = "list",
-                              .type = googlesql::TYPE_BIGNUMERIC,
-                              .arguments = {"CAST($1 AS VARCHAR)"},
-                              .order = kPercentileOrder,
-                              .nulls = kFilterUnlessRespected,
-                              .finish = PercentileCont<googlesql::TYPE_BIGNUMERIC>,
-                          },
-                      },
-                  .uses = {TypeUse::kBigNumeric},
-              },
-          },
-          {
-              "TF_IDF",
-              {
-                  .rules =
-                      {
-                          {
-                              .function = "bq_tf_idf_dictionary",
-                              .arguments = {"$1", "$2", "$3"},
-                              .defaults = {"", "32000", "5"},
-                              .finish = TfIdf,
-                          },
-                      },
-              },
-          },
-          {
-              "PERCENTILE_DISC",
-              {
-                  .rules =
-                      {
-                          PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_DOUBLE),
-                          PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_DOUBLE),
-                          PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_DOUBLE),
-                          PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_UNKNOWN),
-                          PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_UNKNOWN),
-                          PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_UNKNOWN),
-                      },
-                  .uses = {TypeUse::kBigNumeric},
-              },
-          },
+  static constexpr StaticAggregateRule kRowNumber[] = {{.function = "row_number"}};
+  static constexpr StaticAggregateRule kRank[] = {{.function = "rank"}};
+  static constexpr StaticAggregateRule kDenseRank[] = {{.function = "dense_rank"}};
+  static constexpr StaticAggregateRule kPercentRank[] = {{.function = "percent_rank"}};
+  static constexpr StaticAggregateRule kCumeDist[] = {{.function = "cume_dist"}};
+  static constexpr StaticAggregateRule kNtile[] = {{.function = "ntile"}};
+  static constexpr ConstantArgument kLagConstants[] = {
+      {
+          .argument = 3,
+          .description = "default expression",
+          .message = "The third argument (the default expression) to LAG must be constant",
+      },
   };
-  return *kAnalytics;
+  static constexpr ConstantArgument kLeadConstants[] = {
+      {
+          .argument = 3,
+          .description = "default expression",
+          .message = "The third argument (the default expression) to LEAD must be constant",
+      },
+  };
+  static constexpr StaticAggregateRule kLag[] = {
+      {.function = "lag", .carries = true, .constant_arguments = kLagConstants},
+  };
+  static constexpr StaticAggregateRule kLead[] = {
+      {.function = "lead", .carries = true, .constant_arguments = kLeadConstants},
+  };
+  static constexpr StaticAggregateRule kFirstValue[] = {
+      {.function = "first_value", .nulls = kModifier, .carries = true},
+  };
+  static constexpr StaticAggregateRule kLastValue[] = {
+      {.function = "last_value", .nulls = kModifier, .carries = true},
+  };
+  static constexpr StaticAggregateRule kNthValue[] = {
+      {.function = "nth_value", .nulls = kModifier, .carries = true},
+  };
+  static constexpr StaticAggregateRule kPercentileCont[] = {
+      {
+          .function = "list",
+          .type = googlesql::TYPE_DOUBLE,
+          .arguments = kValueArgument,
+          .order = kFloatPercentileOrder,
+          .nulls = kFilterUnlessRespected,
+          .finish = PercentileCont<googlesql::TYPE_DOUBLE>,
+      },
+      {
+          .function = "list",
+          .type = googlesql::TYPE_NUMERIC,
+          .arguments = kValueArgument,
+          .order = kPercentileOrder,
+          .nulls = kFilterUnlessRespected,
+          .finish = PercentileCont<googlesql::TYPE_NUMERIC>,
+      },
+      {
+          .function = "list",
+          .type = googlesql::TYPE_BIGNUMERIC,
+          .arguments = kBigNumericValueArgument,
+          .order = kPercentileOrder,
+          .nulls = kFilterUnlessRespected,
+          .finish = PercentileCont<googlesql::TYPE_BIGNUMERIC>,
+      },
+  };
+  static constexpr std::string_view kTfIdfArguments[] = {"$1", "$2", "$3"};
+  static constexpr std::string_view kTfIdfDefaults[] = {"", "32000", "5"};
+  static constexpr StaticAggregateRule kTfIdf[] = {
+      {
+          .function = "bq_tf_idf_dictionary",
+          .arguments = kTfIdfArguments,
+          .defaults = kTfIdfDefaults,
+          .finish = TfIdf,
+      },
+  };
+  static constexpr StaticAggregateRule kPercentileDisc[] = {
+      PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_DOUBLE),
+      PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_DOUBLE),
+      PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_DOUBLE),
+      PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_UNKNOWN),
+      PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_UNKNOWN),
+      PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_UNKNOWN),
+  };
+  static constexpr function_catalog::StaticNamedDefinition<StaticAggregateRule> kAnalytics[] = {
+      {"ROW_NUMBER", {.rules = kRowNumber}},
+      {"RANK", {.rules = kRank}},
+      {"DENSE_RANK", {.rules = kDenseRank}},
+      {"PERCENT_RANK", {.rules = kPercentRank}},
+      {"CUME_DIST", {.rules = kCumeDist}},
+      {"NTILE", {.rules = kNtile}},
+      {"LAG", {.rules = kLag, .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric}}},
+      {"LEAD", {.rules = kLead, .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric}}},
+      {
+          "FIRST_VALUE",
+          {.rules = kFirstValue, .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric}},
+      },
+      {
+          "LAST_VALUE",
+          {.rules = kLastValue, .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric}},
+      },
+      {
+          "NTH_VALUE",
+          {.rules = kNthValue, .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric}},
+      },
+      {"PERCENTILE_CONT", {.rules = kPercentileCont, .uses = {TypeUse::kBigNumeric}}},
+      {"TF_IDF", {.rules = kTfIdf}},
+      {"PERCENTILE_DISC", {.rules = kPercentileDisc, .uses = {TypeUse::kBigNumeric}}},
+  };
+  return kAnalytics;
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

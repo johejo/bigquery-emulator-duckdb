@@ -5,10 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
-#include <iterator>
+#include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -232,23 +231,23 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
 
 }  // namespace
 
-const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TrigonometricFunctions() {
-  static const auto* const kFunctions = [] {
-    auto* functions = new std::unordered_map<std::string_view, FunctionDefinition<Rule>>();
-    std::ranges::transform(kTrigonometricFunctions, std::inserter(*functions, functions->end()),
-                           [](const TrigonometricFunction& function) {
-                             return std::pair{
-                                 function.name,
-                                 FunctionDefinition<Rule>{
-                                     .rules = function_catalog::Same(
-                                         function.backend, function.arity,
-                                         {function_catalog::Is(1, {googlesql::TYPE_DOUBLE})}),
-                                 },
-                             };
-                           });
+std::span<const function_catalog::NamedDefinition<Rule>> TrigonometricFunctions() {
+  static const auto kFunctions = [] {
+    std::array<function_catalog::NamedDefinition<Rule>, kTrigonometricFunctions.size()> functions;
+    std::ranges::transform(
+        kTrigonometricFunctions, functions.begin(), [](const TrigonometricFunction& function) {
+          return function_catalog::NamedDefinition<Rule>{
+              function.name,
+              FunctionDefinition<Rule>{
+                  .rules =
+                      function_catalog::Same(function.backend, function.arity,
+                                             {function_catalog::Is(1, {googlesql::TYPE_DOUBLE})}),
+              },
+          };
+        });
     return functions;
   }();
-  return *kFunctions;
+  return kFunctions;
 }
 
 void RegisterMathFunctions(duckdb_connection connection, const Options& options) {

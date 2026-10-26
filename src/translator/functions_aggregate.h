@@ -1,17 +1,13 @@
 #pragma once
 
-#include <string_view>
-#include <unordered_map>
+#include <span>
 
 #include "src/function_catalog/rules.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
-const std::unordered_map<std::string_view,
-                         function_catalog::FunctionDefinition<function_catalog::AggregateRule>>&
-Aggregates();
-const std::unordered_map<std::string_view,
-                         function_catalog::FunctionDefinition<function_catalog::AggregateRule>>&
+std::span<const function_catalog::NamedDefinition<function_catalog::AggregateRule>> Aggregates();
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
 Analytics();
 
 }  // namespace bigquery_emulator_duckdb::translator
