@@ -3,7 +3,6 @@ package goclient
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -134,7 +133,7 @@ func duration(value any, unit schema.TimeUnitType) time.Duration {
 // options a job sets, and count the files they write.
 func TestExtract(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	bucket := newExtractBucket(t, "go-extract")
 	dataset := newDataset(t, client, "go_extract")
@@ -263,7 +262,7 @@ func TestExtract(t *testing.T) {
 // with a wildcard in its bucket name or more than one wildcard.
 func TestExtractErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	newExtractBucket(t, "go-extract-errors")
 	dataset := newDataset(t, client, "go_extract_errors")

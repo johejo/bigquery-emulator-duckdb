@@ -1,7 +1,6 @@
 package goclient
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -16,7 +15,7 @@ import (
 // https://cloud.google.com/bigquery/docs/reference/rest/v2/tables
 func TestTableExpiration(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_table_expiration")
 	run := func(sql string) error {

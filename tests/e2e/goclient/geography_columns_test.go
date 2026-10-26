@@ -2,7 +2,6 @@ package goclient
 
 import (
 	"cmp"
-	"context"
 	"encoding/hex"
 	"errors"
 	"reflect"
@@ -35,7 +34,7 @@ const (
 // those of scalars/geography.txt and scalars/geography_linestring.txt.
 func TestGeographyColumns(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_geography_columns")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
@@ -179,7 +178,7 @@ func TestGeographyColumns(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/geospatial-data#loading_data
 func TestGeographyParquetWkb(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_geography_parquet_wkb")
 

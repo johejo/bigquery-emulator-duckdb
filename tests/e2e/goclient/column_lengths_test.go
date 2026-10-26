@@ -13,13 +13,13 @@ import (
 // including fields in STRUCTs and ARRAYs, and remain in the table schema.
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#parameterized_data_types
 func TestColumnLengthWrites(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_column_length_writes")
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	columns := `(s STRING(3) NOT NULL, b BYTES(3), r STRUCT<label STRING(3)>, a ARRAY<STRING(3)>)`
 	values := `SELECT '日本語' AS s, b'abc' AS b, STRUCT('abc' AS renamed) AS r, ['abc', ''] AS a FROM UNNEST([0])`
@@ -167,13 +167,13 @@ func TestColumnLengthWrites(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-json#details_of_loading_json_data
 // https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
 func TestColumnLengthLoadBytes(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_column_length_load_bytes")
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE json_bytes (b BYTES(3), r STRUCT<b BYTES(3)>, a ARRAY<BYTES(3)>)")
 	p.mustRun("CREATE TABLE csv_bytes (b BYTES(3))")

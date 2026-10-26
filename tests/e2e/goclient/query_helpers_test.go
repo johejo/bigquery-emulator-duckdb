@@ -1,7 +1,6 @@
 package goclient
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -33,7 +32,7 @@ func (p datasetQueries) query(sql string, table string, disposition bigquery.Tab
 	query := p.client.Query(sql)
 	query.Dst = p.dataset.Table(table)
 	query.WriteDisposition = disposition
-	return wait(context.Background(), query)
+	return wait(p.t.Context(), query)
 }
 
 func (p datasetQueries) load(table, rows string, schema bigquery.Schema,
@@ -44,7 +43,7 @@ func (p datasetQueries) load(table, rows string, schema bigquery.Schema,
 	source.Schema = schema
 	loader := p.dataset.Table(table).LoaderFrom(source)
 	loader.WriteDisposition = disposition
-	return wait(context.Background(), loader)
+	return wait(p.t.Context(), loader)
 }
 
 func (p datasetQueries) copy(table string, disposition bigquery.TableWriteDisposition,
@@ -56,7 +55,7 @@ func (p datasetQueries) copy(table string, disposition bigquery.TableWriteDispos
 	}
 	copier := p.dataset.Table(table).CopierFrom(tables...)
 	copier.WriteDisposition = disposition
-	return wait(context.Background(), copier)
+	return wait(p.t.Context(), copier)
 }
 
 func (p datasetQueries) read(sql string, parameters ...bigquery.QueryParameter) [][]bigquery.Value {
@@ -64,7 +63,7 @@ func (p datasetQueries) read(sql string, parameters ...bigquery.QueryParameter) 
 	query := p.client.Query(sql)
 	query.DefaultDatasetID = p.dataset.DatasetID
 	query.Parameters = parameters
-	rows, err := query.Read(context.Background())
+	rows, err := query.Read(p.t.Context())
 	if err != nil {
 		p.t.Fatalf("%s: %v", sql, err)
 	}

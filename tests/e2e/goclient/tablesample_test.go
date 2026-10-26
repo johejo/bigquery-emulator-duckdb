@@ -16,13 +16,13 @@ import (
 // 65,536 rows, NaN returned all rows in eight trials while 50 PERCENT returned half each time.
 func TestTableSampleQueryParameters(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_tablesample_parameters")
 	if err := dataset.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	const rowCount int64 = 65536
 	p.mustRun("CREATE TABLE t AS SELECT id FROM UNNEST(GENERATE_ARRAY(1, 65536)) AS id")

@@ -88,7 +88,7 @@ func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigq
 // 38), which loads back into the same values.
 func TestBigNumericParquet(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_bignumeric_parquet")
 
@@ -255,7 +255,7 @@ func TestBigNumericParquet(t *testing.T) {
 // A load that would change a value or BigQuery would treat differently fails.
 func TestBigNumericParquetErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_bignumeric_parquet_errors")
 

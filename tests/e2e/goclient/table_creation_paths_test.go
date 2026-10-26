@@ -1,7 +1,6 @@
 package goclient
 
 import (
-	"context"
 	"reflect"
 	"strconv"
 	"testing"
@@ -29,7 +28,7 @@ type creationPaths struct {
 
 func (p creationPaths) view(table string) tableView {
 	p.t.Helper()
-	metadata, err := p.dataset.Table(table).Metadata(context.Background())
+	metadata, err := p.dataset.Table(table).Metadata(p.t.Context())
 	if err != nil {
 		p.t.Fatalf("%s: %v", table, err)
 	}
@@ -87,7 +86,7 @@ func informationSchemaOf(schema bigquery.Schema) (columns, paths [][]bigquery.Va
 // defaults and metadata that path gives them, and tables.get and INFORMATION_SCHEMA agree on it.
 func TestTableCreationPaths(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_table_creation_paths")
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
@@ -283,7 +282,7 @@ func TestWritesToExistingTables(t *testing.T) {
 // its rows, schema, defaults, metadata and creation time.
 func TestFailedReplacementsKeepTheTable(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_failed_replacements")
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}

@@ -14,7 +14,7 @@ import (
 func runScript(t *testing.T, client *bigquery.Client, dataset, sql string) (*bigquery.Job,
 	*bigquery.JobStatus, error) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	query := client.Query(sql)
 	query.DefaultDatasetID = dataset
 	job, err := query.Run(ctx)
@@ -82,7 +82,7 @@ func readRows(t *testing.T, rows *bigquery.RowIterator) [][]bigquery.Value {
 // Tests of dataset creation or metadata should create their datasets explicitly.
 func newDataset(t *testing.T, client *bigquery.Client, id string) *bigquery.Dataset {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	dataset := client.Dataset(id)
 	_ = dataset.DeleteWithContents(ctx)
 	if err := dataset.Create(ctx, nil); err != nil {
@@ -107,7 +107,7 @@ func newClientForProject(t *testing.T, project string) *bigquery.Client {
 	if endpoint == "" {
 		t.Skip("BQ_EMULATOR_API is not set; run just e2e")
 	}
-	client, err := bigquery.NewClient(context.Background(), project,
+	client, err := bigquery.NewClient(t.Context(), project,
 		option.WithEndpoint(endpoint), option.WithoutAuthentication())
 	if err != nil {
 		t.Fatalf("bigquery.NewClient: %v", err)

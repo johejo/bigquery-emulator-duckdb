@@ -20,7 +20,7 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 	if err != nil {
 		return nil, err
 	}
-	rows, err := job.Read(context.Background())
+	rows, err := job.Read(t.Context())
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 // routines.get and routines.list describe them.
 func TestPersistentSqlUdfs(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_routines")
 	run := func(sql string) error {
@@ -167,7 +167,7 @@ func TestPersistentSqlUdfs(t *testing.T) {
 	// A dataset with routines is still in use.
 	other := client.Dataset("go_routines_in_use")
 	_ = other.DeleteWithContents(ctx)
-	t.Cleanup(func() { _ = other.DeleteWithContents(ctx) })
+	t.Cleanup(func() { _ = other.DeleteWithContents(context.Background()) })
 	if err := other.Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 // documentation: https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
 func TestRoutineInsertUpdate(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newClient(t)
 	dataset := newDataset(t, client, "go_routine_api")
 	routine := dataset.Routine("f")
