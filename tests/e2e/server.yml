@@ -2,7 +2,7 @@ desc: server startup rejects invalid listeners, accepts bursts of connections an
 steps:
   server:
     exec:
-      command: go test -count=1 ./tests/e2e/server
+      command: bash tests/e2e/go-test.sh server -count=1 ./tests/e2e/server
     dump:
       expr: current.stdout + current.stderr
     test: current.exit_code == 0

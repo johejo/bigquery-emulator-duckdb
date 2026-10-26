@@ -2,5 +2,5 @@ desc: SESSION_USER configuration and rejection without an identity
 steps:
   configuration:
     exec:
-      command: go test -count=1 ./tests/e2e/session_user
+      command: bash tests/e2e/go-test.sh session_user -count=1 ./tests/e2e/session_user
     test: current.exit_code == 0
