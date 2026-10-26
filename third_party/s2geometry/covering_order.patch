@@ -1,0 +1,37 @@
+--- a/s2/s2region_coverer.h
++++ b/s2/s2region_coverer.h
+@@ -347,2 +347,32 @@
+-  typedef std::priority_queue<QueueEntry, std::vector<QueueEntry>,
+-                              CompareQueueEntries> CandidateQueue;
++  class CandidateQueue
++      : public std::priority_queue<QueueEntry, std::vector<QueueEntry>,
++                                   CompareQueueEntries> {
++   public:
++    // Equal priorities must be popped as libc++ pops them: choose the left
++    // child on a tie, and sift through the entire heap before replacing the
++    // final hole. std::priority_queue alone differs between standard libraries,
++    // producing different S2_COVERINGCELLIDS arrays for the same input.
++    void pop() {
++      if (this->c.size() > 1) {
++        const QueueEntry top = this->c.front();
++        const std::size_t length = this->c.size();
++        std::size_t hole = 0;
++        while (2 * hole + 1 < length) {
++          std::size_t child = 2 * hole + 1;
++          if (child + 1 < length && this->comp(this->c[child], this->c[child + 1])) {
++            ++child;
++          }
++          this->c[hole] = this->c[child];
++          hole = child;
++        }
++        if (hole == length - 1) {
++          this->c[hole] = top;
++        } else {
++          this->c[hole] = this->c.back();
++          this->c.back() = top;
++          std::push_heap(this->c.begin(), this->c.begin() + hole + 1, this->comp);
++        }
++      }
++      this->c.pop_back();
++    }
++  };

@@ -165,8 +165,20 @@ absl::StatusOr<std::string> SetOperation(const Arguments& args) {
 }
 
 absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
+  if (args.Bool(1) && args.Bool(2)) {
+    return absl::OutOfRangeError(
+        "ST_GeogFromText failed: Options planar and oriented are not compatible.");
+  }
+  if (args.Bool(1) && args.Bool(3)) {
+    return absl::OutOfRangeError(
+        "ST_GeogFromText failed: Options make_valid and oriented are not compatible.");
+  }
+  if (args.Bool(2) || args.Bool(3)) {
+    return absl::UnimplementedError(
+        "The emulator does not support ST_GEOGFROMTEXT with planar or make_valid set to TRUE");
+  }
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
-                             googlesql_geography::ReadWkt(args.String(0)));
+                             googlesql_geography::ReadWkt(args.String(0), args.Bool(1)));
   return EncodeGeography(geography);
 }
 
@@ -188,6 +200,22 @@ absl::StatusOr<std::string> GeogFromHexWkb(const Arguments& args) {
       googlesql_geography::ReadHexWkb(args.String(0), "ST_GeogFromWKBHex failed: ",
                                       /*oriented=*/false));
   return EncodeGeography(geography);
+}
+
+template <bool kHex>
+absl::StatusOr<std::string> GeogFromOrientedWkb(const Arguments& args) {
+  if (args.Bool(2) || args.Bool(3)) {
+    return absl::UnimplementedError(
+        "The emulator does not support ST_GEOGFROMWKB with planar or make_valid set to TRUE");
+  }
+  const auto geography =
+      kHex ? googlesql_geography::ReadHexWkb(args.String(0),
+                                             "ST_GeogFromWKBHex failed: ", args.Bool(1))
+           : googlesql_geography::ReadWkb(args.String(0), "ST_GeogFromWKB failed: ", args.Bool(1));
+  if (!geography.ok()) {
+    return geography.status();
+  }
+  return EncodeGeography(*geography);
 }
 
 // The encoded geography of `text` as googlesql_geography::ReadGeography reads it.
@@ -283,9 +311,10 @@ absl::StatusOr<std::string> MakeLine(const std::vector<std::string>& values) {
   return Encode(*result);
 }
 
-absl::StatusOr<std::string> MakePolygon(const std::vector<std::string>& values) {
+absl::StatusOr<std::string> MakePolygon(const std::vector<std::string>& values,
+                                        bool oriented = false) {
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<Geography> geographies, Decode(values));
-  auto result = googlesql_geography::MakePolygon(geographies);
+  auto result = googlesql_geography::MakePolygon(geographies, oriented);
   if (!result.ok()) {
     return result.status();
   }
@@ -472,8 +501,10 @@ const Definitions& GeographyDefinitions() {
         ->Scalar("bq_st_geogpoint", {kDouble, kDouble}, kGeography,
                  EachRow<Call<googlesql_geography::GeogPoint>>)
         .Call("ST_GEOGPOINT", 2);
-    definitions->Scalar("bq_st_geogfromtext", {kVarchar}, kGeography, EachRow<GeogFromText>)
-        .Call("ST_GEOGFROMTEXT", 1);
+    definitions
+        ->Scalar("bq_st_geogfromtext", {kVarchar, kBoolean, kBoolean, kBoolean}, kGeography,
+                 EachRow<GeogFromText>)
+        .Call("ST_GEOGFROMTEXT", {1, 4}, {"false", "false", "false"});
     definitions->Scalar("bq_st_geogfromgeojson", {kVarchar}, kGeography, EachRow<GeogFromGeoJson>)
         .Call("ST_GEOGFROMGEOJSON", 1);
     // ST_GEOGFROMWKB and ST_GEOGFROM read BYTES as WKB, and ST_GEOGFROMWKB reads a STRING as its
@@ -506,6 +537,32 @@ const Definitions& GeographyDefinitions() {
       auto& backend =
           definitions->Scalar("bq_st_geogfrom", {kVarchar}, kGeography, EachRow<GeogFrom>);
       backend.Sql("ST_GEOGFROM", of_type(backend, googlesql::TYPE_STRING));
+    }
+    {
+      auto& backend =
+          definitions->Scalar("bq_st_geogfromwkb_oriented", {kBlob, kBoolean, kBoolean, kBoolean},
+                              kGeography, EachRow<GeogFromOrientedWkb<false>>);
+      backend.Sql("ST_GEOGFROMWKB",
+                  {
+                      {
+                          .arity = 4,
+                          .spelling = backend.Invoke("$1, $2, $3, $4"),
+                          .conditions = {{.argument = 1, .types = {googlesql::TYPE_BYTES}}},
+                      },
+                  });
+    }
+    {
+      auto& backend = definitions->Scalar("bq_st_geogfromhexwkb_oriented",
+                                          {kVarchar, kBoolean, kBoolean, kBoolean}, kGeography,
+                                          EachRow<GeogFromOrientedWkb<true>>);
+      backend.Sql("ST_GEOGFROMWKB",
+                  {
+                      {
+                          .arity = 4,
+                          .spelling = backend.Invoke("$1, $2, $3, $4"),
+                          .conditions = {{.argument = 1, .types = {googlesql::TYPE_STRING}}},
+                      },
+                  });
     }
     definitions->Scalar("bq_geography_input", {kVarchar}, kGeography, EachRow<GeographyInput>);
     definitions->Scalar("bq_parquet_geography_input", {kVarchar}, kGeography,
@@ -763,6 +820,27 @@ const Definitions& GeographyDefinitions() {
                   });
     }
     {
+      auto& backend = definitions->Custom(
+          "bq_st_makepolygonoriented",
+          [](duckdb_connection connection, const char* name, const Options& /*options*/) {
+            const LogicalType geography(duckdb_create_logical_type(kGeography));
+            const LogicalType list(duckdb_create_list_type(geography.get()));
+            Register(connection, name, {list.get()}, geography.get(),
+                     EachRow<[](const Arguments& args) {
+                       return MakePolygon(args.Strings(0), /*oriented=*/true);
+                     }>);
+          });
+      backend.Sql(
+          "ST_MAKEPOLYGONORIENTED",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "CASE WHEN len($1) = 0 OR list_count($1) <> len($1) THEN NULL ELSE " +
+                              backend.Invoke("$1") + " END",
+              },
+          });
+    }
+    {
       auto& backend = definitions->Custom("bq_st_dump", [](duckdb_connection connection,
                                                            const char* name,
                                                            const Options& /*options*/) {
@@ -800,6 +878,33 @@ const Definitions& GeographyDefinitions() {
         ->Scalar("bq_s2_cellidfrompoint", {kGeography, kBigint}, kBigint,
                  EachRow<Call<googlesql_geography::CellIdFromPoint>>)
         .Call("S2_CELLIDFROMPOINT", {1, 2}, {"30"});
+    definitions
+        ->Custom("bq_s2_coveringcellids",
+                 [](duckdb_connection connection, const char* name, const Options& /*options*/) {
+                   const LogicalType geography(duckdb_create_logical_type(kGeography));
+                   const LogicalType bigint(duckdb_create_logical_type(kBigint));
+                   const LogicalType number(duckdb_create_logical_type(kDouble));
+                   const LogicalType list(duckdb_create_list_type(bigint.get()));
+                   Register(connection, name,
+                            std::vector<duckdb_logical_type>{
+                                geography.get(),
+                                bigint.get(),
+                                bigint.get(),
+                                bigint.get(),
+                                number.get(),
+                            },
+                            list.get(), EachRow<Call<googlesql_geography::CoveringCellIds>>);
+                 })
+        .Sql(
+            "S2_COVERINGCELLIDS",
+            {
+                {
+                    .arity = {1, 5},
+                    .spelling = "coalesce(bq_s2_coveringcellids($1, $2, $3, $4, $5), []::BIGINT[])",
+                    .defaults = {"0", "30", "8", "0.0"},
+                },
+            },
+            {TypeUse::kRejectsSafe});
     definitions->Custom("bq_st_boundingbox", RegisterBounds<false>).Call("ST_BOUNDINGBOX", 1);
     // The aggregates' finishes, over the non-NULL values that list() collects.
     definitions->Custom(kCentroidAggregate, [](duckdb_connection connection, const char* name,

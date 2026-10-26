@@ -1,0 +1,86 @@
+# BigQuery's documented examples and answers obtained with tools/bqanswers.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(-122, 47), min_level => 12)
+=> [{"v":"6093613931972369317"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('LINESTRING(-122.12 47.67, -122.19 47.69)'), min_level => 12)
+=> [{"v":"6093384954555662336"},{"v":"6093390709811838976"},{"v":"6093390735581642752"},{"v":"6093390740145045504"},{"v":"6093390791416217600"},{"v":"6093390812891054080"},{"v":"6093390817187069952"},{"v":"6093496378892222464"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(0, 0))
+=> [{"v":"1152921504606846977"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(-90, 0))
+=> [{"v":"-8070450532247928831"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(0, 90), min_level => 4, max_level => 4)
+=> [{"v":"5769111122661605376"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => 0, max_level => 0, max_cells => 1)
+=> [{"v":"1152921504606846976"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'))
+=> [{"v":"384307168202282325"},{"v":"1152921504606846975"},{"v":"1152939096792891392"},{"v":"1152991873349976064"},{"v":"1153009465537069056"},{"v":"1153273348327735296"},{"v":"1153390629569429504"},{"v":"1921535841011411627"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> [{"v":"384307168202282325"},{"v":"1152428923397603328"},{"v":"1152851135862669312"},{"v":"1152991873351024640"},{"v":"1153132610839379968"},{"v":"1153414085816090624"},{"v":"1921418559771115520"},{"v":"1921559297259470848"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(9 9), LINESTRING(0 0, 1 1))'), min_level => 4, max_level => 8, max_cells => 3)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: covering exceeded max_cells argument of 3. Consider reducing `min_level` or increasing `max_cells`. Error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('POINT EMPTY'))
+=> []
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('fullglobe'))
+=> [{"v":"1152921504606846976"},{"v":"3458764513820540928"},{"v":"5764607523034234880"},{"v":"8070450532247928832"},{"v":"-8070450532247928832"},{"v":"-5764607523034234880"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE), max_level => 3)
+=> [{"v":"1152921504606846976"},{"v":"3458764513820540928"},{"v":"5764607523034234880"},{"v":"8070450532247928832"},{"v":"-8070450532247928832"},{"v":"-5764607523034234880"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), buffer => 1000)
+=> [{"v":"1153886898633048064"},{"v":"1153886927355641856"},{"v":"1153886961715380224"},{"v":"1153886996075118592"},{"v":"1153887030434856960"},{"v":"1153887133514072064"},{"v":"1153887154988908544"},{"v":"1153887339672502272"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'), buffer => 1000, max_cells => 4)
+=> [{"v":"384307162475659264"},{"v":"1152921435887370240"},{"v":"1153202979583557632"},{"v":"1921535863917903872"}]
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGFROMTEXT('POINT EMPTY'), buffer => 1000)
+=> []
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), buffer => -1)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: buffer_meters should be nonnegative. Error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), buffer => CAST('NaN' AS FLOAT64))
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: buffer_meters should be nonnegative. Error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), buffer => CAST('+inf' AS FLOAT64))
+=> error: S2_CoveringCellIDs: buffer_meters must be set to less than half the circumference of the earth. Error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(CAST(NULL AS GEOGRAPHY))
+=> []
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => NULL)
+=> []
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), buffer => NULL)
+=> []
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => -1)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: min_level must be nonnegative; error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_level => 31)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: max_level is above maximum possible allowed value of 30; error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => 10, max_level => 9)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: min_level should be less than or equal to max_level; error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_cells => 0)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: max_cells should at least be specified to be at least one cell; error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_cells => -1)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: max_cells should at least be specified to be at least one cell; error in S2_COVERINGCELLIDS expression
+
+SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => 5, max_level => 5, max_cells => 1, buffer => 1000000)
+=> error: S2_CoveringCellIDs: GetS2CellCovering failed: covering exceeded max_cells argument of 1. Consider reducing `min_level` or increasing `max_cells`. Error in S2_COVERINGCELLIDS expression
+
+SELECT SAFE.S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_level => 31)
+=> error: SAFE with function s2_coveringcellids is not supported.
