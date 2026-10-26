@@ -572,7 +572,7 @@ std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>
       std::vector<std::string> columns;
       // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted, as
       // are a RANGE, which has no text form in DuckDB, and an INTERVAL, whose text form differs.
-      // A GEOGRAPHY is read from its WKT, as in the other formats.
+      // A GEOGRAPHY is read from its text, as in the other formats.
       std::vector<std::string> conversions;
       for (const FieldSchema& field : schema) {
         const bool big = field.type == FieldType::kBigNumeric;
@@ -631,7 +631,7 @@ std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>
           StoredValue(is_parquet
                           ? ParquetValue(name, TextGeographies(field), parquet.Child(field.name), 0)
                           : JsonValue(name, TextGeographies(field)),
-                      field),
+                      field, is_parquet),
           name));
     }
     sql = std::format("SELECT {} FROM ({}) AS source", Join(columns, ", "), sql);

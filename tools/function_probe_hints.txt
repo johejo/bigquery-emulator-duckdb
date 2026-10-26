@@ -110,6 +110,10 @@ values geogfrom_text | 'POINT(3 5)' | '{"type": "Point", "coordinates": [3, 5]}'
 elements ^ST_GEOGFROM\( | geogfrom_text | STRING
 argument ^ST_GEOGFROM\( | BYTES | FROM_HEX('010100000000000000000000400000000000001040')
 note ST_GEOGFROMGEOJSON See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
+values wkb_text | '010100000000000000000000400000000000001040' | '010700000000000000' | '010200000002000000feffffffffffef3f000000000000f03f01000000000008400000000000000040'
+elements ^ST_GEOGFROMWKB\( | wkb_text | STRING
+argument ^ST_GEOGFROMWKB\( | BYTES | FROM_HEX('010100000000000000000000400000000000001040')
+note ST_GEOGFROMWKB See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
 # BigQuery also measures nonempty points over the spheroid, which the emulator rejects.
 longest ^ST_DISTANCE\(

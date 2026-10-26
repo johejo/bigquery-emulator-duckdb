@@ -190,17 +190,17 @@ BigQuery loads as NULL.
 
 ### GEOGRAPHY values
 
-Loads and `tabledata.insertAll` take GEOGRAPHY values as WKT or GeoJSON, and `ST_GEOGFROM` takes
-them as a STRING; WKB is unsupported. Query parameters take only WKT. Query parameters, loads and
-`tabledata.insertAll` take a WKT polygon only where its shell runs counterclockwise and its holes
-clockwise, since BigQuery takes the region on the left of each ring. Additional limits are:
+Loads and `tabledata.insertAll` take GEOGRAPHY values as WKT, GeoJSON or hex-encoded WKB, and
+Parquet loads also take binary WKB. Query parameters take only WKT. Query parameters, loads and
+`tabledata.insertAll` take a WKT or WKB polygon only where its shell runs counterclockwise and its
+holes clockwise, since BigQuery takes the region on the left of each ring. Additional limits are:
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
 - `ST_ASGEOJSON` is unsupported for shapes that cross the antimeridian or touch a pole.
 - Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
   holes that collapse are unsupported.
-- `ST_GEOGFROMTEXT`'s `oriented`, `planar` and `make_valid` arguments are unsupported, as is
-  `ST_GEOGFROMGEOJSON`'s `make_valid`.
+- `ST_GEOGFROMTEXT`'s and `ST_GEOGFROMWKB`'s `oriented`, `planar` and `make_valid` arguments are
+  unsupported, as is `ST_GEOGFROMGEOJSON`'s `make_valid`.
 - GeoJSON polygons with an edge along a pole, such as `ST_ASGEOJSON`'s full polygon, are
   unsupported.
 

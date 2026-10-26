@@ -37,8 +37,9 @@ std::string CheckedWriteValue(const std::string& sql, const FieldSchema& field,
                               bool assignment = false);
 
 // The DuckDB value `sql` of `field`, as a load reads it, with each GEOGRAPHY in it, at any depth,
-// read from its WKT into the form a table stores it in, which is the one queries hold.
-std::string StoredValue(const std::string& sql, const FieldSchema& field);
+// read from its text into the form a table stores it in, which is the one queries hold. With
+// `parquet`, a GEOGRAPHY may also be the text DuckDB casts a binary column's WKB to.
+std::string StoredValue(const std::string& sql, const FieldSchema& field, bool parquet = false);
 
 // The select list of a table of `schema`, with each GEOGRAPHY, at any depth, as the WKT that
 // tabledata.list and query results return; `*` when it has none. When `selected` is set,

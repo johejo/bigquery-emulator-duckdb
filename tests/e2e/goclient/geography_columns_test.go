@@ -3,6 +3,7 @@ package goclient
 import (
 	"cmp"
 	"context"
+	"encoding/hex"
 	"errors"
 	"reflect"
 	"slices"
@@ -10,6 +11,9 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
 	"google.golang.org/api/iterator"
 )
 
@@ -17,7 +21,15 @@ import (
 const fullGeographyWkt = "GEOMETRYCOLLECTION(POLYGON((0 0, 120 0, -120 0, 0 0)), " +
 	"POLYGON((0 0, -120 0, 120 0, 0 0)))"
 
-// A table with GEOGRAPHY columns, also REPEATED and in a RECORD, takes WKT and GeoJSON from
+// The WKB of POINT(2 4), from ST_GEOGFROM's documentation, and of POLYGON((0 0, 0 1, 1 0, 0 0)),
+// whose shell runs clockwise.
+const (
+	pointWkb     = "010100000000000000000000400000000000001040"
+	clockwiseWkb = "01030000000100000004000000000000000000000000000000000000000000000000000000000000000000f03f" +
+		"000000000000f03f000000000000000000000000000000000000000000000000"
+)
+
+// A table with GEOGRAPHY columns, also REPEATED and in a RECORD, takes WKT, GeoJSON and WKB from
 // tabledata.insertAll and loads, and GEOGRAPHY values from queries and DML. tabledata.list
 // returns each as WKT, and queries read the columns as GEOGRAPHY. The WKT and coordinates are
 // those of scalars/geography.txt and scalars/geography_linestring.txt.
@@ -66,15 +78,24 @@ func TestGeographyColumns(t *testing.T) {
 		t.Fatalf("invalid rows: %v, want an error for each, for a clockwise shell", err)
 	}
 
-	// Both also take GeoJSON geometries:
+	// Both also take GeoJSON geometries and hex-encoded WKB, whose polygons are oriented as WKT's
+	// are; POINT(2 4) is ST_GEOGFROM's example:
 	// https://cloud.google.com/bigquery/docs/geospatial-data#loading_data
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom
 	if err := inserter.Put(ctx, []*bigquery.ValuesSaver{
 		row(int64(3), `{"type": "Point", "coordinates": [1, 2]}`, nil, nil),
+		row(int64(13), pointWkb, nil, nil),
 	}); err != nil {
 		t.Fatal(err)
 	}
+	err = inserter.Put(ctx, []*bigquery.ValuesSaver{row(int64(8), clockwiseWkb, nil, nil)})
+	if !errors.As(err, &rowErrors) || len(rowErrors) != 1 ||
+		!strings.Contains(rowErrors[0].Error(), "whose shell runs clockwise") {
+		t.Fatalf("clockwise WKB: %v, want an error for a clockwise shell", err)
+	}
 	if err := p.load("places", `{"id": 4, "g": "POINT(5 6)", "r": {"g": null}}`+"\n"+
-		`{"id": 12, "g": "{\"type\": \"Point\", \"coordinates\": [3, 4]}"}`+"\n", schema,
+		`{"id": 12, "g": "{\"type\": \"Point\", \"coordinates\": [3, 4]}"}`+"\n"+
+		`{"id": 14, "g": "`+pointWkb+`"}`+"\n", schema,
 		bigquery.WriteAppend); err != nil {
 		t.Fatal(err)
 	}
@@ -106,6 +127,8 @@ func TestGeographyColumns(t *testing.T) {
 		{int64(5), "POINT(170 10)", empty, nil},
 		{int64(6), "POINT(12 13)", []bigquery.Value{"POINT(5 6)"}, nil},
 		{int64(12), "POINT(3 4)", empty, nil},
+		{int64(13), "POINT(2 4)", empty, nil},
+		{int64(14), "POINT(2 4)", empty, nil},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tabledata.list = %v, want %v", got, want)
@@ -154,5 +177,56 @@ func TestGeographyColumns(t *testing.T) {
 	if got, want := p.read(`SELECT ST_ISCLOSED(gs[OFFSET(0)]), ST_ISCLOSED(r.g)
 		FROM places WHERE id = 9`), [][]bigquery.Value{{true, true}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("nested full polygons = %v, want %v", got, want)
+	}
+}
+
+// A Parquet load reads a binary column as WKB into a GEOGRAPHY field, also REPEATED:
+// https://cloud.google.com/bigquery/docs/geospatial-data#loading_data
+func TestGeographyParquetWkb(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_geography_parquet_wkb")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+
+	point, err := hex.DecodeString(pointWkb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	allocator := memory.NewGoAllocator()
+	ids := array.NewInt64Builder(allocator)
+	ids.AppendValues([]int64{1, 2}, nil)
+	values := array.NewBinaryBuilder(allocator, arrow.BinaryTypes.Binary)
+	values.Append(point)
+	values.AppendNull()
+	lists := array.NewListBuilder(allocator, arrow.BinaryTypes.Binary)
+	elements := lists.ValueBuilder().(*array.BinaryBuilder)
+	lists.Append(true)
+	elements.Append(point)
+	lists.Append(true)
+	source := writeParquet(t, []arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "g", Type: arrow.BinaryTypes.Binary, Nullable: true},
+		{Name: "gs", Type: arrow.ListOf(arrow.BinaryTypes.Binary), Nullable: true},
+	}, []arrow.Array{ids.NewArray(), values.NewArray(), lists.NewArray()})
+	schema := bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType},
+		{Name: "g", Type: bigquery.GeographyFieldType},
+		{Name: "gs", Type: bigquery.GeographyFieldType, Repeated: true},
+	}
+	if err := loadParquet(ctx, dataset.Table("places"), source, schema); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p := creationPaths{t: t, client: client, dataset: dataset}
+	if got, want := p.read(`SELECT id, ST_ASTEXT(g), ARRAY(SELECT ST_ASTEXT(e) FROM UNNEST(gs) AS e)
+		FROM places ORDER BY id`), [][]bigquery.Value{
+		{int64(1), "POINT(2 4)", []bigquery.Value{"POINT(2 4)"}},
+		{int64(2), nil, []bigquery.Value(nil)},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("loaded = %v, want %v", got, want)
 	}
 }

@@ -18,6 +18,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/escaping.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/type.pb.h"
@@ -32,6 +33,7 @@
 #include "src/googlesql_geography/geojson.h"
 #include "src/googlesql_geography/options.h"
 #include "src/googlesql_geography/value.h"
+#include "src/googlesql_geography/wkb.h"
 #include "src/googlesql_geography/wkt.h"
 #include "src/googlesql_geography_duckdb/codec.h"
 #include "src/googlesql_geography_duckdb/functions.h"
@@ -169,33 +171,117 @@ absl::StatusOr<std::string> GeogFromGeoJson(const Arguments& args) {
   return EncodeGeography(geography);
 }
 
+absl::StatusOr<std::string> GeogFromWkb(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
+                             googlesql_geography::ReadWkb(args.String(0)));
+  return EncodeGeography(geography);
+}
+
+// The geography of hex-encoded WKB, whose odd first digit BigQuery reads as a byte of its own.
+absl::StatusOr<Geography> ReadHexWkb(std::string_view text, std::string_view failed,
+                                     bool oriented) {
+  const auto* const invalid =
+      std::ranges::find_if(text, [](unsigned char c) { return std::isxdigit(c) == 0; });
+  std::string bytes;
+  if (invalid != text.end() ||
+      !absl::HexStringToBytes((text.size() % 2 == 0 ? "" : "0") + std::string(text), &bytes)) {
+    return absl::OutOfRangeError(
+        std::string(failed) +
+        "Failed to decode invalid hexadecimal string due to character at offset " +
+        std::to_string(invalid - text.begin()) + ": " + std::string(text));
+  }
+  return googlesql_geography::ReadWkb(bytes, failed, oriented);
+}
+
+absl::StatusOr<std::string> GeogFromHexWkb(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Geography geography,
+      ReadHexWkb(args.String(0), "ST_GeogFromWKBHex failed: ", /*oriented=*/false));
+  return EncodeGeography(geography);
+}
+
+// The fewest hex digits ST_GEOGFROM reads as WKB, those of its byte order and type.
+constexpr size_t kWkbHeaderDigits = 10;
+
 // The geography of `text` as ST_GEOGFROM reads a STRING, and loads and tabledata.insertAll with
-// `oriented` WKT: GeoJSON where it starts with '{', and WKT otherwise. BigQuery also takes WKB,
-// hex-encoded or, from Parquet, binary, which DuckDB casts to text that starts with the escape of
-// its first byte; these are unsupported.
-absl::StatusOr<std::string> ReadGeography(const std::string& text, bool oriented) {
+// `oriented` WKT and WKB: GeoJSON where it starts with '{', hex-encoded WKB where it has only hex
+// digits, enough for a WKB header, and starts with a byte order, and WKT otherwise. `failed`
+// prefixes WKT and WKB errors.
+absl::StatusOr<std::string> ReadGeography(const std::string& text, bool oriented,
+                                          std::string_view failed) {
   const size_t start = text.find_first_not_of(" \t\r\n");
   if (start != std::string::npos && text.at(start) == '{') {
     GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, googlesql_geography::ReadGeoJson(text));
     return EncodeGeography(geography);
   }
-  if (text.starts_with("\\x") || (!text.empty() && std::ranges::all_of(text, [](unsigned char c) {
-        return std::isxdigit(c) != 0;
-      }))) {
-    return absl::UnimplementedError("The emulator does not support WKB GEOGRAPHY values");
+  if (text.size() >= kWkbHeaderDigits && (text.starts_with("00") || text.starts_with("01")) &&
+      std::ranges::all_of(text, [](unsigned char c) { return std::isxdigit(c) != 0; })) {
+    GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ReadHexWkb(text, failed, oriented));
+    return EncodeGeography(geography);
   }
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
-                             googlesql_geography::ReadWkt(text, oriented));
+                             googlesql_geography::ReadWkt(text, oriented, failed));
+  return EncodeGeography(geography);
+}
+
+constexpr std::string_view kGeogFromFailed = "ST_GeogFrom failed: ";
+
+// ST_GEOGFROM fails on an empty STRING or BYTES before it reads either.
+absl::Status Missing() {
+  return absl::OutOfRangeError(std::string(kGeogFromFailed) + "Geography value is missing");
+}
+
+// ST_GEOGFROM of BYTES, which BigQuery reads as WKB.
+absl::StatusOr<std::string> GeogFromBytes(const Arguments& args) {
+  const std::string bytes = args.String(0);
+  if (bytes.empty()) {
+    return Missing();
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
+                             googlesql_geography::ReadWkb(bytes, kGeogFromFailed));
   return EncodeGeography(geography);
 }
 
 absl::StatusOr<std::string> GeogFrom(const Arguments& args) {
-  return ReadGeography(args.String(0), /*oriented=*/false);
+  const std::string text = args.String(0);
+  if (text.empty()) {
+    return Missing();
+  }
+  return ReadGeography(text, /*oriented=*/false, kGeogFromFailed);
 }
 
-// A GEOGRAPHY that a load or tabledata.insertAll writes, whose WKT polygons are oriented.
+// A GEOGRAPHY that a load or tabledata.insertAll writes, whose WKT and WKB polygons are oriented.
+constexpr std::string_view kInputFailed = "ST_GeogFromText failed: ";
+
 absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
-  return ReadGeography(args.String(0), /*oriented=*/true);
+  return ReadGeography(args.String(0), /*oriented=*/true, kInputFailed);
+}
+
+// A GEOGRAPHY that a Parquet load writes, as GeographyInput takes it, except that a binary column
+// holds WKB, which DuckDB casts to text that escapes as \xHH each byte it does not print, as it
+// does the first byte of any WKB.
+absl::StatusOr<std::string> ParquetGeographyInput(const Arguments& args) {
+  const std::string text = args.String(0);
+  if (!text.starts_with("\\x")) {
+    return ReadGeography(text, /*oriented=*/true, kInputFailed);
+  }
+  std::string bytes;
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (text.at(i) == '\\' && i + 3 < text.size() && text.at(i + 1) == 'x') {
+      std::string byte;
+      if (!absl::HexStringToBytes(std::string_view(text).substr(i + 2, 2), &byte)) {
+        return absl::InvalidArgumentError("Invalid escaped BLOB text: " + text);
+      }
+      bytes += byte;
+      i += 3;
+    } else {
+      bytes.push_back(text.at(i));
+    }
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
+                             googlesql_geography::ReadWkb(bytes, "ST_GeogFromWKB failed: ",
+                                                          /*oriented=*/true));
+  return EncodeGeography(geography);
 }
 
 absl::StatusOr<std::optional<std::string>> UnionGeographies(
@@ -416,17 +502,40 @@ const Definitions& GeographyDefinitions() {
         .Call("ST_GEOGFROMTEXT", 1);
     definitions->Scalar("bq_st_geogfromgeojson", {kVarchar}, kGeography, EachRow<GeogFromGeoJson>)
         .Call("ST_GEOGFROMGEOJSON", 1);
-    // BYTES, which BigQuery reads as WKB, is unsupported.
-    definitions->Scalar("bq_st_geogfrom", {kVarchar}, kGeography, EachRow<GeogFrom>)
-        .Sql("ST_GEOGFROM",
-             {
-                 {
-                     .arity = 1,
-                     .spelling = "bq_st_geogfrom($1)",
-                     .conditions = {{.argument = 1, .types = {googlesql::TYPE_STRING}}},
-                 },
-             });
+    // ST_GEOGFROMWKB and ST_GEOGFROM read BYTES as WKB, and ST_GEOGFROMWKB reads a STRING as its
+    // hex and ST_GEOGFROM as WKT, GeoJSON or hex WKB.
+    const auto of_type = [](const BackendDefinition& backend, googlesql::TypeKind type) {
+      return std::vector<Rule>{
+          {
+              .arity = 1,
+              .spelling = backend.Invoke("$1"),
+              .conditions = {{.argument = 1, .types = {type}}},
+          },
+      };
+    };
+    {
+      auto& backend =
+          definitions->Scalar("bq_st_geogfromwkb", {kBlob}, kGeography, EachRow<GeogFromWkb>);
+      backend.Sql("ST_GEOGFROMWKB", of_type(backend, googlesql::TYPE_BYTES));
+    }
+    {
+      auto& backend =
+          definitions->Scalar("bq_st_geogfrombytes", {kBlob}, kGeography, EachRow<GeogFromBytes>);
+      backend.Sql("ST_GEOGFROM", of_type(backend, googlesql::TYPE_BYTES));
+    }
+    {
+      auto& backend = definitions->Scalar("bq_st_geogfromhexwkb", {kVarchar}, kGeography,
+                                          EachRow<GeogFromHexWkb>);
+      backend.Sql("ST_GEOGFROMWKB", of_type(backend, googlesql::TYPE_STRING));
+    }
+    {
+      auto& backend =
+          definitions->Scalar("bq_st_geogfrom", {kVarchar}, kGeography, EachRow<GeogFrom>);
+      backend.Sql("ST_GEOGFROM", of_type(backend, googlesql::TYPE_STRING));
+    }
     definitions->Scalar("bq_geography_input", {kVarchar}, kGeography, EachRow<GeographyInput>);
+    definitions->Scalar("bq_parquet_geography_input", {kVarchar}, kGeography,
+                        EachRow<ParquetGeographyInput>);
     definitions
         ->Scalar("bq_st_geogpointfromgeohash", {kVarchar}, kGeography,
                  EachRow<Call<googlesql_geography::PointFromGeohash>>)
@@ -437,6 +546,10 @@ const Definitions& GeographyDefinitions() {
                    return googlesql_geography::Wkt(geography);
                  }>>)
         .Call("ST_ASTEXT", 1);
+    definitions
+        ->Scalar("bq_st_asbinary", {kGeography}, kBlob,
+                 EachRow<OfGeography<googlesql_geography::Wkb>>)
+        .Call("ST_ASBINARY", 1);
     definitions
         ->Scalar("bq_st_asgeojson", {kGeography}, kVarchar,
                  EachRow<Call<googlesql_geography::AsGeoJson>>)

@@ -14,7 +14,8 @@ namespace googlesql_geography {
 // must have four or more vertices and end where they start. With `oriented`, as loads and query
 // parameters read WKT, a polygon's interior lies to the left of its rings; the emulator
 // takes only polygons with a counterclockwise shell and clockwise holes, which enclose the regions
-// it builds.
-absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented = false);
+// it builds. `failed` prefixes the errors.
+absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented = false,
+                                  std::string_view failed = "ST_GeogFromText failed: ");
 
 }  // namespace googlesql_geography
