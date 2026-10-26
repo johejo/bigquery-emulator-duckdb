@@ -21,6 +21,7 @@ func TestQueryErrors(t *testing.T) {
 				t.Fatalf("%s:%d: expected => error: or => error contains:", c.path, c.line)
 			}
 			t.Run(fmt.Sprintf("%s:%d", filepath.Base(c.path), c.line), func(t *testing.T) {
+				t.Parallel()
 				if filepath.Base(path) == "external_query_spanner.txt" && os.Getenv("E2E_SPANNER_DATABASE") == "" {
 					t.Skip("Spanner emulator is unavailable on this platform; set SPANNER_EMULATOR_HOST and E2E_SPANNER_DATABASE")
 				}
