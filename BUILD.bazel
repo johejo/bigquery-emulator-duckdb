@@ -1197,16 +1197,18 @@ genrule(
     cmd = "echo 'inline constexpr char kPythonRuntime[] = \"$(rlocationpath @python_3_11//:python3)\";' > $@",
 )
 
-cc_binary(
-    name = "python_udf_worker",
+cc_library(
+    name = "python_worker",
     srcs = [
         "src/python_worker.cc",
         ":python_runtime_path",
     ],
+    hdrs = ["src/python_worker.h"],
     data = [
         "@python_3_11//:files",
         "@python_3_11//:python3",
     ],
+    linkstatic = True,
     deps = [
         "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
@@ -1232,6 +1234,7 @@ cc_binary(
         ":emulator",
         ":external_query",
         ":project",
+        ":python_worker",
         ":server",
         ":shell",
         "//src/googlesql_geography",

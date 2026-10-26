@@ -1,4 +1,6 @@
-// Only this executable links libpython. The emulator never initializes an interpreter.
+// Only the internal worker mode initializes an interpreter.
+#include "src/python_worker.h"
+
 #include <Python.h>  // IWYU pragma: keep
 #include <fcntl.h>
 #ifndef __APPLE__
@@ -11,6 +13,10 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#ifndef __APPLE__
+#include <fstream>
+#include <limits>
+#endif
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -292,7 +298,22 @@ int Run(int argc, char** argv) {
 #ifndef __APPLE__
   // macOS enforces its resident-memory limit in the parent instead.
   const rlim_t memory = std::stoull(argv[1]);
-  const rlimit limit{.rlim_cur = memory, .rlim_max = memory};
+  rlim_t pages = 0;
+  {
+    std::ifstream usage("/proc/self/statm");
+    if (!(usage >> pages)) {
+      throw std::runtime_error("Cannot read Python worker address space usage");
+    }
+  }
+  const auto page_size = sysconf(_SC_PAGESIZE);
+  if (page_size <= 0 ||
+      pages > (std::numeric_limits<rlim_t>::max() - memory) / static_cast<rlim_t>(page_size)) {
+    throw std::runtime_error("Invalid Python worker address space limit");
+  }
+  // Re-exec maps the entire emulator, including code Python never calls. Budget
+  // additional address space above those startup mappings, before Python initializes.
+  const rlim_t ceiling = (pages * static_cast<rlim_t>(page_size)) + memory;
+  const rlimit limit{.rlim_cur = ceiling, .rlim_max = ceiling};
   if (setrlimit(RLIMIT_AS, &limit) != 0) {
     throw std::runtime_error("Cannot set Python worker memory limit");
   }
@@ -337,7 +358,7 @@ int Run(int argc, char** argv) {
 }
 }  // namespace
 
-int main(int argc, char** argv) {
+int bigquery_emulator_duckdb::PythonWorkerMain(int argc, char** argv) {
   try {
     return Run(argc, argv);
   } catch (const std::exception& error) {

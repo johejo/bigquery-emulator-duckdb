@@ -232,8 +232,10 @@ calls typed `bq_py_*` scalar functions. Each DuckDB local function state starts 
 reuses its compiled functions across rows, and destroys it at query cleanup. Independent
 execution states use separate processes and Python globals.
 
-The `python_udf_worker` executable links the rules_python CPython 3.11 runtime; the main
-emulator does not link or initialize libpython. The worker uses the CPython C API for compilation,
+The emulator links the rules_python CPython 3.11 runtime and re-executes itself with
+the `internal-python-worker` subcommand for each worker. Only this internal mode initializes libpython,
+before any server or DuckDB initialization. An explicit `--python-worker` still starts an
+external executable with the memory limit as its only argument. The worker uses the CPython C API for compilation,
 argument conversion and calls. A private Unix socket carries newline-delimited JSON batches,
 with hex for BYTES and strings for floating-point values so nonfinite values survive transport.
 Definitions and argument schemas are sent once per worker, then referenced by worker-local IDs.
@@ -244,5 +246,7 @@ acknowledges each completed scalar call; the parent renews the call deadline on 
 requiring a round trip before the next row. An error stops the batch and fails the query.
 Standard input, output and error point to the null device, separately from the protocol socket.
 The parent polls nonblocking I/O against a call deadline and kills the worker process group on cleanup, then
-waits for its child. On Linux, address space limits apply before Python initializes. On macOS,
+waits for its child. On Linux, the worker reads its initial address space from `/proc/self/statm`
+and sets `RLIMIT_AS` to that baseline plus the configured budget before Python initializes.
+This excludes the emulator executable and its startup mappings from the budget. On macOS,
 where Darwin rejects `RLIMIT_AS`, the parent samples the worker's resident memory while polling.

@@ -17,7 +17,6 @@ cc_library(
     srcs = ["worker.cc"],
     hdrs = ["worker.h"],
     copts = ["-std=c++20"],
-    data = ["//:python_udf_worker"],
     implementation_deps = ["@rules_cc//cc/runfiles"],
     linkstatic = True,
     deps = [

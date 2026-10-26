@@ -20,6 +20,7 @@
 #include "src/external_query.h"
 #include "src/googlesql_geography/options.h"
 #include "src/project.h"
+#include "src/python_worker.h"
 #include "src/server.h"
 #include "src/shell.h"
 #include "src/shell/format.h"
@@ -44,7 +45,7 @@ void PrintUsage() {
          "                              300000)\n"
          "  --javascript-memory-mib MIB  How much memory JavaScript UDF calls may allocate per\n"
          "                               query on each thread (default: 256)\n"
-         "  --python-worker PATH  Override the bundled libpython worker executable\n"
+         "  --python-worker PATH  Override the Python worker with an external executable\n"
          "  --python-timeout-ms MS  Python UDF call timeout, including worker startup (default: "
          "300000)\n"
          "  --python-memory-mib MIB  Python worker memory limit (default: 256)\n"
@@ -241,6 +242,14 @@ int Run(int argc, char* const* argv) {
 // Everything lives in Run() so that nothing, including building the default ServerOptions,
 // can throw out of main().
 int main(int argc, char** argv) {
+  if (argc > 1 && std::string_view(argv[1]) == "internal-python-worker") {
+    // Keep argv[0] for runtime discovery, and retain the external worker's memory argument.
+    if (argc != 3) {
+      return 2;
+    }
+    char* worker_argv[] = {argv[0], argv[2], nullptr};
+    return bigquery_emulator_duckdb::PythonWorkerMain(2, worker_argv);
+  }
   try {
     return Run(argc, argv);
   } catch (const std::exception& error) {
