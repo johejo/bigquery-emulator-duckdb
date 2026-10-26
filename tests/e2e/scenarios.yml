@@ -2,7 +2,7 @@ desc: API scenarios compare selected observations with explicit compatibility ex
 steps:
   scenarios:
     exec:
-      command: go test -count=1 ./tests/e2e/scenarios
+      command: bash tests/e2e/go-test.sh scenarios -count=1 ./tests/e2e/scenarios
     dump:
       expr: current.stdout + current.stderr
     test: current.exit_code == 0

@@ -2,7 +2,7 @@ desc: JavaScript UDF time and memory limits set by flags, and rejection of inval
 steps:
   limits:
     exec:
-      command: go test -count=1 ./tests/e2e/javascript_limits
+      command: bash tests/e2e/go-test.sh javascript_limits -count=1 ./tests/e2e/javascript_limits
     dump:
       expr: current.stdout + current.stderr
     test: current.exit_code == 0

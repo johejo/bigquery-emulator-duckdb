@@ -2,7 +2,7 @@ desc: GCS loads honor endpoint configuration, anonymous emulator access, permiss
 steps:
   gcs_client:
     exec:
-      command: go test -count=1 ./tests/e2e/gcsclient
+      command: bash tests/e2e/go-test.sh gcsclient -count=1 ./tests/e2e/gcsclient
     dump:
       expr: current.stdout + current.stderr
     test: current.exit_code == 0

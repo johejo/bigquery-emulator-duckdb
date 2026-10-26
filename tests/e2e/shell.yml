@@ -217,7 +217,7 @@ steps:
   # runn cannot give the shell a terminal, so a Go test drives it through a pty.
   terminal:
     exec:
-      command: go test -count=1 ./tests/e2e/shell
+      command: bash tests/e2e/go-test.sh shell -count=1 ./tests/e2e/shell
     dump:
       expr: current.stdout + current.stderr
     test: current.exit_code == 0
