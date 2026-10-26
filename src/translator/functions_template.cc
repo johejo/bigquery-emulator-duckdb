@@ -713,6 +713,57 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       "CAST('100000000000000000000000000000000000000' AS BIGNUM)",
   };
   static constexpr std::string_view kSequenceErrors[] = {"'Sequence step cannot be 0.'"};
+  static constexpr googlesql::TypeKind kDateTypes[] = {TYPE_DATE};
+  static constexpr googlesql::TypeKind kDatetimeTypes[] = {TYPE_DATETIME};
+  static constexpr googlesql::TypeKind kTimestampTypes[] = {TYPE_TIMESTAMP};
+  static constexpr googlesql::TypeKind kTimeTypes[] = {TYPE_TIME};
+  static constexpr StaticCondition kInterval[] = {{.argument = 1, .types = kIntervalTypes}};
+  static constexpr StaticCondition kIntervals[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kDateInterval[] = {
+      {.argument = 1, .types = kDateTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kIntervalDate[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kDateTypes},
+  };
+  static constexpr StaticCondition kDates[] = {
+      {.argument = 1, .types = kDateTypes},
+      {.argument = 2, .types = kDateTypes},
+  };
+  static constexpr StaticCondition kDatetime[] = {{.argument = 1, .types = kDatetimeTypes}};
+  static constexpr StaticCondition kDatetimeSecond[] = {{.argument = 2, .types = kDatetimeTypes}};
+  static constexpr StaticCondition kDatetimeInterval[] = {
+      {.argument = 1, .types = kDatetimeTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kTimestamp[] = {{.argument = 1, .types = kTimestampTypes}};
+  static constexpr StaticCondition kTimestampSecond[] = {{.argument = 2, .types = kTimestampTypes}};
+  static constexpr StaticCondition kTimestampInterval[] = {
+      {.argument = 1, .types = kTimestampTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr StaticCondition kTime[] = {{.argument = 1, .types = kTimeTypes}};
+  static constexpr StaticCondition kIntervalInt64[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kInt64Types},
+  };
+  static constexpr StaticCondition kInt64Interval[] = {
+      {.argument = 1, .types = kInt64Types},
+      {.argument = 2, .types = kIntervalTypes},
+  };
+  static constexpr function_catalog::TypeRejection kMultiplyRejections[] = {
+      {.types = kIntervalDoubleTypes, .message = "No matching signature for operator *"},
+      {.types = kDoubleIntervalTypes, .message = "No matching signature for operator *"},
+  };
+  static constexpr std::string_view kDivisionErrors[] = {"'division by zero'"};
+  static constexpr std::string_view kModErrors[] = {
+      "'division by zero: MOD(' || $1 || ', ' || $2 || ')'",
+  };
+  static constexpr std::string_view kDivErrors[] = {"'division by zero: ' || $1 || ' / ' || $2"};
   static constexpr auto kRulesBacking = std::tuple{
       // A backslash escapes the character after it, and must not end the pattern. BYTES are
       // unsupported, since DuckDB's LIKE takes only VARCHAR.
@@ -751,6 +802,217 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
              {
                  .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
              }),
+      // Operators stay expressions that CASE and IF can short-circuit. GoogleSQL adds an
+      // INTERVAL's months, days and time in turn, checking each step's range; see
+      // src/googlesql_functions_duckdb/interval.cc.
+      Define(
+          "$ADD",
+          {
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_add(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_add_intervals($1, $2)", .conditions = kIntervals},
+              {.arity = 2, .spelling = "bq_add_date_interval($1, $2)", .conditions = kDateInterval},
+              {.arity = 2, .spelling = "bq_add_date_interval($2, $1)", .conditions = kIntervalDate},
+              {.arity = 2, .spelling = "bq_add_datetime_interval($1, $2)", .conditions = kDatetime},
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_datetime_interval($2, $1)",
+                  .conditions = kDatetimeSecond,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_timestamp_interval($1, $2)",
+                  .conditions = kTimestamp,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_timestamp_interval($2, $1)",
+                  .conditions = kTimestampSecond,
+              },
+              {.arity = 2, .spelling = "($1 + $2)"},
+          },
+          {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      // - subtracts an INTERVAL as + adds its negation.
+      Define(
+          "$SUBTRACT",
+          {
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_subtract(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) "
+                      "AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_subtract_intervals($1, $2)", .conditions = kInterval},
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_date_interval($1, $2)",
+                  .conditions = kDateInterval,
+              },
+              {.arity = 2, .spelling = "bq_subtract_dates($1, $2)", .conditions = kDates},
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_datetime_interval($1, $2)",
+                  .conditions = kDatetimeInterval,
+              },
+              {.arity = 2, .spelling = "bq_subtract_datetimes($1, $2)", .conditions = kDatetime},
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_timestamp_interval($1, $2)",
+                  .conditions = kTimestampInterval,
+              },
+              {.arity = 2, .spelling = "bq_subtract_timestamps($1, $2)", .conditions = kTimestamp},
+              {.arity = 2, .spelling = "bq_subtract_times($1, $2)", .conditions = kTime},
+              {.arity = 2, .spelling = "($1 - $2)"},
+          },
+          {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      // DuckDB multiplies DECIMAL(38, 9) into DECIMAL(38, 18), overflowing past 20
+      // integer digits, and divides as DOUBLE; GoogleSQL computes the NUMERIC result.
+      Define("$MULTIPLY",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CAST(bq_bignumeric_multiply(CAST($1 AS VARCHAR), CAST($2 AS "
+                                 "VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 2, .spelling = "bq_multiply_numeric($1, $2)", .conditions = kNumeric},
+                 // Reject FLOAT64 operands as BigQuery does.
+                 {
+                     .arity = 2,
+                     .spelling = "bq_multiply_interval($1, $2)",
+                     .conditions = kIntervalInt64,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_multiply_interval($2, $1)",
+                     .conditions = kInt64Interval,
+                 },
+                 {.arity = 2, .spelling = "($1 * $2)"},
+             },
+             {
+                 .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
+                 .type_rejections = kMultiplyRejections,
+             }),
+      // DuckDB would return infinity on division by zero.
+      Define(
+          "$DIVIDE",
+          {
+              {
+                  .arity = 2,
+                  .spelling = "CAST(bq_bignumeric_divide(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) "
+                              "AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_divide_numeric($1, $2)", .conditions = kNumeric},
+              {.arity = 2, .spelling = "bq_divide_interval($1, $2)", .conditions = kIntervalInt64},
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE "
+                      "$1 / $2 END",
+                  .errors = kDivisionErrors,
+              },
+          },
+          {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      Define("$UNARY_MINUS",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_bignumeric_negate(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 1, .spelling = "(-$1)"},
+             },
+             {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
+      // SAFE_DIVIDE makes the zero divisor disappear.
+      Define("SAFE_DIVIDE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CAST(bq_bignumeric_safe_divide(CAST($1 AS VARCHAR), CAST($2 AS "
+                                 "VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 2, .spelling = "bq_safe_divide_numeric($1, $2)", .conditions = kNumeric},
+                 {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
+             },
+             {.uses = {TypeUse::kBigNumeric}}),
+      // DuckDB returns NULL on a zero divisor, and MOD(INT64_MIN, -1) overflows instead of 0.
+      Define(
+          "MOD",
+          {
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_mod(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "WHEN $2 = -1 THEN 0 ELSE mod($1, $2) END",
+                  .conditions = kInt64,
+                  .errors = kModErrors,
+              },
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "ELSE mod($1, $2) END",
+                  .errors = kModErrors,
+              },
+          },
+          {.uses = {TypeUse::kBigNumeric}}),
+      // DuckDB's divide() of DECIMAL returns DOUBLE; GoogleSQL computes the exact quotient.
+      Define(
+          "DIV",
+          {
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CAST(bq_bignumeric_div(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
+                  .conditions = kBigNumeric,
+              },
+              {.arity = 2, .spelling = "bq_div_numeric($1, $2)", .conditions = kNumeric},
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "ELSE divide($1, $2) END",
+                  .conditions = kInt64,
+                  .errors = kDivErrors,
+              },
+          },
+          {.uses = {TypeUse::kBigNumeric}}),
+      // DuckDB's sign() is 0 for NaN.
+      Define("SIGN",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_bignumeric_sign(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {
+                     .arity = 1,
+                     .spelling = "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END",
+                     .conditions = kDouble,
+                 },
+                 {.arity = 1, .spelling = "sign($1)"},
+             },
+             {.uses = {TypeUse::kBigNumeric}}),
+      Define("ABS",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_bignumeric_abs(CAST($1 AS VARCHAR)) AS BIGNUM)",
+                     .conditions = kBigNumeric,
+                 },
+                 {.arity = 1, .spelling = "abs($1)"},
+             },
+             {.uses = {TypeUse::kBigNumeric}}),
       Define("$IS_TRUE", {{.arity = 1, .spelling = "($1 IS TRUE)"}}),
       Define("$IS_FALSE", {{.arity = 1, .spelling = "($1 IS FALSE)"}}),
       Define("$NOT", {{.arity = 1, .spelling = "(NOT $1)"}}),
@@ -1191,192 +1453,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   },
           },
       },
-      // Operators. Division binds its operands once, as every rule does, and stays an
-      // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
-      // GoogleSQL adds an INTERVAL's months, days and time in turn, and fails where a step leaves
-      // the range; see src/googlesql_functions_duckdb/interval.cc.
-      {
-          "$ADD",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_add", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_intervals($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_date_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_date_interval($2, $1)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_DATE})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_datetime_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATETIME})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_datetime_interval($2, $1)",
-                          .conditions = {Is(2, {TYPE_DATETIME})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_timestamp_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_add_timestamp_interval($2, $1)",
-                          .conditions = {Is(2, {TYPE_TIMESTAMP})},
-                      },
-                      {.arity = 2, .spelling = "($1 + $2)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
-      // - subtracts an INTERVAL as + adds its negation.
-      {
-          "$SUBTRACT",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_subtract", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_intervals($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_date_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_dates($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_DATE})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_datetime_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATETIME}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_datetimes($1, $2)",
-                          .conditions = {Is(1, {TYPE_DATETIME})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_timestamp_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIMESTAMP}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_timestamps($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_subtract_times($1, $2)",
-                          .conditions = {Is(1, {TYPE_TIME})},
-                      },
-                      {.arity = 2, .spelling = "($1 - $2)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB multiplies DECIMAL(38, 9) values into a DECIMAL(38, 18), which overflows past 20
-      // integer digits, and divides them as DOUBLE values; GoogleSQL computes the NUMERIC result,
-      // rounded half away from zero.
-      {
-          "$MULTIPLY",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_multiply", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_multiply_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      // See src/googlesql_functions_duckdb/interval.cc; the registered type
-                      // rejections reject FLOAT64 operands as BigQuery does.
-                      {
-                          .arity = 2,
-                          .spelling = "bq_multiply_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_multiply_interval($2, $1)",
-                          .conditions = {Is(1, {TYPE_INT64}), Is(2, {TYPE_INTERVAL})},
-                      },
-                      {.arity = 2, .spelling = "($1 * $2)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-              .type_rejections =
-                  {
-                      {
-                          .types = kIntervalDoubleTypes,
-                          .message = "No matching signature for operator *",
-                      },
-                      {
-                          .types = kDoubleIntervalTypes,
-                          .message = "No matching signature for operator *",
-                      },
-                  },
-          },
-      },
-      {
-          "$DIVIDE",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_divide", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_divide_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      // See src/googlesql_functions_duckdb/interval.cc.
-                      {
-                          .arity = 2,
-                          .spelling = "bq_divide_interval($1, $2)",
-                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
-                              "ELSE $1 / $2 "
-                              "END",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors = {"'division by zero'"},
-                      },
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
-      {
-          "$UNARY_MINUS",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_negate", 1),
-                      {.arity = 1, .spelling = "(-$1)"},
-                  },
-              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
-          },
-      },
       {
           "$EQUAL",
           {
@@ -1480,101 +1556,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           },
       },
 
-      // A division by zero is an error in BigQuery and +Inf in DuckDB, so SAFE_DIVIDE has to
-      // make the zero itself disappear.
-      {
-          "SAFE_DIVIDE",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_safe_divide", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_safe_divide_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
-      // in DuckDB where it is 0 in BigQuery.
-      {
-          "MOD",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_mod", 2),
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
-                              "WHEN $2 = -1 "
-                              "THEN 0 "
-                              "ELSE mod($1, $2) END",
-                          .conditions = {Is(1, {TYPE_INT64})},
-                          .defaults = {},
-                          .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling =
-                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
-                              "ELSE mod($1, "
-                              "$2) END",
-                          .conditions = {},
-                          .defaults = {},
-                          .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
-                      },
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB's divide() of DECIMAL values returns a DOUBLE; GoogleSQL computes the exact
-      // NUMERIC quotient and checks overflow.
-      {
-          "DIV",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_div", 2),
-                      {
-                          .arity = 2,
-                          .spelling = "bq_div_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                      },
-                      {
-                          .arity = 2,
-                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 "
-                                      "THEN !1 ELSE "
-                                      "divide($1, $2) "
-                                      "END",
-                          .conditions = {Is(1, {TYPE_INT64})},
-                          .defaults = {},
-                          .errors = {"'division by zero: ' || $1 || ' / ' || $2"},
-                      },
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      // DuckDB's sign() is 0 for NaN.
-      {
-          "SIGN",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_sign", 1),
-                      {
-                          .arity = 1,
-                          .spelling = "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END",
-                          .conditions = {Is(1, {TYPE_DOUBLE})},
-                      },
-                      {.arity = 1, .spelling = "sign($1)"},
-                  },
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
       // DuckDB takes the digits as an INTEGER.
       // DuckDB rounds halfway values away from zero, and its round_even() goes through
       // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
@@ -1612,17 +1593,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                       {.arity = 2, .spelling = RoundWithDigits("trunc")},
                   },
               }),
-              .uses = {TypeUse::kBigNumeric},
-          },
-      },
-      {
-          "ABS",
-          {
-              .rules =
-                  {
-                      BigNumericOperator("bq_bignumeric_abs", 1),
-                      {.arity = 1, .spelling = "abs($1)"},
-                  },
               .uses = {TypeUse::kBigNumeric},
           },
       },
