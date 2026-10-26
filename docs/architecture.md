@@ -63,6 +63,11 @@ uses of physical representations such as graph STRUCTs or BIGNUMERIC values. Rul
 is the same for all backends; GEOGRAPHY support is a type attribute, independent of the backend
 reported in the function support table.
 
+Literal rule tables use [static definitions](../src/function_catalog/static_definitions.h): a
+`constexpr` tuple owns each function's overload array beside its name and attributes. A separate
+`constexpr` table takes views only after that tuple reaches static storage, so no view points into
+a temporary or requires dynamic allocation. Registration copies these definitions into the catalog.
+
 The common catalog also owns `ScalarCall`'s AST accessors and
 [resolved_access](../src/function_catalog/resolved_access.h), which reads arguments, types and
 literals for handlers. Feature providers can use them without depending on the translator;

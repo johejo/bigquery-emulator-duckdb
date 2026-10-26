@@ -8,16 +8,21 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
+#include "src/function_catalog/static_definitions.h"
 #include "src/translator/handlers.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::Define;
+using function_catalog::DefinitionViews;
 
 using function_catalog::Rule;
 using function_catalog::StaticCondition;
@@ -659,72 +664,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
   static constexpr std::string_view kEndpointErrors[] = {
       "'The emulator does not support graph endpoint predicates with NULL operands'",
   };
-  static constexpr StaticRule kSource[] = {
-      {
-          .arity = 2,
-          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                      "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
-          .conditions = kEndpoints,
-          .errors = kEndpointErrors,
-      },
-  };
-  static constexpr StaticRule kDestination[] = {
-      {
-          .arity = 2,
-          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                      "struct_extract($1, '$id') = struct_extract($2, '$destination_id') END",
-          .conditions = kEndpoints,
-          .errors = kEndpointErrors,
-      },
-  };
-  static constexpr StaticRule kLabels[] = {
-      {.arity = 1, .spelling = "struct_extract($1, '$labels')", .conditions = kElement},
-  };
-  static constexpr StaticRule kNodes[] = {
-      {.arity = 1, .spelling = "struct_extract($1, '$nodes')", .conditions = kPath},
-  };
-  static constexpr StaticRule kEdges[] = {
-      {.arity = 1, .spelling = "struct_extract($1, '$edges')", .conditions = kPath},
-  };
-  static constexpr StaticRule kPathFirst[] = {
-      {.arity = 1, .spelling = "struct_extract($1, '$nodes')[1]", .conditions = kPath},
-  };
-  static constexpr StaticRule kPathLast[] = {
-      {.arity = 1, .spelling = "struct_extract($1, '$nodes')[-1]", .conditions = kPath},
-  };
-  static constexpr StaticRule kPathLength[] = {
-      {.arity = 1, .spelling = "len(struct_extract($1, '$edges'))", .conditions = kPath},
-  };
-  static constexpr StaticRule kIsAcyclic[] = {
-      {
-          .arity = 1,
-          .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
-                      "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
-          .conditions = kPath,
-      },
-  };
-  static constexpr StaticRule kIsTrail[] = {
-      {
-          .arity = 1,
-          .spelling = "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
-                      "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
-          .conditions = kPath,
-      },
-  };
-  static constexpr StaticRule kIsSimple[] = {
-      {
-          .arity = 1,
-          .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
-                      "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
-                      "len(struct_extract($1, '$nodes')) > 1 AND "
-                      "struct_extract(struct_extract($1, '$nodes')[1], '$id') = "
-                      "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE 0 END",
-          .conditions = kPath,
-      },
-  };
-  static constexpr StaticRule kIf[] = {
-      {.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"},
-  };
   static constexpr googlesql::TypeKind kStringTypes[] = {TYPE_STRING};
   static constexpr googlesql::TypeKind kBytesTypes[] = {TYPE_BYTES};
   static constexpr googlesql::TypeKind kInt64Types[] = {TYPE_INT64};
@@ -747,24 +686,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       {.argument = 3, .types = kInt64Types},
   };
   static constexpr std::string_view kLikeErrors[] = {"'LIKE pattern ends with a backslash'"};
-  // A backslash escapes the character after it, and must not end the pattern. BYTES are
-  // unsupported, since DuckDB's LIKE takes only VARCHAR.
-  static constexpr StaticRule kLike[] = {
-      {
-          .arity = 2,
-          .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
-                      "THEN !1 ELSE "
-                      "($1 LIKE $2 ESCAPE '\\') END",
-          .conditions = kString,
-          .errors = kLikeErrors,
-      },
-  };
-  static constexpr StaticRule kIsDistinctFrom[] = {
-      {.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"},
-  };
-  static constexpr StaticRule kIsNotDistinctFrom[] = {
-      {.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"},
-  };
   static constexpr function_catalog::TypeRejection kDistinctRejections[] = {
       {
           .types = kStructTypes,
@@ -777,295 +698,464 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
           .message = "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
       },
   };
-  static constexpr StaticRule kIsNull[] = {{.arity = 1, .spelling = "($1 IS NULL)"}};
-  static constexpr StaticRule kIsTrue[] = {{.arity = 1, .spelling = "($1 IS TRUE)"}};
-  static constexpr StaticRule kIsFalse[] = {{.arity = 1, .spelling = "($1 IS FALSE)"}};
-  static constexpr StaticRule kNot[] = {{.arity = 1, .spelling = "(NOT $1)"}};
-  static constexpr StaticRule kBitwiseNot[] = {{.arity = 1, .spelling = "(~$1)"}};
-  static constexpr StaticRule kBitwiseAnd[] = {{.arity = 2, .spelling = "($1 & $2)"}};
-  static constexpr StaticRule kBitwiseOr[] = {{.arity = 2, .spelling = "($1 | $2)"}};
-  static constexpr StaticRule kBitwiseXor[] = {{.arity = 2, .spelling = "xor($1, $2)"}};
-  // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
-  static constexpr StaticRule kInArray[] = {
-      {.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"},
-  };
   static constexpr ArgumentMode kInArrayModes[] = {
       ArgumentMode::kExpression,
       ArgumentMode::kIntervalArrayKeys,
   };
-  static constexpr StaticRule kIeeeDivide[] = {
-      {.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"},
-  };
-  // DuckDB cannot cast an empty BLOB to BIT.
-  static constexpr StaticRule kBitCount[] = {
-      {.arity = 1, .spelling = "bit_count($1)", .conditions = kInt64},
-      {
-          .arity = 1,
-          .spelling = "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
-          .conditions = kBytes,
-      },
-  };
-  static constexpr StaticRule kTimeTrunc[] = {
-      {.arity = 2, .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)"},
-  };
-  static constexpr StaticRule kCurrentDate[] = {{.arity = 0, .spelling = "CURRENT_DATE"}};
-  static constexpr StaticRule kCurrentTime[] = {{.arity = 0, .spelling = "CURRENT_TIME"}};
-  static constexpr StaticRule kCurrentTimestamp[] = {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}};
-  static constexpr StaticRule kCurrentDatetime[] = {
-      {.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"},
-  };
-  // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
-  static constexpr StaticRule kTimestamp[] = {
-      {.arity = 1, .spelling = "bq_string_to_timestamp($1, false)", .conditions = kString},
-      {.arity = 2, .spelling = "bq_string_to_timestamp_in($1, $2)", .conditions = kString},
-      {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
-      // A civil time in the given zone.
-      {
-          .arity = 2,
-          .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
-          .conditions = kCivil,
-      },
-  };
-  // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
-  // truncates toward zero.
-  static constexpr StaticRule kUnixSeconds[] = {
-      {.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"},
-  };
-  static constexpr StaticRule kUnixMillis[] = {
-      {.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"},
-  };
-  static constexpr StaticRule kUnixDate[] = {
-      {.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"},
-  };
   static constexpr std::string_view kDateFromUnixDateErrors[] = {
       "'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1",
   };
-  static constexpr StaticRule kDateFromUnixDate[] = {
-      {
-          .arity = 1,
-          .spelling = "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
-                      "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
-          .errors = kDateFromUnixDateErrors,
-      },
-  };
-  // Strings. The other string functions are GoogleSQL's, at least for BYTES; see BackendRules().
-  static constexpr StaticRule kLength[] = {
-      {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
-      {.arity = 1, .spelling = "length($1)"},
-  };
-  static constexpr StaticRule kByteLength[] = {
-      {.arity = 1, .spelling = "strlen($1)", .conditions = kString},
-      {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
-  };
-  // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
-  static constexpr StaticRule kMd5[] = {{.arity = 1, .spelling = "unhex(md5($1))"}};
-  static constexpr StaticRule kSha1[] = {{.arity = 1, .spelling = "unhex(sha1($1))"}};
-  static constexpr StaticRule kSha256[] = {{.arity = 1, .spelling = "unhex(sha256($1))"}};
-  static constexpr StaticRule kToHex[] = {{.arity = 1, .spelling = "lower(hex($1))"}};
-  static constexpr StaticRule kFromHex[] = {
-      {.arity = 1, .spelling = "unhex($1)", .conditions = kString},
-  };
-  static constexpr StaticRule kToBase64[] = {{.arity = 1, .spelling = "to_base64($1)"}};
-  static constexpr StaticRule kFromBase64[] = {
-      {.arity = 1, .spelling = "from_base64($1)", .conditions = kString},
-  };
   static constexpr std::string_view kErrorMessages[] = {
       "coalesce($1, 'ERROR function called with NULL value')",
-  };
-  static constexpr StaticRule kError[] = {
-      {.arity = 1, .spelling = "!1", .errors = kErrorMessages},
-  };
-  static constexpr StaticRule kArrayReverse[] = {{.arity = 1, .spelling = "list_reverse($1)"}};
-  // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
-  static constexpr StaticRule kBagOfWords[] = {
-      {
-          .arity = 1,
-          .spelling = "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
-                      "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = 1 OR "
-                      "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, lambda "
-                      "_r, _k: struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], "
-                      "len(_s) + 1) - _r)))[1])[1]",
-      },
-  };
-  // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
-  // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
-  static constexpr StaticRule kArrayToString[] = {
-      {
-          .arity = 2,
-          .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                      "ELSE list_aggr($1, 'string_agg', $2) END",
-          .conditions = kStringDelimiter,
-      },
-      {
-          .arity = 3,
-          .spelling = "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                      "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
-                      "'string_agg', $2) END",
-          .conditions = kStringDelimiter,
-      },
-      // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
-      // ||, starting from NULL when the delimiter or NULL text is NULL.
-      {
-          .arity = 2,
-          .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda _a, _e, _i: "
-                      "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                      "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
-          .conditions = kBytesDelimiter,
-      },
-      {
-          .arity = 3,
-          .spelling =
-              "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda _a, _e, _i: "
-              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
-          .conditions = kBytesDelimiter,
-      },
   };
   static constexpr std::string_view kOneDefault[] = {"1"};
   static constexpr std::string_view kBigNumericOneDefault[] = {
       "CAST('100000000000000000000000000000000000000' AS BIGNUM)",
   };
   static constexpr std::string_view kSequenceErrors[] = {"'Sequence step cannot be 0.'"};
-  // generate_series() has no floating point overload, and returns an empty list for a zero
-  // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
-  static constexpr StaticRule kGenerateArray[] = {
-      {
-          .arity = {2, 3},
-          .spelling = "bq_generate_array_numeric($1, $2, $3)",
-          .conditions = kNumeric,
-          .defaults = kOneDefault,
-          .implementation = Implementation::kGoogleSQL,
-      },
-      {
-          .arity = {2, 3},
-          .spelling = "bq_generate_array($1, $2, $3)",
-          .conditions = kDouble,
-          .defaults = kOneDefault,
-          .implementation = Implementation::kGoogleSQL,
-      },
-      {
-          .arity = {2, 3},
-          .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), "
-                      "CAST($2 AS VARCHAR), CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
-          .conditions = kBigNumeric,
-          .defaults = kBigNumericOneDefault,
-          .implementation = Implementation::kGoogleSQL,
-      },
-      {
-          .arity = {2, 3},
-          .spelling = "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
-          .conditions = kInt64Sequence,
-          .defaults = kOneDefault,
-          .errors = kSequenceErrors,
-      },
+  static constexpr auto kRulesBacking = std::tuple{
+      // A backslash escapes the character after it, and must not end the pattern. BYTES are
+      // unsupported, since DuckDB's LIKE takes only VARCHAR.
+
+      Define("$LIKE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
+                                 "THEN !1 ELSE "
+                                 "($1 LIKE $2 ESCAPE '\\') END",
+                     .conditions = kString,
+                     .errors = kLikeErrors,
+                 },
+             }),
+
+      Define("$IS_DISTINCT_FROM",
+             {
+                 {.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"},
+             },
+             {
+                 .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+                 .type_rejections = kDistinctRejections,
+             }),
+
+      Define("$IS_NOT_DISTINCT_FROM",
+             {
+                 {.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"},
+             },
+             {
+                 .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+                 .type_rejections = kNotDistinctRejections,
+             }),
+
+      Define("$IS_NULL", {{.arity = 1, .spelling = "($1 IS NULL)"}},
+             {
+                 .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+             }),
+      Define("$IS_TRUE", {{.arity = 1, .spelling = "($1 IS TRUE)"}}),
+      Define("$IS_FALSE", {{.arity = 1, .spelling = "($1 IS FALSE)"}}),
+      Define("$NOT", {{.arity = 1, .spelling = "(NOT $1)"}}),
+      Define("$BITWISE_NOT", {{.arity = 1, .spelling = "(~$1)"}}),
+      Define("$BITWISE_AND", {{.arity = 2, .spelling = "($1 & $2)"}}),
+      Define("$BITWISE_OR", {{.arity = 2, .spelling = "($1 | $2)"}}),
+      Define("$BITWISE_XOR", {{.arity = 2, .spelling = "xor($1, $2)"}}),
+
+      // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL
+      // array.
+      Define("$IN_ARRAY",
+             {
+                 {.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"},
+             },
+             {
+                 .uses =
+                     {
+                         TypeUse::kCompares,
+                         TypeUse::kComparesIntervalKeys,
+                         TypeUse::kComparesStructsWithInterval,
+                         TypeUse::kBigNumeric,
+                     },
+                 .argument_modes = kInArrayModes,
+                 .struct_handler = StructComparison,
+             }),
+
+      Define("IEEE_DIVIDE",
+             {
+                 {.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"},
+             }),
+      // DuckDB cannot cast an empty BLOB to BIT.
+
+      Define("BIT_COUNT",
+             {
+                 {.arity = 1, .spelling = "bit_count($1)", .conditions = kInt64},
+                 {
+                     .arity = 1,
+                     .spelling = "CASE WHEN octet_length($1) = 0 THEN 0 ELSE "
+                                 "bit_count(CAST($1 AS BIT)) END",
+                     .conditions = kBytes,
+                 },
+             }),
+
+      Define("TIME_TRUNC",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)",
+                 },
+             }),
+      Define("CURRENT_DATE", {{.arity = 0, .spelling = "CURRENT_DATE"}}),
+      Define("CURRENT_TIME", {{.arity = 0, .spelling = "CURRENT_TIME"}}),
+      Define("CURRENT_TIMESTAMP", {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}),
+
+      Define("CURRENT_DATETIME",
+             {
+                 {.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"},
+             }),
+      // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
+
+      Define("TIMESTAMP",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "bq_string_to_timestamp($1, false)",
+                     .conditions = kString,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_string_to_timestamp_in($1, $2)",
+                     .conditions = kString,
+                 },
+                 {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
+                 // A civil time in the given zone.
+                 {
+                     .arity = 2,
+                     .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
+                     .conditions = kCivil,
+                 },
+             }),
+      // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
+      // truncates toward zero.
+
+      Define("UNIX_SECONDS",
+             {
+                 {.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"},
+             }),
+
+      Define("UNIX_MILLIS",
+             {
+                 {.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"},
+             }),
+
+      Define("UNIX_DATE",
+             {
+                 {.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"},
+             }),
+
+      Define(
+          "DATE_FROM_UNIX_DATE",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
+                              "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
+                  .errors = kDateFromUnixDateErrors,
+              },
+          }),
+      // Strings. The other string functions are GoogleSQL's, at least for BYTES; see
+      // BackendRules().
+
+      Define("LENGTH",
+             {
+                 {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
+                 {.arity = 1, .spelling = "length($1)"},
+             }),
+
+      Define("BYTE_LENGTH",
+             {
+                 {.arity = 1, .spelling = "strlen($1)", .conditions = kString},
+                 {.arity = 1, .spelling = "octet_length($1)", .conditions = kBytes},
+             }),
+      // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
+      Define("MD5", {{.arity = 1, .spelling = "unhex(md5($1))"}}),
+      Define("SHA1", {{.arity = 1, .spelling = "unhex(sha1($1))"}}),
+      Define("SHA256", {{.arity = 1, .spelling = "unhex(sha256($1))"}}),
+      Define("TO_HEX", {{.arity = 1, .spelling = "lower(hex($1))"}}),
+
+      Define("FROM_HEX",
+             {
+                 {.arity = 1, .spelling = "unhex($1)", .conditions = kString},
+             }),
+      Define("TO_BASE64", {{.arity = 1, .spelling = "to_base64($1)"}}),
+
+      Define("FROM_BASE64",
+             {
+                 {.arity = 1, .spelling = "from_base64($1)", .conditions = kString},
+             }),
+
+      Define("ERROR",
+             {
+                 {.arity = 1, .spelling = "!1", .errors = kErrorMessages},
+             },
+             {
+                 .uses =
+                     {
+                         TypeUse::kBuildsOrReadsInterval,
+                         TypeUse::kBuildsOrReadsRange,
+                         TypeUse::kRejectsSafe,
+                         TypeUse::kBigNumeric,
+                     },
+             }),
+
+      Define("ARRAY_REVERSE", {{.arity = 1, .spelling = "list_reverse($1)"}},
+             {
+                 .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
+             }),
+      // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
+
+      Define(
+          "BAG_OF_WORDS",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
+                              "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = "
+                              "1 OR "
+                              "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, "
+                              "lambda "
+                              "_r, _k: struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + "
+                              "1], "
+                              "len(_s) + 1) - _r)))[1])[1]",
+              },
+          }),
+      // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
+      // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
+
+      Define(
+          "ARRAY_TO_STRING",
+          {
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                              "ELSE list_aggr($1, 'string_agg', $2) END",
+                  .conditions = kStringDelimiter,
+              },
+              {
+                  .arity = 3,
+                  .spelling = "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN "
+                              "'' "
+                              "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
+                              "'string_agg', $2) END",
+                  .conditions = kStringDelimiter,
+              },
+              // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
+              // ||, starting from NULL when the delimiter or NULL text is NULL.
+              {
+                  .arity = 2,
+                  .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
+                              "_a, _e, _i: "
+                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                              "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
+                  .conditions = kBytesDelimiter,
+              },
+              {
+                  .arity = 3,
+                  .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, "
+                              "$3)), lambda _a, "
+                              "_e, _i: "
+                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE CAST('' "
+                              "AS BLOB) END)",
+                  .conditions = kBytesDelimiter,
+              },
+          }),
+      // generate_series() has no floating point overload, and returns an empty list for a zero
+      // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
+
+      Define("GENERATE_ARRAY",
+             {
+                 {
+                     .arity = {2, 3},
+                     .spelling = "bq_generate_array_numeric($1, $2, $3)",
+                     .conditions = kNumeric,
+                     .defaults = kOneDefault,
+                     .implementation = Implementation::kGoogleSQL,
+                 },
+                 {
+                     .arity = {2, 3},
+                     .spelling = "bq_generate_array($1, $2, $3)",
+                     .conditions = kDouble,
+                     .defaults = kOneDefault,
+                     .implementation = Implementation::kGoogleSQL,
+                 },
+                 {
+                     .arity = {2, 3},
+                     .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), "
+                                 "CAST($2 AS VARCHAR), CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS "
+                                 "BIGNUM))",
+                     .conditions = kBigNumeric,
+                     .defaults = kBigNumericOneDefault,
+                     .implementation = Implementation::kGoogleSQL,
+                 },
+                 {
+                     .arity = {2, 3},
+                     .spelling = "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
+                     .conditions = kInt64Sequence,
+                     .defaults = kOneDefault,
+                     .errors = kSequenceErrors,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kBigNumeric},
+             }),
+
+      Define("$IS_SOURCE_NODE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                                 "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
+                     .conditions = kEndpoints,
+                     .errors = kEndpointErrors,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("$IS_DEST_NODE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                                 "struct_extract($1, '$id') = struct_extract($2, "
+                                 "'$destination_id') END",
+                     .conditions = kEndpoints,
+                     .errors = kEndpointErrors,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("LABELS",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "struct_extract($1, '$labels')",
+                     .conditions = kElement,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("NODES",
+             {
+                 {.arity = 1, .spelling = "struct_extract($1, '$nodes')", .conditions = kPath},
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("EDGES",
+             {
+                 {.arity = 1, .spelling = "struct_extract($1, '$edges')", .conditions = kPath},
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("PATH_FIRST",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "struct_extract($1, '$nodes')[1]",
+                     .conditions = kPath,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("PATH_LAST",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "struct_extract($1, '$nodes')[-1]",
+                     .conditions = kPath,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("PATH_LENGTH",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "len(struct_extract($1, '$edges'))",
+                     .conditions = kPath,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define(
+          "IS_ACYCLIC",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                              "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
+                  .conditions = kPath,
+              },
+          },
+          {
+              .uses = {TypeUse::kGraphValues},
+          }),
+
+      Define(
+          "IS_TRAIL",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
+                              "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
+                  .conditions = kPath,
+              },
+          },
+          {
+              .uses = {TypeUse::kGraphValues},
+          }),
+
+      Define(
+          "IS_SIMPLE",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                              "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes')) - "
+                              "CASE "
+                              "WHEN "
+                              "len(struct_extract($1, '$nodes')) > 1 AND "
+                              "struct_extract(struct_extract($1, '$nodes')[1], '$id') = "
+                              "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE "
+                              "0 END",
+                  .conditions = kPath,
+              },
+          },
+          {
+              .uses = {TypeUse::kGraphValues},
+          }),
+
+      Define("IF",
+             {
+                 {.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"},
+             },
+             {
+                 .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+             }),
   };
-  static constexpr function_catalog::StaticNamedDefinition<StaticRule> kRules[] = {
-      {"$LIKE", {.rules = kLike}},
-      {
-          "$IS_DISTINCT_FROM",
-          {
-              .rules = kIsDistinctFrom,
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
-              .type_rejections = kDistinctRejections,
-          },
-      },
-      {
-          "$IS_NOT_DISTINCT_FROM",
-          {
-              .rules = kIsNotDistinctFrom,
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
-              .type_rejections = kNotDistinctRejections,
-          },
-      },
-      {
-          "$IS_NULL",
-          {
-              .rules = kIsNull,
-              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
-          },
-      },
-      {"$IS_TRUE", {.rules = kIsTrue}},
-      {"$IS_FALSE", {.rules = kIsFalse}},
-      {"$NOT", {.rules = kNot}},
-      {"$BITWISE_NOT", {.rules = kBitwiseNot}},
-      {"$BITWISE_AND", {.rules = kBitwiseAnd}},
-      {"$BITWISE_OR", {.rules = kBitwiseOr}},
-      {"$BITWISE_XOR", {.rules = kBitwiseXor}},
-      {
-          "$IN_ARRAY",
-          {
-              .rules = kInArray,
-              .uses =
-                  {
-                      TypeUse::kCompares,
-                      TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructsWithInterval,
-                      TypeUse::kBigNumeric,
-                  },
-              .argument_modes = kInArrayModes,
-              .struct_handler = StructComparison,
-          },
-      },
-      {"IEEE_DIVIDE", {.rules = kIeeeDivide}},
-      {"BIT_COUNT", {.rules = kBitCount}},
-      {"TIME_TRUNC", {.rules = kTimeTrunc}},
-      {"CURRENT_DATE", {.rules = kCurrentDate}},
-      {"CURRENT_TIME", {.rules = kCurrentTime}},
-      {"CURRENT_TIMESTAMP", {.rules = kCurrentTimestamp}},
-      {"CURRENT_DATETIME", {.rules = kCurrentDatetime}},
-      {"TIMESTAMP", {.rules = kTimestamp}},
-      {"UNIX_SECONDS", {.rules = kUnixSeconds}},
-      {"UNIX_MILLIS", {.rules = kUnixMillis}},
-      {"UNIX_DATE", {.rules = kUnixDate}},
-      {"DATE_FROM_UNIX_DATE", {.rules = kDateFromUnixDate}},
-      {"LENGTH", {.rules = kLength}},
-      {"BYTE_LENGTH", {.rules = kByteLength}},
-      {"MD5", {.rules = kMd5}},
-      {"SHA1", {.rules = kSha1}},
-      {"SHA256", {.rules = kSha256}},
-      {"TO_HEX", {.rules = kToHex}},
-      {"FROM_HEX", {.rules = kFromHex}},
-      {"TO_BASE64", {.rules = kToBase64}},
-      {"FROM_BASE64", {.rules = kFromBase64}},
-      {
-          "ERROR",
-          {
-              .rules = kError,
-              .uses =
-                  {
-                      TypeUse::kBuildsOrReadsInterval,
-                      TypeUse::kBuildsOrReadsRange,
-                      TypeUse::kRejectsSafe,
-                      TypeUse::kBigNumeric,
-                  },
-          },
-      },
-      {
-          "ARRAY_REVERSE",
-          {
-              .rules = kArrayReverse,
-              .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
-          },
-      },
-      {"BAG_OF_WORDS", {.rules = kBagOfWords}},
-      {"ARRAY_TO_STRING", {.rules = kArrayToString}},
-      {"GENERATE_ARRAY", {.rules = kGenerateArray, .uses = {TypeUse::kBigNumeric}}},
-      {"$IS_SOURCE_NODE", {.rules = kSource, .uses = {TypeUse::kGraphValues}}},
-      {"$IS_DEST_NODE", {.rules = kDestination, .uses = {TypeUse::kGraphValues}}},
-      {"LABELS", {.rules = kLabels, .uses = {TypeUse::kGraphValues}}},
-      {"NODES", {.rules = kNodes, .uses = {TypeUse::kGraphValues}}},
-      {"EDGES", {.rules = kEdges, .uses = {TypeUse::kGraphValues}}},
-      {"PATH_FIRST", {.rules = kPathFirst, .uses = {TypeUse::kGraphValues}}},
-      {"PATH_LAST", {.rules = kPathLast, .uses = {TypeUse::kGraphValues}}},
-      {"PATH_LENGTH", {.rules = kPathLength, .uses = {TypeUse::kGraphValues}}},
-      {"IS_ACYCLIC", {.rules = kIsAcyclic, .uses = {TypeUse::kGraphValues}}},
-      {"IS_TRAIL", {.rules = kIsTrail, .uses = {TypeUse::kGraphValues}}},
-      {"IS_SIMPLE", {.rules = kIsSimple, .uses = {TypeUse::kGraphValues}}},
-      {
-          "IF",
-          {.rules = kIf, .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric}},
-      },
-  };
+  static constexpr auto kRules = DefinitionViews(kRulesBacking);
   return kRules;
 }
 

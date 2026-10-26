@@ -29,6 +29,7 @@
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/rules.h"
+#include "src/function_catalog/static_definitions.h"
 #include "src/googlesql_geography/geography.h"
 #include "src/googlesql_geography/geojson.h"
 #include "src/googlesql_geography/options.h"
@@ -38,6 +39,7 @@
 #include "src/googlesql_geography_duckdb/functions.h"
 
 namespace bigquery_emulator_duckdb::geography_duckdb {
+
 using duckdb_functions::Arguments;
 using duckdb_functions::EachRow;
 using duckdb_functions::kBigint;
@@ -46,6 +48,8 @@ using duckdb_functions::kBoolean;
 using duckdb_functions::kDouble;
 using duckdb_functions::kVarchar;
 using duckdb_functions::Register;
+using function_catalog::Define;
+using function_catalog::DefinitionViews;
 using googlesql_geography::BoundingBox;
 using googlesql_geography::Geography;
 using googlesql_geography::IndexedGeography;
@@ -753,15 +757,12 @@ namespace {
 // finishes. ST_UNION_AGG unions them as ST_UNION does an array, which puts all the points first,
 // so none of these folds the values one at a time.
 template <const char* kFunction>
-constexpr function_catalog::StaticAggregateRule kListAggregate[] = {
-    {
-        .function = "list",
-        .distinct = AggregateRule::Distinct::kUnsupported,
-        .skip_nulls = true,
-        .finish =
-            [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
-               const std::string& /*tail*/) { return std::string(kFunction) + "(" + sql + ")"; },
-    },
+constexpr function_catalog::StaticAggregateRule kListAggregate = {
+    .function = "list",
+    .distinct = AggregateRule::Distinct::kUnsupported,
+    .skip_nulls = true,
+    .finish = [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                 const std::string& /*tail*/) { return std::string(kFunction) + "(" + sql + ")"; },
 };
 
 // BigQuery takes none of them over a window.
@@ -771,15 +772,24 @@ constexpr TypeUses kAggregateUses = {TypeUse::kBuildsOrReadsGeography, TypeUse::
 
 std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
 GeographyAggregates() {
-  static constexpr function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>
-      kAggregates[] = {
-          {"ST_UNION_AGG", {.rules = kListAggregate<kUnionArray>, .uses = kAggregateUses}},
-          {
-              "ST_CENTROID_AGG",
-              {.rules = kListAggregate<kCentroidAggregate>, .uses = kAggregateUses},
-          },
-          {"ST_EXTENT", {.rules = kListAggregate<kExtent>, .uses = kAggregateUses}},
+  static constexpr auto kAggregatesBacking = std::tuple{
+
+      Define("ST_UNION_AGG", {kListAggregate<kUnionArray>},
+             {
+                 .uses = kAggregateUses,
+             }),
+
+      Define("ST_CENTROID_AGG", {kListAggregate<kCentroidAggregate>},
+             {
+                 .uses = kAggregateUses,
+             }),
+
+      Define("ST_EXTENT", {kListAggregate<kExtent>},
+             {
+                 .uses = kAggregateUses,
+             }),
   };
+  static constexpr auto kAggregates = DefinitionViews(kAggregatesBacking);
   return kAggregates;
 }
 
