@@ -1732,17 +1732,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "AI.IF is translated as IF"
-  label: "ai_functions_test:ai_if_empty_string_prompt"
-  label: "ai_functions_test:ai_if_model_arg_is_null"
-  label: "ai_functions_test:ai_if_non_deterministic_output"
-  label: "ai_functions_test:ai_if_options_arg_is_null"
-  label: "ai_functions_test:ai_if_payload_arg_is_null"
-  label: "ai_functions_test:ai_if_prompt_arg_is_null"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "ARRAY_AVG overflows to an infinity on large FLOAT64 values and fails on large NUMERIC values where BigQuery averages them"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_4qS1lLNqJ_o_99999999>"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_SZg36vYOvN4_99, NULL>"
