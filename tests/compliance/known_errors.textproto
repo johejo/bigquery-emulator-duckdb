@@ -346,32 +346,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "An invalid argument, such as a NULL or negative offset, does not fail as BigQuery does"
-  label: "limit_queries_test:param_limit_negative"
-  label: "limit_queries_test:param_offset_negative"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "An invalid argument, such as a NULL or negative offset, does not fail as BigQuery does"
-  label: "analytic_lag_test:lag_negative_offset"
-  label: "analytic_lag_test:lag_null_offset"
-  label: "analytic_lead_test:lead_negative_offset"
-  label: "analytic_lead_test:lead_null_offset"
-  label: "analytic_nth_value_test:nth_value_negative_n"
-  label: "analytic_nth_value_test:nth_value_null_n"
-  label: "analytic_nth_value_test:nth_value_zero_n"
-  label: "analytic_ntile_test:ntile_null_bucket_count"
-  label: "limit_queries_test:expr_limit_null"
-  label: "limit_queries_test:expr_offset_null"
-  label: "limit_queries_test:limit_null"
-  label: "limit_queries_test:offset_null"
-  label: "limit_queries_test:param_limit_null"
-  label: "limit_queries_test:param_offset_null"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects ARRAYs in aggregate functions with DISTINCT, which GoogleSQL accepts"
   label: "aggregation_distinct_queries_test:aggregation_distinct_count_6"
   label: "elementwise_aggregation_test:aggregate_elementwise_avg_testtable_bignumeric_array_val_distinct"
@@ -1732,17 +1706,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "AI.IF is translated as IF"
-  label: "ai_functions_test:ai_if_empty_string_prompt"
-  label: "ai_functions_test:ai_if_model_arg_is_null"
-  label: "ai_functions_test:ai_if_non_deterministic_output"
-  label: "ai_functions_test:ai_if_options_arg_is_null"
-  label: "ai_functions_test:ai_if_payload_arg_is_null"
-  label: "ai_functions_test:ai_if_prompt_arg_is_null"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "ARRAY_AVG overflows to an infinity on large FLOAT64 values and fails on large NUMERIC values where BigQuery averages them"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_4qS1lLNqJ_o_99999999>"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_SZg36vYOvN4_99, NULL>"
@@ -1817,18 +1780,6 @@ known_errors {
   label: "code:bXor_BYTES_<@xaa@xaa_oAF5vaTKOd4_@xaa@xaa>_BYTES_<UUUUU>"
   label: "code:bXor_BYTES_<foo>_BYTES_NULL"
   label: "code:bXor_BYTES_NULL_BYTES_<foo>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "TO_JSON_STRING with escaped field names differs"
-  label: "strings_test:to_json_string_with_escaped_field_names"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "SPLIT of NULL differs"
-  label: "strings_test:split_nulls"
 }
 
 known_errors {
@@ -1915,20 +1866,6 @@ known_errors {
   label: "json_comparison_test:scalar_coercion_basic"
   label: "json_comparison_test:scalar_mixed_types"
   label: "json_comparison_test:scalar_number_basic"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "JSON_EXTRACT does not accept JSONPath subscripts with quoted names, such as $['a']"
-  label: "code:json_extract_JSON_<@@@@@:@5_SvphWxi4KS0_@@a@@:1@>_STRING_<@@@'@'@>"
-  label: "code:json_extract_JSON_<@@@@@:@5_SvphWxi4KS0_@@a@@:1@>_STRING_<@@@'@'@@1@>"
-  label: "code:json_extract_JSON_<@@@a@@:@_HYv7JWied60_@:true@@>_STRING_<@@@'a@'@>"
-  label: "code:json_extract_JSON_<@@@a@b@c@@:5@>_STRING_<@@@'a@b@c@'@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@@'x@'@@1@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@x@@'1@'@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@x@@'a@'@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@y@0@@@'a@'@>"
-  label: "json_queries_test:json_extract"
 }
 
 known_errors {

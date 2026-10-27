@@ -1,0 +1,61 @@
+# Navigation argument constraints:
+# third_party/bigquery_docs/reference/standard-sql/navigation_functions.md
+# third_party/bigquery_docs/reference/standard-sql/numbering_functions.md
+# Error messages agree with GoogleSQL's analytic_lag/lead/nth_value/ntile tests.
+DECLARE n INT64 DEFAULT -1;
+SELECT LAG(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The offset to the function LAG must not be negative
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT LAG(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The offset to the function LAG must not be null
+
+DECLARE n INT64 DEFAULT -1;
+SELECT LEAD(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The offset to the function LEAD must not be negative
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT LEAD(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The offset to the function LEAD must not be null
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT NTH_VALUE(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The N value for the NthValue function must not be NULL
+
+DECLARE n INT64 DEFAULT 0;
+SELECT NTH_VALUE(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The N value for the NthValue function must be positive
+
+DECLARE n INT64 DEFAULT -1;
+SELECT NTH_VALUE(x, n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The N value for the NthValue function must be positive
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT NTILE(n) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The N value (number of buckets) for the NTILE function must not be NULL
+
+# Zero is valid for LAG/LEAD but not for NTH_VALUE/NTILE.
+DECLARE n INT64 DEFAULT 0;
+SELECT LAG(x, n) OVER (ORDER BY x) FROM UNNEST([7]) AS x
+=> "7"
+
+DECLARE n INT64 DEFAULT 0;
+SELECT LEAD(x, n) OVER (ORDER BY x) FROM UNNEST([7]) AS x
+=> "7"
+
+# LIMIT/OFFSET: GoogleSQL compliance testdata/limit_queries.test.
+DECLARE n INT64 DEFAULT NULL;
+SELECT x FROM UNNEST([1]) AS x LIMIT n
+=> error: Limit requires non-null count and offset
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT x FROM UNNEST([1]) AS x LIMIT 1 OFFSET n
+=> error: Limit requires non-null count and offset
+
+DECLARE n INT64 DEFAULT -1;
+SELECT x FROM UNNEST([1]) AS x LIMIT n
+=> error: Limit requires non-negative count and offset
+
+DECLARE n INT64 DEFAULT -1;
+SELECT x FROM UNNEST([1]) AS x LIMIT 1 OFFSET n
+=> error: Limit requires non-negative count and offset
