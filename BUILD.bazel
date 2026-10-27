@@ -810,7 +810,6 @@ cc_library(
         ":duckdb_handle",
         ":interval",
         ":result_chunks",
-        ":result_rows",
         ":type_mapping",
         ":vector_value",
         "//third_party/duckdb",
@@ -828,7 +827,10 @@ cc_library(
         # json_value brings nlohmann's single header, which nlohmann/json.hpp then names.
         "@nlohmann_json//:singleheader-json",
     ],
-    deps = ["@abseil-cpp//absl/status:statusor"],
+    deps = [
+        ":result_rows",
+        "@abseil-cpp//absl/status:statusor",
+    ],
 )
 
 cc_library(
