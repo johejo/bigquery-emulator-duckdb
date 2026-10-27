@@ -448,7 +448,7 @@ functions.
 | [`SQRT`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`TAN`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`TANH`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
-| [`TRUNC`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
+| [`TRUNC`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL / GoogleSQL function |  |
 
 ## Navigation functions
 

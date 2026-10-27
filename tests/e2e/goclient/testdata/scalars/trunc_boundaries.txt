@@ -1,0 +1,63 @@
+# Expected values: BigQuery answers recorded from unverified/trunc.txt.
+# The first six forms previously failed GoogleSQL compliance.
+
+SELECT TRUNC(x, -9223372036854775808) FROM UNNEST([3.1415925]) x
+=> "0.0"
+
+SELECT TRUNC(x, 9223372036854775807) FROM UNNEST([3.1415925]) x
+=> "3.1415925"
+
+SELECT TRUNC(x, -309) FROM UNNEST([1.6e308]) x
+=> "0.0"
+
+SELECT TRUNC(x, -40000) FROM UNNEST([1.0]) x
+=> "0.0"
+
+SELECT TRUNC(x, 323) FROM UNNEST([4.94065645841247e-324]) x
+=> "0.0"
+
+SELECT TRUNC(x, 6) FROM UNNEST([75.736617999999993]) x
+=> "75.736617"
+
+# Opposite signs, neighboring precisions and decimal/binary rounding boundaries.
+SELECT TRUNC(x, 6) FROM UNNEST([-75.736617999999993]) x
+=> "-75.736617"
+
+SELECT TRUNC(x, 5) FROM UNNEST([0.01207]) x
+=> "0.01207"
+
+SELECT TRUNC(x, 5) FROM UNNEST([-0.01207]) x
+=> "-0.01207"
+
+SELECT TRUNC(x, -308) FROM UNNEST([1.6e308]) x
+=> "1.0E308"
+
+# BigQuery returns positive zero here, unlike GoogleSQL's signed zero.
+SELECT TRUNC(x, -309) FROM UNNEST([-1.6e308]) x
+=> "0.0"
+
+SELECT TRUNC(x, 324) FROM UNNEST([4.94065645841247e-324]) x
+=> "4.9E-324"
+
+SELECT TRUNC(x, 323) FROM UNNEST([-4.94065645841247e-324]) x
+=> "-0.0"
+
+# Nonfinite values survive even an extreme precision. FORMAT also observes zero's sign.
+SELECT FORMAT('%t', TRUNC(x, -9223372036854775808)) FROM UNNEST([CAST('inf' AS FLOAT64)]) x
+=> "inf"
+
+SELECT FORMAT('%t', TRUNC(x, 9223372036854775807)) FROM UNNEST([CAST('-inf' AS FLOAT64)]) x
+=> "-inf"
+
+SELECT FORMAT('%t', TRUNC(x, -9223372036854775808)) FROM UNNEST([CAST('NaN' AS FLOAT64)]) x
+=> "nan"
+
+SELECT FORMAT('%t', TRUNC(x, -40000)) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, 9223372036854775807)) FROM UNNEST([CAST('-0.0' AS FLOAT64)]) x
+=> "-0.0"
+
+# Per-row INT64 precisions.
+SELECT STRING_AGG(CAST(TRUNC(x, n) AS STRING), ',' ORDER BY n) FROM UNNEST([STRUCT(123.75 AS x, -1 AS n), STRUCT(123.75 AS x, 1 AS n)])
+=> "120,123.7"

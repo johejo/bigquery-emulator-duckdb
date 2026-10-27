@@ -1,0 +1,46 @@
+# Expected values: BigQuery's TRUNC definition (toward zero, including negative N),
+# NULL propagation and nonfinite examples:
+# third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+# Precision-sensitive FLOAT64 cases recorded from BigQuery are in trunc_boundaries.txt.
+
+SELECT CAST(TRUNC(x) AS INT64) FROM UNNEST([2.3]) x
+=> "2"
+
+SELECT CAST(TRUNC(x) AS INT64) FROM UNNEST([-2.8]) x
+=> "-2"
+
+SELECT TRUNC(x, 1) FROM UNNEST([2.35]) x
+=> "2.3"
+
+SELECT TRUNC(x, 1) FROM UNNEST([-2.35]) x
+=> "-2.3"
+
+SELECT CAST(TRUNC(x, -1) AS INT64) FROM UNNEST([123.75]) x
+=> "120"
+
+SELECT CAST(TRUNC(x, -1) AS INT64) FROM UNNEST([-123.75]) x
+=> "-120"
+
+SELECT TRUNC(x, CAST(NULL AS INT64)) FROM UNNEST([2.35]) x
+=> null
+
+SELECT TRUNC(x, 1) FROM UNNEST([CAST(NULL AS FLOAT64)]) x
+=> null
+
+SELECT TRUNC(x, CAST(NULL AS INT64)) FROM UNNEST([CAST(NULL AS FLOAT64)]) x
+=> null
+
+SELECT IS_INF(TRUNC(x, 1)) FROM UNNEST([CAST('+inf' AS FLOAT64)]) x
+=> "true"
+
+SELECT TRUNC(x, -1) < 0 FROM UNNEST([CAST('-inf' AS FLOAT64)]) x
+=> "true"
+
+SELECT IS_NAN(TRUNC(x, 1)) FROM UNNEST([CAST('NaN' AS FLOAT64)]) x
+=> "true"
+
+SELECT SAFE.TRUNC(x, 1) FROM UNNEST([-2.35]) x
+=> "-2.3"
+
+SELECT TYPEOF(TRUNC(x, 1)) FROM UNNEST([2.35]) x
+=> "FLOAT64"

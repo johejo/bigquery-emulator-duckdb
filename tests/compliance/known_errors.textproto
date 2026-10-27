@@ -2165,22 +2165,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "TRUNC fails on a precision beyond INT32 and does not truncate extreme values to 0"
-  label: "code:trunc_FLOAT64_3@1415925_INT64_-9223372036854775808"
-  label: "code:trunc_FLOAT64_3@1415925_INT64_9223372036854775807"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "TRUNC fails on a precision beyond INT32 and does not truncate extreme values to 0"
-  label: "code:trunc_FLOAT64_1@6e308_INT64_-309"
-  label: "code:trunc_FLOAT64_1_INT64_-40000"
-  label: "code:trunc_FLOAT64_4@94065645841247e-324_INT64_323"
-  label: "code:trunc_FLOAT64_75@736617999999993_INT64_6"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "UPDATE cannot set a field of a NULL STRUCT, or a field to DEFAULT"
   label: "dml_update_struct_test:assign_array_struct_field_default"
   label: "dml_update_struct_test:assign_struct_array_sub_subfield_default"

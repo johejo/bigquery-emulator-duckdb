@@ -1590,6 +1590,15 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   BigNumericRounding("bq_bignumeric_trunc", false),
                   {
                       {.arity = 1, .spelling = "trunc($1)"},
+                      // DuckDB's DOUBLE scaling can round across an integer boundary before
+                      // truncation; guards cannot repair that loss of precision. GoogleSQL
+                      // computes the decimal scaling in double-double precision instead.
+                      {
+                          .arity = 2,
+                          .spelling = "bq_trunc_digits($1, $2)",
+                          .conditions = {Is(1, {TYPE_DOUBLE})},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
                       {.arity = 2, .spelling = RoundWithDigits("trunc")},
                   },
               }),
