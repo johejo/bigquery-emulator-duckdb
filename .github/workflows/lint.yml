@@ -31,7 +31,7 @@ jobs:
         run: |
           echo "GOCACHE=$RUNNER_TEMP/go-build" >> "$GITHUB_ENV"
           echo "GOMODCACHE=$HOME/.cache/go-mod" >> "$GITHUB_ENV"
-      # The Test workflow saves the shared Go caches; this job only restores them.
+      # Saved by the Test workflow.
       - name: Restore Go module cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

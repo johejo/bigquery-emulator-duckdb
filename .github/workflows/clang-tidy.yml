@@ -33,15 +33,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
-      # Repository downloads are shared with the Test workflow, which saves this cache.
+      # Saved by the Test workflow.
       - name: Restore Bazel repository cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cache/bazel-repo
+            ~/.cache/bazel-repo-contents
             ~/.cache/bazelisk
-          key: bazel-repo-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
-          restore-keys: bazel-repo-v2-${{ runner.os }}-${{ runner.arch }}-
+          key: bazel-repo-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel*', '.bazelversion', 'third_party/**/*.patch', 'third_party/**/BUILD.*.bazel', 'tools/clang_tidy/repository.bzl') }}
+          restore-keys: bazel-repo-v3-${{ runner.os }}-${{ runner.arch }}-
       - name: Restore Bazel disk cache
         id: disk-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -74,8 +74,7 @@ jobs:
           path: ${{ runner.temp }}/bazel-reports/
           retention-days: 7
           if-no-files-found: ignore
-      # Bazel collects the disk cache once idle. Give it time, then stop the server so that it does
-      # not delete entries while they are archived.
+      # Let Bazel collect the disk cache once idle, then stop it before archiving.
       - name: Stop Bazel
         if: >-
           github.event_name == 'push' && github.ref == 'refs/heads/main' &&
@@ -85,7 +84,7 @@ jobs:
           sleep 30
           nix run .#bazel -- --ignore_all_rc_files shutdown
           du -sh ~/.cache/bazel-disk
-      # Only main pushes save caches; pull requests and manual runs reuse them.
+      # Only main pushes save caches.
       - name: Save Bazel disk cache
         if: >-
           github.event_name == 'push' && github.ref == 'refs/heads/main' &&

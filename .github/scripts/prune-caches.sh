@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Usage: prune-caches.sh KEY PREFIX
 #
-# Deletes the caches under PREFIX that were saved before KEY, so each prefix keeps one entry and
-# earlier commits' copies do not push other caches out of the repository's quota. Entries saved
-# after KEY, such as by a later commit's run that finished first, are kept.
+# Deletes the caches under PREFIX saved before KEY, so that each prefix keeps one entry within the
+# repository's quota. Entries saved after KEY, by a later commit's run, are kept.
 set -euo pipefail
 
 key=$1

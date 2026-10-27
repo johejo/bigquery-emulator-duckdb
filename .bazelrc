@@ -71,18 +71,15 @@ build:heavy-includes --aspects=//tools/heavy_includes:heavy_includes.bzl%heavy_i
 build:heavy-includes --output_groups=heavy_includes
 build:heavy-includes --keep_going
 
-# CI settings. GitHub Actions saves and restores these caches between runs; see
-# .github/workflows/test.yml.
+# CI settings; see .github/workflows/test.yml for the caches GitHub Actions keeps between runs.
 build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
-# Reuse extracted repositories across runs instead of fetching them again. The cache outlives
-# dependency changes, so let Bazel remove unused entries while its server waits between steps.
-build:ci --repo_contents_cache=~/.cache/bazel-repo/contents
+# Bazel removes unused extracted repositories while idle, unlike downloads; CI saves only these.
+build:ci --repo_contents_cache=~/.cache/bazel-repo-contents
 build:ci --repo_contents_cache_gc_idle_delay=5s
-# Let Gazelle reuse the Go caches that CI saves between runs.
+# Let Gazelle reuse CI's Go caches.
 build:ci --repo_env=GO_REPOSITORY_USE_HOST_CACHE=1
-# Limit cache growth while leaving room for earlier builds; a recent cold macOS run used 2.1G.
-# GitHub Actions keeps 10GB of caches for the repository, shared with the repository caches.
+# A cold macOS build uses 2.1G; keep earlier builds too, within GitHub Actions' 10GB of caches.
 build:ci --experimental_disk_cache_gc_max_size=4G
 build:ci --experimental_disk_cache_gc_max_age=3d
 build:ci --experimental_disk_cache_gc_idle_delay=5s
