@@ -82,12 +82,12 @@ SELECT b290673529(1)
 => "true"
 
 # BigQuery's SQL UDF documentation:
-# https://cloud.google.com/bigquery/docs/user-defined-functions#sql_udfs
+# third_party/bigquery_docs/user-defined-functions.md
 CREATE TEMP FUNCTION AddFourAndDivide(x INT64, y INT64) RETURNS FLOAT64 AS ((x + 4) / y);
 SELECT AddFourAndDivide(3, 2)
 => "3.5"
 
-# https://cloud.google.com/bigquery/docs/user-defined-functions#templated-sql-udf-parameters
+# third_party/bigquery_docs/user-defined-functions.md
 CREATE TEMP FUNCTION addFourAndDivideAny(x ANY TYPE, y ANY TYPE) AS ((x + 4) / y);
 SELECT addFourAndDivideAny(3, 4)
 => "1.75"
@@ -100,7 +100,7 @@ CREATE TEMP FUNCTION lastArrayElement(arr ANY TYPE) AS (arr[ORDINAL(ARRAY_LENGTH
 SELECT lastArrayElement(x) FROM (SELECT [2, 3, 5, 8, 13] AS x)
 => "13"
 
-# https://cloud.google.com/bigquery/docs/user-defined-functions#scalar_subqueries
+# third_party/bigquery_docs/user-defined-functions.md
 CREATE TEMP TABLE users AS
   (SELECT 1 AS id, 10 AS age UNION ALL SELECT 2 AS id, 30 AS age UNION ALL SELECT 3 AS id, 10 AS age);
 CREATE TEMP FUNCTION countUserByAge(userAge INT64) AS
@@ -151,7 +151,7 @@ SELECT COUNT(DISTINCT f(RAND())) FROM UNNEST(GENERATE_ARRAY(1, 100))
 
 ## Scope
 # Temporary functions have query scope, and declarations and calls are case-insensitive.
-# https://cloud.google.com/bigquery/docs/user-defined-functions
+# third_party/bigquery_docs/user-defined-functions.md
 
 CREATE TEMP FUNCTION Foo(x INT64) AS (x);
 SELECT FOO(1)

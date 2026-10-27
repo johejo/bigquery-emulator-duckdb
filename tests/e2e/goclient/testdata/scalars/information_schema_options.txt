@@ -1,6 +1,6 @@
 # INFORMATION_SCHEMA.SCHEMATA_OPTIONS and TABLE_OPTIONS values documented by BigQuery.
-# https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata-options
-# https://cloud.google.com/bigquery/docs/information-schema-table-options
+# third_party/bigquery_docs/information-schema-datasets-schemata-options.md
+# third_party/bigquery_docs/information-schema-table-options.md
 
 CREATE SCHEMA IF NOT EXISTS scalars_options_expiration;
 ALTER SCHEMA scalars_options_expiration SET OPTIONS (default_table_expiration_days = 90);

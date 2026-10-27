@@ -1,5 +1,5 @@
 # MATCH joins the incoming working table by shared variables, or forms a cross product.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_match
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 # FinGraph has Knows edges 10:1->2, 11:2->1, 12:1->1, 13:1->2, and Owns 1->7.
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->(b:Person) MATCH (b:Person)-[:Knows]->(c:Person) RETURN COUNT(*) AS result)
 => "8"

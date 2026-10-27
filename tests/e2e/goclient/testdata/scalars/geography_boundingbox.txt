@@ -1,5 +1,5 @@
 ## GEOGRAPHY bounding rectangles
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The polygon examples are documented. Round away floating-point error in spherical bounds.
 
 SELECT ST_BOUNDINGBOX(CAST(NULL AS GEOGRAPHY))

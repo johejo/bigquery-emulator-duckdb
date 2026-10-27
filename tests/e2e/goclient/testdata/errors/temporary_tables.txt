@@ -1,6 +1,6 @@
 # Temporary tables require a multi-statement query and no dataset qualifier.
 # A view must not outlive the temporary table it reads.
-# https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables
+# third_party/bigquery_docs/multi-statement-queries.md
 
 CREATE TEMP TABLE n (x INT64)
 => error:

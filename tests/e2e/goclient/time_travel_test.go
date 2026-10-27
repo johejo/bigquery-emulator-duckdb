@@ -13,8 +13,8 @@ import (
 
 // FOR SYSTEM_TIME AS OF reads the rows a table had at a time, whichever kind of write changed
 // them since.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#for_system_time_as_of
-// https://cloud.google.com/bigquery/docs/time-travel
+// third_party/bigquery_docs/reference/standard-sql/query-syntax.md
+// third_party/bigquery_docs/time-travel.md
 func TestTimeTravel(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -123,8 +123,8 @@ func TestTimeTravel(t *testing.T) {
 
 	// CREATE TABLE COPY and CLONE and CREATE SNAPSHOT TABLE copy the rows a table had then, which a
 	// clone and a snapshot record as when they were made.
-	// https://cloud.google.com/bigquery/docs/table-snapshots-create
-	// https://cloud.google.com/bigquery/docs/table-clones-create
+	// third_party/bigquery_docs/table-snapshots-create.md
+	// third_party/bigquery_docs/table-clones-create.md
 	for _, sql := range []string{
 		"CREATE TABLE copied_at COPY t FOR SYSTEM_TIME AS OF @ts",
 		"CREATE TABLE cloned_at CLONE t FOR SYSTEM_TIME AS OF @ts",
@@ -156,7 +156,7 @@ func TestTimeTravel(t *testing.T) {
 
 // BigQuery's errors for the times FOR SYSTEM_TIME AS OF cannot read, and the statements that read a
 // table at several times, as BigQuery answers.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#for_system_time_as_of
+// third_party/bigquery_docs/reference/standard-sql/query-syntax.md
 func TestTimeTravelErrorsAndStatements(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

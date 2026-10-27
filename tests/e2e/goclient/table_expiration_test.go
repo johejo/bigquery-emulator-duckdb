@@ -12,7 +12,7 @@ import (
 
 // Table.expirationTime documents milliseconds since the epoch, indefinite persistence when
 // omitted, and deletion after expiration. DDL expiration_timestamp sets the same property.
-// https://cloud.google.com/bigquery/docs/reference/rest/v2/tables
+// third_party/bigquery_docs/reference/rest/v2/tables.md
 func TestTableExpiration(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

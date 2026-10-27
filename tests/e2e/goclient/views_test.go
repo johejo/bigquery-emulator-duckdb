@@ -115,7 +115,7 @@ func TestViewLifecycle(t *testing.T) {
 
 // Views created by DDL keep their query and read their tables when queried; jobs and tabledata
 // reject them as destinations or sources.
-// https://cloud.google.com/bigquery/docs/views
+// third_party/bigquery_docs/views.md
 func TestViewStatements(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

@@ -1,5 +1,5 @@
 # NULLIF returns NULL when its arguments compare equal, otherwise its first argument.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#nullif
+# third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md
 SELECT NULLIF(a, 1) FROM t WHERE a = 1
 => null
 
@@ -43,7 +43,7 @@ SELECT TYPEOF(NULLIF(1.0, 1.0))
 => "FLOAT64"
 
 # NaN compares unequal to itself. Columns prevent analyzer constant folding.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#comparison_operators
+# third_party/bigquery_docs/reference/standard-sql/operators.md
 SELECT IS_NAN(NULLIF(x, x)) FROM UNNEST([CAST('NaN' AS FLOAT64)]) x
 => "true"
 

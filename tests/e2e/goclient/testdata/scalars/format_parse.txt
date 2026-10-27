@@ -241,7 +241,7 @@ SELECT CAST(x AS STRING) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
 
 ## Array casts require identical element types; structs cast fields by position
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_array
+# third_party/bigquery_docs/reference/standard-sql/conversion_functions.md
 
 SELECT ARRAY_LENGTH(CAST(x AS ARRAY<INT64>)) FROM (SELECT [1, 2] AS x)
 => "2"

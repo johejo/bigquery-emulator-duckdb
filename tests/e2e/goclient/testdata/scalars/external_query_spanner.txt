@@ -1,5 +1,5 @@
 # Spanner's documented mapping preserves these scalar values and truncates TIMESTAMP nanos:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#spanner-mapping
+# third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md
 # tools/e2e connects test.us.spanner to an empty GoogleSQL database in the Spanner emulator.
 
 SELECT x FROM EXTERNAL_QUERY('us.spanner', 'SELECT 9223372036854775807 AS x')

@@ -1,5 +1,5 @@
 # Explicit CTAS schemas declare NOT NULL even on temporary tables.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 
 CREATE TEMP TABLE c (x INT64 NOT NULL) AS SELECT 1 AS x; SELECT x FROM c
 => "1"

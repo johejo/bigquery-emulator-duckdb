@@ -1,11 +1,11 @@
 # GQL queries: a GRAPH clause followed by linear query statements.
 # Expected values are the documented results of the FinGraph examples, which TransferGraph holds
 # without TIMESTAMP columns. A final NEXT aggregates each documented result table into one cell.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 
 # The GRAPH clause example groups by a graph element, then joins it in the next statement. The
 # documentation's table shows account 6 for Lee, who owns account 16.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#graph_query
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (:Account)-[:Transfers]->(account:Account)
 RETURN account, COUNT(*) AS num_incoming_transfers
@@ -17,7 +17,7 @@ NEXT
 RETURN STRING_AGG(FORMAT('%d:%s:%d', account_id, owner_name, num_incoming_transfers), ',' ORDER BY account_id) AS result
 => "7:Alex:1,16:Lee:3,20:Dana:1"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_next
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (:Account)-[:Transfers]->(account:Account)
 RETURN account, COUNT(*) AS num_incoming_transfers
@@ -30,7 +30,7 @@ FILTER num_incoming_transfers < 2
 RETURN STRING_AGG(FORMAT('%d:%s', account_id, owner_name), ',' ORDER BY account_id) AS result
 => "7:Alex,20:Dana"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_filter
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (p:Person)-[o:Owns]->(a:Account)
 FILTER p.Id <> 1
@@ -50,7 +50,7 @@ FILTER WHERE num_transfers > 1
 RETURN STRING_AGG(FORMAT('%d:%d', source.id, num_transfers), ',' ORDER BY source.id) AS result
 => "7:2,20:2"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_for
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (p:Person)-[o:Owns]->(a:Account)
 FOR element in ["all","some"] WITH OFFSET
@@ -84,7 +84,7 @@ WITH element as col
 RETURN STRING_AGG(CAST(col AS STRING), ',' ORDER BY col) AS result
 => "1,2,3"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_let
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (source:Account)-[e:Transfers]->(destination:Account)
 LET a = source
@@ -105,7 +105,7 @@ LET b = a
 RETURN STRING_AGG(CAST(b.id AS STRING), ',' ORDER BY b.id) AS result
 => "7,7,16,20,20"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_limit
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (source:Account)-[e:Transfers]->(destination:Account)
 ORDER BY source.Id
@@ -122,8 +122,8 @@ MATCH (src_account:Account)<-[owns:Owns]-(owner:Person)
 RETURN FORMAT('%d:%s', src_account.id, owner.name) AS result
 => "20:Dana"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_offset
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_skip
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 # Without ORDER BY, only the number of rows left is determined.
 GRAPH scalar_graph.TransferGraph
 MATCH (p:Person)
@@ -137,7 +137,7 @@ RETURN COUNT(*) AS result
 => "1"
 
 # Ties at 300 are kept or skipped together.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_order_by
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (src_account:Account)-[transfer:Transfers]->(dst_account:Account)
 ORDER BY transfer.amount DESC
@@ -151,7 +151,7 @@ OFFSET 1
 RETURN STRING_AGG(FORMAT('%d:%d', src_account.id, transfer.amount), ',' ORDER BY transfer.amount DESC, src_account.id) AS result
 => "7:300,16:300,20:200,7:100"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_return
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (p:Person)
 LET a = 1, b = 2, c = 3
@@ -196,7 +196,7 @@ LIMIT 1
 OFFSET 1
 => error:
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_with
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (src:Account)-[transfer:Transfers]->(dst:Account)
 WITH DISTINCT dst
@@ -213,7 +213,7 @@ WITH COUNT(*) AS transfer_total, src.id AS source_id, dst.id AS destination_id
 RETURN STRING_AGG(FORMAT('%d:%d:%d', transfer_total, destination_id, source_id), ',' ORDER BY source_id, destination_id) AS result
 => "2:16:7,1:20:16,1:7:20,1:16:20"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_set
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 GRAPH scalar_graph.TransferGraph
 MATCH (p:Person)
 RETURN p.name, 1 AS group_id
@@ -276,7 +276,7 @@ RETURN STRING_AGG(CAST(id AS STRING), ',' ORDER BY id) AS result
 => "7,20"
 
 # Graph elements group by identity; NULL elements from OPTIONAL MATCH form one group.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#groupable_data_types
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
 GRAPH scalar_graph.TransferGraph
 MATCH (n:Person)
 OPTIONAL MATCH (n)-[:Owns]->(a:Account {is_blocked: TRUE})

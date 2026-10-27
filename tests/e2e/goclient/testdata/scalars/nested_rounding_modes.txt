@@ -1,5 +1,5 @@
 # Rounding parameterized NUMERIC and BIGNUMERIC fields in STRUCTs and ARRAYs.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_option_list
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 #
 # Expected values and errors were confirmed against BigQuery.
 # Each script creates its own table in the scalars fixture.

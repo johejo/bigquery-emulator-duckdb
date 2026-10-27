@@ -1,5 +1,5 @@
 # A temporary LIKE, COPY or CLONE of a temporary table, as BigQuery answers.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_like
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 
 CREATE TEMP TABLE s (id INT64);
 INSERT s (id) VALUES (1);

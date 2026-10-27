@@ -13,8 +13,8 @@ import (
 
 // Materialized views expose their definition and always include base-table changes when
 // max_staleness is unset, even when the cached result has not been refreshed.
-// https://cloud.google.com/bigquery/docs/materialized-views-use
-// https://cloud.google.com/bigquery/docs/materialized-views-create#query_limitations
+// third_party/bigquery_docs/materialized-views-use.md
+// third_party/bigquery_docs/materialized-views-create.md
 func TestMaterializedViewLifecycle(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -143,7 +143,7 @@ func TestMaterializedViewLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Deletion/recreation changes the base table's identity; the old MV cannot read it.
-	// https://cloud.google.com/bigquery/docs/materialized-views-intro#limitations
+	// third_party/bigquery_docs/materialized-views-intro.md
 	mustRun("DROP TABLE source")
 	if _, _, err := runScript(t, client, dataset.DatasetID, "SELECT * FROM mv"); err == nil {
 		t.Fatal("MV over a deleted base table was readable")
@@ -204,7 +204,7 @@ func TestMaterializedViewSchemaExpansion(t *testing.T) {
 }
 
 // These forms are forbidden by BigQuery's incremental MV definition restrictions.
-// https://cloud.google.com/bigquery/docs/materialized-views-create#query_limitations
+// third_party/bigquery_docs/materialized-views-create.md
 func TestMaterializedViewRejectsInvalidDefinitions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

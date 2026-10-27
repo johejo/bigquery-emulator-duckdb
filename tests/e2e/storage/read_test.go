@@ -365,7 +365,7 @@ func TestReadAvroTypes(t *testing.T) {
 }
 
 // Avro represents JSON as JSON text and GEOGRAPHY as WKT, both string/sqlType:
-// https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
+// third_party/bigquery_docs/reference/storage.md
 func TestReadAvroJSONAndGeography(t *testing.T) {
 	for _, tc := range []struct {
 		name, kind, value, want string
@@ -516,7 +516,7 @@ func TestReadEmptyAndMultipleBatches(t *testing.T) {
 }
 
 // Storage Read's documented Arrow types and snapshot isolation determine the expected values:
-// https://docs.cloud.google.com/bigquery/docs/reference/storage#arrow_schema_details
+// third_party/bigquery_docs/reference/storage.md
 func TestReadArrowSnapshotTypesAndConcurrentResume(t *testing.T) {
 	t.Parallel()
 	rest, read, _ := clients(t)
@@ -696,7 +696,7 @@ func TestReadRejectsInvalidAndUnsupportedOptions(t *testing.T) {
 
 // The Storage Read API gives a RANGE as a STRUCT of start and end in Arrow, whose NULL field is an
 // unbounded end, which the Go client reads as a RangeValue:
-// https://docs.cloud.google.com/bigquery/docs/reference/storage#arrow_schema_details
+// third_party/bigquery_docs/reference/storage.md
 func TestGoClientStorageReadRange(t *testing.T) {
 	rest, _, _ := clients(t)
 	table(t, rest, "storage_read_range", "id INT64, d RANGE<DATE>, dt RANGE<DATETIME>, ts RANGE<TIMESTAMP>")
@@ -736,7 +736,7 @@ func TestGoClientStorageReadRange(t *testing.T) {
 
 // In Avro, the first RANGE of an element type defines the record google.sqlType.RANGE_T, of
 // nullable start and end fields, and later ones name it:
-// https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
+// third_party/bigquery_docs/reference/storage.md
 func TestReadAvroRange(t *testing.T) {
 	rest, read, _ := clients(t)
 	path := table(t, rest, "storage_read_avro_range", "id INT64, d1 RANGE<DATE>, d2 RANGE<DATE>, dt RANGE<DATETIME>, ts RANGE<TIMESTAMP>, nested STRUCT<rs ARRAY<RANGE<DATE>>>")

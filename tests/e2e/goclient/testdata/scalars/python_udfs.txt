@@ -1,5 +1,5 @@
 # Python UDF structure and scalar type mappings:
-# https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python
+# third_party/bigquery_docs/user-defined-functions-python.md
 # Each case has its own persistent routine because scalar cases run concurrently.
 
 CREATE OR REPLACE FUNCTION scalars.py_multiply(x FLOAT64, y FLOAT64)
@@ -87,7 +87,7 @@ SELECT SUM(scalars.py_rows(x)) FROM UNNEST([1.0, 2.0, 3.0]) AS x
 => "12.0"
 
 # The documentation's logging example explicitly maps None to SQL NULL.
-# https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python#enable_logging
+# third_party/bigquery_docs/user-defined-functions-python.md
 CREATE OR REPLACE FUNCTION scalars.py_null_result()
 RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(): return None';
 SELECT scalars.py_null_result() IS NULL
@@ -154,7 +154,7 @@ SELECT scalars.py_exception()
 => error contains: ValueError: bad input
 
 # Identity preserves NULLs and row positions across batches and DuckDB chunks.
-# Type mappings: https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python
+# Type mappings: third_party/bigquery_docs/user-defined-functions-python.md
 CREATE OR REPLACE FUNCTION scalars.py_batch_identity(x INT64)
 RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x';
 WITH inputs AS (

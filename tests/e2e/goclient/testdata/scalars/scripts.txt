@@ -1,6 +1,6 @@
 # Multi-statement queries, whose result is that of the last statement to run. Expected values
 # follow the procedural language reference:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language
+# third_party/bigquery_docs/reference/standard-sql/procedural-language.md
 
 ## DECLARE and SET
 
@@ -73,7 +73,7 @@ SELECT hi
 
 # Type parameters constrain what a variable takes, and a value that breaks them fails the
 # assignment with an error the script may handle. Expected values follow the data types reference:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#parameterized_data_types
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
 
 DECLARE x STRING(10);
 SET x = "hello";
@@ -291,7 +291,7 @@ SELECT 2;
 
 ## Temporary tables
 # Expected values follow
-# https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables
+# third_party/bigquery_docs/multi-statement-queries.md
 
 CREATE TEMP TABLE n AS SELECT 5 AS x;
 SELECT x FROM n
@@ -323,7 +323,7 @@ SELECT MAX(a) FROM scalars.t
 => "3"
 
 ## Transactions
-# Expected behavior follows https://cloud.google.com/bigquery/docs/transactions:
+# Expected behavior follows third_party/bigquery_docs/transactions.md:
 # DML changes commit or roll back together; temporary-table DDL is permitted.
 
 CREATE TEMP TABLE tx (x INT64);
@@ -371,7 +371,7 @@ SELECT SUM(x) FROM tx
 => "1"
 
 # A temporary SQL UDF declared before a transaction can read its uncommitted rows.
-# UDF calls follow https://cloud.google.com/bigquery/docs/user-defined-functions.
+# UDF calls follow third_party/bigquery_docs/user-defined-functions.md.
 DECLARE n INT64;
 CREATE TEMP TABLE tx (x INT64);
 CREATE TEMP FUNCTION total() AS ((SELECT SUM(x) FROM tx));
@@ -390,7 +390,7 @@ SELECT x IS NULL
 => "true"
 
 # Inside a query, "NULL and empty ARRAYs are two distinct values", in a struct too.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#array_type
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
 DECLARE x STRUCT<y ARRAY<STRING>> DEFAULT STRUCT(['a']);
 SET x = STRUCT(CAST(NULL AS ARRAY<STRING>));
 SELECT x.y IS NULL
@@ -402,7 +402,7 @@ SELECT x IS NULL
 => "false"
 
 ## EXECUTE IMMEDIATE
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate,
+# third_party/bigquery_docs/reference/standard-sql/procedural-language.md,
 # whose examples set y to 5 and fill Books with four rows, the earliest from 1599.
 
 DECLARE y INT64;
@@ -477,7 +477,7 @@ SELECT @@dataset_project_id = @@project_id
 
 ## Dataset system variables
 # SET and name resolution follow the system variables reference:
-# https://cloud.google.com/bigquery/docs/reference/system-variables
+# third_party/bigquery_docs/reference/system-variables.md
 
 SET @@dataset_id = 'scalars';
 SELECT @@dataset_id

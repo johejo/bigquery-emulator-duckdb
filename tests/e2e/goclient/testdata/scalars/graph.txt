@@ -1,5 +1,5 @@
 # FinGraph names and IDs from BigQuery's documented sample.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-queries#graph_table_operator
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
 SELECT name FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person) WHERE p.id = 1 RETURN p.name AS name)
 => "Alex"
 SELECT name FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person WHERE p.id = 2) RETURN p.name AS name)
@@ -10,7 +10,7 @@ SELECT name FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person) FILTER p.id 
 => "Lee"
 
 # Graph function definitions, including single-node paths and repeated nodes/edges.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN LABELS(a) AS result)
 => [{"v":"Person"}]
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN LABELS(e) AS result)

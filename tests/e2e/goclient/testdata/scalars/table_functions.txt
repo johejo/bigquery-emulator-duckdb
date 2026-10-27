@@ -1,6 +1,6 @@
 # SQL table functions with scalar parameters and optional explicit return schemas.
-# https://cloud.google.com/bigquery/docs/table-functions
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_function_statement
+# third_party/bigquery_docs/table-functions.md
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 
 CREATE OR REPLACE TABLE FUNCTION scalars.tvf_filter(lower_bound INT64) AS (SELECT a FROM scalars.t WHERE a > lower_bound);
 SELECT COUNT(*) FROM scalars.tvf_filter(2)

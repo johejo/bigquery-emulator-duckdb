@@ -1,5 +1,5 @@
 # CREATE PROCEDURE's IN arguments and variable scope:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 # strict_mode=FALSE checks syntax only; IN arguments are local variables.
 CREATE OR REPLACE PROCEDURE scalars.proc_in(x INT64) OPTIONS(strict_mode=FALSE)
 BEGIN SET x = x + 1; SELECT x; END;
@@ -127,7 +127,7 @@ CALL scalars.proc_caller_function()
 => "2"
 
 # OUT and INOUT arguments, from CREATE PROCEDURE's documentation:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 DECLARE accumulator INT64 DEFAULT 0;
 CREATE OR REPLACE PROCEDURE scalars.proc_add_delta(INOUT x INT64, delta INT64)
 OPTIONS(strict_mode=FALSE) BEGIN SET x = x + delta; END;

@@ -1,5 +1,5 @@
 # Any-direction patterns match directed edges in either direction.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#edge_pattern
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 # Self-loop deduplication also follows GoogleSQL's graph_table.test self_edge_deduped.
 # FinGraph has reciprocal edges (10, 11), parallel edges (10, 13), and a self-loop (12).
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) RETURN COUNT(*) AS result)
@@ -22,7 +22,7 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-
 => "2"
 
 # Paths record traversal order. WALK permits revisiting nodes and reusing edges.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND e.id = 10 RETURN PATH_FIRST(p).name AS result)
 => "Dana"
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND e.id = 10 RETURN PATH_LAST(p).name AS result)

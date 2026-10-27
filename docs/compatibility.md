@@ -67,7 +67,7 @@ datasets, NULL dataset tags, NULL `resourceTags` in full REST updates, and copyi
 tables through copy jobs are unsupported until their metadata behavior is verified. Use DDL `SET OPTIONS (tags = ...)` or a full REST update to replace tags.
 
 BigQuery returns no tag option row after clearing tags, although its
-[tag documentation](https://cloud.google.com/bigquery/docs/tags) says that untagged resources
+[tag documentation](../third_party/bigquery_docs/tags.md) says that untagged resources
 return an empty array. The recorded BigQuery cases retain the project and run that established
 this behavior.
 
@@ -226,12 +226,12 @@ Their limits are:
 - Only the `default_type_for_decimal_columns` option is supported.
 
 MySQL queries use a read-only attachment. Duplicate column names, zero dates, JSON results and
-types outside BigQuery's [MySQL mapping](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#mysql_mapping)
+types outside BigQuery's [MySQL mapping](../third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md)
 are unsupported. Only the `default_type_for_decimal_columns` option is supported.
 
 Spanner queries are limited to GoogleSQL returning BOOL, BYTES, DATE, FLOAT64, INT64, JSON,
 NUMERIC, STRING and TIMESTAMP, using BigQuery's
-[Spanner mapping](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#spanner-mapping).
+[Spanner mapping](../third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md).
 ARRAY, STRUCT, annotated PostgreSQL types and all nonempty options, including
 `query_execution_priority`, are unsupported. Queries run as single-use, strong, read-only
 transactions; query partitioning and Data Boost are not implemented.

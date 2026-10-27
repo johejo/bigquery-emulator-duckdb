@@ -1,6 +1,6 @@
 # Search prefixes select one path for each pair of endpoint identities.
 # Expected results follow BigQuery's documented partitioning and shortest-edge rules.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_search_prefix
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 # FinGraph edges: 10:1->2, 11:2->1, 12:1->1, 13:1->2. Node 3 is isolated.
 # Never assert which path is chosen when several paths qualify.
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]->(b:Person) RETURN COUNT(*) AS result)
@@ -63,17 +63,17 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST (a:Perso
 => "1"
 
 # A search prefix and a mode cannot appear on the same path pattern.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST TRAIL (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
 => error:
 
 # Only endpoints may be reused outside a prefixed pattern in the same MATCH.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_search_prefix
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY (a:Person)-[:Knows]->(mid:Person)-[:Knows]->(b:Person), (mid)-[:Owns]->(c:Account) RETURN COUNT(*) AS result)
 => error:
 
 # A parenthesized path filter restricts candidates before the search prefix.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#parenthesized_path_pattern
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ANY SHORTEST ((a:Person)-[e:Knows]->{1,2}(b:Person) WHERE ARRAY_LENGTH(e) = 2) RETURN SUM(PATH_LENGTH(p)) AS result)
 => "8"
 

@@ -1,6 +1,6 @@
 # Field names in a STRUCT column differ in more than case, as column names do. ADD COLUMN names
 # the field without its column.
-# https://cloud.google.com/bigquery/docs/schemas#column_names
+# third_party/bigquery_docs/schemas.md
 
 CREATE SCHEMA IF NOT EXISTS errors_table_schemas;
 CREATE OR REPLACE TABLE errors_table_schemas.case_fields (r STRUCT<a STRING, A INT64>)

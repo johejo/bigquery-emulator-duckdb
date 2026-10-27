@@ -1,5 +1,5 @@
 ## ST_GEOGFROMWKB and ST_ASBINARY
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # ST_GEOGFROMWKB reads WKB as BYTES or hex text, as ST_GEOGFROM does, and ST_ASBINARY writes the
 # WKB it reads back, whose WKT is that of geography_polygon.txt and geography_multipart.txt. Every
 # function returns NULL for a NULL argument.
@@ -318,7 +318,7 @@ SELECT ST_GEOGFROM('')
 => error: ST_GeogFrom failed: Geography value is missing
 
 ## ST_GEOGFROM of WKB
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_GEOGFROM(FROM_HEX('010100000000000000000000400000000000001040'))
 => "POINT(2 4)"

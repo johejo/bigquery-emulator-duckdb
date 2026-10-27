@@ -92,7 +92,7 @@ func TestTableCreationPaths(t *testing.T) {
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 
 	// A string literal default keeps its quotes in defaultValueExpression
-	// (https://cloud.google.com/bigquery/docs/default-values).
+	// (third_party/bigquery_docs/default-values.md).
 	declared := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType, Required: true, Description: "key"},
 		{Name: "name", Type: bigquery.StringFieldType, DefaultValueExpression: "'none'"},
@@ -224,7 +224,7 @@ func TestWritesToExistingTables(t *testing.T) {
 
 	// "If the query omits a column with a default value, the default value is assigned", and a
 	// load assigns defaults to columns its data does not have but keeps its NULLs
-	// (https://cloud.google.com/bigquery/docs/default-values).
+	// (third_party/bigquery_docs/default-values.md).
 	if err := p.query("SELECT 1 AS id", "target", bigquery.WriteAppend); err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestWritesToExistingTables(t *testing.T) {
 	}
 
 	// A copy cannot append to a table whose additional columns have defaults
-	// (https://cloud.google.com/bigquery/docs/default-values#limitations).
+	// (third_party/bigquery_docs/default-values.md).
 	if err := p.copy("target", bigquery.WriteAppend, "narrow"); err == nil {
 		t.Error("copy appended to a table whose additional column has a default")
 	}

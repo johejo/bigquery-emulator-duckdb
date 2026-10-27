@@ -447,7 +447,7 @@ SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST([BIGNUMERIC '1e30']) x
 => null
 
 # BigQuery rejects casts between arrays with different element types, including struct fields.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_array
+# third_party/bigquery_docs/reference/standard-sql/conversion_functions.md
 SELECT TO_JSON_STRING(CAST(x AS ARRAY<STRING>)) FROM UNNEST([STRUCT([BIGNUMERIC '-0.10', NULL] AS x)])
 => error:
 

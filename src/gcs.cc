@@ -139,7 +139,7 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
   const std::string suffix = object.substr(wildcard + 1);
   // The documented file-name pattern (fed-sample*.csv) excludes subfolders,
   // whereas *.csv and a trailing prefix wildcard include them.
-  // https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards
+  // third_party/bigquery_docs/batch-loading-data.md
   const bool filename_pattern = !prefix.empty() && prefix.back() != '/' && !suffix.empty() &&
                                 suffix.find('/') == std::string::npos;
   storage::Client client = impl_->client();

@@ -1,5 +1,5 @@
 ## GEOGRAPHY multipart geometries and collections
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The descriptions of ST_GEOGFROMTEXT, ST_GEOMETRYTYPE, ST_ISCOLLECTION, ST_NUMGEOMETRIES and
 # ST_DUMP give the parts a geography has, and BigQuery's answers how it orders, merges and drops
 # them.

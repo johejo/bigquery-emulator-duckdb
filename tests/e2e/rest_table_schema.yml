@@ -81,7 +81,7 @@ steps:
               schema: {fields: [{name: c, type: STRING, maxLength: x}]}
     test: current.res.status == 400
   # A RANGE has an element type of DATE, DATETIME or TIMESTAMP:
-  # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#range_type
+  # third_party/bigquery_docs/reference/standard-sql/data-types.md
   range_without_element_type:
     req:
       /projects/test/datasets/rest_table_schema/tables:

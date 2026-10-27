@@ -1,0 +1,47 @@
+[
+  {
+    "file": "tests/e2e/goclient/testdata/unverified/graph.api.json",
+    "contains": "BigQuery Graph queries require a reservation",
+    "reason": "Recorded BigQuery error messages, including their URLs, are expected responses, not citations."
+  },
+  {
+    "file": "src/analyzer.cc",
+    "contains": "https://cloud.google.com/bigquery/docs/schemas#column_names",
+    "reason": "Client-visible error message must match BigQuery. This is not a documentation citation."
+  },
+  {
+    "file": "tests/e2e/goclient/testdata/scalars/structs.txt",
+    "contains": "=> error: Invalid field name",
+    "reason": "Recorded BigQuery error text, including its URL, must not be modified."
+  },
+  {
+    "file": "tools/ddl_options.json",
+    "contains": "\"source\":",
+    "reason": "Machine-readable upstream provenance; generated report links are localized by bigquerydocs render."
+  },
+  {
+    "file": "tools/restprobe/functions.go",
+    "contains": "const functionDocs =",
+    "reason": "Report URL construction; bigquerydocs render localizes the generated citations."
+  },
+  {
+    "file": "tools/restprobe/api.go",
+    "contains": "apiDocs   =",
+    "reason": "Report URL construction; bigquerydocs render localizes the generated citations."
+  },
+  {
+    "file": "tools/update_bigquery_functions.sh",
+    "contains": "readonly base=",
+    "reason": "Explicit upstream index update command, not a citation."
+  },
+  {
+    "file": "Justfile",
+    "contains": "curl -fsSL https://docs.cloud.google.com/bigquery/docs/",
+    "reason": "Explicit upstream DDL metadata update command requiring HTML, not a citation."
+  },
+  {
+    "file": "tools/bigquery_functions.txt",
+    "contains": "# Each line is a function name and its page and anchor under",
+    "reason": "Defines the base URI for machine-readable relative page names, which bigquerydocs scans separately."
+  }
+]

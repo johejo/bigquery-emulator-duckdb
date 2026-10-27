@@ -1,5 +1,5 @@
 # BigQuery TIME_ADD/TIME_SUB wrap within a 24-hour day for all five supported parts.
-# Expected times follow https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_add
+# Expected times follow third_party/bigquery_docs/reference/standard-sql/time_functions.md
 # and #time_sub, using integer arithmetic modulo the microseconds in a day.
 # Read inputs from UNNEST to exercise translation rather than constant folding.
 

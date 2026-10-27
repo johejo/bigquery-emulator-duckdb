@@ -1,5 +1,5 @@
 # INFORMATION_SCHEMA.VIEWS columns and values documented by BigQuery.
-# https://cloud.google.com/bigquery/docs/information-schema-views
+# third_party/bigquery_docs/information-schema-views.md
 
 CREATE OR REPLACE VIEW scalars.infoschema_view_definition AS SELECT 1 AS x;
 SELECT view_definition FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_definition'

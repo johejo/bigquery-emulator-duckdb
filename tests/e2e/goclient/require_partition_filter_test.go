@@ -9,7 +9,7 @@ import (
 )
 
 // CREATE TABLE ignores NULL option values:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_statement
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestRequirePartitionFilterNullCreateOption(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

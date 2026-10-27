@@ -29,7 +29,7 @@ func loadGCS(ctx context.Context, table *bigquery.Table, schema bigquery.Schema,
 }
 
 // A load reads the objects a URI names, with at most one wildcard, as
-// https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards describes: a wildcard
+// third_party/bigquery_docs/batch-loading-data.md describes: a wildcard
 // matches across subfolders, and an object name is matched literally, escaped or not. A load
 // without a schema appends to the table's own.
 func TestGCSLoadWildcards(t *testing.T) {

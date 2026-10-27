@@ -1,0 +1,1204 @@
+{
+  "pages": [
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/arrays",
+      "file": "third_party/bigquery_docs/arrays.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/arrays",
+      "title": "Work with arrays",
+      "sha256": "186ae999a9fa0a7784d4f40170970c1d2da7ad3c61d727e1a2fd408e01d3bdde",
+      "updateTime": "2026-10-02T03:43:03Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/batch-loading-data",
+      "file": "third_party/bigquery_docs/batch-loading-data.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/batch-loading-data",
+      "title": "Batch load data",
+      "sha256": "441737e0cbba1088147768546933200dece4f639bad0edee16ee6b6410727f0d",
+      "updateTime": "2026-10-02T03:43:03Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/default-values",
+      "file": "third_party/bigquery_docs/default-values.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/default-values",
+      "title": "Specify default column values",
+      "sha256": "8f6580f9fde44d7531a1775c4e9c5f885a472bbfedabaa6e80fc4222483a4cba",
+      "updateTime": "2026-10-22T12:10:59Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/deleting-labels",
+      "file": "third_party/bigquery_docs/deleting-labels.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/deleting-labels",
+      "title": "Deleting labels",
+      "sha256": "b29f32677d81b97508163a954a4ff91b5d98a661ec5f770a72cf49fe02d0f175",
+      "updateTime": "2026-10-08T16:59:08Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/exporting-data",
+      "file": "third_party/bigquery_docs/exporting-data.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/exporting-data",
+      "title": "Export table data to Cloud Storage",
+      "sha256": "fc3a159c80616034d9671e73f26d144f1cf9a1444e685490ac8690f70c17cd58",
+      "updateTime": "2026-10-21T16:28:53Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/geospatial-data",
+      "file": "third_party/bigquery_docs/geospatial-data.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/geospatial-data",
+      "title": "Work with geospatial data",
+      "sha256": "c8944e21a9a4572ae1f95d1552d24baab3b44a0024a60aca28d2c1393aa90e5c",
+      "updateTime": "2026-10-02T03:50:23Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-datasets-schemata-options",
+      "file": "third_party/bigquery_docs/information-schema-datasets-schemata-options.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-datasets-schemata-options",
+      "title": "SCHEMATA_OPTIONS view",
+      "sha256": "04ef55e99f09fab6fe75c94f82bba10f5f81a35117ade06386cc8dd66f9d7120",
+      "updateTime": "2026-10-02T03:43:09Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-parameters",
+      "file": "third_party/bigquery_docs/information-schema-parameters.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-parameters",
+      "title": "PARAMETERS view",
+      "sha256": "2fb2b3daf35d713aa8d80b96aac6131c2048f65a178c25162c0583f0df39eadd",
+      "updateTime": "2026-10-02T03:42:47Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-partitions",
+      "file": "third_party/bigquery_docs/information-schema-partitions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-partitions",
+      "title": "PARTITIONS view",
+      "sha256": "247c58af8a7c83ea595fd4f3347f2e39205b6c6d9868d78d9a8e3b25bc979c6b",
+      "updateTime": "2026-10-11T03:47:52Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-routines",
+      "file": "third_party/bigquery_docs/information-schema-routines.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-routines",
+      "title": "ROUTINES view",
+      "sha256": "5d13915ed02f08aa4ffa19d9673ce2d1d479da1440c6f91133fe7b5053128ed2",
+      "updateTime": "2026-10-11T03:47:52Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-snapshots",
+      "file": "third_party/bigquery_docs/information-schema-snapshots.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-snapshots",
+      "title": "TABLE_SNAPSHOTS view",
+      "sha256": "268a3c7f88019963ab346e5a2d8933af90d88308d749855e6201bcf03a68aa2e",
+      "updateTime": "2026-10-02T03:42:47Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-table-options",
+      "file": "third_party/bigquery_docs/information-schema-table-options.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-table-options",
+      "title": "TABLE_OPTIONS view",
+      "sha256": "c6701568e400db259fcd5068a8b29a58f735e7cbf6387a9c4c73e50daa82b6fb",
+      "updateTime": "2026-10-11T03:47:52Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-tables",
+      "file": "third_party/bigquery_docs/information-schema-tables.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-tables",
+      "title": "TABLES view",
+      "sha256": "d4ca9cafbe0130e7be2a4f2e8aa4aa9c12f7e9cda93ebc94af48664e7b34d725",
+      "updateTime": "2026-10-11T03:47:52Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-views",
+      "file": "third_party/bigquery_docs/information-schema-views.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-views",
+      "title": "VIEWS view",
+      "sha256": "cc68a5c8f962a8ed3967e7007023820baa349bfdb12ec1fdda4e8393c1ccda9b",
+      "updateTime": "2026-10-02T03:43:46Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv",
+      "file": "third_party/bigquery_docs/loading-data-cloud-storage-csv.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv",
+      "title": "Load CSV data from Cloud Storage",
+      "sha256": "553e2b199d20cfc5864d9392e8d5a2760cc6a8f67172102268c542a80a412c3f",
+      "updateTime": "2026-10-21T21:01:01Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-json",
+      "file": "third_party/bigquery_docs/loading-data-cloud-storage-json.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-json",
+      "title": "Load JSON data from Cloud Storage",
+      "sha256": "3a55f8cf7fac4450a2c89ae05487b3e32f4c3347a6a43aad7d2a73f5b775ae42",
+      "updateTime": "2026-10-21T21:01:01Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/locations",
+      "file": "third_party/bigquery_docs/locations.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/locations",
+      "title": "BigQuery locations",
+      "sha256": "2c04af3d070d61fa0d31f4f4b7d7a1fea75fccffee8a5101e84692a60d349c7c",
+      "updateTime": "2026-10-09T16:58:25Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/managing-views",
+      "file": "third_party/bigquery_docs/managing-views.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/managing-views",
+      "title": "Manage logical views",
+      "sha256": "0683797291eef8f02d507ddb56cfd4fd6ddd4052621b33ecc4cd98dc1ba43113",
+      "updateTime": "2026-10-02T03:43:46Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/materialized-views-create",
+      "file": "third_party/bigquery_docs/materialized-views-create.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/materialized-views-create",
+      "title": "Create materialized views",
+      "sha256": "be77b86a3f77d505e0f99da98966ddd7e950b072c5f8882ea1b1845fe53e9146",
+      "updateTime": "2026-10-22T12:10:59Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/materialized-views-intro",
+      "file": "third_party/bigquery_docs/materialized-views-intro.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/materialized-views-intro",
+      "title": "Introduction to materialized views",
+      "sha256": "9dba7649ff0372cd403a874180820ea364503761ed41150f8feb07960241fbd3",
+      "updateTime": "2026-10-06T17:47:38Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/materialized-views-use",
+      "file": "third_party/bigquery_docs/materialized-views-use.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/materialized-views-use",
+      "title": "Use materialized views",
+      "sha256": "9c58dd698bbd0fd8ecd0489db58916549501cec585e63170b27136c8eaff6a90",
+      "updateTime": "2026-10-02T03:43:46Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/multi-statement-queries",
+      "file": "third_party/bigquery_docs/multi-statement-queries.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/multi-statement-queries",
+      "title": "Work with multi-statement queries",
+      "sha256": "df176eab364c3bbdbd12e68b4a7bee187c26fb9764685125380d76532e42ce40",
+      "updateTime": "2026-10-02T03:43:51Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/parameterized-queries",
+      "file": "third_party/bigquery_docs/parameterized-queries.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/parameterized-queries",
+      "title": "Run parameterized queries",
+      "sha256": "2a6dcd31855702cb5835b9dff1b38084c4910b39a44d7b10e0eaab2beaf23c12",
+      "updateTime": "2026-10-02T03:43:51Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/partitioned-tables",
+      "file": "third_party/bigquery_docs/partitioned-tables.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/partitioned-tables",
+      "title": "Introduction to partitioned tables",
+      "sha256": "0218f93de1fd438c83ab09469b7a25fc4e16482b6056df88dc3e3403e5d566b7",
+      "updateTime": "2026-10-23T18:04:35Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/bq-cli-reference",
+      "file": "third_party/bigquery_docs/reference/bq-cli-reference.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/bq-cli-reference",
+      "title": "bq command-line tool reference",
+      "sha256": "d4891a3823737cbde9a5987180f5644e5a3e967ed2df04f89142c0b0a700ac41",
+      "updateTime": "2026-10-16T17:54:34Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest",
+      "file": "third_party/bigquery_docs/reference/rest.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest",
+      "title": "BigQuery API",
+      "sha256": "0f9ddc104232d85232276711a7f8604ea084fdec78df25d9ee0be35f5025e762",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job",
+      "file": "third_party/bigquery_docs/reference/rest/v2/Job.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job",
+      "title": "Job",
+      "sha256": "33b867360605889332cbe5f7fbd5a06930da0dd469bc49e7655534fc6111a335",
+      "updateTime": "2026-10-02T18:43:35Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets",
+      "title": "REST Resource: datasets",
+      "sha256": "eab5c79419768d22f27fd46e6e6edff735d9e3c92154d24815f3fd4dac59de38",
+      "updateTime": "2026-03-14T23:23:17Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete",
+      "title": "Method: datasets.delete",
+      "sha256": "1e9dbd21a0325572f21bc5c868ff9699292120f2d3d4d6f193094e6fc1a8f128",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/get.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get",
+      "title": "Method: datasets.get",
+      "sha256": "b833410be6dbd93bb5d1e6a8fad7971904e931bc41f5a6536aa16792a569b4e0",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/insert.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert",
+      "title": "Method: datasets.insert",
+      "sha256": "61e2e0df43b4876b7caf6c035dfdbbf7b236208c4cca86915b653b41edb3007b",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list",
+      "title": "Method: datasets.list",
+      "sha256": "180d6e91ee564f6d680c9dc08b249d96fbf6115506278068e8909be78c732b2d",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/patch.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch",
+      "title": "Method: datasets.patch",
+      "sha256": "528c58f1306ec36c6cf1d009357590167479578c5c18d84583bf981d8f71c804",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/undelete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete",
+      "title": "Method: datasets.undelete",
+      "sha256": "62449d6aab2d1a7ba961ea811a055df61ae0cbc471e03a93e8c2a0a348452da8",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update",
+      "file": "third_party/bigquery_docs/reference/rest/v2/datasets/update.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update",
+      "title": "Method: datasets.update",
+      "sha256": "a089b2dbe50f1c0f8c42a3740026f723910cb0feaec8ec649af40c87f6d03376",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/cancel",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/cancel.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/cancel",
+      "title": "Method: jobs.cancel",
+      "sha256": "e6da3182cec31065fe5180e265b04b83d253fa9496081a150e416ec1cbe522ff",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/delete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/delete",
+      "title": "Method: jobs.delete",
+      "sha256": "1a129e7c909f2f386a4882627908e681935b5f191b4012cd881ee24b98b19120",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/get",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/get.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/get",
+      "title": "Method: jobs.get",
+      "sha256": "6f17ab2dd0e32d9e15b680990a3479ad4f30eff6ef51db8ecf69d75d2c6cd6f3",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/getQueryResults",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/getQueryResults.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/getQueryResults",
+      "title": "Method: jobs.getQueryResults",
+      "sha256": "1ea67ee3f43a667bf5e8852734d45607fabd600f17b08f35e3140a0da9934ed5",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/insert.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert",
+      "title": "Method: jobs.insert",
+      "sha256": "3b70e8a4a2eafd136e9de23414479c05cf74cd7f692c721ae6768c37c60134c4",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/list",
+      "title": "Method: jobs.list",
+      "sha256": "30693cf8d873edae67bbe7b07d7267503ec8cdec0a75628773666aba72d05b3d",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query",
+      "file": "third_party/bigquery_docs/reference/rest/v2/jobs/query.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query",
+      "title": "Method: jobs.query",
+      "sha256": "119f70de937e2db1c08d04b8c9565b555a9050ab01c7390a2a1035bb0f27d6a8",
+      "updateTime": "2026-06-30T05:33:54Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/delete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/models/delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/delete",
+      "title": "Method: models.delete",
+      "sha256": "4efd184a87604d3c09bbab65085daaee44352677d22d176cabfe1ca4b5ce3bb5",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/get",
+      "file": "third_party/bigquery_docs/reference/rest/v2/models/get.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/get",
+      "title": "Method: models.get",
+      "sha256": "4bb407afaa64783578383545ceface2f73801c10384b5b62d9c8ea81ac23c57d",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/models/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/list",
+      "title": "Method: models.list",
+      "sha256": "8eedd7b63d8c04ea3f37c0dd084874b551c9780a8338969605846269a23c68d1",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/patch",
+      "file": "third_party/bigquery_docs/reference/rest/v2/models/patch.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/patch",
+      "title": "Method: models.patch",
+      "sha256": "6b8f19e628bfaaeb9f582d895bbafdf6aacd00b5846b740cff16be0b0987a2d1",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/projects/getServiceAccount",
+      "file": "third_party/bigquery_docs/reference/rest/v2/projects/getServiceAccount.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/projects/getServiceAccount",
+      "title": "Method: projects.getServiceAccount",
+      "sha256": "8496c2ef5b9d079908ac74e54b545a51f9ad7dcce4b06d99a57d96c5816b672b",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/projects/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/projects/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/projects/list",
+      "title": "Method: projects.list",
+      "sha256": "28acd8804d1a43a9a7c6e595b1193daae6492bc2db68c8a66ea8aa360edf962d",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines",
+      "title": "REST Resource: routines",
+      "sha256": "a0c25a2783ad5fc2f00f9e6a9f582e1b735302e0483edf6cac1f4cc9eed9387c",
+      "updateTime": "2026-07-19T09:34:39Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/delete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/delete",
+      "title": "Method: routines.delete",
+      "sha256": "5082f9603df96920408297f63f2c62e340b29d0b1529e6b9ca0c3ee89a3d4f40",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/get",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/get.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/get",
+      "title": "Method: routines.get",
+      "sha256": "0e60c8213b4ca1cd14384a23d63c8441f3d24ac696629b6f36daa257bee04cbf",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/getIamPolicy",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/getIamPolicy.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/getIamPolicy",
+      "title": "Method: routines.getIamPolicy",
+      "sha256": "41073b1b42e0c6db8911a130b8ab05058750406d2af3205583fa089188d7a03f",
+      "updateTime": "2025-10-17T21:03:32Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/insert",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/insert.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/insert",
+      "title": "Method: routines.insert",
+      "sha256": "d6097456a25377231b60c24c80d9e7b487972a72edd247187fcdab1ff53da4df",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/list",
+      "title": "Method: routines.list",
+      "sha256": "360f566f5693a58aad75af79024b25324c6a2e7e80490c1b90c7cf23e04d479a",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/setIamPolicy",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/setIamPolicy.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/setIamPolicy",
+      "title": "Method: routines.setIamPolicy",
+      "sha256": "5a1132f6443eaa894bcacef28aa70e18f35251ab5309577a149d6e2fb0bd62ce",
+      "updateTime": "2025-10-17T21:03:59Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/testIamPermissions",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/testIamPermissions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/testIamPermissions",
+      "title": "Method: routines.testIamPermissions",
+      "sha256": "44aec92cd1235fce8ef741dafcb27d2b2cbf9474014606fdeb724144cfd3aaf4",
+      "updateTime": "2025-10-17T21:04:20Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/update",
+      "file": "third_party/bigquery_docs/reference/rest/v2/routines/update.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/update",
+      "title": "Method: routines.update",
+      "sha256": "d65c06210cc75a980c0dcde24b622f25015fc56a37fc149c2f131d3fae2c1bda",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/batchDelete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/batchDelete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/batchDelete",
+      "title": "Method: rowAccessPolicies.batchDelete",
+      "sha256": "80920e5e0cc65c9551bc20008a450a1c0e56acb57cff4af3f5321ca51fc13f0a",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/delete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/delete",
+      "title": "Method: rowAccessPolicies.delete",
+      "sha256": "57e98000549e85da7979112fd0716f87aa7729d9c7f51d78053de690059bb355",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/get",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/get.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/get",
+      "title": "Method: rowAccessPolicies.get",
+      "sha256": "2eb49d3a7d87789f56a2508972f10a7b483196fec088ca9a154057d280a31f7b",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/getIamPolicy",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/getIamPolicy.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/getIamPolicy",
+      "title": "Method: rowAccessPolicies.getIamPolicy",
+      "sha256": "e0ad1b96e108eab73df7a29cb8ed1126374d8eb25c25b9ef49199f6c3713ec7a",
+      "updateTime": "2025-10-17T21:03:42Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/insert",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/insert.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/insert",
+      "title": "Method: rowAccessPolicies.insert",
+      "sha256": "99fa582931ab81740c5dd6e3b4170bc398c17f3196b7b2e712b7bee868b98f05",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/list",
+      "title": "Method: rowAccessPolicies.list",
+      "sha256": "b64f8c6964b686e18f5ec62bdce0e2410cf06a8a05257cf31f4332d49a58ebc4",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/testIamPermissions",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/testIamPermissions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/testIamPermissions",
+      "title": "Method: rowAccessPolicies.testIamPermissions",
+      "sha256": "0204795bb521f4cd16f66671239a6757bc579b29f90e5346001c0fff77b727fd",
+      "updateTime": "2025-10-17T21:03:18Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/update",
+      "file": "third_party/bigquery_docs/reference/rest/v2/rowAccessPolicies/update.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/rowAccessPolicies/update",
+      "title": "Method: rowAccessPolicies.update",
+      "sha256": "463ad8c497c6f34a25f1c09f17337ec7536842328fcd341ebe91f5c4a5b5aa0b",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tabledata/insertAll.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll",
+      "title": "Method: tabledata.insertAll",
+      "sha256": "d3a87357358a8c383e7645251ecd70a98ae86f5306486fe10051dad6ab5a852e",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tabledata/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list",
+      "title": "Method: tabledata.list",
+      "sha256": "83d189dc2c59ed60dea90b19cb3e7cf9ced5295ae405ac63567b7c90aba42d50",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables",
+      "title": "REST Resource: tables",
+      "sha256": "46cba5aaf30f525aaff039cc6a6b92cf355e5baf98677843fe49b78be14ed0a7",
+      "updateTime": "2026-08-27T00:16:39Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/delete",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/delete",
+      "title": "Method: tables.delete",
+      "sha256": "83ebdabf5068d9b1f328899889fd63332d531d571092c7f71f4a394066cda924",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/get",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/get.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/get",
+      "title": "Method: tables.get",
+      "sha256": "d08ad93061b5746805265e82f9698847b0f2788dd52771fdba0e15392da36679",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/getIamPolicy.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy",
+      "title": "Method: tables.getIamPolicy",
+      "sha256": "49923f1be2957f80d8a3dcad8c4f10d047ade8db72b47bdcda463a8c3b807c31",
+      "updateTime": "2025-10-17T21:05:00Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/insert.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert",
+      "title": "Method: tables.insert",
+      "sha256": "bed8e2f54e9302b08a8faa4557f8ac6f81f9d6c603bf8ff265673eee7a608cec",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/list",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/list.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/list",
+      "title": "Method: tables.list",
+      "sha256": "f4a26be5cbd947b9262cc3e749d701e815a1f00c07d80afec6cd0828032fd95f",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/patch.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch",
+      "title": "Method: tables.patch",
+      "sha256": "691c1c41102672e8f3bd5a43d3a675dd768747a7528b4fbad2c2e1be79d86267",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/setIamPolicy",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/setIamPolicy.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/setIamPolicy",
+      "title": "Method: tables.setIamPolicy",
+      "sha256": "4ae5bfa939b9b6b936362920417389775babc08615d097856d83b873202c91ce",
+      "updateTime": "2025-10-17T21:04:12Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/testIamPermissions",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/testIamPermissions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/testIamPermissions",
+      "title": "Method: tables.testIamPermissions",
+      "sha256": "2084aa639c6e1b26867aa863be9ebfd5daa80d7078ded5bb4dc330ad576c32a5",
+      "updateTime": "2025-10-17T21:03:07Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/update",
+      "file": "third_party/bigquery_docs/reference/rest/v2/tables/update.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/update",
+      "title": "Method: tables.update",
+      "sha256": "ee9ea4c0908c9db12e258a351dbe9e7f710b0bc1e9dcdb879e643f6805502119",
+      "updateTime": "2026-05-30T12:26:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions",
+      "title": "AEAD encryption functions",
+      "sha256": "277fd54ec84b1d0bbf6f2a361312383db878d0f6e8d2618a32aa7f583c8cba21",
+      "updateTime": "2026-10-02T03:48:01Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/aggregate-dp-functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/aggregate-dp-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/aggregate-dp-functions",
+      "title": "Differentially private aggregate functions",
+      "sha256": "772970e003fa81d432b76810b97ae85228c21c14283d2903824eeb827ded3d94",
+      "updateTime": "2026-10-20T17:54:11Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions",
+      "title": "Aggregate functions",
+      "sha256": "73b3063151b9d2cfbf31f01f6b6a1902ee2bbbaeab62af474cea8b29ee8c065f",
+      "updateTime": "2026-10-16T19:48:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions",
+      "title": "Approximate aggregate functions",
+      "sha256": "f1bf58b9a0d05f7ae05d92ba40fdbbd50cd6e7c3a669a023d7bc0003069acee8",
+      "updateTime": "2026-10-15T20:23:00Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/array_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions",
+      "title": "Array functions",
+      "sha256": "4512de497e95d9f2b00c473e516949719c7fbf81a60581d67a0e9d88100837b1",
+      "updateTime": "2026-10-02T03:48:01Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/bit_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions",
+      "title": "Bit functions",
+      "sha256": "9f5e2987c9e602c017388c5132c06ed79e1a6b1f5889d833ff12f5b3479038cf",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions",
+      "title": "Conditional expressions",
+      "sha256": "b3ad62c503b55755d8abe3cbbd2762d12961e80370f71f31c11dbbf91c5b9a37",
+      "updateTime": "2026-10-08T18:27:29Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/conversion_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions",
+      "title": "Conversion functions",
+      "sha256": "815497ff0299516a0ffa28915ca4831fa3015eb553d809f6ec7ba2891d1908ad",
+      "updateTime": "2026-10-11T03:47:10Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language",
+      "file": "third_party/bigquery_docs/reference/standard-sql/data-definition-language.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language",
+      "title": "Data definition language (DDL) statements in GoogleSQL",
+      "sha256": "941daa527c408a977661edbe7d4e1b57805d6b49af3890ed925bd1a48f074062",
+      "updateTime": "2026-10-20T05:10:10Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-types",
+      "file": "third_party/bigquery_docs/reference/standard-sql/data-types.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-types",
+      "title": "Data types",
+      "sha256": "92f3dd53b5fdf43c6b12313452b14509730d0376900fcbe0b34489e22792ef0a",
+      "updateTime": "2026-10-16T19:48:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/date_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/date_functions",
+      "title": "Date functions",
+      "sha256": "216942bec7db5ab99ed4f8e885136cc3a5b2afd38833426c87297da2fd87e82d",
+      "updateTime": "2026-10-22T16:41:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions",
+      "title": "Datetime functions",
+      "sha256": "24f5be1555cf349204e4aa6741de5ceb4592247f9ce2602948f60aa7a61ab3b5",
+      "updateTime": "2026-10-22T16:41:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/debugging_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions",
+      "title": "Debugging functions",
+      "sha256": "1e7506ce986c68a1732af73cd0b1ad22456ea236f4cc61a92a80e607a4c35ca5",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/dlp_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions",
+      "title": "DLP encryption functions",
+      "sha256": "34cd26d18ce4ea4bd3fd6abfd1f8342ccd7d9eca03114125d07f57fc50352c26",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax",
+      "file": "third_party/bigquery_docs/reference/standard-sql/dml-syntax.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax",
+      "title": "Data manipulation language (DML) statements in GoogleSQL",
+      "sha256": "b336fde60715867b47beea52ef56dbe722bd291773aab8a121972801f2799b4e",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions",
+      "title": "Federated query functions",
+      "sha256": "6339af01abd942f4b9cfee1d490270a2c742cb34be36615a489f4606268eee79",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/format-elements",
+      "file": "third_party/bigquery_docs/reference/standard-sql/format-elements.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/format-elements",
+      "title": "Format elements",
+      "sha256": "b3a38efbce34ab60c3fddc18f97605c6a72864e0328b06904ea8d7ece3d2b62b",
+      "updateTime": "2026-10-09T22:30:01Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/functions-all",
+      "file": "third_party/bigquery_docs/reference/standard-sql/functions-all.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/functions-all",
+      "title": "Functions (alphabetical)",
+      "sha256": "e80ab6a82f312427dccf68f80c8a27450750ff3740fd02a5406293999fff6285",
+      "updateTime": "2026-10-15T14:49:58Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions",
+      "title": "Geography functions",
+      "sha256": "a692c5c96f20c9e8e89a279e715c9dad03fed71c1afd9a27f5e550c1cb81fba8",
+      "updateTime": "2026-10-13T04:32:14Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators",
+      "file": "third_party/bigquery_docs/reference/standard-sql/graph-operators.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators",
+      "title": "GQL operators",
+      "sha256": "a67dadd0a606da278e55a63ee95ea99d082927fc8a5a484d8289f75c79f997fe",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns",
+      "file": "third_party/bigquery_docs/reference/standard-sql/graph-patterns.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns",
+      "title": "GQL patterns",
+      "sha256": "6edc6418f1c294436d0ff41347b21ee3c4e33df48266b3a1306176fb2071ee97",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements",
+      "file": "third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements",
+      "title": "GQL query statements",
+      "sha256": "d9214f45fd32cd6650e9d08a4e1e2c59d471bb0aced71ce508fa6e22604599bd",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-schema-statements",
+      "file": "third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-schema-statements",
+      "title": "GQL schema statements",
+      "sha256": "6e854949b3f55e1e25dd11527a2009ebec5d2921bc9c6273588918cfca46a828",
+      "updateTime": "2026-10-16T19:48:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions",
+      "title": "GQL functions",
+      "sha256": "fa4d01a08f69d24b7bdd2d0d709d7b0fa4fcce5fb77fff0cd63562bdf5b5e36d",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-queries",
+      "file": "third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-queries",
+      "title": "Graphs within SQL",
+      "sha256": "795660ec92a85b9c6ed376ac8fff9f93dde573583ca02b861c41ad5c328f006c",
+      "updateTime": "2026-10-16T19:48:19Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/hash_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions",
+      "title": "Hash functions",
+      "sha256": "8f5409588fa9520d8841405eb764b80b9c547a67c2b69f069e5a1a4e5b93a348",
+      "updateTime": "2026-10-15T14:49:58Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/hll_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions",
+      "title": "HyperLogLog++ functions",
+      "sha256": "572caa98e924622463213f18d5bbb7296704722b57c7053be87012bdbade1497",
+      "updateTime": "2026-10-15T20:23:00Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/interval_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions",
+      "title": "Interval functions",
+      "sha256": "e944ecb0ee0cffe13bfcdd10372fd476722f99077125d8bfa32b99ebf3570887",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/json_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/json_functions",
+      "title": "JSON functions",
+      "sha256": "eafcc88d5ffea2e922497ad7a479f9e1dbb0773ac80173cb1ee38804521e5fa1",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions",
+      "title": "KLL quantile functions",
+      "sha256": "d867a0e63c51738fc9ee7b6c8ade736ffaa711a65916a4d209a8b57bf0fbab44",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/lexical",
+      "file": "third_party/bigquery_docs/reference/standard-sql/lexical.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/lexical",
+      "title": "Lexical structure and syntax",
+      "sha256": "1daac2c69bf97d37806f72219a5eee10cc528488929020681356d4ef37ef82a8",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions",
+      "title": "Mathematical functions",
+      "sha256": "8d12a58a2f01ad4f595b90194245e676024c5cff873155f03398504e612d7749",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions",
+      "title": "Navigation functions",
+      "sha256": "6fb34c08f5a3a1427e560f66efb0ab98cf81f2240a4828d22d08d5af8261da1e",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/net_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/net_functions",
+      "title": "Net functions",
+      "sha256": "311fb8cb8157c35d5285bd7378e92460c3e286141e46f8cc81339b0802d908ae",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions",
+      "title": "Numbering functions",
+      "sha256": "a9f6ee86228df3acc4d46036c4a42c4af8501f5f1aa2197a06bde0d4a8e22b07",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/objectref_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions",
+      "title": "ObjectRef functions",
+      "sha256": "1e456cf2ec2ea95f2ba9958b50ccc93dd7871a044390e85a33f5e8ae8e3877d7",
+      "updateTime": "2026-10-01T16:49:34Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/operators",
+      "file": "third_party/bigquery_docs/reference/standard-sql/operators.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/operators",
+      "title": "Operators",
+      "sha256": "7c53132e449f8ad6091cb570ea5887c6e927cf5fb31d9fd51c809b859c889b2f",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language",
+      "file": "third_party/bigquery_docs/reference/standard-sql/procedural-language.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language",
+      "title": "Procedural language",
+      "sha256": "9efc84c3799c3d2885e165e4be71fab14499861c3f3e25386a7db256c10ed4d1",
+      "updateTime": "2026-10-02T08:49:05Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax",
+      "file": "third_party/bigquery_docs/reference/standard-sql/query-syntax.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax",
+      "title": "Query syntax",
+      "sha256": "76aecce232d6c35b188c9372c65f6c8b15a145348cf7a575993d92f7ab9f20a1",
+      "updateTime": "2026-10-15T16:16:41Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/range-functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/range-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/range-functions",
+      "title": "Range functions",
+      "sha256": "d8338d495bb748edb5205dd534b000101be9d523491f18a3471935ca0ca56c09",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/search_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/search_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/search_functions",
+      "title": "Search functions",
+      "sha256": "eeef00b8f295d9588e9cd9849a55a4085b37a66a358abb821c857073d0eb8482",
+      "updateTime": "2026-10-22T18:05:35Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/security_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/security_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/security_functions",
+      "title": "Security functions",
+      "sha256": "9eb3810f599fbd99755e62f9de1311ca3fdf606986bfe85478fec281f69894b0",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions",
+      "title": "Statistical aggregate functions",
+      "sha256": "95bd5ced45db9fe2d93e5f33b46a96d5c512dbe01e0de7becc536e3a370552f3",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/string_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/string_functions",
+      "title": "String functions",
+      "sha256": "e35e23df4dcaf64b8bc83030d8b6b5a93dd723fb1d7652c941a24728867da834",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in",
+      "file": "third_party/bigquery_docs/reference/standard-sql/table-functions-built-in.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in",
+      "title": "Table functions (built in)",
+      "sha256": "8518e6d75ea370a4f367ed580696adc1ef912f370465d676a8b782cb05039e08",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis",
+      "file": "third_party/bigquery_docs/reference/standard-sql/text-analysis.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis",
+      "title": "Text analysis",
+      "sha256": "d90cd7a0a9f5d9a249e542b3924f2d250d4fa7ab5df87c68a70f2004ee2eaf4f",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions",
+      "title": "Text analysis functions",
+      "sha256": "f587d97c8608eee22d982a70bb7d0d46cdc09e91993e12a3feba452fb5d68169",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/time-series-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions",
+      "title": "Time series functions",
+      "sha256": "c76e99098bdd0482ebb194e39d5b918131c1343b6b13a0d667b57f16360a36a3",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/time_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/time_functions",
+      "title": "Time functions",
+      "sha256": "57fa90822f786ef9441d0014c8b3b2058b32ea36c988acdbc6b310693f7f7594",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions",
+      "title": "Timestamp functions",
+      "sha256": "9a53306301ef3f85e68d5ecaac0e4b23ae4996051b10a561ed3c4a23bed76c98",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/utility-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions",
+      "title": "Utility functions",
+      "sha256": "26e68b797c586e1198b5f261d3295ef299a6dfe593721425afbe3050a7847243",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/vectorindex_functions",
+      "file": "third_party/bigquery_docs/reference/standard-sql/vectorindex_functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/vectorindex_functions",
+      "title": "Vector index functions",
+      "sha256": "0de17e94a1aeb48e6a5127369e627f21e5a7b133f893d216cd30bba871b968d1",
+      "updateTime": "2026-10-02T03:44:33Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/storage",
+      "file": "third_party/bigquery_docs/reference/storage.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/storage",
+      "title": "Use the BigQuery Storage Read API to read table data",
+      "sha256": "9fd345720a0fb755f786cdc59fa8ff95cfb47c014291c8789baccb511287bedc",
+      "updateTime": "2026-10-02T03:49:42Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/system-variables",
+      "file": "third_party/bigquery_docs/reference/system-variables.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/system-variables",
+      "title": "System variables reference",
+      "sha256": "e7129742fdb419bab6c7ef4135ff05efac334ff277bf03a73fd02468eefe6377",
+      "updateTime": "2026-10-02T03:48:01Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/resource-hierarchy",
+      "file": "third_party/bigquery_docs/resource-hierarchy.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/resource-hierarchy",
+      "title": "Introduction to the resource hierarchy",
+      "sha256": "d61a6e0cb2fcf43b6dc78284f3a0800b1e6820e4ebc521fdc8e6aaa8000c18f8",
+      "updateTime": "2026-10-02T03:43:15Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/schemas",
+      "file": "third_party/bigquery_docs/schemas.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/schemas",
+      "title": "Specify a schema",
+      "sha256": "5e73e2a171f0f1fce115e68d87cf1246ab9f1ce129fb98b5642e6c876d572311",
+      "updateTime": "2026-10-22T12:10:59Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/supported-data-types",
+      "file": "third_party/bigquery_docs/supported-data-types.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/supported-data-types",
+      "title": "Supported protocol buffer and Arrow data types",
+      "sha256": "3d60c29bb8f5b195ffd2274da1a13922437fb7e5e4b259fcdabd50c045d0935b",
+      "updateTime": "2026-10-24T03:38:39Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-clones-create",
+      "file": "third_party/bigquery_docs/table-clones-create.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-clones-create",
+      "title": "Create table clones",
+      "sha256": "fabea8d96aebe58403e3851eab87c8b35a02de5ae790c238e2a10beabdbda682",
+      "updateTime": "2026-10-02T03:43:51Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-functions",
+      "file": "third_party/bigquery_docs/table-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-functions",
+      "title": "Table functions",
+      "sha256": "dee2f469385ae17286c0c595af57bce6bbf757f1f0e59712b7e4110f026ef356",
+      "updateTime": "2026-10-20T05:10:10Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-sampling",
+      "file": "third_party/bigquery_docs/table-sampling.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-sampling",
+      "title": "Table sampling",
+      "sha256": "d8bf72344fee93a701a47ce22b46177d0525bd7bad18432b6184c0164a4ea515",
+      "updateTime": "2026-10-02T03:43:43Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-snapshots-create",
+      "file": "third_party/bigquery_docs/table-snapshots-create.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-snapshots-create",
+      "title": "Create table snapshots",
+      "sha256": "441021b8e7dbeceb4d6019a9d58ff6db213a7fc5bba9d988c234c867e3b2c749",
+      "updateTime": "2026-10-02T03:43:43Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-snapshots-delete",
+      "file": "third_party/bigquery_docs/table-snapshots-delete.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-snapshots-delete",
+      "title": "Delete table snapshots",
+      "sha256": "ffc8c0586e532216cfcfe4b10e6348b725de13bcc00f3b1c2a7377c66ee874b8",
+      "updateTime": "2026-10-02T03:43:43Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-snapshots-intro",
+      "file": "third_party/bigquery_docs/table-snapshots-intro.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-snapshots-intro",
+      "title": "Introduction to table snapshots",
+      "sha256": "77458991c2b7d74df484db239b59a1086fa4c9d3676c28d70ecf867d76b76eff",
+      "updateTime": "2026-10-02T03:43:43Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-snapshots-restore",
+      "file": "third_party/bigquery_docs/table-snapshots-restore.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-snapshots-restore",
+      "title": "Restore table snapshots",
+      "sha256": "ff26e7d0e5ae07fec28b9933fd66d5df4e5a96d44d4e9caa228db78f5e412276",
+      "updateTime": "2026-10-19T08:55:50Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/table-snapshots-update",
+      "file": "third_party/bigquery_docs/table-snapshots-update.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/table-snapshots-update",
+      "title": "Update table snapshot metadata",
+      "sha256": "91330700d9e56743e4290f9c36ee05ffeedb015ef1907dba5aaa725d9597bff4",
+      "updateTime": "2026-10-16T17:27:10Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/tags",
+      "file": "third_party/bigquery_docs/tags.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/tags",
+      "title": "Control access with tags",
+      "sha256": "abbfaa69bdaf68cdd6dc153c7784a3299a419bff4964ff34a7e15bae413fe6aa",
+      "updateTime": "2026-09-30T16:43:47Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/time-travel",
+      "file": "third_party/bigquery_docs/time-travel.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/time-travel",
+      "title": "Data retention with time travel and fail-safe",
+      "sha256": "2f7aa5c26dcab1f3db79566c589baffb31ff1cd7611a170186aa83a07220cb93",
+      "updateTime": "2026-10-13T19:58:56Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/transactions",
+      "file": "third_party/bigquery_docs/transactions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/transactions",
+      "title": "Multi-statement transactions",
+      "sha256": "051f2a7a383531819501dde535044674833c0c048bab4d646fc217f80dc1da39",
+      "updateTime": "2026-10-22T10:24:59Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/updating-datasets",
+      "file": "third_party/bigquery_docs/updating-datasets.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/updating-datasets",
+      "title": "Update dataset properties",
+      "sha256": "259c69a6062860ec476b4373a773598f53edfd2bdca01bacaf726ff6cfba6e3c",
+      "updateTime": "2026-10-02T03:43:43Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/user-defined-functions",
+      "file": "third_party/bigquery_docs/user-defined-functions.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/user-defined-functions",
+      "title": "User-defined functions",
+      "sha256": "9e98a3107abf788c4e60b2ebe714fc27c399cb1ee782c7447f069bdf3a65fd89",
+      "updateTime": "2026-10-02T03:44:00Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python",
+      "file": "third_party/bigquery_docs/user-defined-functions-python.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/user-defined-functions-python",
+      "title": "Work with user-defined functions in Python",
+      "sha256": "359ad4bdc0266227b700e2a4bf03cc10a2aa3f6753bf2133914701e51ae2f962",
+      "updateTime": "2026-10-24T03:38:53Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/views",
+      "file": "third_party/bigquery_docs/views.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/views",
+      "title": "Create logical views",
+      "sha256": "dec48a378bb7256603efbf2d21f27c6261c81b26ba627689ea18c759efdffb70",
+      "updateTime": "2026-10-22T12:10:59Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/write-api-streaming",
+      "file": "third_party/bigquery_docs/write-api-streaming.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/write-api-streaming",
+      "title": "Stream data using the Storage Write API (gRPC)",
+      "sha256": "7a2a5100c68d09c856344df45fb0e9d1f10d0cb2b982fed48b75cea29ecb2a8f",
+      "updateTime": "2026-10-24T03:38:53Z"
+    }
+  ]
+}

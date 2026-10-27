@@ -1,6 +1,6 @@
 # Tag option types and values are documented at:
-# https://cloud.google.com/bigquery/docs/information-schema-table-options
-# https://cloud.google.com/bigquery/docs/tags#list_tags_attached_to_a_dataset
+# third_party/bigquery_docs/information-schema-table-options.md
+# third_party/bigquery_docs/tags.md
 # Synthetic tag definitions use the emulator's documented IAM exception.
 # These single-tag cases do not assume an order for multiple tags.
 
@@ -30,7 +30,7 @@ SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_na
 => "[STRUCT(\"123456789012/env\", \"test\")]"
 
 # Documented tag detachment removes the matching key/value pair and keeps other tags.
-# https://cloud.google.com/bigquery/docs/tags#detach_tags_from_a_table
+# third_party/bigquery_docs/tags.md
 CREATE OR REPLACE TABLE scalars.tags_removed (x INT64) OPTIONS (tags = [('123456789012/env', 'test'), ('123456789012/team', 'sales')]);
 ALTER TABLE scalars.tags_removed SET OPTIONS (tags -= [('123456789012/env', 'test')]);
 SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_removed' AND option_name = 'tags'

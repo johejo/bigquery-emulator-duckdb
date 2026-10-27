@@ -260,9 +260,9 @@ func TestAppendedRoundingModes(t *testing.T) {
 // OPTIONS "has no impact on new columns added to existing tables". A NUMERIC or BIGNUMERIC field
 // added to a table "without an explicit rounding mode specified" inherits the table's default, and
 // "Changing this field doesn't affect existing fields"
-// (https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets,
-// https://cloud.google.com/bigquery/docs/reference/rest/v2/tables,
-// https://cloud.google.com/bigquery/docs/updating-datasets). The rounded values are the examples
+// (third_party/bigquery_docs/reference/rest/v2/datasets.md,
+// third_party/bigquery_docs/reference/rest/v2/tables.md,
+// third_party/bigquery_docs/updating-datasets.md). The rounded values are the examples
 // of BigQuery's DDL reference, 2.25 to 2.2 and 2.3.
 func TestDefaultRoundingModes(t *testing.T) {
 	t.Parallel()

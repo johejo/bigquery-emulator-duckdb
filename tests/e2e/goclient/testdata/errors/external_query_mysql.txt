@@ -1,4 +1,4 @@
-# BigQuery's unsupported types: https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#unsupported_data_types
+# BigQuery's unsupported types: third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md
 # Fixtures: tests/e2e/mysql.sql.
 
 SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT bit_value FROM types')

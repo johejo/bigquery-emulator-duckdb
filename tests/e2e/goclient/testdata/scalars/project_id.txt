@@ -1,6 +1,6 @@
 # @@project_id is the read-only ID of the project that runs the query, test, in a single
 # statement as in a script; inside a procedure it is still the project that runs the script.
-# https://cloud.google.com/bigquery/docs/reference/system-variables
+# third_party/bigquery_docs/reference/system-variables.md
 
 SELECT @@project_id
 => "test"

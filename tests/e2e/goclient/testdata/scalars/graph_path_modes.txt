@@ -1,5 +1,5 @@
 # WALK keeps all paths, TRAIL excludes repeated edges, and ACYCLIC excludes repeated nodes.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 # FinGraph's edges 10 and 13 are parallel, 11 reverses them, and 12 is a self-loop.
 # The only two-edge directed walk that repeats an edge is (12, 12).
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH WALK (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)

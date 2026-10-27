@@ -1,6 +1,6 @@
 desc: resourceTags enforces its REST map type and local tag limits
-# https://cloud.google.com/bigquery/docs/reference/rest/v2/tables#Table.FIELDS.resource_tags
-# https://cloud.google.com/bigquery/docs/tags#limitations
+# third_party/bigquery_docs/reference/rest/v2/tables.md
+# third_party/bigquery_docs/tags.md
 # Synthetic tag definitions deliberately use the emulator's IAM exception.
 runners:
   req: ${BQ_EMULATOR_API}

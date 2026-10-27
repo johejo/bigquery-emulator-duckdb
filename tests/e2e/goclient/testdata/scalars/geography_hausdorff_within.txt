@@ -1,5 +1,5 @@
 # BigQuery geography function documentation: ST_HAUSDORFFDWITHIN.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_HAUSDORFFDWITHIN(ST_GEOGFROMTEXT('LINESTRING(10 1, 20 1)'), ST_GEOGFROMTEXT('LINESTRING(10 2, 20 2)'), 100000)
 => "false"

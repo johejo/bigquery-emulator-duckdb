@@ -3,7 +3,7 @@ package goclient
 import "testing"
 
 // Temporary UDFs belong to their query, as
-// https://cloud.google.com/bigquery/docs/user-defined-functions describes.
+// third_party/bigquery_docs/user-defined-functions.md describes.
 // Run separate jobs in order so that a JavaScript global leaking between them changes the result.
 func TestJavaScriptUdfKeepsNoStateAcrossQueries(t *testing.T) {
 	t.Parallel()

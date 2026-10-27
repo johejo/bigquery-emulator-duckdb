@@ -11,7 +11,7 @@ import (
 
 // TABLESAMPLE accepts a numeric parameter in [0, 100]. The endpoints select no rows or all
 // rows; intermediate percentages select a subset whose size is nondeterministic.
-// https://cloud.google.com/bigquery/docs/table-sampling
+// third_party/bigquery_docs/table-sampling.md
 // BigQuery's answers establish the NULL and infinity messages. On a 16-partition table with
 // 65,536 rows, NaN returned all rows in eight trials while 50 PERCENT returned half each time.
 func TestTableSampleQueryParameters(t *testing.T) {

@@ -123,7 +123,7 @@ void CheckRoundingModes(const std::vector<FieldSchema>& schema);
 
 // The path, below `path`, of the first field of `schema` whose name another field beside it has,
 // ignoring case as BigQuery does, at any depth; BigQuery rejects such a schema.
-// https://cloud.google.com/bigquery/docs/schemas#column_names
+// third_party/bigquery_docs/schemas.md
 std::optional<std::string> DuplicateFieldPath(const std::vector<FieldSchema>& schema,
                                               const std::string& path = "");
 

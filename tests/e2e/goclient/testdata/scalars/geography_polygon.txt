@@ -1,5 +1,5 @@
 ## GEOGRAPHY polygons and the functions over them
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The examples of ST_GEOGFROM, ST_CLUSTERDBSCAN, ST_SIMPLIFY, ST_EXTERIORRING and ST_INTERIORRINGS
 # show which region a polygon encloses and how it is written; the descriptions of ST_GEOGFROMTEXT,
 # ST_MAKEPOLYGON, ST_DIMENSION, ST_GEOMETRYTYPE, ST_NUMPOINTS, ST_ISCLOSED, ST_LENGTH and

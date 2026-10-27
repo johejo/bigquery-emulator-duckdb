@@ -1,5 +1,5 @@
 # JavaScript UDF cases from BigQuery's documentation:
-# https://cloud.google.com/bigquery/docs/user-defined-functions#javascript-udf-structure
+# third_party/bigquery_docs/user-defined-functions.md
 
 CREATE TEMP FUNCTION multiplyInputs(x FLOAT64, y FLOAT64)
 RETURNS FLOAT64
@@ -25,7 +25,7 @@ SELECT SUM(plusOne(x)) FROM UNNEST([1, 2, 3, 4, 5]) AS x
 => "20.0"
 
 # Argument encodings from BigQuery's documentation:
-# https://cloud.google.com/bigquery/docs/user-defined-functions#supported-javascript-udf-data-types
+# third_party/bigquery_docs/user-defined-functions.md
 
 CREATE TEMP FUNCTION f(b BYTES) RETURNS STRING LANGUAGE js AS "return typeof b + ':' + b;";
 SELECT f(b"abc")

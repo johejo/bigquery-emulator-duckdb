@@ -1,5 +1,5 @@
 # A view's query must resolve when it is created, and a view cannot read itself.
-# https://cloud.google.com/bigquery/docs/views
+# third_party/bigquery_docs/views.md
 
 CREATE SCHEMA IF NOT EXISTS errors_views; CREATE OR REPLACE VIEW errors_views.unresolved AS SELECT missing FROM UNNEST([1]) AS id
 => error:

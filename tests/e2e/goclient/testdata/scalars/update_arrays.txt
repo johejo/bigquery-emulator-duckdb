@@ -1,7 +1,7 @@
 # UPDATE replaces a repeated field with a rebuilt array. Expected values follow
 # the documented UPDATE repeated-record examples and ARRAY/UNNEST semantics:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#update_repeated_records
-# https://cloud.google.com/bigquery/docs/arrays#filtering_arrays
+# third_party/bigquery_docs/reference/standard-sql/dml-syntax.md
+# third_party/bigquery_docs/arrays.md
 # WITH OFFSET and ORDER BY preserve element order explicitly.
 
 CREATE TEMP TABLE ua AS SELECT [1, 2, 3] AS a;

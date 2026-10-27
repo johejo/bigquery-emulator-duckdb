@@ -1,5 +1,5 @@
 # Table paths that name no table fail, rather than resolve to another table.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#table_names
+# third_party/bigquery_docs/reference/standard-sql/lexical.md
 
 # No default dataset is set, so a table name alone names no table.
 SELECT 1 FROM t

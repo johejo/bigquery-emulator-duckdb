@@ -83,7 +83,7 @@ func TestTableMetadata(t *testing.T) {
 	check("v", metadata{"a view", "", map[string]string{"kind": "view"}})
 
 	// Empty labels arrays create unlabeled resources, including snapshots of labeled tables.
-	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language
+	// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 	for _, tc := range []struct {
 		name, sql string
 		want      metadata
@@ -100,7 +100,7 @@ func TestTableMetadata(t *testing.T) {
 	}
 
 	// SET OPTIONS with an empty array removes labels and preserves other metadata.
-	// https://cloud.google.com/bigquery/docs/deleting-labels
+	// third_party/bigquery_docs/deleting-labels.md
 	if err := run("ALTER TABLE ddl SET OPTIONS (labels = [])"); err != nil {
 		t.Fatal(err)
 	}

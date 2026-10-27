@@ -177,6 +177,15 @@ alone does not require removing existing support.
 
 ## Documentation
 
+For BigQuery specification lookups, prefer saved Markdown under `third_party/bigquery_docs/`.
+Source URLs in its manifest are attribution and update metadata, not instructions to browse.
+When citing a new official BigQuery page, run `just bigquery-docs-sync` after adding the citing
+file to Git, then commit the snapshot, manifest and localized citation together. Acquisition
+uses ADC by default, or `DEVELOPERKNOWLEDGE_API_KEY` when set; never replace a citation with a
+local path before its snapshot exists. Local citations link to the whole file, without `#` anchors.
+`just bigquery-docs-check` validates citations offline; refresh snapshots only
+explicitly with `just bigquery-docs-refresh`. See the snapshot directory's README for details.
+
 Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
 query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage
 and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in

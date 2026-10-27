@@ -1,5 +1,5 @@
 # EXTERNAL_QUERY on Cloud SQL for PostgreSQL
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#postgresql_mapping
+# third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md
 #
 # Each query needs a connection named postgres in the US multi-region, to a Cloud SQL for
 # PostgreSQL instance; the queries read no tables.

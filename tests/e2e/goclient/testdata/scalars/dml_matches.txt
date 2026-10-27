@@ -2,7 +2,7 @@
 # UPDATE and MERGE fail when a target row matches more than one source row, and change nothing;
 # target rows that match the same source row, unmatched duplicates and matches no action applies
 # to are valid, as is a MERGE that only deletes.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#update_statement
+# third_party/bigquery_docs/reference/standard-sql/dml-syntax.md
 
 CREATE TEMP TABLE t AS SELECT id, 0 AS v FROM UNNEST([1, 2, 2, 3]) AS id;
 UPDATE t SET v = s.v FROM UNNEST([STRUCT(1 AS id, 10 AS v), (1, 20), (3, 30)]) AS s
@@ -51,7 +51,7 @@ SELECT TO_JSON_STRING(ARRAY(SELECT id FROM t ORDER BY id))
 
 # A matched DELETE can coexist with INSERT; matching duplicates are not inserted, while
 # unmatched duplicates are. A true DELETE predicate on any match removes the target row.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement
+# third_party/bigquery_docs/reference/standard-sql/dml-syntax.md
 CREATE TEMP TABLE t AS SELECT id, 0 AS rowid, 0 AS _r, 0 AS _t FROM UNNEST([1, 2, 2, 3]) AS id;
 MERGE t USING UNNEST([STRUCT(1 AS id, FALSE AS del), (1, TRUE), (2, TRUE), (4, FALSE), (4, FALSE)]) AS s ON t.id = s.id
 WHEN MATCHED AND s.del THEN DELETE

@@ -13,9 +13,9 @@ import (
 // the value will only affect new tables, not existing ones", and "an explicit expirationTime when
 // creating a table ... takes precedence". The default "affects both tables and views", and DDL's
 // default_table_expiration_days sets it in days
-// (https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets,
-// https://cloud.google.com/bigquery/docs/managing-views,
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language).
+// (third_party/bigquery_docs/reference/rest/v2/datasets.md,
+// third_party/bigquery_docs/managing-views.md,
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md).
 func TestDatasetDefaultTableExpiration(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

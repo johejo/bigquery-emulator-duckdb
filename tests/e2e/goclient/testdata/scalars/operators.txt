@@ -46,7 +46,7 @@ SELECT DIV(7, 2)
 => "3"
 
 # DIV fails on a zero divisor, as division does.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div
+# third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
 SELECT DIV(x + 1, 0) FROM UNNEST([1]) x
 => error contains: division by zero
 

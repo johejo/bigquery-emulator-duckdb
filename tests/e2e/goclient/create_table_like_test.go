@@ -16,7 +16,7 @@ import (
 // CREATE TABLE LIKE copies only the metadata of the source table: its schema, partitioning,
 // clustering and options, which the statement's own clauses replace.
 // With AS SELECT, the data comes from the query, as documented at:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_like
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestCreateTableLike(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

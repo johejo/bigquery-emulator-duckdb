@@ -54,7 +54,7 @@ SELECT COUNT(*) AS c, SUM(id) AS s FROM t;`)
 }
 
 // EXECUTE IMMEDIATE sees no query parameters of the request, as
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
+// third_party/bigquery_docs/reference/standard-sql/procedural-language.md
 // describes; testdata/scalars/scripts.txt covers the rest of its rules.
 func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
 	t.Parallel()
@@ -118,7 +118,7 @@ func TestChildJobsOfAMultiStatementQueryAreUnsupported(t *testing.T) {
 }
 
 // Temporary tables follow
-// https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables.
+// third_party/bigquery_docs/multi-statement-queries.md.
 func TestTemporaryTablesLastForTheirMultiStatementQuery(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -183,7 +183,7 @@ SELECT a FROM t;`)
 	}
 }
 
-// https://cloud.google.com/bigquery/docs/multi-statement-queries#write_a_multi-statement_query
+// third_party/bigquery_docs/multi-statement-queries.md
 // excludes TEMP function declarations followed by one SELECT from multi-statement queries.
 func TestTemporaryFunctionQueryReportsSelectAndResolvedTypes(t *testing.T) {
 	t.Parallel()
@@ -234,7 +234,7 @@ SELECT StringIdentity(@value) AS answer`)
 }
 
 // Transaction changes persist only on commit, including when a script exits or fails.
-// https://cloud.google.com/bigquery/docs/transactions
+// third_party/bigquery_docs/transactions.md
 func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -287,7 +287,7 @@ func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
 
 // A table that expires while a transaction is open is not part of the transaction: queries from
 // other clients run meanwhile, and the transaction commits.
-// https://cloud.google.com/bigquery/docs/transactions
+// third_party/bigquery_docs/transactions.md
 func TestTransactionsLeaveExpirationToOtherQueries(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -344,7 +344,7 @@ func TestTransactionsLeaveExpirationToOtherQueries(t *testing.T) {
 
 // The analyzer's logical names are reported even when DuckDB uses positional internal names.
 // STRUCT names and order, including duplicate names, follow the data types reference:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#struct_type
+// third_party/bigquery_docs/reference/standard-sql/data-types.md
 func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
 	t.Parallel()
 	client := newClient(t)
@@ -369,7 +369,7 @@ func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
 
 // Dataset system variables change the defaults for subsequent statements, including DDL,
 // DML, scalar subqueries and dynamic SQL. Explicit table paths keep their meaning.
-// https://cloud.google.com/bigquery/docs/reference/system-variables
+// third_party/bigquery_docs/reference/system-variables.md
 func TestDatasetSystemVariablesResolveSubsequentStatements(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

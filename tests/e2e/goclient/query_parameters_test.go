@@ -13,9 +13,9 @@ import (
 )
 
 // Parameters substitute typed expressions, including arrays and structs:
-// https://cloud.google.com/bigquery/docs/parameterized-queries
+// third_party/bigquery_docs/parameterized-queries.md
 // NULL parameters are documented by the bq --parameter flag:
-// https://cloud.google.com/bigquery/docs/reference/bq-cli-reference#bq_query
+// third_party/bigquery_docs/reference/bq-cli-reference.md
 func TestQueryParameterValuesAndSchema(t *testing.T) {
 	t.Parallel()
 	client := newClient(t)
