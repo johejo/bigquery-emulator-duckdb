@@ -8,15 +8,21 @@ import (
 	"github.com/johejo/bigquery-emulator-duckdb/internal/ddloptions"
 )
 
-const reference = `
-<h3 id="table_option_list">Table options</h3>
-<table><tr><th>NAME</th><th>VALUE</th><th>Details</th></tr>
-<tr><td><code>description</code></td><td>STRING</td><td>Description</td></tr>
-<tr><td>new_option</td><td>BOOLEAN</td><td>A new option</td></tr></table>
-<h3 id="new_option_list">New options</h3>
-<table><tr><th>NAME</th><th>VALUE</th><th>Details</th></tr>
-<tr><td>labels</td><td>&lt;ARRAY&lt;STRUCT&lt;STRING, STRING&gt;&gt;&gt;</td><td>Labels</td></tr></table>
-`
+// ddl is the DDL reference's URL, which the snapshot's links keep.
+const ddl = "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language"
+
+const reference = "## `CREATE TABLE` statement\n\n" +
+	"- [`table_option_list`](" + ddl + "#table_option_list) : options.\n\n" +
+	"### `table_option_list`\n\n" +
+	"<table>\n<tbody>\n<tr class=\"header\">\n<th><code>NAME</code></th>\n<th><code>VALUE</code></th>\n<th>Details</th>\n</tr>\n" +
+	"<tr><td><code>description</code></td><td><p><code>STRING</code></p></td><td>Description</td></tr>\n" +
+	"<tr><td>new_option</td><td>BOOLEAN</td><td>A new option</td></tr>\n</tbody>\n</table>\n\n" +
+	"## `CREATE NEW` statement\n\n" +
+	"- [`option_list`](" + ddl + "#new_option_list) : options.\n\n" +
+	"### `option_list`\n\n" +
+	"| `NAME`   | `VALUE`                         | Details |\n" +
+	"|----------|---------------------------------|---------|\n" +
+	"| `labels` | `ARRAY<STRUCT<STRING, STRING>>` | [Labels](https://example.com) |\n"
 
 func catalog() *ddloptions.Catalog {
 	return &ddloptions.Catalog{
@@ -66,9 +72,20 @@ func TestNewOptionsAndGroupsHaveNoGuessedSamplesOrTemplates(t *testing.T) {
 
 func TestRejectsChangedUpstreamFormat(t *testing.T) {
 	t.Parallel()
-	err := refresh(catalog(), strings.NewReader("<html>Unavailable</html>"))
+	err := refresh(catalog(), strings.NewReader("# Unavailable\n"))
 	if err == nil || !strings.Contains(err.Error(), "no recognized option tables") {
 		t.Errorf("refresh() = %v", err)
+	}
+}
+
+func TestAnchorsWithoutLinksAreHeadings(t *testing.T) {
+	t.Parallel()
+	tables, err := optionTables(strings.NewReader("### `column_option_list`\n\n| Name | Value |\n|--|--|\n| `a` | `INT64` |\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tables["column_option_list"]; !reflect.DeepEqual(got, [][]string{{"a", "INT64"}}) {
+		t.Errorf("tables = %q", tables)
 	}
 }
 

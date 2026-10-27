@@ -1782,6 +1782,8 @@
     {
       "name": "CREATE FUNCTION Python",
       "group": "function_option_list",
+      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f', {option}) AS 'def f(x): return x'",
+      "implementation": "CREATE FUNCTION",
       "only": [
         "description",
         "library",
@@ -1790,27 +1792,25 @@
         "container_cpu",
         "container_memory",
         "container_request_concurrency"
-      ],
-      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f', {option}) AS 'def f(x): return x'",
-      "implementation": "CREATE FUNCTION"
+      ]
     },
     {
       "name": "CREATE FUNCTION Python runtime",
       "group": "function_option_list",
+      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(entry_point='f', {option}) AS 'def f(x): return x'",
       "implementation": "CREATE FUNCTION",
       "only": [
         "runtime_version"
-      ],
-      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(entry_point='f', {option}) AS 'def f(x): return x'"
+      ]
     },
     {
       "name": "CREATE FUNCTION Python entry point",
       "group": "function_option_list",
+      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', {option}) AS 'def f(x): return x'",
       "implementation": "CREATE FUNCTION",
       "only": [
         "entry_point"
-      ],
-      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', {option}) AS 'def f(x): return x'"
+      ]
     },
     {
       "name": "CREATE AGGREGATE FUNCTION SQL",
