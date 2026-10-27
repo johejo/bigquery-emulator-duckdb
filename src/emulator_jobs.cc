@@ -460,6 +460,10 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       if (!table.metadata.resource_tags.empty()) {
         throw ApiError::Unsupported("copy jobs from tables with tags");
       }
+      // Whether BigQuery copies a primary key is not known.
+      if (!table.metadata.primary_key.empty()) {
+        throw ApiError::Unsupported("copy jobs from tables with primary keys");
+      }
       if (sql.empty()) {
         schema = table.schema;
         first_source = source;

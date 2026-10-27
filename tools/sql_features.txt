@@ -22,6 +22,7 @@ setup CREATE PROPERTY GRAPH d.g NODE TABLES (d.t KEY (id) LABEL Person PROPERTIE
 section Graphs
 
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
+query `CREATE PROPERTY GRAPH` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.u)
 query `CREATE PROPERTY GRAPH` | CREATE OR REPLACE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
@@ -237,8 +238,15 @@ query Partitioning and clustering | CREATE TABLE n (d DATE) PARTITION BY d OPTIO
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE, partition_expiration_days = 1)
 note Partitioning and clustering | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering).
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
+query Primary and foreign keys | CREATE TABLE n (a INT64 PRIMARY KEY NOT ENFORCED)
+query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED) AS SELECT 1 AS a
 query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
-note Primary and foreign keys | Accepted and dropped.
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE u DROP PRIMARY KEY
+query Primary and foreign keys | ALTER TABLE u DROP PRIMARY KEY IF EXISTS
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE t ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES u (id) NOT ENFORCED
+query Primary and foreign keys | ALTER TABLE t DROP CONSTRAINT IF EXISTS fk
+note Primary and foreign keys | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
 query Collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64); INSERT n (a) VALUES (1); SELECT a FROM n
 query `CREATE TEMP TABLE` | CREATE TEMPORARY TABLE _SESSION.n AS SELECT id FROM t; SELECT id FROM _SESSION.n

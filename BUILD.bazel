@@ -284,7 +284,10 @@ cc_library(
     srcs = ["src/catalog_table.cc"],
     hdrs = ["src/catalog_table.h"],
     copts = ["-std=c++20"],
-    implementation_deps = [":table_source"],
+    implementation_deps = [
+        ":duckdb_sql",
+        ":table_source",
+    ],
     deps = [
         ":field_schema",
         ":references",

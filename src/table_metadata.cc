@@ -186,6 +186,24 @@ std::vector<std::string> ParseClustering(const json& value) {
 // The member `key` of `body`, or null when it has none.
 json Member(const json& body, const char* key) { return body.value(key, json()); }
 
+// TableConstraints.primaryKey.columns of `value`, a TableConstraints object or null; its
+// foreignKeys are dropped.
+std::vector<std::string> ParsePrimaryKey(const json& value) {
+  const json primary_key = value.is_object() ? Member(value, "primaryKey") : json();
+  const json columns = primary_key.is_object() ? Member(primary_key, "columns") : json();
+  if ((!value.is_null() && !value.is_object()) ||
+      (!primary_key.is_null() && !primary_key.is_object()) ||
+      (!columns.is_null() && !columns.is_array())) {
+    throw ApiError::Invalid("Field tableConstraints.primaryKey.columns must be an array");
+  }
+  std::vector<std::string> names;
+  std::ranges::transform(columns.is_array() ? columns : json::array(), std::back_inserter(names),
+                         [](const json& column) {
+                           return StringValue(column, "tableConstraints.primaryKey.columns");
+                         });
+  return names;
+}
+
 // Reads the partitioning of a Table resource `table` into `metadata`.
 void ParsePartitioning(const json& table, TableMetadata& metadata) {
   metadata.time_partitioning = ParseTimePartitioning(Member(table, "timePartitioning"));
@@ -445,6 +463,9 @@ json TableMetadata::ToJson() const {
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
+  if (!primary_key.empty()) {
+    fields["tableConstraints"] = {{"primaryKey", {{"columns", primary_key}}}};
+  }
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
@@ -565,6 +586,11 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
   } else if (!patch) {
     metadata.clustering.clear();
   }
+  if (const auto it = body.find("tableConstraints"); it != body.end()) {
+    metadata.primary_key = ParsePrimaryKey(*it);
+  } else if (!patch) {
+    metadata.primary_key.clear();
+  }
 }
 
 DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
@@ -643,6 +669,24 @@ void ValidateLabels(const std::map<std::string, std::string>& labels) {
     }
     if (const std::string_view problem = LabelTextProblem(value); !problem.empty()) {
       throw ApiError::Invalid(std::format("Label value \"{}\" {}", value, problem));
+    }
+  }
+}
+
+void ValidatePrimaryKey(const std::vector<std::string>& primary_key,
+                        const std::vector<FieldSchema>& schema) {
+  for (auto name = primary_key.begin(); name != primary_key.end(); ++name) {
+    const FieldSchema* field = FindField(schema, *name);
+    if (field == nullptr) {
+      throw ApiError::Invalid("The primary key column cannot be found in the schema: " + *name);
+    }
+    if (std::ranges::any_of(primary_key.begin(), name, [&](const std::string& other) {
+          return FindField(schema, other) == field;
+        })) {
+      throw ApiError::Invalid("Duplicate primary key column: " + field->name);
+    }
+    if (!field->default_value_expression.empty()) {
+      throw ApiError::Invalid("Primary key column " + field->name + " cannot have a default value");
     }
   }
 }

@@ -76,6 +76,7 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
   ValidateLabels(metadata.labels);
   ValidateResourceTags(metadata.resource_tags);
   ValidatePartitioning(metadata, schema);
+  ValidatePrimaryKey(metadata.primary_key, schema);
   json comment = metadata.ToJson();
   if (!metadata.tag_order.empty()) {
     comment["tagOrder"] = metadata.tag_order;
@@ -95,6 +96,10 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
   ValidateResourceTags(view.metadata.resource_tags);
   if (view.metadata.require_partition_filter) {
     throw ApiError::Unsupported("requirePartitionFilter on views");
+  }
+  // What BigQuery does with a primary key on a view is not known.
+  if (!view.metadata.primary_key.empty()) {
+    throw ApiError::Unsupported("tableConstraints on views");
   }
   if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
     if (view.materialized) {

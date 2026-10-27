@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 0 | 4 | 0 |
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 24 | 7 | 2 |
+| [DDL](#ddl) | 23 | 8 | 2 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -103,7 +103,7 @@ rejected.
 | Column rounding modes | Supported |  |
 | Default rounding modes | Supported |  |
 | Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option partition_expiration_days. |
-| Primary and foreign keys | Supported | Accepted and dropped. |
+| Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: ALTER TABLE action AddConstraintAction; ALTER TABLE action DropConstraintAction. |
 | Collation | Unsupported |  |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `CREATE TABLE LIKE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |

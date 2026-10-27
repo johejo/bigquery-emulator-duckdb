@@ -52,8 +52,8 @@ EDGE TABLES (scalar_graph.Transfer KEY (id, to_id, amount) SOURCE KEY (id) REFER
   DESTINATION KEY (to_id) REFERENCES Account (id) LABEL Transfers,
   scalar_graph.PersonOwnAccount KEY (id, account_id) SOURCE KEY (id) REFERENCES Person (id)
   DESTINATION KEY (account_id) REFERENCES Account (id) LABEL Owns);
--- BigQuery's documented FinGraph example as written, apart from the dataset name, and
--- CREATE PROPERTY GRAPH without OR REPLACE and with the tables' primary keys as KEY clauses.
+-- BigQuery's documented FinGraph example as written, apart from the dataset name and
+-- CREATE PROPERTY GRAPH without OR REPLACE. Its element tables take their tables' primary keys.
 -- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
 CREATE SCHEMA IF NOT EXISTS scalar_fingraph;
 CREATE OR REPLACE TABLE scalar_fingraph.Person (
@@ -117,15 +117,15 @@ VALUES
   (3,16,"2020-02-18 05:44:20.655");
 CREATE PROPERTY GRAPH scalar_fingraph.FinGraph
   NODE TABLES (
-    scalar_fingraph.Account KEY (id),
-    scalar_fingraph.Person KEY (id)
+    scalar_fingraph.Account,
+    scalar_fingraph.Person
   )
   EDGE TABLES (
-    scalar_fingraph.PersonOwnAccount KEY (id, account_id)
+    scalar_fingraph.PersonOwnAccount
       SOURCE KEY (id) REFERENCES Person (id)
       DESTINATION KEY (account_id) REFERENCES Account (id)
       LABEL Owns,
-    scalar_fingraph.AccountTransferAccount KEY (id, to_id, create_time)
+    scalar_fingraph.AccountTransferAccount
       SOURCE KEY (id) REFERENCES Account (id)
       DESTINATION KEY (to_id) REFERENCES Account (id)
       LABEL Transfers

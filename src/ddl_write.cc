@@ -276,6 +276,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       if (std::ranges::any_of(metadata.clustering, names)) {
         throw ApiError::Invalid("Cannot drop clustering column " + column->name);
       }
+      if (std::ranges::any_of(metadata.primary_key, names)) {
+        throw ApiError::Invalid("Cannot drop primary key column " + column->name);
+      }
       statements.push_back(std::format("ALTER TABLE {} DROP COLUMN {}", QualifiedName(table),
                                        QuoteIdentifier(column->name)));
       schema.erase(column);
@@ -307,6 +310,12 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
         throw ApiError::Invalid("Column not found: " + value->name);
       }
       if (!value->drop) {
+        if (std::ranges::any_of(metadata.primary_key, [&](const std::string& name) {
+              return ToLowerAscii(name) == ToLowerAscii(column->name);
+            })) {
+          throw ApiError::Invalid("Primary key column " + column->name +
+                                  " cannot have a default value");
+        }
         ValidateColumnDefault(
             *column, value->literal != nullptr ? std::optional(*value->literal) : std::nullopt);
       }
@@ -322,6 +331,22 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       std::ranges::move(RepeatedColumnDefaultStatements(table, {*column}),
                         std::back_inserter(statements));
       commented.push_back(column->name);
+    } else if (const auto* key = std::get_if<PrimaryKeyAction>(&action)) {
+      if (key->drop) {
+        if (metadata.primary_key.empty() && !key->if_exists) {
+          throw ApiError::Invalid("Table " + table.table_id + " has no primary key");
+        }
+        metadata.primary_key.clear();
+      } else {
+        if (!metadata.primary_key.empty()) {
+          throw ApiError::Invalid("Table " + table.table_id + " already has a primary key");
+        }
+        ValidatePrimaryKey(key->columns, schema);
+        std::ranges::transform(
+            key->columns, std::back_inserter(metadata.primary_key),
+            [&](const std::string& name) { return FindColumn(schema, name)->name; });
+      }
+      set_options = true;
     } else {
       const auto& updates = std::get<OptionUpdates>(action);
       ApplyOptionUpdates(updates, metadata);
