@@ -82,7 +82,8 @@ build:ci --repo_contents_cache_gc_idle_delay=5s
 # Let Gazelle reuse the Go caches that CI saves between runs.
 build:ci --repo_env=GO_REPOSITORY_USE_HOST_CACHE=1
 # Limit cache growth while leaving room for earlier builds; a recent cold macOS run used 2.1G.
-build:ci --experimental_disk_cache_gc_max_size=5G
+# GitHub Actions keeps 10GB of caches for the repository, shared with the repository caches.
+build:ci --experimental_disk_cache_gc_max_size=4G
 build:ci --experimental_disk_cache_gc_max_age=3d
 build:ci --experimental_disk_cache_gc_idle_delay=5s
 test:ci --test_output=errors
