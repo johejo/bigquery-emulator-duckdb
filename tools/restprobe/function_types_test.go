@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 
@@ -52,11 +51,13 @@ func TestTypeCoverageKeepsUntestedAndUnenumerated(t *testing.T) {
 	if len(calls) != 2 || calls[1].probe.Outcome != probereport.Untested {
 		t.Fatalf("missing untested form: %+v", calls)
 	}
-	var out bytes.Buffer
-	writeFunctionTypes(&out, map[string]bool{"F": true, "G": true}, catalog, calls)
-	for _, fragment := range []string{"**1 of 2 functions**", "| [F](#f) | 2 | Untested |", "| `G` | 0 | Not enumerated |", "no sample for NO_SAMPLE"} {
-		if !strings.Contains(out.String(), fragment) {
-			t.Errorf("report lacks %q", fragment)
+	reports := functionTypeReports(map[string]bool{"F": true, "G": true}, catalog, calls)
+	for _, fragment := range []string{"**1 of 2 functions**", "| [F](function-types/mathematical.md#f) | 2 | Untested |", "| `G` | 0 | Not enumerated |"} {
+		if !strings.Contains(string(reports["function-types.md"]), fragment) {
+			t.Errorf("index lacks %q", fragment)
 		}
+	}
+	if !strings.Contains(string(reports["function-types/mathematical.md"]), "no sample for NO_SAMPLE") {
+		t.Error("detail page lost untested form")
 	}
 }

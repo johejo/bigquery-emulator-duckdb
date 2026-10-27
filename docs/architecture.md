@@ -236,8 +236,13 @@ form and compares the REST result schema with the documented type, recursively i
 STRUCT fields, repeated fields and RANGE element metadata. Missing samples or analyzer
 rejections remain visible as Untested; functions absent from the catalog are Not enumerated.
 Syntax-like options can explicitly remain literals. A function cannot be Supported when an
-enumerated form is Untested. `just docs-function-types` regenerates this report alone;
-`just docs` includes it, and `just docs-check` checks both catalog and report freshness offline.
+enumerated form is Untested. The JSON catalog stays a single file; Markdown has an overview in
+`docs/function-types.md` and detail pages under `docs/function-types/`, grouped by specification
+page. The overview links directly to each function's details, and detail pages link back to the
+shared coverage notes. `just docs-function-types` regenerates this report set alone;
+`just docs` includes it, and `just docs-check` checks the catalog and every report file for
+freshness offline. `restprobe -check function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR` checks
+without modifying files, including detecting obsolete domain pages; regeneration removes them.
 These probes do not verify result values or establish semantic compatibility.
 
 ## DDL option probes

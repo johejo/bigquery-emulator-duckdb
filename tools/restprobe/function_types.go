@@ -4,10 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"runtime"
-	"strings"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/functioncoverage"
@@ -83,7 +81,7 @@ func typedResponse(r response, sql, want string) (probereport.Probe, error) {
 	return probereport.Probe{Outcome: probereport.Runs}, nil
 }
 
-func probeFunctionTypes(w io.Writer, binary, catalogPath, functionsPath string) error {
+func probeFunctionTypes(binary, catalogPath, functionsPath, outputDir string, check bool) error {
 	catalog, err := functioncoverage.Read(catalogPath)
 	if err != nil {
 		return err
@@ -137,45 +135,5 @@ func probeFunctionTypes(w io.Writer, binary, catalogPath, functionsPath string) 
 			return err
 		}
 	}
-	writeFunctionTypes(w, known, catalog, calls)
-	return nil
-}
-
-func writeFunctionTypes(w io.Writer, known map[string]bool, catalog functioncoverage.Catalog, calls []typedCall) {
-	byName := map[string][]typedCall{}
-	for _, call := range calls {
-		byName[call.function.Name] = append(byName[call.function.Name], call)
-	}
-	fmt.Fprint(w, functionTypesPreamble)
-	fmt.Fprintf(w, "\nType signatures are enumerated for **%d of %d functions**. The remaining **%d** are not enumerated; their function-level probes are listed in [functions.md](functions.md).\n", len(catalog.Functions), len(known), len(known)-len(catalog.Functions))
-	fmt.Fprint(w, "\n## Coverage\n\n| Function | Enumerated forms | Status |\n| --- | --- | --- |\n")
-	for _, name := range probereport.SortedNames(known) {
-		entries := byName[name]
-		if len(entries) == 0 {
-			fmt.Fprintf(w, "| `%s` | 0 | Not enumerated |\n", name)
-			continue
-		}
-		counts := map[probereport.Outcome]int{}
-		for _, call := range entries {
-			counts[call.probe.Outcome]++
-		}
-		status := probereport.Status(counts)
-		// The shared report's status ignores untested calls when some run. Here incomplete type
-		// coverage must never become Supported merely because all the calls we could build ran.
-		if counts[probereport.Untested] > 0 && status != "Broken" {
-			status = "Untested"
-		}
-		fmt.Fprintf(w, "| [%s](#%s) | %d | %s |\n", name, strings.ToLower(strings.ReplaceAll(name, ".", "")), len(entries), status)
-	}
-	for _, f := range catalog.Functions {
-		fmt.Fprintf(w, "\n## %s\n\nSource: [%s](../%s).\n", f.Name, f.Name, f.Source)
-		if f.Note != "" {
-			fmt.Fprintf(w, "\n%s\n", f.Note)
-		}
-		fmt.Fprint(w, "\n| Input types | Return type | Status | Notes |\n| --- | --- | --- | --- |\n")
-		for _, call := range byName[f.Name] {
-			status := probereport.Status(map[probereport.Outcome]int{call.probe.Outcome: 1})
-			fmt.Fprintf(w, "| `%s` | `%s` | %s | %s |\n", strings.Join(call.signature.Arguments, ", "), call.signature.Result, status, probereport.Escape(call.probe.Detail))
-		}
-	}
+	return syncFunctionTypeReports(outputDir, functionTypeReports(known, catalog, calls), check)
 }

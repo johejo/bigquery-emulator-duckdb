@@ -1,5 +1,6 @@
 // Command restprobe probes the emulator through its REST API and prints the Markdown reports
-// docs/sql.md, docs/options.md, docs/api.md and docs/functions.md. Each SQL, DDL option and API
+// docs/sql.md, docs/options.md, docs/api.md and docs/functions.md, and writes the function type
+// index and domain pages under OUTPUT_DIR. Each SQL, DDL option and API
 // probe starts a fresh emulator from the binary that -emulator names, so that probes neither see
 // nor disturb each other's data; function calls share a few emulators and their graph fixture. Probes
 // run in parallel.
@@ -8,7 +9,7 @@
 //	restprobe -emulator BINARY options CATALOG
 //	restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE
 //	restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE
-//	restprobe -emulator BINARY function-types CATALOG FUNCTIONS_FILE
+//	restprobe -emulator BINARY [-check] function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR
 //
 // FUNCTION_PROBE is //:function_probe, which builds the calls. CATALOG is tools/ddl_options.json.
 package main
@@ -94,25 +95,28 @@ func parallel(n int, run func(i int) error) error {
 
 func main() {
 	binary := flag.String("emulator", "", "the emulator binary to probe")
+	check := flag.Bool("check", false, "check function type report files without writing them")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: restprobe -emulator BINARY sql FEATURES_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY options CATALOG")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE")
-		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY function-types CATALOG FUNCTIONS_FILE")
+		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY [-check] function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR")
 	}
 	flag.Parse()
 	args := flag.Args()
 	var err error
 	switch {
+	case *check && (len(args) == 0 || args[0] != "function-types"):
+		err = fmt.Errorf("-check is only supported for function-types")
 	case *binary != "" && len(args) == 2 && args[0] == "sql":
 		err = probeSQL(os.Stdout, *binary, args[1])
 	case *binary != "" && len(args) == 2 && args[0] == "options":
 		err = probeOptions(os.Stdout, *binary, args[1])
 	case *binary != "" && len(args) == 3 && args[0] == "api":
 		err = probeAPI(os.Stdout, *binary, args[1], args[2])
-	case *binary != "" && len(args) == 3 && args[0] == "function-types":
-		err = probeFunctionTypes(os.Stdout, *binary, args[1], args[2])
+	case *binary != "" && len(args) == 4 && args[0] == "function-types":
+		err = probeFunctionTypes(*binary, args[1], args[2], args[3], *check)
 	case *binary != "" && len(args) == 4 && args[0] == "functions":
 		err = probeFunctions(os.Stdout, *binary, args[1], args[2:])
 	default:
