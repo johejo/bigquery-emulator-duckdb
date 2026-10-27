@@ -354,8 +354,10 @@ such as on macOS.
 
 Graph DDL rejects:
 
-- Keys other than INT64 or STRING columns, and properties other than INT64, STRING, BOOL or
-  FLOAT64 columns, such as computed properties.
+- Element tables without a `KEY` clause, since tables do not keep their primary keys.
+- Keys of type FLOAT64, BIGNUMERIC, INTERVAL, RANGE, GEOGRAPHY, JSON, ARRAY or STRUCT, and keys
+  other than columns.
+- Computed properties, measures and property options.
 - More than one label per element table, views as element tables, and graph options.
 - `OR REPLACE` and `IF NOT EXISTS` in `CREATE PROPERTY GRAPH`, and `IF EXISTS` in
   `DROP PROPERTY GRAPH`.

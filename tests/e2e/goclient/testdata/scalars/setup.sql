@@ -52,6 +52,84 @@ EDGE TABLES (scalar_graph.Transfer KEY (id, to_id, amount) SOURCE KEY (id) REFER
   DESTINATION KEY (to_id) REFERENCES Account (id) LABEL Transfers,
   scalar_graph.PersonOwnAccount KEY (id, account_id) SOURCE KEY (id) REFERENCES Person (id)
   DESTINATION KEY (account_id) REFERENCES Account (id) LABEL Owns);
+-- BigQuery's documented FinGraph example as written, apart from the dataset name, and
+-- CREATE PROPERTY GRAPH without OR REPLACE and with the tables' primary keys as KEY clauses.
+-- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+CREATE SCHEMA IF NOT EXISTS scalar_fingraph;
+CREATE OR REPLACE TABLE scalar_fingraph.Person (
+  id               INT64,
+  name             STRING,
+  birthday         TIMESTAMP,
+  country          STRING,
+  city             STRING,
+  PRIMARY KEY (id) NOT ENFORCED
+);
+CREATE OR REPLACE TABLE scalar_fingraph.Account (
+  id               INT64,
+  create_time      TIMESTAMP,
+  is_blocked       BOOL,
+  nick_name        STRING,
+  PRIMARY KEY (id) NOT ENFORCED
+);
+CREATE OR REPLACE TABLE scalar_fingraph.PersonOwnAccount (
+  id               INT64 NOT NULL,
+  account_id       INT64 NOT NULL,
+  create_time      TIMESTAMP,
+  PRIMARY KEY (id, account_id) NOT ENFORCED,
+  FOREIGN KEY (id) REFERENCES scalar_fingraph.Person(id) NOT ENFORCED,
+  FOREIGN KEY (account_id) REFERENCES scalar_fingraph.Account(id) NOT ENFORCED
+);
+CREATE OR REPLACE TABLE scalar_fingraph.AccountTransferAccount (
+  id               INT64 NOT NULL,
+  to_id            INT64 NOT NULL,
+  amount           FLOAT64,
+  create_time      TIMESTAMP NOT NULL,
+  order_number     STRING,
+  PRIMARY KEY (id, to_id, create_time) NOT ENFORCED,
+  FOREIGN KEY (id) REFERENCES scalar_fingraph.Account(id) NOT ENFORCED,
+  FOREIGN KEY (to_id) REFERENCES scalar_fingraph.Account(id) NOT ENFORCED
+);
+INSERT INTO scalar_fingraph.Account
+  (id, create_time, is_blocked, nick_name)
+VALUES
+  (7,"2020-01-10 06:22:20.222",false,"Vacation Fund"),
+  (16,"2020-01-27 17:55:09.206",true,"Vacation Fund"),
+  (20,"2020-02-18 05:44:20.655",false,"Rainy Day Fund");
+INSERT INTO scalar_fingraph.Person
+  (id, name, birthday, country, city)
+VALUES
+  (1,"Alex","1991-12-21 00:00:00","Australia","Adelaide"),
+  (2,"Dana","1980-10-31 00:00:00","Czech_Republic","Moravia"),
+  (3,"Lee","1986-12-07 00:00:00","India","Kollam");
+INSERT INTO scalar_fingraph.AccountTransferAccount
+  (id, to_id, amount, create_time, order_number)
+VALUES
+  (7,16,300,"2020-08-29 15:28:58.647","304330008004315"),
+  (7,16,100,"2020-10-04 16:55:05.342","304120005529714"),
+  (16,20,300,"2020-09-25 02:36:14.926","103650009791820"),
+  (20,7,500,"2020-10-04 16:55:05.342","304120005529714"),
+  (20,16,200,"2020-10-17 03:59:40.247","302290001255747");
+INSERT INTO scalar_fingraph.PersonOwnAccount
+  (id, account_id, create_time)
+VALUES
+  (1,7,"2020-01-10 06:22:20.222"),
+  (2,20,"2020-01-27 17:55:09.206"),
+  (3,16,"2020-02-18 05:44:20.655");
+CREATE PROPERTY GRAPH scalar_fingraph.FinGraph
+  NODE TABLES (
+    scalar_fingraph.Account KEY (id),
+    scalar_fingraph.Person KEY (id)
+  )
+  EDGE TABLES (
+    scalar_fingraph.PersonOwnAccount KEY (id, account_id)
+      SOURCE KEY (id) REFERENCES Person (id)
+      DESTINATION KEY (account_id) REFERENCES Account (id)
+      LABEL Owns,
+    scalar_fingraph.AccountTransferAccount KEY (id, to_id, create_time)
+      SOURCE KEY (id) REFERENCES Account (id)
+      DESTINATION KEY (to_id) REFERENCES Account (id)
+      LABEL Transfers
+  );
 
 CREATE SCHEMA IF NOT EXISTS scalars;
 CREATE SCHEMA IF NOT EXISTS scalars_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
