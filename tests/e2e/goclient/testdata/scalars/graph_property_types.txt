@@ -1,0 +1,64 @@
+# Graph element tables with TIMESTAMP keys and properties: the documented FinGraph examples,
+# over scalar_fingraph.FinGraph as written in the documentation. A final NEXT aggregates each
+# documented result table into one cell.
+
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+GRAPH scalar_fingraph.FinGraph
+MATCH (p:Person)
+RETURN p.name
+NEXT
+RETURN STRING_AGG(name, ',' ORDER BY name) AS result
+=> "Alex,Dana,Lee"
+
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+GRAPH scalar_fingraph.FinGraph
+MATCH (p:Person WHERE p.birthday < '1990-01-10')
+RETURN p.name
+NEXT
+RETURN STRING_AGG(name, ',' ORDER BY name) AS result
+=> "Dana,Lee"
+
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+GRAPH scalar_fingraph.FinGraph
+MATCH (n:Person WHERE n.birthday > '1990-01-10')
+RETURN n.name
+NEXT
+RETURN STRING_AGG(name, ',' ORDER BY name) AS result
+=> "Alex"
+
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+GRAPH scalar_fingraph.FinGraph
+MATCH -[e:Owns WHERE e.create_time > '2020-01-14' AND e.create_time < '2020-05-14']->
+RETURN e.id
+NEXT
+RETURN STRING_AGG(CAST(id AS STRING), ',' ORDER BY id) AS result
+=> "2,3"
+
+# The documented OPTIONAL CALL example without the CALL, which the result does not depend on
+# since every person's account has outgoing transfers.
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+GRAPH scalar_fingraph.FinGraph
+MATCH (p:Person)-[:Owns]->(a:Account)-[t:Transfers]->()
+RETURN p.name, a.Id AS account_id, t.amount AS transfer_amount, DATE(t.create_time) AS transfer_date
+NEXT
+RETURN STRING_AGG(FORMAT('%s:%d:%g:%t', name, account_id, transfer_amount, transfer_date), ',' ORDER BY name, transfer_date DESC) AS result
+=> "Alex:7:100:2020-10-04,Alex:7:300:2020-08-29,Dana:20:200:2020-10-17,Dana:20:500:2020-10-04,Lee:16:300:2020-09-25"
+
+# The Transfers edge table's key includes its TIMESTAMP column create_time.
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+GRAPH scalar_fingraph.FinGraph
+MATCH (account:Account)-[transfer:Transfers]-(:Account {is_blocked:true})
+RETURN transfer.order_number, transfer.amount
+NEXT
+RETURN STRING_AGG(FORMAT('%s:%g', order_number, amount), ',' ORDER BY order_number, amount) AS result
+=> "103650009791820:300,302290001255747:200,304120005529714:100,304330008004315:300"
+
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+GRAPH scalar_fingraph.FinGraph
+MATCH
+  (p:Person {id: 2})-[:Owns]->(account:Account)-[t:Transfers]->
+  (to_account:Account)
+RETURN p.id AS sender_id, to_account.id AS to_id
+NEXT
+RETURN STRING_AGG(FORMAT('%d:%d', sender_id, to_id), ',' ORDER BY to_id) AS result
+=> "2:7,2:16"

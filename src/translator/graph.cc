@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -30,8 +31,16 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-bool PropertyType(const googlesql::Type* type) {
-  return type->IsInt64() || type->IsString() || type->IsBool() || type->IsDouble();
+constexpr std::string_view kUnsupportedKeys =
+    "graph keys of type FLOAT64, BIGNUMERIC, INTERVAL, RANGE, GEOGRAPHY, JSON, ARRAY or STRUCT, or "
+    "other than columns";
+
+// Identities compare keys as text, which distinguishes FLOAT64 values that compare equal, such
+// as 0 and -0.
+bool KeyType(const googlesql::Type* type) {
+  return type->IsInt64() || type->IsString() || type->IsBytes() || type->IsBool() ||
+         type->IsDate() || type->IsDatetime() || type->IsTime() || type->IsTimestamp() ||
+         type->IsNumericType();
 }
 
 std::optional<std::string> Key(const googlesql::ResolvedExpr& expr,
@@ -55,8 +64,7 @@ std::optional<std::string> Keys(
   std::vector<std::string> names;
   for (const auto& key : keys) {
     const auto name = Key(*key, scan, native);
-    if (!name || (!key->type()->IsInt64() && !key->type()->IsString()) ||
-        key->type_annotation_map() != nullptr) {
+    if (!name || !KeyType(key->type()) || key->type_annotation_map() != nullptr) {
       return std::nullopt;
     }
     names.push_back(*name);
@@ -227,7 +235,7 @@ std::optional<std::string> CreatePropertyGraph(
       }
       const auto keys = Keys(element->key_list(), table, false);
       if (!keys || element->key_list().empty()) {
-        return Unsupported(scope, "graph keys other than columns");
+        return Unsupported(scope, kUnsupportedKeys);
       }
       const auto alias = googlesql::ToIdentifierLiteral(element->alias());
       std::string sql = googlesql::ToIdentifierLiteral(table.table()->FullName()) + " AS " + alias +
@@ -251,7 +259,7 @@ std::optional<std::string> CreatePropertyGraph(
           const auto native_edge_keys = Keys(ref->edge_table_column_list(), table, true);
           const auto native_node_keys = Keys(ref->node_table_column_list(), node_table, true);
           if (!edge_keys || !node_keys || !native_edge_keys || !native_node_keys) {
-            return Unsupported(scope, "graph endpoint keys other than columns");
+            return Unsupported(scope, kUnsupportedKeys);
           }
           const std::string side = source ? " SOURCE KEY " : " DESTINATION KEY ";
           sql +=
@@ -266,11 +274,10 @@ std::optional<std::string> CreatePropertyGraph(
       for (const auto& property : element->property_definition_list()) {
         const auto column = Key(*property->expr(), table, false);
         const auto native_column = Key(*property->expr(), table, true);
-        if (!column || !native_column || !PropertyType(property->expr()->type()) ||
+        if (!column || !native_column || !DuckDbType(property->expr()->type()) ||
             !property->options_list().empty() || property->is_measure() ||
             property->expr()->type_annotation_map() != nullptr) {
-          return Unsupported(scope,
-                             "graph properties other than INT64, STRING, BOOL or FLOAT64 columns");
+          return Unsupported(scope, "computed properties, measures or property options");
         }
         properties.push_back(*column + " AS " +
                              googlesql::ToIdentifierLiteral(property->property_declaration_name()));
@@ -429,8 +436,10 @@ std::optional<Relation> FlatGraphPath(
         return Unsupported(scope, "graph properties other than columns");
       }
       const auto* source = (*value)->GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
-      outputs.push_back(
-          std::format("{}.{} AS {}", variable, QuoteIdentifier(source->Name()), output));
+      outputs.push_back(std::format(
+          "{} AS {}",
+          StoredColumn(variable + "." + QuoteIdentifier(source->Name()), source->GetType()),
+          output));
       fields.push_back(std::format("{} := q.{}", name, output));
     }
     if (fields.empty()) {
