@@ -124,13 +124,16 @@ _restprobe := _test_go + " run ./tools/restprobe -emulator " + justfile_director
 _sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
 _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
 _function_probe := _restprobe + " functions " + justfile_directory() + "/bazel-bin/function_probe " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/tools/function_probe_hints.txt"
+_function_types_args := "function-types " + justfile_directory() + "/tools/function_types.json " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/docs"
+_function_types_probe := _restprobe + " " + _function_types_args
 _option_probe := _restprobe + " options " + justfile_directory() + "/tools/ddl_options.json"
 _storage_probe := _test_go + " run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 
 # Regenerates the compatibility tables for functions, SQL, DDL options, REST and Storage RPCs.
-docs:
+docs: function-types-update
     bazelisk build //:function_probe //:bigquery-emulator-duckdb
     {{ _function_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/functions.md > docs/functions.md.tmp && mv docs/functions.md.tmp docs/functions.md
+    {{ _function_types_probe }}
     {{ _sql_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/sql.md > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
     {{ _option_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/options.md > docs/options.md.tmp && mv docs/options.md.tmp docs/options.md
     {{ _api_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/api.md > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
@@ -138,12 +141,23 @@ docs:
 
 # Fails when function, SQL, DDL option, REST or Storage docs are stale.
 docs-check:
+    {{ _test_go }} run ./tools/functioncoverage third_party/bigquery_docs | diff -u tools/function_types.json - || { echo "function type catalog is stale; run just function-types-update" >&2; exit 1; }
     bazelisk build //:function_probe //:bigquery-emulator-duckdb
     {{ _function_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/functions.md | diff -u docs/functions.md - || { echo "docs/functions.md is stale; run just docs" >&2; exit 1; }
+    {{ _restprobe }} -check {{ _function_types_args }}
     {{ _sql_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/sql.md | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
     {{ _option_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/options.md | diff -u docs/options.md - || { echo "docs/options.md is stale; run just docs" >&2; exit 1; }
     {{ _api_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/api.md | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }
     {{ _storage_probe }} | diff -u docs/storage.md - || { echo "docs/storage.md is stale; run just docs" >&2; exit 1; }
+
+# Extract reviewed input/output type tables from the saved official function documentation.
+function-types-update:
+    {{ _test_go }} run ./tools/functioncoverage third_party/bigquery_docs > tools/function_types.json.tmp && mv tools/function_types.json.tmp tools/function_types.json
+
+# Regenerates the type-level report without the unrelated API and SQL probes.
+docs-function-types: function-types-update
+    bazelisk build //:bigquery-emulator-duckdb
+    {{ _function_types_probe }}
 
 # Regenerates docs/options.md alone, while editing tools/ddl_options.json.
 docs-options:

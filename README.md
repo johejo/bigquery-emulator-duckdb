@@ -272,6 +272,7 @@ What the emulator supports is listed in generated pages:
 - [docs/sql.md](docs/sql.md): statements and clauses
 - [docs/options.md](docs/options.md): DDL options
 - [docs/functions.md](docs/functions.md): built-in functions
+- [docs/function-types.md](docs/function-types.md): input-type combinations and return types, including enumeration gaps
 
 These tables check execution, not agreement with BigQuery's results or metadata.
 [Query and API limits](docs/compatibility.md) covers restrictions and differences, and the

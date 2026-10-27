@@ -211,6 +211,41 @@ For analysis, `RoutineCatalog` resolves view and routine definitions against the
 and dataset, shares their dependency state and detects recursion. This lets queries use current
 definitions while keeping job-local objects out of persistent dependencies.
 
+## Function type probes
+
+The existing `//:function_probe` enumerates GoogleSQL signatures and builds calls using
+`tools/function_probe_hints.txt`; `tools/restprobe functions` aggregates their outcomes per
+function. That is separate from the specification-driven type coverage in
+[function-types.md](function-types.md).
+
+`tools/functioncoverage` is a Go generator for reviewed classes of type tables and prose domains
+in the saved BigQuery documentation. `just function-types-update` generates
+`tools/function_types.json`, a reviewable list of concrete argument and result types with local
+source pages. It extracts unary INPUT/OUTPUT tables and binary input matrices from mathematical
+and aggregate function pages, with explicit rules for synonyms and optional arguments. Unknown
+table shapes or types fail generation. `domains.go` expands reviewed STRING/BYTES, numeric,
+orderable, array-element and arbitrary-value domains, checking that their source sections exist.
+These prose rules require review when the specification changes; they are not inferred from
+emulator registrations. Generic domains use representative nested structural shapes; their
+limits and other incomplete expansions are stated in the report and catalog notes.
+To expand coverage, add a reviewed extraction or domain rule and its source snapshot, regenerate
+the catalog, and review the concrete signatures. Keep function-specific valid samples in the
+catalog's generation rules and recursive typed samples in `internal/functioncoverage`.
+
+`tools/restprobe function-types` binds data arguments as typed columns, executes every catalog
+form and compares the REST result schema with the documented type, recursively including
+STRUCT fields, repeated fields and RANGE element metadata. Missing samples or analyzer
+rejections remain visible as Untested; functions absent from the catalog are Not enumerated.
+Syntax-like options can explicitly remain literals. A function cannot be Supported when an
+enumerated form is Untested. The JSON catalog stays a single file; Markdown has an overview in
+`docs/function-types.md` and detail pages under `docs/function-types/`, grouped by specification
+page. The overview links directly to each function's details, and detail pages link back to the
+shared coverage notes. `just docs-function-types` regenerates this report set alone;
+`just docs` includes it, and `just docs-check` checks the catalog and every report file for
+freshness offline. `restprobe -check function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR` checks
+without modifying files, including detecting obsolete domain pages; regeneration removes them.
+These probes do not verify result values or establish semantic compatibility.
+
 ## DDL option probes
 
 `tools/ddl_options.json` is a snapshot of the option lists in BigQuery's DDL reference. `groups`

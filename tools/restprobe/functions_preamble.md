@@ -10,7 +10,9 @@ grouped by the page that documents it, and whether the emulator runs it.
 queries in `tools/function_probe_hints.txt`, and `tools/restprobe` runs the calls. Optional date
 parts and time zones are probed both omitted and supplied. A probe checks only that a call
 translates and runs on DuckDB, not that it returns what BigQuery would. The notes of a Partial
-function list the forms the emulator rejected.
+function list the forms the emulator rejected. [Type-level coverage](function-types.md) lists
+explicit input-type combinations and return types from the saved official documentation,
+including functions whose types have not yet been enumerated.
 
 - **Supported**: every call runs.
 - **Partial**: some calls run, and the emulator rejects the others as unsupported.
