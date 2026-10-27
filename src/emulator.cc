@@ -61,7 +61,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::vector<ExternalConnection>& connections,
                    const udf::PythonOptions& python, const googlesql_geography::Options& geography,
                    const functions_duckdb::Options& functions,
-                   ExcludedFunctionIds excluded_function_ids)
+                   ExcludedFunctionIds excluded_function_ids, FunctionDeclarations declarations)
     : backend_(
           session_user, javascript,
           {
@@ -75,6 +75,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
           },
           python, geography, functions),
       excluded_function_ids_(std::move(excluded_function_ids)),
+      declarations_(declarations),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
   for (const ExternalConnection& connection : connections) {

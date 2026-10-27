@@ -313,6 +313,9 @@ class Emulator::ScriptHostImpl : public ScriptHost {
   [[nodiscard]] const ExcludedFunctionIds& excluded_function_ids() const override {
     return emulator_.excluded_function_ids_;
   }
+  [[nodiscard]] FunctionDeclarations function_declarations() const override {
+    return emulator_.declarations_;
+  }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
     return emulator_.NewTableSource(session, expire, &location_);
   }
@@ -434,7 +437,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   }
   const auto source = NewTableSource(nullptr, true, location);
   RoutineCatalog catalog(*source, &type_factory, settings.default_project, settings.default_dataset,
-                         nullptr, excluded_function_ids_);
+                         nullptr, excluded_function_ids_, declarations_);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
   std::optional<TranslatedStatement> translated =
@@ -541,7 +544,7 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
     // A default cannot read tables, so they need not be expired first.
     const auto source = NewTableSource(nullptr, /*expire=*/false);
     RoutineCatalog catalog(*source, &type_factory, table.project_id, "", nullptr,
-                           excluded_function_ids_);
+                           excluded_function_ids_, declarations_);
     const absl::StatusOr<AnalyzerResult> analyzed = AnalyzeScriptExpression(
         field.default_value_expression, nullptr, *type, catalog, type_factory, settings);
     if (!analyzed.ok()) {

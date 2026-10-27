@@ -37,7 +37,8 @@ class RoutineCatalog : public BigQueryCatalog {
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                  std::string default_project, std::string default_dataset,
                  const TemporaryTables* temporary = nullptr,
-                 const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds());
+                 const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds(),
+                 FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
   ~RoutineCatalog() override;
 
   absl::Status FindFunction(const absl::Span<const std::string>& path,
@@ -68,7 +69,8 @@ class RoutineCatalog : public BigQueryCatalog {
 
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                  std::string default_project, std::string default_dataset, State& state,
-                 const ExcludedFunctionIds& excluded_function_ids);
+                 const ExcludedFunctionIds& excluded_function_ids,
+                 FunctionDeclarations declarations);
 
   // The function `routine` defines, resolved as described above.
   absl::StatusOr<std::unique_ptr<googlesql::Function>> Resolve(const Routine& routine);

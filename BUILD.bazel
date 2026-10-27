@@ -1581,6 +1581,26 @@ cc_library(
 )
 
 cc_test(
+    name = "analyzer_declarations_test",
+    srcs = ["tests/analyzer_declarations_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":builtin_function_options",
+        ":emulator",
+        ":external_query",
+        ":project",
+        ":references",
+        "//src/googlesql_functions_duckdb:options",
+        "//src/googlesql_geography",
+        "//src/udf/javascript:limits",
+        "//src/udf/python:options",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "function_options_test",
     srcs = ["tests/function_options_test.cc"],
     copts = ["-std=c++20"],
