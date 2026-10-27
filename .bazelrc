@@ -8,22 +8,17 @@ build --host_cxxopt=-std=c++20
 build --action_env=PATH
 build --host_action_env=PATH
 
-# GoogleSQL loads time zones at runtime. Forward TZDIR, when set, to actions and tests for hosts
-# without /usr/share/zoneinfo, such as NixOS.
+# GoogleSQL loads time zones at runtime; forward TZDIR for hosts without /usr/share/zoneinfo.
 build --action_env=TZDIR
 build --test_env=TZDIR
 
-# Enable warnings for this repository's sources, including build tools, and fail on them, without
-# changing dependency compilation flags. Apple clang leaves designated initializers that omit a
-# field out of -Wextra, while the Nix clang on Linux warns about them.
+# Fail on warnings in this repository's sources and tools. Apple clang's -Wextra omits missing
+# designated initializers, which the Nix clang reports.
 build --per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Wmissing-designated-field-initializers,-Werror
 build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Wmissing-designated-field-initializers,-Werror
 
-# Silence warnings from dependencies, which this repository cannot fix, while keeping warnings
-# from its own C++ sources. -w covers dependency sources. Dependency headers are found through
-# -iquote, so warnings inside them, such as deprecations in inline functions, would still be
-# reported while compiling this repository's sources; treat them as system headers (a clang flag;
-# the Nix and Xcode toolchains are clang). Direct uses of deprecated APIs are still reported.
+# Silence dependencies' warnings: -w for their sources, and system-header treatment (a clang flag)
+# for their headers, found through -iquote. Direct uses of deprecated APIs are still reported.
 build --per_file_copt=external/.*@-w
 build --host_per_file_copt=external/.*@-w
 build --copt=--system-header-prefix=absl/
@@ -35,10 +30,8 @@ build --host_copt=--system-header-prefix=google/
 build --host_copt=--system-header-prefix=googlesql/
 build --host_copt=--system-header-prefix=s2/
 
-# Optimize dependencies, such as GoogleSQL, while this repository's sources keep the fastbuild
-# defaults so that they recompile quickly. The emulator starts in about half the CPU time, which
-# speeds up the probes and end-to-end tests that start many emulators. Exec tools are already
-# optimized.
+# Optimize dependencies but not this repository's sources, which recompile often. The emulator
+# starts in about half the CPU time, which speeds up probes and end-to-end tests.
 build --per_file_copt=external/.*@-O2
 
 # Share Python's OpenSSL across the TLS clients.
@@ -46,8 +39,7 @@ common --@postgres//:with_ssl=openssl
 common --@grpc//third_party:grpc_use_openssl=true
 common --@curl//:ssl_lib=openssl
 
-# GoogleSQL's py_binary relies on implicit __init__.py creation, which rules_python deprecates. No
-# Python target in the build needs it.
+# rules_python deprecates implicit __init__.py files, which only GoogleSQL's unused py_binary needs.
 build --incompatible_default_to_explicit_init_py
 # Bootstrap directly into rules_python's interpreter without a host Python on PATH.
 build --@rules_python//python/config_settings:bootstrap_impl=script
@@ -55,8 +47,7 @@ build --@rules_python//python/config_settings:bootstrap_impl=script
 # macOS build compatibility.
 build:macos --features=-header_modules
 build:macos --features=-parse_headers
-# The standalone CPython static archive contains LLVM bitcode. Use LLVM's Mach-O linker
-# for target binaries and build tools, rather than Apple's linker and its older LTO reader.
+# The static CPython archive contains LLVM bitcode, which Apple's linker reads poorly.
 build:macos --linkopt=-fuse-ld=lld
 build:macos --host_linkopt=-fuse-ld=lld
 
