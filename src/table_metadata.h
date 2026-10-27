@@ -154,7 +154,8 @@ struct DatasetMetadata {
 TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
-// `body` sets, clears those it sets to null, and merges its labels, a null value removing one;
+// `body` sets, clears those it sets to null, labels included, and merges its labels, a null value
+// removing one;
 // resourceTags patches merge keys and preserve their order. An empty object is a no-op on
 // tables, and null clears table tags. Empty patches on tagged datasets and null dataset tags
 // remain unsupported. Full updates replace resourceTags.
@@ -166,17 +167,15 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // cloneDefinition and snapshotDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
 
-// The metadata of the Dataset resource `dataset`, in the US unless it names another location. Any
-// other field with a value besides those that identify the dataset or that the server reports is
-// unsupported, since they change how BigQuery treats the dataset's tables. Throws
-// ApiError::Invalid for those, for a field of the wrong type, for a location BigQuery does not
-// have and for a label BigQuery rejects.
+// The metadata of the Dataset resource `dataset`, in the US unless it names another location.
+// Throws ApiError::Invalid for a field of the wrong type, for a location BigQuery does not have
+// and for a label BigQuery rejects.
 DatasetMetadata DatasetMetadataFromJson(const nlohmann::json& dataset);
 
 // datasets.patch (`patch`) or datasets.update applied to `metadata`, as UpdateTableMetadata does
-// for tables; a defaultTableExpirationMs of 0 clears it, as BigQuery documents for datasets.patch.
-// A location must be the dataset's own, since a dataset cannot move. Throws as
-// DatasetMetadataFromJson does.
+// for tables, except that datasets.update keeps the friendly name when `body` leaves it out; a
+// defaultTableExpirationMs of 0 clears it, as BigQuery documents for datasets.patch. A location
+// must be the dataset's own, since a dataset cannot move. Throws as DatasetMetadataFromJson does.
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const nlohmann::json& body, bool patch);
 
 // Throws ApiError::Invalid for a default table expiration BigQuery rejects: one shorter than an

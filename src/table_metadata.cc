@@ -73,10 +73,13 @@ std::string StringValue(const json& value, const char* key) {
   return value.get<std::string>();
 }
 
-// Applies the labels of `labels`, a JSON object, to `into`; a null value removes a label.
+// Applies the labels of `labels`, a JSON object, to `into`; a null value removes a label, and
+// null labels remove them all, as in a patch.
 void MergeLabels(const json& labels, std::map<std::string, std::string>& into,
                  std::vector<std::string>& order) {
   if (labels.is_null()) {
+    into.clear();
+    order.clear();
     return;
   }
   if (!labels.is_object()) {
@@ -236,8 +239,12 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch, b
   };
   set("description",
       [&](const json& value) { metadata.description = StringValue(value, "description"); });
-  set("friendlyName",
-      [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
+  // As BigQuery answers, datasets.update keeps a friendly name it leaves out, but clears one it
+  // sets to null.
+  if (table || body.contains("friendlyName")) {
+    set("friendlyName",
+        [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
+  }
   set("labels",
       [&](const json& value) { MergeLabels(value, metadata.labels, metadata.label_order); });
   if (const auto tags = body.find("resourceTags"); tags != body.end()) {
@@ -286,39 +293,6 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch, b
     metadata.default_rounding_mode = *std::move(parsed);
   });
   ValidateLabels(metadata.labels);
-}
-
-// Throws for the fields of a Dataset resource the emulator does not keep; see
-// DatasetMetadataFromJson. A null field, or an empty object or array, is accepted,
-// since it sets nothing.
-void CheckDatasetFields(const json& dataset) {
-  if (!dataset.is_object()) {
-    throw ApiError::Invalid("Invalid dataset resource");
-  }
-  static constexpr std::string_view kKnown[] = {
-      "kind",
-      "etag",
-      "id",
-      "selfLink",
-      "datasetReference",
-      "creationTime",
-      "lastModifiedTime",
-      "description",
-      "friendlyName",
-      "labels",
-      "resourceTags",
-      "tags",
-      "defaultTableExpirationMs",
-      "defaultRoundingMode",
-      "location",
-  };
-  for (const auto& [key, value] : dataset.items()) {
-    if (value.is_null() || ((value.is_object() || value.is_array()) && value.empty()) ||
-        std::ranges::find(kKnown, key) != std::end(kKnown)) {
-      continue;
-    }
-    throw ApiError::Unsupported("dataset field " + key);
-  }
 }
 
 // The location the Dataset resource `dataset` names, or nothing when it names none.
@@ -598,14 +572,12 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
 
 DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
   DatasetMetadata metadata;
-  CheckDatasetFields(dataset);
   metadata.location = DatasetLocationField(dataset).value_or(kDefaultLocation);
   UpdateDatasetMetadata(metadata, dataset, /*patch=*/false);
   return metadata;
 }
 
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool patch) {
-  CheckDatasetFields(body);
   // Whether BigQuery rejects another location or ignores it is not known.
   if (const std::optional<std::string> location = DatasetLocationField(body);
       location.has_value() && *location != metadata.Location()) {

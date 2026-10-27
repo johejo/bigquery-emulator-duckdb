@@ -48,6 +48,64 @@ const ResourceMask& RoutineFields() {
   return *kFields;
 }
 
+// The fields of a Dataset resource datasets.insert, patch and update handle, although they
+// support only some of their values.
+const ResourceMask& DatasetFields() {
+  static const ResourceMask* const kFields = new ResourceMask(MaskOf({
+      "datasetReference",
+      "description",
+      "friendlyName",
+      "labels",
+      "resourceTags",
+      "defaultTableExpirationMs",
+      "defaultRoundingMode",
+      "location",
+  }));
+  return *kFields;
+}
+
+// The fields of a Table resource tables.insert, patch and update handle, although they support
+// only some of their values.
+const ResourceMask& TableFields() {
+  static const ResourceMask* const kFields = [] {
+    auto* fields = new ResourceMask(MaskOf({
+        "tableReference",
+        "schema.fields.name",
+        "schema.fields.type",
+        "schema.fields.mode",
+        "schema.fields.fields",
+        "schema.fields.description",
+        "schema.fields.maxLength",
+        "schema.fields.precision",
+        "schema.fields.scale",
+        "schema.fields.roundingMode",
+        "schema.fields.rangeElementType",
+        "schema.fields.defaultValueExpression",
+        "schema.fields.policyTags",
+        "view.query",
+        "view.useLegacySql",
+        "materializedView.query",
+        "materializedView.enableRefresh",
+        "materializedView.allowNonIncrementalDefinition",
+        "timePartitioning",
+        "rangePartitioning",
+        "clustering",
+        "requirePartitionFilter",
+        "description",
+        "friendlyName",
+        "labels",
+        "resourceTags",
+        "expirationTime",
+        "defaultRoundingMode",
+        "tableConstraints",
+        "encryptionConfiguration",
+    }));
+    fields->fields["schema"].fields["fields"].fields["fields"].recursive = true;
+    return fields;
+  }();
+  return *kFields;
+}
+
 // The fields of a job resource ParseJobInsert handles, although it supports only some of their
 // values.
 const ResourceMask& JobFields() {
@@ -622,10 +680,9 @@ TableGetRequest ParseTableGet(const httplib::Request& request) {
   };
 }
 
-DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& body) {
-  if (!body.is_object()) {
-    throw ApiError::Invalid("Invalid dataset resource");
-  }
+// BigQuery ignores the fields a Dataset or Table resource lacks, at any depth, as it does a job's.
+DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& resource) {
+  const json body = CheckResource(resource, "Dataset", DatasetFields(), UnknownFields::kIgnore);
   const json reference = body.value("datasetReference", json::object());
   if (!reference.is_object() || !reference.contains("datasetId")) {
     throw ApiError::Invalid("Required parameter is missing: datasetId");
@@ -640,7 +697,8 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const jso
   };
 }
 
-TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json& body) {
+TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json& resource) {
+  const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore);
   const json reference = body.value("tableReference", json::object());
   if (!reference.is_object() || !reference.contains("tableId")) {
     throw ApiError::Invalid("Required parameter is missing: tableId");
@@ -654,9 +712,6 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   if (body.contains("materializedView")) {
     if (body.contains("view")) {
       throw ApiError::Invalid("Cannot specify both view and materializedView");
-    }
-    if (body.contains("maxStaleness")) {
-      throw ApiError::Unsupported("materialized view maxStaleness");
     }
     request.materialized = true;
     request.view = body["materializedView"];
@@ -758,21 +813,24 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   };
 }
 
-TableUpdateRequest ParseTableUpdate(const json& body) {
-  if (!body.is_object()) {
-    throw ApiError::Invalid("Invalid table resource");
+json ParseDatasetUpdate(const json& body, bool patch) {
+  return CheckResource(body, "Dataset", DatasetFields(), UnknownFields::kIgnore,
+                       patch ? Change::kPatch : Change::kUpdate);
+}
+
+TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
+  const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore,
+                                  patch ? Change::kPatch : Change::kUpdate);
+  if (!body.value("materializedView", json()).is_null()) {
+    throw ApiError::Unsupported("updating materializedView");
   }
-  if (body.contains("materializedView") || body.contains("maxStaleness")) {
-    throw ApiError::Unsupported("updating materializedView or maxStaleness");
-  }
-  TableUpdateRequest request;
-  if (body.contains("schema") && !body["schema"].is_null()) {
+  TableUpdateRequest request{.resource = body, .schema = std::nullopt, .view = std::nullopt};
+  // As BigQuery answers, a patch that sets the schema to null keeps it; the emulator keeps a view
+  // set to null too.
+  if (!body.value("schema", json()).is_null()) {
     request.schema = SchemaFromJson(body["schema"]);
   }
-  if (body.contains("view") && !body["view"].is_null()) {
-    if (!body["view"].is_object()) {
-      throw ApiError::Invalid("Invalid view definition");
-    }
+  if (!body.value("view", json()).is_null()) {
     request.view = body["view"];
   }
   return request;

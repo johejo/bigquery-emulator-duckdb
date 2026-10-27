@@ -48,7 +48,7 @@ request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"
 note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `resourceTags`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag. See [Resource tags](compatibility.md#resource-tags).
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
-note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels, resource tags and default table expiration.
+note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, labels, resource tags and default table expiration, and the friendly name when the request sets it.
 
 request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
 note bigquery.jobs.cancel | See [Jobs](compatibility.md#jobs).

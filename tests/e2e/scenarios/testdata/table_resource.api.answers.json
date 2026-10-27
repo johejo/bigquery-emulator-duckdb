@@ -1,0 +1,464 @@
+{
+  "version": 1,
+  "cases": {
+    "insert_array_schema": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid JSON payload received. Unknown name \"schema\" at 'table': Proto field is not repeating, cannot start list.",
+                        "field": "table"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid JSON payload received. Unknown name \"schema\" at 'table': Proto field is not repeating, cannot start list.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid JSON payload received. Unknown name \"schema\" at 'table': Proto field is not repeating, cannot start list.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_invalid_expiration_time": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'table.expiration_time.value' (TYPE_INT64), \"abc\"",
+                        "field": "table.expiration_time.value"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'table.expiration_time.value' (TYPE_INT64), \"abc\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'table.expiration_time.value' (TYPE_INT64), \"abc\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_invalid_num_rows": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'table.num_rows.value' (TYPE_UINT64), \"abc\"",
+                        "field": "table.num_rows.value"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'table.num_rows.value' (TYPE_UINT64), \"abc\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'table.num_rows.value' (TYPE_UINT64), \"abc\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_invalid_require_partition_filter": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'table.require_partition_filter.value' (TYPE_BOOL), \"abc\"",
+                        "field": "table.require_partition_filter.value"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'table.require_partition_filter.value' (TYPE_BOOL), \"abc\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'table.require_partition_filter.value' (TYPE_BOOL), \"abc\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_null_schema_field_description": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "insert_object_schema_fields": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "insert_snake_case_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "maxLength": "5",
+                "name": "x",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_field_rounding_mode": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'table.schema.fields[0].rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                        "field": "table.schema.fields[0].rounding_mode"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'table.schema.fields[0].rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'table.schema.fields[0].rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_unknown_rounding_mode": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'table.default_rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                        "field": "table.default_rounding_mode"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'table.default_rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'table.default_rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_unknown_schema_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "patch_null_fields": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "description": "c",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_null_label": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "description": "d",
+          "friendlyName": "f",
+          "schema": {
+            "fields": [
+              {
+                "description": "c",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_null_schema": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "description": "d",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          },
+          "schema": {
+            "fields": [
+              {
+                "description": "c",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_snake_case_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "description": "d",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          },
+          "schema": {
+            "fields": [
+              {
+                "description": "c",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "description": "e",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          },
+          "schema": {
+            "fields": [
+              {
+                "description": "c",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_unknown_schema_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "description": "d",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          },
+          "schema": {
+            "fields": [
+              {
+                "description": "e",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "update_null_fields": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "update_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,296 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run kb4pshlnlga2topmkr3zwxjpk4; the answers
+# sidecar keeps the observations. Rejections observe their status, reason and message.
+#
+# As jobs.insert does (job_resource.api.yaml), datasets.insert, patch and update ignore fields the
+# Dataset resource lacks, at any depth, and take integers for strings. Errors name protocol buffer
+# types the discovery document leaves out: defaultTableExpirationMs is a google.protobuf.Int64Value,
+# whose value field they name, and defaultRoundingMode a TableFieldSchema.RoundingMode.
+#
+# A patch takes its top-level fields by their JSON names only: it ignores friendly_name, which
+# datasets.insert takes. A patch that sets a field to null clears it.
+#
+# BigQuery also takes an object for the repeated access as its only element, and ignores an
+# unknown field of an access entry, but the emulator does not support access.
+description: >-
+  datasets.insert, patch and update with fields the Dataset schema lacks, protocol buffer field
+  names, values of the wrong JSON type, unknown enum values and null fields.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  insert:
+    steps:
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: ${body}
+        observe:
+          status: /status
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+          defaultTableExpirationMs: /body/defaultTableExpirationMs
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: ${body}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+  modify:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+            description: d
+            friendlyName: f
+            labels: {a: b}
+      - name: modify
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body: ${body}
+        observe:
+          status: /status
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: insert_unknown_field
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        unknownField: 1
+    expect:
+      insert:
+        status: 200
+  - name: insert_unknown_nested_field
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}', unknownField: 1}
+        location: US
+    expect:
+      insert:
+        status: 200
+  - name: insert_snake_case_field
+    template: insert
+    vars:
+      body:
+        dataset_reference: {dataset_id: '${dataset}'}
+        location: US
+        friendly_name: f
+    expect:
+      insert:
+        status: 200
+        friendlyName: f
+  - name: insert_number_description
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        description: 1
+    expect:
+      insert:
+        status: 200
+        description: '1'
+  - name: insert_number_label_value
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        labels: {a: 1}
+    expect:
+      insert:
+        status: 200
+        labels: {a: '1'}
+  - name: insert_number_default_table_expiration
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        defaultTableExpirationMs: 3600000
+    expect:
+      insert:
+        status: 200
+        defaultTableExpirationMs: '3600000'
+  - name: insert_invalid_default_table_expiration
+    template: rejected
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        defaultTableExpirationMs: abc
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Invalid value at 'dataset.default_table_expiration_ms.value' (TYPE_INT64), "abc"
+  - name: insert_string_case_insensitive
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        isCaseInsensitive: 'false'
+    expect:
+      insert:
+        status: 200
+  - name: insert_unknown_rounding_mode
+    template: rejected
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        defaultRoundingMode: ROUND_UP
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'dataset.default_rounding_mode'
+          (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), "ROUND_UP"
+  - name: insert_unknown_storage_billing_model
+    template: rejected
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        storageBillingModel: CHEAP
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'dataset.storage_billing_model'
+          (type.googleapis.com/google.cloud.bigquery.v2.Dataset.StorageBillingModel), "CHEAP"
+  - name: insert_string_reference
+    template: rejected
+    vars:
+      body:
+        datasetReference: '${dataset}'
+        location: US
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'dataset.dataset_reference'
+          (type.googleapis.com/google.cloud.bigquery.v2.DatasetReference), "${dataset}"
+  - name: insert_null_description
+    template: insert
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        description: null
+    expect:
+      insert:
+        status: 200
+  - name: insert_invalid_creation_time
+    template: rejected
+    vars:
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        location: US
+        creationTime: abc
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Invalid value at 'dataset.creation_time' (TYPE_INT64), "abc"
+  - name: patch_unknown_field
+    template: modify
+    vars:
+      method: PATCH
+      body: {description: e, unknownField: 1}
+    expect:
+      modify: {status: 200}
+      get: {description: e, friendlyName: f, labels: {a: b}}
+  - name: patch_unknown_nested_field
+    template: modify
+    vars:
+      method: PATCH
+      body:
+        datasetReference: {datasetId: '${dataset}', unknownField: 1}
+        description: e
+    expect:
+      modify: {status: 200}
+      get: {description: e, friendlyName: f, labels: {a: b}}
+  - name: patch_snake_case_field
+    template: modify
+    vars:
+      method: PATCH
+      body: {friendly_name: g}
+    expect:
+      modify: {status: 200}
+      get: {description: d, friendlyName: f, labels: {a: b}}
+  - name: patch_null_fields
+    template: modify
+    vars:
+      method: PATCH
+      body: {description: null, friendlyName: null, labels: null}
+    expect:
+      modify: {status: 200}
+      get: {}
+  - name: patch_null_label
+    template: modify
+    vars:
+      method: PATCH
+      body: {labels: {a: null}}
+    expect:
+      modify: {status: 200}
+      get: {description: d, friendlyName: f}
+  - name: update_unknown_field
+    template: modify
+    vars:
+      method: PUT
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        description: e
+        unknownField: 1
+    expect:
+      modify: {status: 200}
+      get: {description: e, friendlyName: f}
+  - name: update_null_fields
+    template: modify
+    vars:
+      method: PUT
+      body:
+        datasetReference: {datasetId: '${dataset}'}
+        description: null
+        friendlyName: null
+        labels: null
+    expect:
+      modify: {status: 200}
+      get: {}

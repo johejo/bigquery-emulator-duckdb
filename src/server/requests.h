@@ -84,6 +84,8 @@ struct TableInsertRequest {
 
 // What tables.patch and tables.update change. The emulator keeps what they leave out.
 struct TableUpdateRequest {
+  // The checked Table resource, for UpdateTableMetadata.
+  nlohmann::json resource;
   std::optional<std::vector<FieldSchema>> schema;
   std::optional<nlohmann::json> view;
 };
@@ -135,10 +137,15 @@ ListPage ParseListPage(const httplib::Request& request);
 DatasetFilter ParseDatasetFilter(const httplib::Request& request);
 RoutineListRequest ParseRoutineList(const httplib::Request& request);
 TableGetRequest ParseTableGet(const httplib::Request& request);
-DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
-TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
+DatasetInsertRequest ParseDatasetInsert(const std::string& project_id,
+                                        const nlohmann::json& resource);
+TableInsertRequest ParseTableInsert(const DatasetReference& dataset,
+                                    const nlohmann::json& resource);
 Routine ParseRoutine(const DatasetReference& dataset, const nlohmann::json& body);
-TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
+// The checked Dataset resource of datasets.patch (`patch`) or datasets.update, for
+// UpdateDatasetMetadata.
+nlohmann::json ParseDatasetUpdate(const nlohmann::json& body, bool patch);
+TableUpdateRequest ParseTableUpdate(const nlohmann::json& resource, bool patch);
 InsertAllRequest ParseInsertAll(const nlohmann::json& body);
 
 }  // namespace bigquery_emulator_duckdb::server

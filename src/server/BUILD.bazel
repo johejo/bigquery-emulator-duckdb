@@ -59,6 +59,8 @@ cc_library(
         "//:api_error",
         "//:discovery_document",
         "//:httplib",
+        "@googleapis//google/cloud/bigquery/v2:bigquery_cc_proto",
+        "@protobuf",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],

@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "cases": {
+    "insert_invalid_type": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_null_description": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_number_description": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "description": "1",
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_number_expiration_time": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "expirationTime": "4102444800000",
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_number_label_value": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "labels": {
+            "a": "1"
+          },
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_number_table_id": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_string_require_partition_filter": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_reference_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {},
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_view_field": {
+      "project": "johejo-sandbox",
+      "run": "sekw35nji45hayi63jydi2zl74",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  }
+}
