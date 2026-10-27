@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
+#include "src/backend_initializer.h"
 #include "src/field_schema.h"
 #include "src/function_options.h"
 #include "src/googlesql_functions_duckdb/objectref_options.h"
@@ -16,8 +17,6 @@
 #include "src/googlesql_geography/options.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
-#include "src/udf/javascript/limits.h"
-#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -37,11 +36,10 @@ class Backend {
  public:
   explicit Backend(
       const std::optional<std::string>& session_user = std::nullopt,
-      const udf::JavaScriptLimits& javascript = udf::JavaScriptLimits(),
       const functions_duckdb::ObjectStorage& storage = functions_duckdb::ObjectStorage(),
-      const udf::PythonOptions& python = udf::PythonOptions(),
       const googlesql_geography::Options& geography = {.expand_bounding_box = true},
-      const functions_duckdb::Options& functions = BigQueryFunctionOptions());
+      const functions_duckdb::Options& functions = BigQueryFunctionOptions(),
+      const BackendInitializer& initialize = {});
   ~Backend();
 
   Backend(const Backend&) = delete;

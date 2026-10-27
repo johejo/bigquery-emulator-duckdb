@@ -150,7 +150,8 @@ ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapte
 connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
 GCS-backed metadata fetch, and [connection_id.cc](../src/connection_id.cc) normalizes connection IDs
 for both ObjectRef and external queries. [backend_functions.cc](../src/backend_functions.cc)
-assembles registration of these function libraries and UDF adapters.
+assembles registration of these common function libraries. Application-specific registrations
+are supplied through a [`BackendInitializer`](../src/backend_initializer.h).
 
 HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
 the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.
@@ -238,6 +239,11 @@ execution limits. [udf/python](../src/udf/python/) owns Python worker discovery,
 communication and limits. Neither runtime depends on DuckDB. [udf_duckdb](../src/udf_duckdb/)
 converts SQL values, registers the UDF calls and ties one runtime per thread to the query lifetime.
 The runtimes keep separate interfaces because their execution and ownership models differ.
+[udf_duckdb/register.cc](../src/udf_duckdb/register.cc) captures their configuration in a backend
+initializer, which the executable supplies to `Emulator` in both server and shell modes. The
+common backend does not depend on either runtime; compliance omits the initializer and links
+neither QuickJS nor the Python worker runtime. This execution composition is independent of the
+catalog's declaration policy and leaves SQL UDF analysis and translation in the common path.
 
 Python routine definitions are stored in the same macro comments as SQL routines, with their
 runtime and entry point. The catalog exposes them as volatile functions, and the translator

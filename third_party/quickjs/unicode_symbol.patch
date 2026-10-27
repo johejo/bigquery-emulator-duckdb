@@ -1,0 +1,13 @@
+diff --git a/libunicode.h b/libunicode.h
+--- a/libunicode.h
++++ b/libunicode.h
+@@ -108,6 +108,9 @@ bool lre_is_id_start(uint32_t c);
+ bool lre_is_id_continue(uint32_t c);
+ bool lre_is_white_space(uint32_t c);
+ 
++/* PostgreSQL exports a different C function with this name. */
++#define unicode_normalize quickjs_unicode_normalize
++
+ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
+                       UnicodeNormalizationEnum n_type,
+                       void *opaque, void *(*realloc_func)(void *opaque, void *ptr, size_t size));

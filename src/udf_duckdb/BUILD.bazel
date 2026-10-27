@@ -6,6 +6,24 @@ package(
 )
 
 cc_library(
+    name = "register",
+    srcs = ["register.cc"],
+    hdrs = ["register.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":javascript",
+        ":python",
+    ],
+    linkstatic = True,
+    deps = [
+        "//:backend_initializer",
+        "//src/udf/javascript:limits",
+        "//src/udf/python:options",
+        "//third_party/duckdb",
+    ],
+)
+
+cc_library(
     name = "javascript",
     srcs = ["javascript.cc"],
     hdrs = ["javascript.h"],

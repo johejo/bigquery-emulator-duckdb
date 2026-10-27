@@ -16,6 +16,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend_error.h"
+#include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
@@ -26,8 +27,6 @@
 #include "src/project.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
-#include "src/udf/javascript/limits.h"
-#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -57,13 +56,13 @@ std::string ProjectFileName(const std::string& project_id) {
 
 Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::optional<std::string>& session_user,
-                   const udf::JavaScriptLimits& javascript,
+                   const BackendInitializer& initialize,
                    const std::vector<ExternalConnection>& connections,
-                   const udf::PythonOptions& python, const googlesql_geography::Options& geography,
+                   const googlesql_geography::Options& geography,
                    const functions_duckdb::Options& functions,
                    ExcludedFunctionIds excluded_function_ids, FunctionDeclarations declarations)
     : backend_(
-          session_user, javascript,
+          session_user,
           {
               .fetch =
                   [this](const std::string& objectref, const std::string& project) {
@@ -73,7 +72,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
               .has_connection =
                   [this](const std::string& key) { return connections_.conninfo.contains(key); },
           },
-          python, geography, functions),
+          geography, functions, initialize),
       excluded_function_ids_(std::move(excluded_function_ids)),
       declarations_(declarations),
       has_session_user_(session_user.has_value()),

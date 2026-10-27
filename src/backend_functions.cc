@@ -5,6 +5,7 @@
 
 #include "duckdb.h"
 #include "src/backend_error.h"
+#include "src/backend_initializer.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_aead_duckdb/aead.h"
 #include "src/googlesql_functions_duckdb/bignumeric.h"
@@ -25,10 +26,6 @@
 #include "src/googlesql_hll_duckdb/hll.h"
 #include "src/googlesql_text_analysis_duckdb/text_analysis.h"
 #include "src/spanner_query.h"
-#include "src/udf/javascript/limits.h"
-#include "src/udf/python/options.h"
-#include "src/udf_duckdb/javascript.h"
-#include "src/udf_duckdb/python.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -79,11 +76,10 @@ void RegisterSessionUser(duckdb_connection connection,
 
 void RegisterBackendFunctions(duckdb_database database,
                               const std::optional<std::string>& session_user,
-                              const udf::JavaScriptLimits& javascript,
                               const functions_duckdb::ObjectStorage& storage,
-                              const udf::PythonOptions& python,
                               const googlesql_geography::Options& geography,
-                              const functions_duckdb::Options& functions) {
+                              const functions_duckdb::Options& functions,
+                              const BackendInitializer& initialize) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
@@ -105,9 +101,10 @@ void RegisterBackendFunctions(duckdb_database database,
   geography_duckdb::RegisterGeographyFunctions(connection.get(), geography);
   aead_duckdb::RegisterAeadFunctions(connection.get());
   functions_duckdb::RegisterPercentileFunctions(connection.get());
-  udf_duckdb::RegisterJavaScriptFunctions(connection.get(), javascript);
-  udf_duckdb::RegisterPythonFunctions(connection.get(), python);
   functions_duckdb::RegisterObjectRefFunctions(connection.get(), storage);
+  if (initialize) {
+    initialize(connection.get());
+  }
 }
 
 }  // namespace bigquery_emulator_duckdb

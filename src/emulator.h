@@ -17,6 +17,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
@@ -32,8 +33,6 @@
 #include "src/storage_snapshot.h"
 #include "src/system_variables.h"
 #include "src/table_metadata.h"
-#include "src/udf/javascript/limits.h"
-#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -207,16 +206,16 @@ class Emulator {
   // Restores persisted registrations and replaces those explicitly supplied at startup.
   // With no data directory, registrations and data live in memory only. A nonempty
   // session_user enables SESSION_USER for every client; it and `connections`, which
-  // EXTERNAL_QUERY reaches, are not persisted. JavaScript UDFs run under `javascript`.
+  // EXTERNAL_QUERY reaches, are not persisted. `initialize` registers application-specific
+  // backend functions, such as the JavaScript and Python UDF adapters.
   // Defaults select BigQuery function corrections, built-in exclusions and outward geography
   // bounds. An empty `excluded_function_ids` exposes GoogleSQL-only built-ins too.
   // `declarations` independently selects whether to add BigQuery-specific declarations.
   explicit Emulator(
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
-      const udf::JavaScriptLimits& javascript = udf::JavaScriptLimits(),
+      const BackendInitializer& initialize = {},
       const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
-      const udf::PythonOptions& python = udf::PythonOptions(),
       const googlesql_geography::Options& geography = {.expand_bounding_box = true},
       const functions_duckdb::Options& functions = BigQueryFunctionOptions(),
       ExcludedFunctionIds excluded_function_ids = BigQueryExcludedFunctionIds(),

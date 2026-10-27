@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
@@ -14,8 +15,6 @@
 #include "src/googlesql_geography/options.h"
 #include "src/project.h"
 #include "src/references.h"
-#include "src/udf/javascript/limits.h"
-#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -28,8 +27,8 @@ TEST(AnalyzerDeclarationsTest, DeclarationSetsAreIndependentOfExclusions) {
     for (const auto declarations :
          {FunctionDeclarations::kGoogleSQL, FunctionDeclarations::kBigQuery}) {
       auto emulator = std::make_unique<Emulator>(
-          "", std::vector<Project>{{.project_id = "policy"}}, std::nullopt, udf::JavaScriptLimits(),
-          std::vector<ExternalConnection>(), udf::PythonOptions(), googlesql_geography::Options(),
+          "", std::vector<Project>{{.project_id = "policy"}}, std::nullopt, BackendInitializer{},
+          std::vector<ExternalConnection>(), googlesql_geography::Options(),
           functions_duckdb::Options(),
           exclude ? BigQueryExcludedFunctionIds() : ExcludedFunctionIds(), declarations);
       emulator->CreateDataset({.project_id = "policy", .dataset_id = "dataset"});

@@ -26,6 +26,7 @@
 #include "src/shell/format.h"
 #include "src/udf/javascript/limits.h"
 #include "src/udf/python/options.h"
+#include "src/udf_duckdb/register.h"
 
 namespace {
 
@@ -202,14 +203,18 @@ int Run(int argc, char* const* argv) {
   }
 
   if (shell) {
-    bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
-                                                connections, python, geography);
+    bigquery_emulator_duckdb::Emulator emulator(
+        data_dir, projects, session_user,
+        bigquery_emulator_duckdb::udf_duckdb::UdfInitializer(javascript, python), connections,
+        geography);
     return bigquery_emulator_duckdb::RunShell(emulator, shell_options);
   }
 
   const sigset_t signals = BlockShutdownSignals();
-  bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
-                                              connections, python, geography);
+  bigquery_emulator_duckdb::Emulator emulator(
+      data_dir, projects, session_user,
+      bigquery_emulator_duckdb::udf_duckdb::UdfInitializer(javascript, python), connections,
+      geography);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Start()) {
     std::cerr << "Failed to bind REST " << options.host << ":" << options.port << " or gRPC "

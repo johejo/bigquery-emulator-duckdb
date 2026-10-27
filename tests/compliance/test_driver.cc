@@ -37,6 +37,7 @@
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
@@ -48,8 +49,6 @@
 #include "src/references.h"
 #include "src/result_value.h"
 #include "src/type_mapping.h"
-#include "src/udf/javascript/limits.h"
-#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -373,8 +372,8 @@ class EmulatorTestDriver : public googlesql::TestDriver {
   // end-to-end tests check BigQuery-specific declarations, exclusions and semantic differences.
   void Reset() {
     emulator_ = std::make_unique<Emulator>(
-        "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, udf::JavaScriptLimits(),
-        std::vector<ExternalConnection>(), udf::PythonOptions(),
+        "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, BackendInitializer{},
+        std::vector<ExternalConnection>(),
         googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{},
         ExcludedFunctionIds{}, FunctionDeclarations::kGoogleSQL);
     emulator_->CreateDataset(DatasetReference{kProject, kDataset});
