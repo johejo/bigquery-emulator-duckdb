@@ -24,6 +24,7 @@ steps:
               schema: {fields: [{name: x, type: INT64}]}
               resourceTags: ["123456789012/env", "test"]
     test: current.res.status == 400
+  # BigQuery takes a number for a string, as it does in labels, but not an object.
   wrong_value_type:
     req:
       /projects/test/datasets/rest_tags/tables:
@@ -32,7 +33,7 @@ steps:
             application/json:
               tableReference: {tableId: wrong_value}
               schema: {fields: [{name: x, type: INT64}]}
-              resourceTags: {"123456789012/env": 1}
+              resourceTags: {"123456789012/env": {}}
     test: current.res.status == 400
   # A type error in a tag PATCH must not commit another field from that request.
   rejected_patch:
@@ -42,7 +43,7 @@ steps:
           body:
             application/json:
               description: must not be written
-              resourceTags: {"123456789012/env": 1}
+              resourceTags: {"123456789012/env": {}}
     test: current.res.status == 400
   unchanged_after_rejection:
     req:

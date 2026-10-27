@@ -1,0 +1,136 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, in run qyzd7b2f6yrrqlvrkejrbtudt3 and, from
+# query_unknown_nested_field on, run rdjklqfunpnfesikkhgbgvf3we; the answers sidecar keeps the
+# observations.
+#
+# As for routines (routine_resource.api.yaml), BigQuery takes the integer 1 for a string, here
+# a table ID, and fields by their protocol buffer names. Unlike routines.insert, jobs.insert and
+# jobs.query ignore fields their requests lack, at any depth, rather than rejecting them.
+description: >-
+  jobs.insert and jobs.query parse request resources as BigQuery does: numbers for strings,
+  protocol buffer field names, and fields their requests lack.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  query_job:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration: {query: '${query}'}
+        bind: {job: /body/jobReference/jobId}
+      - name: wait
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/jobs/${job}?location=US"}
+        until: {/body/status/state: DONE}
+        observe:
+          status: /body/status
+          destinationTable: /body/configuration/query/destinationTable/tableId
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  insert:
+    steps:
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body: ${job}
+        observe:
+          status: /status
+          error: /body/error
+          state: /body/status/state
+  query:
+    steps:
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: ${request}
+        observe:
+          status: /status
+          error: /body/error
+          rows: /body/rows
+cases:
+  - name: number_table_id
+    template: query_job
+    vars:
+      query:
+        query: SELECT 1 AS x
+        useLegacySql: false
+        destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: 1}
+    expect:
+      wait:
+        destinationTable: '1'
+        status: {state: DONE}
+  - name: unknown_query_field
+    template: query
+    vars:
+      request: {query: SELECT 1, useLegacySql: false, unknownField: 1}
+    expect:
+      query:
+        status: 200
+        rows: [{f: [{v: '1'}]}]
+  - name: snake_case_field
+    template: query
+    vars:
+      request: {query: SELECT 1, use_legacy_sql: false}
+    expect:
+      query:
+        status: 200
+        rows: [{f: [{v: '1'}]}]
+  - name: query_unknown_nested_field
+    template: query
+    vars:
+      request:
+        query: SELECT 1
+        useLegacySql: false
+        formatOptions: {useInt64Timestamp: false, unknownField: 1}
+    expect:
+      query:
+        status: 200
+        rows: [{f: [{v: '1'}]}]
+  - name: query_unknown_parameter_field
+    template: query
+    vars:
+      request:
+        query: SELECT @x
+        useLegacySql: false
+        queryParameters:
+          - {name: x, parameterType: {type: INT64}, parameterValue: {value: '1'}, unknownField: 1}
+    expect:
+      query:
+        status: 200
+        rows: [{f: [{v: '1'}]}]
+  - name: insert_unknown_field
+    template: insert
+    vars:
+      job:
+        jobReference: {location: US}
+        configuration: {query: {query: SELECT 1, useLegacySql: false}}
+        unknownField: 1
+    expect:
+      insert:
+        status: 200
+        state: DONE
+  - name: insert_unknown_nested_field
+    template: insert
+    vars:
+      job:
+        jobReference: {location: US}
+        configuration: {query: {query: SELECT 1, useLegacySql: false, unknownField: 1}}
+    expect:
+      insert:
+        status: 200
+        state: DONE

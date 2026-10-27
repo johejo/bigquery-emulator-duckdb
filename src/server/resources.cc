@@ -24,6 +24,7 @@
 #include "src/result_rows.h"
 #include "src/routine.h"
 #include "src/server/requests.h"
+#include "src/server/routes.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb::server {

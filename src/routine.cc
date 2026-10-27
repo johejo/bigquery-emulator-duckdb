@@ -196,8 +196,10 @@ std::string RoutineDdl(const Routine& routine) {
   const bool python = resource.value("language", "SQL") == "PYTHON";
   if (python) {
     ddl += "\nLANGUAGE python";
-    options.push_back("  runtime_version=" +
-                      googlesql::ToStringLiteral(resource.at("runtimeVersion").get<std::string>()));
+    options.push_back(
+        "  runtime_version=" +
+        googlesql::ToStringLiteral(
+            resource.at("externalRuntimeOptions").at("runtimeVersion").get<std::string>()));
     options.push_back("  entry_point=" +
                       googlesql::ToStringLiteral(
                           resource.at("pythonOptions").at("entryPoint").get<std::string>()));

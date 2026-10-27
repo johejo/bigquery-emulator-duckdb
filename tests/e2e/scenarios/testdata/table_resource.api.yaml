@@ -1,0 +1,342 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run sekw35nji45hayi63jydi2zl74; the answers
+# sidecar keeps the observations. Rejections observe their status, reason and message.
+#
+# As jobs.insert does (job_resource.api.yaml), tables.insert, patch and update ignore fields the
+# Table resource lacks, at any depth, and take integers for strings. They take an object for the
+# repeated schema.fields as its only element. Errors name protocol buffer types the discovery
+# document leaves out: wrappers such as expirationTime's google.protobuf.Int64Value, whose value
+# field they name, and enums declared elsewhere, such as defaultRoundingMode's
+# TableFieldSchema.RoundingMode.
+#
+# A patch takes its top-level fields by their JSON names only: it ignores friendly_name, although
+# tables.insert takes protocol buffer names such as table_reference. A patch that sets a field to
+# null clears it, but for the schema, which it keeps.
+#
+# The cases the emulator answers otherwise for other reasons are in
+# known_bugs/table_resource.api.yaml.
+description: >-
+  tables.insert, patch and update with fields the Table schema lacks, protocol buffer field names,
+  values of the wrong JSON type, unknown enum values and null fields.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  insert:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        observe:
+          status: /status
+          description: /body/description
+          labels: /body/labels
+          expirationTime: /body/expirationTime
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  insert_schema:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        observe:
+          status: /status
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  modify:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema: {fields: [{name: x, type: INT64, description: c}]}
+            description: d
+            friendlyName: f
+            labels: {a: b}
+      - name: modify
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: ${body}
+        observe:
+          status: /status
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: insert_unknown_schema_field
+    template: insert_schema
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: [{name: x, type: INT64, unknownField: 1}]}
+    expect:
+      insert:
+        status: 200
+        schema: {fields: [{name: x, type: INTEGER}]}
+  - name: insert_snake_case_field
+    template: insert_schema
+    vars:
+      body:
+        table_reference: {project_id: '${project}', dataset_id: '${dataset}', table_id: t}
+        schema: {fields: [{name: x, type: STRING, max_length: 5}]}
+    expect:
+      insert:
+        status: 200
+        schema: {fields: [{name: x, type: STRING, maxLength: '5'}]}
+  - name: insert_invalid_expiration_time
+    template: rejected
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        expirationTime: abc
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Invalid value at 'table.expiration_time.value' (TYPE_INT64), "abc"
+  - name: insert_invalid_require_partition_filter
+    template: rejected
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        requirePartitionFilter: abc
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Invalid value at 'table.require_partition_filter.value' (TYPE_BOOL), "abc"
+  - name: insert_unknown_rounding_mode
+    template: rejected
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        defaultRoundingMode: ROUND_UP
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'table.default_rounding_mode'
+          (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), "ROUND_UP"
+  - name: insert_unknown_field_rounding_mode
+    template: rejected
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: [{name: x, type: NUMERIC, roundingMode: ROUND_UP}]}
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'table.schema.fields[0].rounding_mode'
+          (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), "ROUND_UP"
+  - name: insert_array_schema
+    template: rejected
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: [{name: x, type: INT64}]
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid JSON payload received. Unknown name "schema" at 'table': Proto field is not
+          repeating, cannot start list.
+  - name: insert_object_schema_fields
+    template: insert_schema
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: {name: x, type: INT64}}
+    expect:
+      insert:
+        status: 200
+        schema: {fields: [{name: x, type: INTEGER}]}
+  - name: insert_null_schema_field_description
+    template: insert_schema
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: [{name: x, type: INT64, description: null}]}
+    expect:
+      insert:
+        status: 200
+        schema: {fields: [{name: x, type: INTEGER}]}
+  - name: insert_invalid_num_rows
+    template: rejected
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        numRows: abc
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Invalid value at 'table.num_rows.value' (TYPE_UINT64), "abc"
+  # type is output only and a string, not an enum, so BigQuery ignores any value.
+  - name: patch_unknown_field
+    template: modify
+    vars:
+      method: PATCH
+      body: {description: e, unknownField: 1}
+    expect:
+      modify: {status: 200}
+      get:
+        description: e
+        friendlyName: f
+        labels: {a: b}
+        schema: {fields: [{name: x, type: INTEGER, description: c}]}
+  - name: patch_unknown_schema_field
+    template: modify
+    vars:
+      method: PATCH
+      body:
+        schema: {fields: [{name: x, type: INT64, description: e, unknownField: 1}]}
+    expect:
+      modify: {status: 200}
+      get:
+        description: d
+        friendlyName: f
+        labels: {a: b}
+        schema: {fields: [{name: x, type: INTEGER, description: e}]}
+  - name: patch_snake_case_field
+    template: modify
+    vars:
+      method: PATCH
+      body: {friendly_name: g}
+    expect:
+      modify: {status: 200}
+      get:
+        description: d
+        friendlyName: f
+        labels: {a: b}
+        schema: {fields: [{name: x, type: INTEGER, description: c}]}
+  - name: patch_null_fields
+    template: modify
+    vars:
+      method: PATCH
+      body: {description: null, friendlyName: null, labels: null}
+    expect:
+      modify: {status: 200}
+      get:
+        schema: {fields: [{name: x, type: INTEGER, description: c}]}
+  - name: patch_null_label
+    template: modify
+    vars:
+      method: PATCH
+      body: {labels: {a: null}}
+    expect:
+      modify: {status: 200}
+      get:
+        description: d
+        friendlyName: f
+        schema: {fields: [{name: x, type: INTEGER, description: c}]}
+  - name: patch_null_schema
+    template: modify
+    vars:
+      method: PATCH
+      body: {schema: null}
+    expect:
+      modify: {status: 200}
+      get:
+        description: d
+        friendlyName: f
+        labels: {a: b}
+        schema: {fields: [{name: x, type: INTEGER, description: c}]}
+  - name: update_unknown_field
+    template: modify
+    vars:
+      method: PUT
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: [{name: x, type: INT64}]}
+        unknownField: 1
+    expect:
+      modify: {status: 200}
+      get:
+        schema: {fields: [{name: x, type: INTEGER}]}
+  - name: update_null_fields
+    template: modify
+    vars:
+      method: PUT
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: [{name: x, type: INT64}]}
+        description: null
+        friendlyName: null
+        labels: null
+    expect:
+      modify: {status: 200}
+      get:
+        schema: {fields: [{name: x, type: INTEGER}]}

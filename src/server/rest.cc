@@ -208,9 +208,8 @@ class RestServer::Impl {
     // jobs
     Route("bigquery.jobs.query", {},
           Json([this](const httplib::Request& request, httplib::Response&) {
-            const json body = ParseBody(request);
-            const auto job = emulator_.RunQuery(ParseQuery(Param(request, "projectId"), body));
-            return QueryResponse(*job, ParseQueryPage(body));
+            const JobsQuery query = ParseQuery(Param(request, "projectId"), ParseBody(request));
+            return QueryResponse(*emulator_.RunQuery(query.query), query.page);
           }));
     // Ignores timeoutMs, since jobs finish before they are inserted, and
     // formatOptions.timestampOutputFormat.
@@ -319,7 +318,7 @@ class RestServer::Impl {
     const auto update_dataset = [this](bool patch) {
       return Json([this, patch](const httplib::Request& request, httplib::Response&) {
         const DatasetReference dataset = DatasetFromPath(request);
-        const json body = ParseBody(request);
+        const json body = ParseDatasetUpdate(ParseBody(request), patch);
         DatasetMetadata metadata = emulator_.GetDataset(dataset);
         UpdateDatasetMetadata(metadata, body, patch);
         emulator_.UpdateDataset(dataset, metadata);
@@ -364,13 +363,12 @@ class RestServer::Impl {
     const auto update_table = [this](bool patch) {
       return Json([this, patch](const httplib::Request& request, httplib::Response&) {
         const TableReference table = TableFromPath(request);
-        const json body = ParseBody(request);
-        const TableUpdateRequest update = ParseTableUpdate(body);
+        const TableUpdateRequest update = ParseTableUpdate(ParseBody(request), patch);
         TableMetadata metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
-        UpdateTableMetadata(metadata, body, patch);
+        UpdateTableMetadata(metadata, update.resource, patch);
         return TableResource(emulator_.UpdateTable(
             table, update.schema, update.view, metadata,
-            body.value("defaultRoundingMode", json()) == "ROUNDING_MODE_UNSPECIFIED"));
+            update.resource.value("defaultRoundingMode", json()) == "ROUNDING_MODE_UNSPECIFIED"));
       });
     };
     // Both ignore autodetect_schema.

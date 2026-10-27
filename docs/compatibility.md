@@ -146,7 +146,8 @@ window, which datasets cannot change. It is unsupported:
 ### Schema changes
 
 `tables.patch` and `tables.update` change schema, view definition, description, friendly name,
-labels, clustering, default rounding mode and expiration, and ignore other fields. Partitioning and
+labels, clustering, default rounding mode and expiration; other fields set to other than their
+defaults are unsupported. Partitioning and
 a view's schema cannot change. For resource tags, see [Resource tags](#resource-tags).
 `tables.update` keeps a schema or view definition omitted from the request.
 

@@ -197,7 +197,7 @@ func TestTablePartitioning(t *testing.T) {
 				Schema: schema, Clustering: &bigquery.Clustering{Fields: []string{"missing"}},
 			})
 		},
-		"clustering for a destination table": func() error {
+		"job.configuration.query.clustering": func() error {
 			query := client.Query("SELECT 1 AS id")
 			query.Dst = dataset.Table("clustered")
 			query.Clustering = &bigquery.Clustering{Fields: []string{"id"}}

@@ -48,7 +48,7 @@ request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"
 note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `resourceTags`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag. See [Resource tags](compatibility.md#resource-tags).
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
-note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels, resource tags and default table expiration.
+note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, labels, resource tags and default table expiration, and the friendly name when the request sets it.
 
 request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
 note bigquery.jobs.cancel | See [Jobs](compatibility.md#jobs).
@@ -86,7 +86,7 @@ request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": 
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": true}
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": false, "destinationEncryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": false, "location": "EU"}
-note bigquery.jobs.query | Ignores `timeoutMs`, `labels` and `useQueryCache`. See [Locations](compatibility.md#locations).
+note bigquery.jobs.query | Ignores `timeoutMs`, `labels`, `useQueryCache` and `requestId`. See [Locations](compatibility.md#locations).
 
 request bigquery.routines.delete | DELETE /bigquery/v2/projects/test/datasets/d/routines/f
 request bigquery.routines.get | GET /bigquery/v2/projects/test/datasets/d/routines/f
@@ -97,10 +97,10 @@ request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/ro
 request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"strict"},"routineType":"PROCEDURE","definitionBody":"BEGIN SELECT 1; END"}
 request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"strict_true"},"routineType":"PROCEDURE","definitionBody":"BEGIN SELECT 2; END","strictMode":true}
 request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"js"},"routineType":"SCALAR_FUNCTION","language":"JAVASCRIPT","returnType":{"typeKind":"INT64"},"definitionBody":"return 1;"}
-request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"python"},"routineType":"SCALAR_FUNCTION","language":"PYTHON","runtimeVersion":"python-3.11","pythonOptions":{"entryPoint":"f"},"returnType":{"typeKind":"INT64"},"definitionBody":"def f(): return 1"}
+request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"python"},"routineType":"SCALAR_FUNCTION","language":"PYTHON","externalRuntimeOptions":{"runtimeVersion":"python-3.11"},"pythonOptions":{"entryPoint":"f"},"returnType":{"typeKind":"INT64"},"definitionBody":"def f(): return 1"}
 request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","definitionBody":"1","description":"updated"}
 request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","language":"JAVASCRIPT","definitionBody":"return 1"}
-request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","language":"PYTHON","runtimeVersion":"python-3.11","pythonOptions":{"entryPoint":"f"},"returnType":{"typeKind":"INT64"},"definitionBody":"def f(): return 2"}
+request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","language":"PYTHON","externalRuntimeOptions":{"runtimeVersion":"python-3.11"},"pythonOptions":{"entryPoint":"f"},"returnType":{"typeKind":"INT64"},"definitionBody":"def f(): return 2"}
 note bigquery.routines.insert | Supports SQL and Python scalar UDFs, SQL table functions and SQL procedures; routine references in API bodies need a project ID. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
 note bigquery.routines.update | Preserves the creation time. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?maxResults=1

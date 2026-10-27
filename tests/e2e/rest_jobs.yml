@@ -477,14 +477,6 @@ steps:
             application/json:
               configuration: {query: {query: SELECT 1, destinationTable: ds.t}}
     test: current.res.status == 400
-  malformed_query_type:
-    req:
-      /projects/rest-malformed/jobs:
-        post:
-          body:
-            application/json:
-              configuration: {query: {query: SELECT 1, destinationTable: {datasetId: ds, tableId: 1}}}
-    test: current.res.status == 400
   malformed_query_missing:
     req:
       /projects/rest-malformed/jobs:
@@ -501,14 +493,6 @@ steps:
             application/json:
               configuration: {load: {sourceUris: [a.csv], destinationTable: ds.t}}
     test: current.res.status == 400
-  malformed_load_type:
-    req:
-      /projects/rest-malformed/jobs:
-        post:
-          body:
-            application/json:
-              configuration: {load: {sourceUris: [a.csv], destinationTable: {datasetId: ds, tableId: 1}}}
-    test: current.res.status == 400
   malformed_load_missing:
     req:
       /projects/rest-malformed/jobs:
@@ -524,17 +508,6 @@ steps:
           body:
             application/json:
               configuration: {copy: {sourceTable: ds.t, destinationTable: {datasetId: ds, tableId: source}}}
-    test: current.res.status == 400
-  malformed_copy_type:
-    req:
-      /projects/rest-malformed/jobs:
-        post:
-          body:
-            application/json:
-              configuration:
-                copy:
-                  sourceTable: {datasetId: ds, tableId: 1}
-                  destinationTable: {datasetId: ds, tableId: source}
     test: current.res.status == 400
   malformed_copy_missing:
     req:

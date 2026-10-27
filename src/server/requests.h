@@ -12,6 +12,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/server/routes.h"
 #include "src/table_metadata.h"
 
 namespace httplib {
@@ -56,12 +57,6 @@ struct ListPage {
 // A missing value matches any value of the label, including the empty string.
 using DatasetFilter = std::map<std::string, std::optional<std::string>>;
 
-// A JSON field mask, with whole fields taking precedence over their children.
-struct ResourceMask {
-  bool all = false;
-  std::map<std::string, ResourceMask> fields;
-};
-
 struct RoutineListRequest {
   ListPage page;
   std::string routine_type;
@@ -89,6 +84,8 @@ struct TableInsertRequest {
 
 // What tables.patch and tables.update change. The emulator keeps what they leave out.
 struct TableUpdateRequest {
+  // The checked Table resource, for UpdateTableMetadata.
+  nlohmann::json resource;
   std::optional<std::vector<FieldSchema>> schema;
   std::optional<nlohmann::json> view;
 };
@@ -103,6 +100,12 @@ struct InsertAllRequest {
 struct MediaUpload {
   nlohmann::json metadata;
   std::string content;
+};
+
+// A jobs.query request.
+struct JobsQuery {
+  QueryRequest query;
+  ResultPage page;
 };
 
 using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest, ExtractRequest>;
@@ -121,8 +124,7 @@ bool IsMultipartUpload(const httplib::Request& request);
 MediaUpload ParseMultipartUpload(const httplib::Request& request);
 
 // jobs.query, whose body is the query configuration and its page.
-QueryRequest ParseQuery(const std::string& project_id, const nlohmann::json& body);
-ResultPage ParseQueryPage(const nlohmann::json& body);
+JobsQuery ParseQuery(const std::string& project_id, const nlohmann::json& body);
 // jobs.getQueryResults and tabledata.list, whose page is in the query string.
 ResultPage ParseResultPage(const httplib::Request& request);
 // jobs.insert with a job resource of any supported type.
@@ -135,10 +137,15 @@ ListPage ParseListPage(const httplib::Request& request);
 DatasetFilter ParseDatasetFilter(const httplib::Request& request);
 RoutineListRequest ParseRoutineList(const httplib::Request& request);
 TableGetRequest ParseTableGet(const httplib::Request& request);
-DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
-TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
+DatasetInsertRequest ParseDatasetInsert(const std::string& project_id,
+                                        const nlohmann::json& resource);
+TableInsertRequest ParseTableInsert(const DatasetReference& dataset,
+                                    const nlohmann::json& resource);
 Routine ParseRoutine(const DatasetReference& dataset, const nlohmann::json& body);
-TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
+// The checked Dataset resource of datasets.patch (`patch`) or datasets.update, for
+// UpdateDatasetMetadata.
+nlohmann::json ParseDatasetUpdate(const nlohmann::json& body, bool patch);
+TableUpdateRequest ParseTableUpdate(const nlohmann::json& resource, bool patch);
 InsertAllRequest ParseInsertAll(const nlohmann::json& body);
 
 }  // namespace bigquery_emulator_duckdb::server

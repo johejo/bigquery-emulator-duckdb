@@ -2,17 +2,26 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <initializer_list>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
+#include "google/cloud/bigquery/v2/dataset.pb.h"
+#include "google/cloud/bigquery/v2/job.pb.h"
+#include "google/cloud/bigquery/v2/routine.pb.h"
+#include "google/cloud/bigquery/v2/table.pb.h"
+#include "google/protobuf/descriptor.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/discovery_document.h"
@@ -21,7 +30,10 @@
 namespace bigquery_emulator_duckdb::server {
 namespace {
 
+using google::protobuf::Descriptor;
+using google::protobuf::FieldDescriptor;
 using nlohmann::json;
+namespace v2 = google::cloud::bigquery::v2;
 
 // The API-wide parameters every method accepts. The others are unsupported: `callback` wraps the
 // response in JSONP and `$.xgafv` changes the error format.
@@ -120,7 +132,333 @@ bool Fits(const QueryParameter& parameter, std::string_view value) {
   return true;
 }
 
+// The name of a field path such as "routine.routineReference" in BigQuery's errors, which spell
+// fields as in protocol buffers: "routine.routine_reference".
+std::string ProtoPath(std::string_view path) {
+  std::string result;
+  for (const char c : path) {
+    if (std::isupper(static_cast<unsigned char>(c)) != 0) {
+      result += '_';
+      result += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    } else {
+      result += c;
+    }
+  }
+  return result;
+}
+
+// The JSON name of the protocol buffer field `name`, such as "enableListInference" for
+// "enable_list_inference". BigQuery takes fields by either name, as protocol buffers' JSON
+// parsers do; bq sends parquetOptions.enable_list_inference.
+std::string JsonName(std::string_view name) {
+  std::string result;
+  bool upper = false;
+  for (const char c : name) {
+    if (c == '_') {
+      upper = true;
+    } else {
+      result += upper ? static_cast<char>(std::toupper(static_cast<unsigned char>(c))) : c;
+      upper = false;
+    }
+  }
+  return result;
+}
+
+// The protocol buffer message of the resource schema `schema`, such as "Table". Its fields give
+// the types BigQuery's errors name where the discovery document does not: wrappers, and enums
+// declared in other messages, such as Dataset.defaultRoundingMode's TableFieldSchema.RoundingMode.
+// Naming the generated messages links their descriptors into the program.
+const Descriptor* ProtoMessage(std::string_view schema) {
+  static const auto kMessages = std::to_array({
+      v2::Dataset::descriptor(),
+      v2::Job::descriptor(),
+      v2::QueryRequest::descriptor(),
+      v2::Routine::descriptor(),
+      v2::Table::descriptor(),
+  });
+  const auto* const message = std::ranges::find_if(
+      kMessages, [&](const Descriptor* candidate) { return candidate->name() == schema; });
+  if (message != kMessages.end()) {
+    return *message;
+  }
+  throw std::logic_error("No protocol buffer message for the schema " + std::string(schema));
+}
+
+// The field of `message` the discovery document names `name`, or null when there is no message
+// or it lacks the field, as it does fields newer than its protocol buffers.
+const FieldDescriptor* ProtoField(const Descriptor* message, const std::string& name) {
+  return message == nullptr ? nullptr : message->FindFieldByCamelcaseName(name);
+}
+
+// The value field of the wrapper, such as google.protobuf.Int64Value, that `field` holds, or null
+// when it holds none. The discovery document gives a wrapper as a scalar, but BigQuery's errors
+// name its value field, such as 'table.expiration_time.value'.
+const FieldDescriptor* WrappedValue(const FieldDescriptor* field) {
+  const Descriptor* message = field == nullptr ? nullptr : field->message_type();
+  if (message == nullptr || message->file()->name() != "google/protobuf/wrappers.proto") {
+    return nullptr;
+  }
+  return message->FindFieldByName("value");
+}
+
+std::string Upper(std::string text) {
+  std::ranges::transform(text, text.begin(),
+                         [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+  return text;
+}
+
+// The protocol buffer type of the scalar `parameter` in BigQuery's errors: that of `field`, its
+// protocol buffer field, or, when the message lacks it, one the discovery document gives, with
+// `enum_type` the full name of an enum, such as "google.cloud.bigquery.v2.Routine.Language".
+std::string ProtoType(const QueryParameter& parameter, const FieldDescriptor* field,
+                      std::string_view enum_type) {
+  if (field != nullptr && field->enum_type() != nullptr) {
+    return "type.googleapis.com/" + std::string(field->enum_type()->full_name());
+  }
+  if (!parameter.values.empty()) {
+    return std::format("type.googleapis.com/{}", enum_type);
+  }
+  if (field != nullptr) {
+    return "TYPE_" + Upper(std::string(field->type_name()));
+  }
+  if (parameter.type == "boolean") {
+    return "TYPE_BOOL";
+  }
+  if (parameter.type == "number") {
+    return parameter.format == "float" ? "TYPE_FLOAT" : "TYPE_DOUBLE";
+  }
+  if (parameter.format.ends_with("int32") || parameter.format.ends_with("int64")) {
+    return "TYPE_" + Upper(parameter.format);
+  }
+  return parameter.format == "byte" ? "TYPE_BYTES" : "TYPE_STRING";
+}
+
+// `value` as a value of the scalar `parameter`, or nothing when it is not one. BigQuery parses
+// JSON as protocol buffers do, which also take integers as strings and 64-bit integers, which
+// are strings, as numbers; it also takes integers as strings and "true" and "false" as booleans.
+std::optional<json> ScalarValue(const QueryParameter& parameter, const json& value) {
+  if (parameter.type == "boolean") {
+    if (value.is_boolean()) {
+      return value;
+    }
+    if (value == "true" || value == "false") {
+      return value == "true";
+    }
+    return std::nullopt;
+  }
+  if (parameter.type == "number") {
+    if (!value.is_string()) {
+      return value.is_number() ? std::optional(value) : std::nullopt;
+    }
+    const auto& text = value.get_ref<const std::string&>();
+    double number = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), number);
+    if (text == "NaN" || text == "Infinity" || text == "-Infinity" ||
+        (error == std::errc() && end == text.data() + text.size())) {
+      return value;
+    }
+    return std::nullopt;
+  }
+  if (value.is_number_integer() && parameter.values.empty()) {
+    return Fits(parameter, value.dump())
+               ? std::optional(parameter.type == "integer" ? value : json(value.dump()))
+               : std::nullopt;
+  }
+  if (value.is_string() && Fits(parameter, value.get_ref<const std::string&>())) {
+    return parameter.type == "integer" ? json::parse(value.get_ref<const std::string&>()) : value;
+  }
+  return std::nullopt;
+}
+
+// Whether `value` of the field `property` is its default, which BigQuery cannot tell from
+// leaving the field out. A message never is: an empty one is set.
+bool IsDefault(const json& value, const json& property) {
+  if (property.contains("$ref")) {
+    return false;
+  }
+  if (property.contains("default")) {
+    const auto& text = property["default"].get_ref<const std::string&>();
+    return value.is_string() ? value == text : value.dump() == text;
+  }
+  if (value.is_string()) {
+    return value.get_ref<const std::string&>().empty() ||
+           (value == "0" && property.value("format", "").ends_with("int64"));
+  }
+  return value == false || value == 0 || ((value.is_array() || value.is_object()) && value.empty());
+}
+
+// The schema of the field `property`, which may refer to another.
+const json& Resolved(const json& property) {
+  return property.contains("$ref") ? Discovery()["schemas"][property["$ref"].get<std::string>()]
+                                   : property;
+}
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): a value and its schema.
+json CheckValue(const json& value, const json& property, const FieldDescriptor* field,
+                const ResourceMask& accepted, UnknownFields unknown, const std::string& path,
+                const std::string& enum_type);
+
+json CheckObject(const json& value, const json& schema, const Descriptor* message,
+                 const ResourceMask& accepted, UnknownFields unknown, Change change,
+                 const std::string& path) {
+  const json& properties = schema.at("properties");
+  // Schemas nested in another, such as those of QueryParameterType.structTypes, have no id.
+  const std::string id = schema.value("id", "");
+  for (const auto& [name, child] : accepted.fields) {
+    if (!properties.contains(name)) {
+      throw std::logic_error(std::format("The {} schema has no field {}", id, name));
+    }
+  }
+  if (!value.is_object()) {
+    throw ApiError::Invalid(
+        message == nullptr
+            ? std::format("Invalid value at '{}', {}", ProtoPath(path), value.dump())
+            : std::format("Invalid value at '{}' (type.googleapis.com/{}), {}", ProtoPath(path),
+                          std::string(message->full_name()), value.dump()));
+  }
+  json result = json::object();
+  for (const auto& [key, field] : value.items()) {
+    const bool json_name = properties.contains(key);
+    const std::string name = json_name ? key : JsonName(key);
+    if (!properties.contains(name)) {
+      if (unknown == UnknownFields::kIgnore) {
+        continue;
+      }
+      throw ApiError::Invalid(std::format(
+          "Invalid JSON payload received. Unknown name \"{}\" at '{}': Cannot find field.", key,
+          ProtoPath(path)));
+    }
+    if (change == Change::kPatch && !json_name) {
+      continue;
+    }
+    const json& property = properties[name];
+    const std::string type = Resolved(property).value("type", "");
+    // A list for a message or scalar; maps and google.protobuf.Value take other errors.
+    if (field.is_array() && type != "array" && type != "any" &&
+        (type != "object" || Resolved(property).contains("properties"))) {
+      throw ApiError::Invalid(std::format(
+          "Invalid JSON payload received. Unknown name \"{}\" at '{}': Proto field is not "
+          "repeating, cannot start list.",
+          key, ProtoPath(path)));
+    }
+    const auto child = accepted.fields.find(name);
+    const bool handled = accepted.all || child != accepted.fields.end();
+    const bool output_only = property.value("readOnly", false);
+    if (field.is_null()) {
+      if (change != Change::kInsert && handled && !output_only) {
+        result[name] = nullptr;
+      }
+      continue;
+    }
+    const std::string field_path = std::format("{}.{}", path, name);
+    // The enum a field holds is named after it, such as Routine.Language for Routine.language,
+    // where its protocol buffer field does not name it.
+    std::string type_name = name;
+    type_name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
+    const std::string enum_type = std::format("google.cloud.bigquery.v2.{}.{}", id, type_name);
+    const ResourceMask everything{.all = true, .fields = {}, .recursive = false};
+    const ResourceMask& child_accepted = accepted.all || !handled  ? everything
+                                         : child->second.recursive ? accepted
+                                                                   : child->second;
+    json checked = CheckValue(field, property, ProtoField(message, name), child_accepted, unknown,
+                              field_path, enum_type);
+    // Output-only fields are checked, as BigQuery does, but ignored, as are the defaults of
+    // fields the emulator does not handle, which clients such as bq send.
+    if (output_only) {
+      continue;
+    }
+    if (!handled) {
+      if (IsDefault(checked, property)) {
+        continue;
+      }
+      throw ApiError::Unsupported(field_path);
+    }
+    result[name] = std::move(checked);
+  }
+  return result;
+}
+
+json CheckValue(const json& value, const json& property, const FieldDescriptor* field,
+                const ResourceMask& accepted, UnknownFields unknown, const std::string& path,
+                const std::string& enum_type) {
+  const json& schema = Resolved(property);
+  const std::string type = schema.value("type", "");
+  const Descriptor* message = field == nullptr ? nullptr : field->message_type();
+  if (type == "object" && schema.contains("properties")) {
+    return CheckObject(value, schema, message, accepted, unknown, Change::kInsert, path);
+  }
+  // BigQuery takes an object for a repeated message as its only element.
+  if (type == "array" && (value.is_array() || (value.is_object() &&
+                                               Resolved(schema["items"]).contains("properties")))) {
+    const json elements = value.is_array() ? value : json::array({value});
+    json result = json::array();
+    for (size_t i = 0; i < elements.size(); ++i) {
+      result.push_back(CheckValue(elements[i], schema["items"], field, accepted, unknown,
+                                  std::format("{}[{}]", path, i), enum_type));
+    }
+    return result;
+  }
+  // A map, or a google.protobuf.Struct, whose schema has no properties.
+  if (type == "object" && value.is_object()) {
+    if (!schema.contains("additionalProperties")) {
+      return value;
+    }
+    const FieldDescriptor* entry =
+        field != nullptr && field->is_map() ? message->map_value() : nullptr;
+    json result = json::object();
+    for (const auto& [key, element] : value.items()) {
+      // A null entry is kept: patches remove the label it names.
+      result[key] = element.is_null()
+                        ? json()
+                        : CheckValue(element, schema["additionalProperties"], entry, accepted,
+                                     unknown, std::format("{}.{}", path, key), enum_type);
+    }
+    return result;
+  }
+  if (type == "any") {
+    return value;
+  }
+  if (type != "array" && type != "object") {
+    const QueryParameter parameter = ReadQueryParameter(schema);
+    if (std::optional<json> scalar = ScalarValue(parameter, value); scalar.has_value()) {
+      return *std::move(scalar);
+    }
+    const FieldDescriptor* wrapped = WrappedValue(field);
+    throw ApiError::Invalid(std::format(
+        "Invalid value at '{}{}' ({}), {}", ProtoPath(path), wrapped == nullptr ? "" : ".value",
+        ProtoType(parameter, wrapped == nullptr ? field : wrapped, enum_type), value.dump()));
+  }
+  throw ApiError::Invalid(std::format("Invalid value at '{}', {}", ProtoPath(path), value.dump()));
+}
+// NOLINTEND(bugprone-easily-swappable-parameters)
+
 }  // namespace
+
+ResourceMask MaskOf(std::initializer_list<std::string_view> paths) {
+  ResourceMask mask;
+  for (std::string_view path : paths) {
+    ResourceMask* field = &mask;
+    while (true) {
+      const size_t dot = path.find('.');
+      field = &field->fields[std::string(path.substr(0, dot))];
+      if (dot == std::string_view::npos) {
+        break;
+      }
+      path.remove_prefix(dot + 1);
+    }
+    field->all = true;
+  }
+  return mask;
+}
+
+json CheckResource(const json& resource, std::string_view schema, const ResourceMask& accepted,
+                   UnknownFields unknown, Change change) {
+  // Named in errors like the request field that holds the resource, such as "routine".
+  std::string path(schema);
+  path.front() = static_cast<char>(std::tolower(static_cast<unsigned char>(path.front())));
+  return CheckObject(resource, Discovery()["schemas"].at(std::string(schema)), ProtoMessage(schema),
+                     accepted, unknown, change, path);
+}
 
 const json& Discovery() {
   static const json* const kDocument = new json(json::parse(DiscoveryDocument()));

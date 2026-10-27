@@ -52,8 +52,7 @@ LoadOptions ParseLoadOptions(FileFormat format, const nlohmann::json& config) {
     case FileFormat::kParquet: {
       const auto options = config.value("parquetOptions", nlohmann::json::object());
       return ParquetLoadOptions{
-          .enable_list_inference =
-              options.value("enableListInference", options.value("enable_list_inference", false)),
+          .enable_list_inference = options.value("enableListInference", false),
       };
     }
   }

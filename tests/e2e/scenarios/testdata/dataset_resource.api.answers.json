@@ -1,0 +1,386 @@
+{
+  "version": 1,
+  "cases": {
+    "insert_invalid_creation_time": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'dataset.creation_time' (TYPE_INT64), \"abc\"",
+                        "field": "dataset.creation_time"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'dataset.creation_time' (TYPE_INT64), \"abc\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'dataset.creation_time' (TYPE_INT64), \"abc\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_invalid_default_table_expiration": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'dataset.default_table_expiration_ms.value' (TYPE_INT64), \"abc\"",
+                        "field": "dataset.default_table_expiration_ms.value"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'dataset.default_table_expiration_ms.value' (TYPE_INT64), \"abc\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'dataset.default_table_expiration_ms.value' (TYPE_INT64), \"abc\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_null_description": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "insert_number_default_table_expiration": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "defaultTableExpirationMs": "3600000",
+          "status": 200
+        }
+      }
+    },
+    "insert_number_description": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "description": "1",
+          "status": 200
+        }
+      }
+    },
+    "insert_number_label_value": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "labels": {
+            "a": "1"
+          },
+          "status": 200
+        }
+      }
+    },
+    "insert_object_access": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "An access entry must have exactly one of userByEmail, groupByEmail, domain, specialGroup defined, view, routine, or dataset.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "An access entry must have exactly one of userByEmail, groupByEmail, domain, specialGroup defined, view, routine, or dataset.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_snake_case_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "friendlyName": "f",
+          "status": 200
+        }
+      }
+    },
+    "insert_string_case_insensitive": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "insert_string_reference": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'dataset.dataset_reference' (type.googleapis.com/google.cloud.bigquery.v2.DatasetReference), \"bqa_kb4pshlnlga2topmkr3zwxjpk4_insert_string_reference\"",
+                        "field": "dataset.dataset_reference"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'dataset.dataset_reference' (type.googleapis.com/google.cloud.bigquery.v2.DatasetReference), \"bqa_kb4pshlnlga2topmkr3zwxjpk4_insert_string_reference\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'dataset.dataset_reference' (type.googleapis.com/google.cloud.bigquery.v2.DatasetReference), \"bqa_kb4pshlnlga2topmkr3zwxjpk4_insert_string_reference\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_unknown_access_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_nested_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_rounding_mode": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'dataset.default_rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                        "field": "dataset.default_rounding_mode"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'dataset.default_rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'dataset.default_rounding_mode' (type.googleapis.com/google.cloud.bigquery.v2.TableFieldSchema.RoundingMode), \"ROUND_UP\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_unknown_storage_billing_model": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'dataset.storage_billing_model' (type.googleapis.com/google.cloud.bigquery.v2.Dataset.StorageBillingModel), \"CHEAP\"",
+                        "field": "dataset.storage_billing_model"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'dataset.storage_billing_model' (type.googleapis.com/google.cloud.bigquery.v2.Dataset.StorageBillingModel), \"CHEAP\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'dataset.storage_billing_model' (type.googleapis.com/google.cloud.bigquery.v2.Dataset.StorageBillingModel), \"CHEAP\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_null_fields": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {},
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_null_label": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {
+          "description": "d",
+          "friendlyName": "f"
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_snake_case_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {
+          "description": "d",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {
+          "description": "e",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "patch_unknown_nested_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {
+          "description": "e",
+          "friendlyName": "f",
+          "labels": {
+            "a": "b"
+          }
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "update_null_fields": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {},
+        "modify": {
+          "status": 200
+        }
+      }
+    },
+    "update_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "kb4pshlnlga2topmkr3zwxjpk4",
+      "steps": {
+        "get": {
+          "description": "e",
+          "friendlyName": "f"
+        },
+        "modify": {
+          "status": 200
+        }
+      }
+    }
+  }
+}

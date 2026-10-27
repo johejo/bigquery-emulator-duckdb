@@ -1,0 +1,203 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run sekw35nji45hayi63jydi2zl74; the answers
+# sidecar keeps the observations. These cases of ../table_resource.api.yaml show what
+# tables.insert takes, but the emulator answers them otherwise for reasons of their own: it cannot
+# create a table without a schema, which BigQuery does, and it leaves out the NULLABLE mode of a
+# view's columns, which BigQuery reports.
+description: >-
+  tables.insert cases with unknown fields, numbers for strings and null fields that the emulator
+  answers otherwise: it rejects tables without a schema and omits the mode of view columns.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  insert:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        observe:
+          status: /status
+          description: /body/description
+          labels: /body/labels
+          expirationTime: /body/expirationTime
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  insert_schema:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        observe:
+          status: /status
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  modify:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema: {fields: [{name: x, type: INT64, description: c}]}
+            description: d
+            friendlyName: f
+            labels: {a: b}
+      - name: modify
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: ${body}
+        observe:
+          status: /status
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: insert_unknown_field
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        unknownField: 1
+    expect:
+      insert: {status: 200}
+  - name: insert_unknown_reference_field
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t, unknownField: 1}
+    expect:
+      insert: {status: 200}
+  - name: insert_unknown_view_field
+    template: insert_schema
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        view: {query: SELECT 1 AS x, useLegacySql: false, unknownField: 1}
+    expect:
+      insert:
+        status: 200
+        schema: {fields: [{name: x, type: INTEGER, mode: NULLABLE}]}
+  - name: insert_number_description
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        description: 1
+    expect:
+      insert: {status: 200, description: '1'}
+  - name: insert_number_table_id
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: 1}
+    expect:
+      insert: {status: 200}
+  - name: insert_number_label_value
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        labels: {a: 1}
+    expect:
+      insert: {status: 200, labels: {a: '1'}}
+  - name: insert_number_expiration_time
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        expirationTime: 4102444800000
+    expect:
+      insert: {status: 200, expirationTime: '4102444800000'}
+  - name: insert_string_require_partition_filter
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        requirePartitionFilter: 'false'
+    expect:
+      insert: {status: 200}
+  - name: insert_null_description
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        description: null
+    expect:
+      insert: {status: 200}
+  - name: insert_invalid_type
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        type: NOPE
+    expect:
+      insert: {status: 200}
