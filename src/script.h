@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "src/backend.h"
+#include "src/builtin_function_options.h"
 #include "src/query_parameters.h"
 
 namespace googlesql {
@@ -29,6 +30,7 @@ class ScriptHost {
   virtual Backend& backend() = 0;
   // Whether SESSION_USER is enabled.
   [[nodiscard]] virtual bool has_session_user() const = 0;
+  [[nodiscard]] virtual const ExcludedFunctionIds& excluded_function_ids() const = 0;
   // A catalog source for the tables, views and datasets the emulator holds, as `session` sees
   // them.
   virtual std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) = 0;

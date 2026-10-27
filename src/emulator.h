@@ -17,6 +17,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/builtin_function_options.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/function_options.h"
@@ -207,7 +208,8 @@ class Emulator {
   // With no data directory, registrations and data live in memory only. A nonempty
   // session_user enables SESSION_USER for every client; it and `connections`, which
   // EXTERNAL_QUERY reaches, are not persisted. JavaScript UDFs run under `javascript`.
-  // Defaults select BigQuery function corrections and outward geography bounds.
+  // Defaults select BigQuery function corrections, built-in exclusions and outward geography
+  // bounds. An empty `excluded_function_ids` exposes GoogleSQL-only built-ins too.
   explicit Emulator(
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
@@ -215,7 +217,8 @@ class Emulator {
       const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
       const udf::PythonOptions& python = udf::PythonOptions(),
       const googlesql_geography::Options& geography = {.expand_bounding_box = true},
-      const functions_duckdb::Options& functions = BigQueryFunctionOptions());
+      const functions_duckdb::Options& functions = BigQueryFunctionOptions(),
+      ExcludedFunctionIds excluded_function_ids = BigQueryExcludedFunctionIds());
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 
@@ -388,6 +391,7 @@ class Emulator {
   // lookups may expire other relations on the same thread.
   std::recursive_mutex expiration_mutex_;
   Backend backend_;
+  ExcludedFunctionIds excluded_function_ids_;
   bool has_session_user_;
   ExternalConnections connections_{.backend = backend_};
   GcsClient gcs_client_;

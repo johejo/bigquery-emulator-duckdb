@@ -242,6 +242,9 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
 }  // namespace
 
 void RegisterDatetimeFunctions(duckdb_connection connection, const Options& options) {
+  Register(connection, "bq_months_between_date", {kDate, kDate}, kDouble, Apply<MonthsBetweenDate>);
+  Register(connection, "bq_months_between_datetime", {kDatetime, kDatetime}, kDouble,
+           Apply<MonthsBetweenDatetime>);
   RegisterWithContext(connection, "bq_format_date", {kVarchar, kDate}, kVarchar,
                       ApplyWithContext<FormatDate>, options.unpadded_iso_year);
   RegisterWithContext(connection, "bq_format_datetime", {kVarchar, kDatetime}, kVarchar,

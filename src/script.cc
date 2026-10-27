@@ -377,7 +377,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const AnalyzerSettings settings = Settings(executor);
     std::unique_ptr<TableSource> source = host_.NewTableSource(backend_.get(), /*expire=*/false);
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
-                            settings.default_dataset);
+                            settings.default_dataset, nullptr, host_.excluded_function_ids());
     return AnalyzeScriptType(segment, catalog, type_factory_, settings);
   }
 
@@ -474,7 +474,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   absl::StatusOr<std::unique_ptr<googlesql::ProcedureDefinition>> LoadProcedureDefinition(
       const Routine& routine, TableSource& source) {
     try {
-      RoutineCatalog catalog(source, &type_factory_, routine.reference.project_id, "");
+      RoutineCatalog catalog(source, &type_factory_, routine.reference.project_id, "", nullptr,
+                             host_.excluded_function_ids());
       const auto analyzed = AnalyzeGoogleSql(RoutineStatement(routine), catalog, type_factory_,
                                              {.default_project = routine.reference.project_id});
       const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateProcedureStmt>();
@@ -618,9 +619,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         catalog.temporary->names.insert(std::move(name));
       }
     }
-    catalog.tables =
-        std::make_unique<RoutineCatalog>(*catalog.source, &type_factory_, settings.default_project,
-                                         settings.default_dataset, catalog.temporary.get());
+    catalog.tables = std::make_unique<RoutineCatalog>(
+        *catalog.source, &type_factory_, settings.default_project, settings.default_dataset,
+        catalog.temporary.get(), host_.excluded_function_ids());
     catalog.variables = std::make_unique<googlesql::SimpleCatalog>("variables", &type_factory_);
     for (const auto& [name, value] : executor.GetCurrentVariables()) {
       std::unique_ptr<googlesql::SimpleConstant> constant;

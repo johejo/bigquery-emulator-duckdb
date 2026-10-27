@@ -37,6 +37,7 @@
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/builtin_function_options.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
@@ -368,13 +369,14 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     return absl::OkStatus();
   }
 
-  // The backend functions keep GoogleSQL's behavior where BigQuery's differs, so that these tests
-  // check what the two share; end-to-end tests check BigQuery's differences.
+  // Expose all GoogleSQL built-ins and keep GoogleSQL's behavior where BigQuery's differs;
+  // end-to-end tests check BigQuery's exclusions and semantic differences.
   void Reset() {
     emulator_ = std::make_unique<Emulator>(
         "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, udf::JavaScriptLimits(),
         std::vector<ExternalConnection>(), udf::PythonOptions(),
-        googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{});
+        googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{},
+        ExcludedFunctionIds{});
     emulator_->CreateDataset(DatasetReference{kProject, kDataset});
   }
 

@@ -29,6 +29,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/builtin_function_options.h"
 #include "src/column_default.h"
 #include "src/ddl_write.h"
 #include "src/default_dataset.h"
@@ -309,6 +310,9 @@ class Emulator::ScriptHostImpl : public ScriptHost {
 
   Backend& backend() override { return emulator_.backend_; }
   [[nodiscard]] bool has_session_user() const override { return emulator_.has_session_user_; }
+  [[nodiscard]] const ExcludedFunctionIds& excluded_function_ids() const override {
+    return emulator_.excluded_function_ids_;
+  }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
     return emulator_.NewTableSource(session, expire, &location_);
   }
@@ -429,8 +433,8 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
     settings.positional_parameters.push_back(ParameterType(field, type_factory));
   }
   const auto source = NewTableSource(nullptr, true, location);
-  RoutineCatalog catalog(*source, &type_factory, settings.default_project,
-                         settings.default_dataset);
+  RoutineCatalog catalog(*source, &type_factory, settings.default_project, settings.default_dataset,
+                         nullptr, excluded_function_ids_);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
   std::optional<TranslatedStatement> translated =
@@ -536,7 +540,8 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
     const AnalyzerSettings settings{.default_project = table.project_id};
     // A default cannot read tables, so they need not be expired first.
     const auto source = NewTableSource(nullptr, /*expire=*/false);
-    RoutineCatalog catalog(*source, &type_factory, table.project_id, "");
+    RoutineCatalog catalog(*source, &type_factory, table.project_id, "", nullptr,
+                           excluded_function_ids_);
     const absl::StatusOr<AnalyzerResult> analyzed = AnalyzeScriptExpression(
         field.default_value_expression, nullptr, *type, catalog, type_factory, settings);
     if (!analyzed.ok()) {

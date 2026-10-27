@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -27,6 +29,7 @@
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "src/builtin_function_options.h"
 #include "src/catalog_table.h"
 #include "src/connection_id.h"
 #include "src/field_schema.h"
@@ -183,17 +186,26 @@ void AddObjectRefFunctions(googlesql::SimpleCatalog& catalog) {
       googlesql::FunctionOptions().set_volatility(googlesql::FunctionEnums::VOLATILE)));
 }
 
-// Built once per process: registering every built-in function is expensive, and SimpleCatalog
-// lookups are thread-safe.
-googlesql::SimpleCatalog* BuiltinCatalog() {
-  static googlesql::SimpleCatalog* const kCatalog = [] {
+// Built once per exclusion list: registration is expensive, and lookups are thread-safe.
+googlesql::SimpleCatalog* BuiltinCatalog(const ExcludedFunctionIds& excluded_function_ids) {
+  static std::mutex mutex;
+  static std::map<ExcludedFunctionIds, std::unique_ptr<googlesql::SimpleCatalog>> catalogs;
+  const std::scoped_lock lock(mutex);
+  auto& cached = catalogs[excluded_function_ids];
+  if (cached != nullptr) {
+    return cached.get();
+  }
+  cached.reset([&] {
     auto* catalog = new googlesql::SimpleCatalog("builtin", new googlesql::TypeFactory());
     googlesql::BuiltinFunctionOptions options(GoogleSqlLanguageOptions());
-    // GoogleSQL implements MONTHS_BETWEEN, but BigQuery has no such built-in function.
-    options.exclude_function_ids = {
-        googlesql::FN_MONTHS_BETWEEN_DATE,
-        googlesql::FN_MONTHS_BETWEEN_DATETIME,
+    // Use the backend implementation, not SQL expansion (which needs nanosecond arithmetic).
+    options.rewrite_enabled = {
+        {googlesql::FN_MONTHS_BETWEEN_DATE, false},
+        {googlesql::FN_MONTHS_BETWEEN_DATETIME, false},
     };
+    for (const int64_t id : excluded_function_ids) {
+      options.exclude_function_ids.insert(static_cast<googlesql::FunctionSignatureId>(id));
+    }
     const absl::Status status = catalog->AddBuiltinFunctionsAndTypes(options);
     if (!status.ok()) {
       throw std::runtime_error(status.ToString());
@@ -340,16 +352,18 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
     }
     AddObjectRefFunctions(*catalog);
     return catalog;
-  }();
-  return kCatalog;
+  }());
+  return cached.get();
 }
 
 }  // namespace
 
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                  std::string default_project, std::string default_dataset,
-                                 const TemporaryTables* temporary)
-    : googlesql::CatalogWrapper(BuiltinCatalog()),
+                                 const TemporaryTables* temporary,
+                                 const ExcludedFunctionIds& excluded_function_ids)
+    : googlesql::CatalogWrapper(BuiltinCatalog(excluded_function_ids)),
+      excluded_function_ids_(excluded_function_ids),
       source_(source),
       type_factory_(type_factory),
       default_project_(std::move(default_project)),

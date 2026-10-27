@@ -9,6 +9,7 @@
 #include "absl/types/span.h"
 #include "googlesql/public/catalog.h"
 #include "src/analyzer.h"
+#include "src/builtin_function_options.h"
 #include "src/catalog.h"
 #include "src/references.h"
 #include "src/routine.h"
@@ -35,7 +36,8 @@ class RoutineCatalog : public BigQueryCatalog {
   // `source`, `type_factory` and `temporary` must outlive the catalog, as for BigQueryCatalog.
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                  std::string default_project, std::string default_dataset,
-                 const TemporaryTables* temporary = nullptr);
+                 const TemporaryTables* temporary = nullptr,
+                 const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds());
   ~RoutineCatalog() override;
 
   absl::Status FindFunction(const absl::Span<const std::string>& path,
@@ -65,7 +67,8 @@ class RoutineCatalog : public BigQueryCatalog {
   struct State;
 
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
-                 std::string default_project, std::string default_dataset, State* state);
+                 std::string default_project, std::string default_dataset, State& state,
+                 const ExcludedFunctionIds& excluded_function_ids);
 
   // The function `routine` defines, resolved as described above.
   absl::StatusOr<std::unique_ptr<googlesql::Function>> Resolve(const Routine& routine);

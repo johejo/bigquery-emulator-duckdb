@@ -18,6 +18,9 @@ int64_t MicrosFromTime(const googlesql::TimeValue& time);
 absl::StatusOr<googlesql::DatetimeValue> DatetimeFromMicros(int64_t micros);
 absl::StatusOr<int64_t> MicrosFromDatetime(const googlesql::DatetimeValue& datetime);
 
+absl::Status MonthsBetweenDate(int32_t end, int32_t start, double* out);
+absl::Status MonthsBetweenDatetime(int64_t end, int64_t start, double* out);
+
 // `unpadded_iso_year` writes %G without padding years below 1000, as BigQuery does.
 absl::Status FormatDate(std::string_view format, int32_t date, bool unpadded_iso_year,
                         std::string* out);
