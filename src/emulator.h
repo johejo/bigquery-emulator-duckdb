@@ -210,6 +210,7 @@ class Emulator {
   // EXTERNAL_QUERY reaches, are not persisted. JavaScript UDFs run under `javascript`.
   // Defaults select BigQuery function corrections, built-in exclusions and outward geography
   // bounds. An empty `excluded_function_ids` exposes GoogleSQL-only built-ins too.
+  // `declarations` independently selects whether to add BigQuery-specific declarations.
   explicit Emulator(
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
@@ -218,7 +219,8 @@ class Emulator {
       const udf::PythonOptions& python = udf::PythonOptions(),
       const googlesql_geography::Options& geography = {.expand_bounding_box = true},
       const functions_duckdb::Options& functions = BigQueryFunctionOptions(),
-      ExcludedFunctionIds excluded_function_ids = BigQueryExcludedFunctionIds());
+      ExcludedFunctionIds excluded_function_ids = BigQueryExcludedFunctionIds(),
+      FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 
@@ -392,6 +394,7 @@ class Emulator {
   std::recursive_mutex expiration_mutex_;
   Backend backend_;
   ExcludedFunctionIds excluded_function_ids_;
+  FunctionDeclarations declarations_;
   bool has_session_user_;
   ExternalConnections connections_{.backend = backend_};
   GcsClient gcs_client_;

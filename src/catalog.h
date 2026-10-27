@@ -34,7 +34,8 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                   std::string default_project, std::string default_dataset,
                   const TemporaryTables* temporary = nullptr,
-                  const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds());
+                  const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds(),
+                  FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
   ~BigQueryCatalog() override;
 
   [[nodiscard]] std::string FullName() const override { return "bigquery"; }
@@ -63,8 +64,11 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
     return excluded_function_ids_;
   }
 
+  [[nodiscard]] FunctionDeclarations function_declarations() const { return declarations_; }
+
  private:
   ExcludedFunctionIds excluded_function_ids_;
+  FunctionDeclarations declarations_;
   TableSource& source_;
   googlesql::TypeFactory* type_factory_;
   std::string default_project_;

@@ -31,9 +31,11 @@ namespace bigquery_emulator_duckdb {
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                  std::string default_project, std::string default_dataset,
                                  const TemporaryTables* temporary,
-                                 const ExcludedFunctionIds& excluded_function_ids)
-    : googlesql::CatalogWrapper(BuiltinCatalog(excluded_function_ids)),
+                                 const ExcludedFunctionIds& excluded_function_ids,
+                                 FunctionDeclarations declarations)
+    : googlesql::CatalogWrapper(BuiltinCatalog(excluded_function_ids, declarations)),
       excluded_function_ids_(excluded_function_ids),
+      declarations_(declarations),
       source_(source),
       type_factory_(type_factory),
       default_project_(std::move(default_project)),
@@ -45,7 +47,8 @@ BigQueryCatalog::~BigQueryCatalog() = default;
 absl::Status BigQueryCatalog::FindTableValuedFunction(
     const absl::Span<const std::string>& path, const googlesql::TableValuedFunction** function,
     const FindOptions& options) {
-  if (path.size() != 1 || !absl::EqualsIgnoreCase(path.front(), "external_query")) {
+  if (declarations_ != FunctionDeclarations::kBigQuery || path.size() != 1 ||
+      !absl::EqualsIgnoreCase(path.front(), "external_query")) {
     return googlesql::CatalogWrapper::FindTableValuedFunction(path, function, options);
   }
   if (external_query_ == nullptr) {

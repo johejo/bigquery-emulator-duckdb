@@ -369,14 +369,14 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     return absl::OkStatus();
   }
 
-  // Expose all GoogleSQL built-ins and keep GoogleSQL's behavior where BigQuery's differs;
-  // end-to-end tests check BigQuery's exclusions and semantic differences.
+  // Expose only GoogleSQL declarations, without BigQuery's exclusions or semantic corrections;
+  // end-to-end tests check BigQuery-specific declarations, exclusions and semantic differences.
   void Reset() {
     emulator_ = std::make_unique<Emulator>(
         "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, udf::JavaScriptLimits(),
         std::vector<ExternalConnection>(), udf::PythonOptions(),
         googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{},
-        ExcludedFunctionIds{});
+        ExcludedFunctionIds{}, FunctionDeclarations::kGoogleSQL);
     emulator_->CreateDataset(DatasetReference{kProject, kDataset});
   }
 

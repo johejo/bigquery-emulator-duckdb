@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <utility>
 
 #include "absl/status/status.h"
 #include "googlesql/public/builtin_function_options.h"
@@ -14,12 +15,14 @@
 
 namespace bigquery_emulator_duckdb {
 
-// Built once per exclusion list: registration is expensive, and lookups are thread-safe.
-googlesql::SimpleCatalog* BuiltinCatalog(const ExcludedFunctionIds& excluded_function_ids) {
+// Registration is expensive; cache each policy independently. Lookups are thread-safe.
+googlesql::SimpleCatalog* BuiltinCatalog(const ExcludedFunctionIds& excluded_function_ids,
+                                         FunctionDeclarations declarations) {
   static std::mutex mutex;
-  static std::map<ExcludedFunctionIds, std::unique_ptr<googlesql::SimpleCatalog>> catalogs;
+  using Key = std::pair<ExcludedFunctionIds, FunctionDeclarations>;
+  static std::map<Key, std::unique_ptr<googlesql::SimpleCatalog>> catalogs;
   const std::scoped_lock lock(mutex);
-  auto& cached = catalogs[excluded_function_ids];
+  auto& cached = catalogs[{excluded_function_ids, declarations}];
   if (cached != nullptr) {
     return cached.get();
   }
@@ -31,7 +34,9 @@ googlesql::SimpleCatalog* BuiltinCatalog(const ExcludedFunctionIds& excluded_fun
     if (!status.ok()) {
       throw std::runtime_error(status.ToString());
     }
-    analyzer_functions::AddBigQueryFunctionDeclarations(*catalog);
+    if (declarations == FunctionDeclarations::kBigQuery) {
+      analyzer_functions::AddBigQueryFunctionDeclarations(*catalog);
+    }
     return catalog;
   }());
   return cached.get();
