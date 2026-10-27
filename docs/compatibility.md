@@ -352,26 +352,26 @@ such as on macOS.
 
 ## Graphs
 
-Property graphs support INT64 or STRING column keys, one static label per element table, and column
-properties of type INT64, STRING, BOOL or FLOAT64. Edge endpoints must exist when a graph is created. Computed properties, views as
-element tables, graph options and creation modes such as OR REPLACE and IF NOT
-EXISTS are unsupported.
+Graph DDL rejects:
 
-`GRAPH_TABLE` supports multiple path patterns in one MATCH, chained MATCH and OPTIONAL MATCH,
-directed or undirected edges, property projections through `RETURN`, and scalar filters. Each
-element, including shared variables, must resolve to one table within its MATCH; shared variables
-join by element identity. Paths support WALK, TRAIL and ACYCLIC modes, parenthesized subpaths,
-and bounded edge or subpath repetition with literal bounds, including zero repetitions. Path variables support
-node and edge access and path predicates; group variables expose arrays in traversal order.
-Search prefixes support `ANY` and `ANY SHORTEST` with these same limits; `ANY CHEAPEST` is unsupported.
-Unbounded repetition and non-literal repetition bounds are unsupported. `IS [NOT] SOURCE [OF]` and
-`IS [NOT] DESTINATION [OF]` support non-NULL operands; NULL operands are rejected until
-their BigQuery behavior is verified. Graph element or path results and
-graph values in comparisons, grouping or aggregate and
-analytic functions are unsupported. Element IDs and edge endpoint ID functions are unsupported.
-`SAME` and `ALL_DIFFERENT` do not support `SAFE.` calls or mixing nodes and edges in one call.
-SQL/PGQ's
-`COLUMNS` clause is unsupported; use BigQuery's `RETURN` syntax.
+- Keys other than INT64 or STRING columns, and properties other than INT64, STRING, BOOL or
+  FLOAT64 columns, such as computed properties.
+- More than one label per element table, views as element tables, and graph options.
+- `OR REPLACE` and `IF NOT EXISTS` in `CREATE PROPERTY GRAPH`, and `IF EXISTS` in
+  `DROP PROPERTY GRAPH`.
+- Edges whose endpoint nodes do not exist when the graph is created.
 
-`DROP PROPERTY GRAPH` does not support IF EXISTS. Property graph definitions are
-kept across emulator restarts.
+`GRAPH_TABLE` and GQL queries reject:
+
+- An element that can match more than one element table within its MATCH, such as
+  `(n:Person|Account)` or an unlabeled `(n)`.
+- Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.
+- The GQL `CALL` statement and SQL/PGQ's `COLUMNS` clause.
+- Graph elements or paths in query results.
+- Graph values in comparisons such as `a = b`, grouping sets, `PARTITION BY`, and aggregate or
+  analytic functions other than `COUNT`; paths in `GROUP BY`, `DISTINCT` and `COUNT(DISTINCT)`.
+- Horizontal aggregation over group variables, such as `ARRAY_AGG(e.id)`.
+- `ELEMENT_ID`, `SOURCE_NODE_ID` and `DESTINATION_NODE_ID`.
+- NULL operands of `IS [NOT] SOURCE [OF]` and `IS [NOT] DESTINATION [OF]`, until their BigQuery
+  behavior is verified.
+- `SAFE.` calls of `SAME` and `ALL_DIFFERENT`, and calls that mix nodes and edges.

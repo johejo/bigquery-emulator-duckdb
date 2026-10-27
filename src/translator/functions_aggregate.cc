@@ -276,7 +276,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "count"},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
       Define("$COUNT_STAR", {{.function = "count", .arguments = kStar}}),
 
