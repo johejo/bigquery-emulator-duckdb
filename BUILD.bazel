@@ -1469,6 +1469,7 @@ cc_test(
         "@googlesql//googlesql/public/types",
         # json_value brings nlohmann's single header, which nlohmann/json.hpp then names.
         "@nlohmann_json//:singleheader-json",
+        "@nlohmann_json//:json",
     ],
 )
 
