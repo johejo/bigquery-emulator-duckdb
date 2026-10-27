@@ -450,7 +450,10 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
   bool positional = false;
   for (const auto& field : type->fields()) {
     // A name starting with $ could pass for a RANGE's; BigQuery's column names cannot have one.
+    // DuckDB's SQL parser cannot represent a NUL in an identifier. JSON backends recover
+    // the original names from the value argument's metadata instead.
     positional = positional || field.name.empty() || field.name.starts_with('$') ||
+                 field.name.find('\0') != std::string::npos ||
                  !seen.insert(ToLowerAscii(field.name)).second;
     names.push_back(field.name);
   }

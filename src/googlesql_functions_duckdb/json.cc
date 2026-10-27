@@ -332,12 +332,15 @@ void JsonExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
               evaluator.reset();
               lax_iterator.reset();
               if constexpr (kJson && kExtraction == Extraction::kQuery) {
-                // JSON_QUERY of JSON takes a lax JSONPath, such as "lax $.a".
-                const auto lax = googlesql::functions::json_internal::IsValidAndLaxJSONPath(path);
+                // Legacy paths allow ['key'], which the standard/lax validator rejects.
+                // Only JSON_QUERY of JSON takes a lax JSONPath, such as "lax $.a".
+                const auto lax =
+                    standard ? googlesql::functions::json_internal::IsValidAndLaxJSONPath(path)
+                             : absl::StatusOr<bool>(false);
                 if (!lax.ok()) {
                   return lax.status();
                 }
-                if (standard && *lax) {
+                if (*lax) {
                   auto iterator =
                       googlesql::functions::json_internal::StrictJSONPathIterator::Create(
                           path, /*enable_lax_mode=*/true);

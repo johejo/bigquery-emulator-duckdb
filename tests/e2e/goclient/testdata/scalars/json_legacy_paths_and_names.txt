@@ -1,0 +1,24 @@
+# Legacy quoted JSONPath names: third_party/bigquery_docs/reference/standard-sql/json_functions.md.
+# Exercise JSON inputs; STRING inputs do not use the lax-path validator.
+SELECT TO_JSON_STRING(JSON_EXTRACT(value, "$['a.b']")) FROM UNNEST([JSON '{"a.b": [1,2]}']) AS value
+=> "[1,2]"
+
+SELECT TO_JSON_STRING(JSON_EXTRACT(value, "$['a.b'][1]")) FROM UNNEST([JSON '{"a.b": [1,2]}']) AS value
+=> "2"
+
+SELECT JSON_EXTRACT(value, "$['missing']") IS NULL FROM UNNEST([JSON '{"a.b": [1,2]}']) AS value
+=> "true"
+
+SELECT SAFE.JSON_EXTRACT(value, "$['a.b'") IS NULL FROM UNNEST([JSON '{"a.b": [1,2]}']) AS value
+=> "true"
+
+# Escaping control characters in field names: GoogleSQL compliance
+# testdata/strings.test (to_json_string_with_escaped_field_names).
+SELECT TO_JSON_STRING(STRUCT(x AS `a\x00b`)) FROM UNNEST([1]) AS x
+=> "{\"a\\u0000b\":1}"
+
+SELECT TO_JSON_STRING(STRUCT(STRUCT(x AS `a\x00b`) AS nested)) FROM UNNEST([1]) AS x
+=> "{\"nested\":{\"a\\u0000b\":1}}"
+
+SELECT (STRUCT(x AS `a\x00b`)).`a\x00b` AS value FROM UNNEST([1]) AS x
+=> "1"

@@ -1810,12 +1810,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "TO_JSON_STRING with escaped field names differs"
-  label: "strings_test:to_json_string_with_escaped_field_names"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1e29"
 }
@@ -1898,20 +1892,6 @@ known_errors {
   label: "json_comparison_test:scalar_coercion_basic"
   label: "json_comparison_test:scalar_mixed_types"
   label: "json_comparison_test:scalar_number_basic"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "JSON_EXTRACT does not accept JSONPath subscripts with quoted names, such as $['a']"
-  label: "code:json_extract_JSON_<@@@@@:@5_SvphWxi4KS0_@@a@@:1@>_STRING_<@@@'@'@>"
-  label: "code:json_extract_JSON_<@@@@@:@5_SvphWxi4KS0_@@a@@:1@>_STRING_<@@@'@'@@1@>"
-  label: "code:json_extract_JSON_<@@@a@@:@_HYv7JWied60_@:true@@>_STRING_<@@@'a@'@>"
-  label: "code:json_extract_JSON_<@@@a@b@c@@:5@>_STRING_<@@@'a@b@c@'@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@@'x@'@@1@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@x@@'1@'@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@x@@'a@'@>"
-  label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@y@0@@@'a@'@>"
-  label: "json_queries_test:json_extract"
 }
 
 known_errors {
