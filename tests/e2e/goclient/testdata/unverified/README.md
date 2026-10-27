@@ -15,7 +15,9 @@ as the JSON of an entry of `jobs.query`'s `queryParameters`, such as
 A maintainer fills those in with BigQuery's answers through `just bigquery-answers PROJECT`,
 which processes unanswered queries in `*.txt` and unanswered cases in API scenario files. A file or
 directory can be selected with `just bigquery-answers PROJECT PATH`.
-`just bigquery-answers-validate` checks API scenarios without authentication or requests.
+`just bigquery-answers-validate` checks SQL case formats and API scenarios without authentication
+or requests. It rejects missing `?>` markers, markers without queries, malformed parameter JSON
+objects and invalid recorded answers; it does not check SQL syntax. `just check` runs it too.
 
 Each answered SQL case then moves to
 [`scalars/`](../scalars/), written with `=>`, or with `!>` to `scalars/known_bugs.txt` where
