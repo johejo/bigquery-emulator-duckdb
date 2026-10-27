@@ -11,6 +11,7 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"
 #include "googlesql/public/simple_catalog.h"
+#include "src/builtin_function_options.h"
 
 namespace googlesql {
 class TableValuedFunction;
@@ -35,7 +36,8 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // that the catalog analyzes a statement of, if any, must outlive the catalog.
   BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                   std::string default_project, std::string default_dataset,
-                  const TemporaryTables* temporary = nullptr);
+                  const TemporaryTables* temporary = nullptr,
+                  const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds());
   ~BigQueryCatalog() override;
 
   [[nodiscard]] std::string FullName() const override { return "bigquery"; }
@@ -60,7 +62,12 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   [[nodiscard]] googlesql::TypeFactory* type_factory() const { return type_factory_; }
   [[nodiscard]] const std::string& default_project() const { return default_project_; }
 
+  [[nodiscard]] const ExcludedFunctionIds& excluded_function_ids() const {
+    return excluded_function_ids_;
+  }
+
  private:
+  ExcludedFunctionIds excluded_function_ids_;
   absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> ExternalQuerySchema(
       const std::vector<googlesql::TVFInputArgumentType>& arguments);
 

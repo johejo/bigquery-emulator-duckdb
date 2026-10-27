@@ -14,6 +14,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/builtin_function_options.h"
 #include "src/catalog.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
@@ -33,7 +34,8 @@ namespace {
 
 // Routine.definitionBody requires project-qualified references to other routines. Built-in
 // namespaces such as NET and SAFE are still allowed.
-void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
+void CheckApiRoutineBody(const Routine& routine, TableSource& source,
+                         const ExcludedFunctionIds& excluded_function_ids) {
   if (routine.resource.value("language", "SQL") == "PYTHON") {
     return;
   }
@@ -51,7 +53,7 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
     throw ApiError::Invalid(std::string(status.message()));
   }
   googlesql::TypeFactory types;
-  BigQueryCatalog builtins(source, &types, "", "");
+  BigQueryCatalog builtins(source, &types, "", "", nullptr, excluded_function_ids);
   std::vector<const googlesql::ASTNode*> nodes{
       procedure ? static_cast<const googlesql::ASTNode*>(parsed->script())
       : tvf     ? static_cast<const googlesql::ASTNode*>(parsed->statement())
@@ -131,7 +133,7 @@ Routine Emulator::WriteRoutine(Routine routine, bool update) {
   }
   try {
     const auto source = NewTableSource();
-    CheckApiRoutineBody(routine, *source);
+    CheckApiRoutineBody(routine, *source, excluded_function_ids_);
     std::string statement = RoutineStatement(routine);
     if (update) {
       statement.replace(0, std::string("CREATE").size(), "CREATE OR REPLACE");

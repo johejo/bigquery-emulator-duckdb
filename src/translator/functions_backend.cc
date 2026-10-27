@@ -430,6 +430,19 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("FORMAT_DATETIME", kFormatDateTime),
       Define("FORMAT_TIMESTAMP", kFormatDateTime),
       Define("FORMAT_TIME", {{.arity = 2, .spelling = "bq_format_time($1, $2)"}}),
+      Define("MONTHS_BETWEEN",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "bq_months_between_date($1, $2)",
+                     .conditions = ArgumentType<TYPE_DATE>::kFirst,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_months_between_datetime($1, $2)",
+                     .conditions = ArgumentType<TYPE_DATETIME>::kFirst,
+                 },
+             }),
       Define("PARSE_DATE", {{.arity = 2, .spelling = "bq_parse_date($1, $2)"}}),
 
       Define("PARSE_DATETIME",

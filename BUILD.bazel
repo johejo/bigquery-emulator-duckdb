@@ -333,6 +333,14 @@ cc_library(
 )
 
 cc_library(
+    name = "builtin_function_options",
+    srcs = ["src/builtin_function_options.cc"],
+    hdrs = ["src/builtin_function_options.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = ["@googlesql//googlesql/public:builtin_function_cc_proto"],
+)
+
+cc_library(
     name = "catalog",
     srcs = [
         "src/catalog.cc",
@@ -362,6 +370,7 @@ cc_library(
         "@googlesql//googlesql/public:value",
     ],
     deps = [
+        ":builtin_function_options",
         ":catalog_table",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -416,6 +425,7 @@ cc_library(
     ],
     deps = [
         ":analyzer",
+        ":builtin_function_options",
         ":catalog",
         ":references",
         ":routine",
@@ -1035,6 +1045,7 @@ cc_library(
     deps = [
         ":api_error",
         ":backend",
+        ":builtin_function_options",
         ":external_query",
         ":field_schema",
         ":function_options",
@@ -1110,6 +1121,7 @@ cc_library(
     ],
     deps = [
         ":backend",
+        ":builtin_function_options",
         ":query_parameters",
     ],
 )
@@ -1378,6 +1390,7 @@ cc_test(
     shard_count = 32,
     tags = ["manual"],
     deps = [
+        ":builtin_function_options",
         ":api_error",
         ":result_value",
         ":emulator",

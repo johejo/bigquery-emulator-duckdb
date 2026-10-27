@@ -232,6 +232,16 @@ absl::Status TimestampTrunc(int64_t micros, std::string_view part, std::string_v
   return fn::TimestampTrunc(micros, time_zone, value, out);
 }
 
+absl::Status MonthsBetweenDate(int32_t end, int32_t start, double* out) {
+  return fn::MonthsBetween(end, start, out);
+}
+
+absl::Status MonthsBetweenDatetime(int64_t end, int64_t start, double* out) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime_end, DatetimeFromMicros(end));
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime_start, DatetimeFromMicros(start));
+  return fn::MonthsBetween(datetime_end, datetime_start, out);
+}
+
 // GENERATE_DATE_ARRAY(start, end, INTERVAL step part), with BigQuery's documented
 // 1,048,576-element limit when `extended_limit` is set. Like BigQuery, each step adds to the
 // previous element, so an element clamped to the end of a shorter month moves the rest to that day.

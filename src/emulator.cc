@@ -16,6 +16,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend_error.h"
+#include "src/builtin_function_options.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
@@ -59,7 +60,8 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const udf::JavaScriptLimits& javascript,
                    const std::vector<ExternalConnection>& connections,
                    const udf::PythonOptions& python, const googlesql_geography::Options& geography,
-                   const functions_duckdb::Options& functions)
+                   const functions_duckdb::Options& functions,
+                   ExcludedFunctionIds excluded_function_ids)
     : backend_(
           session_user, javascript,
           {
@@ -72,6 +74,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                   [this](const std::string& key) { return connections_.conninfo.contains(key); },
           },
           python, geography, functions),
+      excluded_function_ids_(std::move(excluded_function_ids)),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
   for (const ExternalConnection& connection : connections) {
