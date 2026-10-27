@@ -13,6 +13,7 @@ bazel_dep(name = "grpc", version = "1.84.0")
 bazel_dep(name = "googlesql", version = "2026.10.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
+bazel_dep(name = "cli11", version = "2.7.2")
 
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 

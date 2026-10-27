@@ -28,8 +28,8 @@ func TestEmptyIdentity(t *testing.T) {
 			defer cancel()
 			output, err := exec.CommandContext(ctx, binary(t), args...).CombinedOutput()
 			var exit *exec.ExitError
-			if ctx.Err() != nil || !errors.As(err, &exit) || strings.Contains(string(output), "listening on") {
-				t.Fatalf("expected startup rejection: %v\n%s", err, output)
+			if ctx.Err() != nil || !errors.As(err, &exit) || exit.ExitCode() != 2 || strings.Contains(string(output), "listening on") {
+				t.Fatalf("expected usage error: %v\n%s", err, output)
 			}
 		})
 	}

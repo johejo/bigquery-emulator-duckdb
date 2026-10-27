@@ -214,6 +214,51 @@ steps:
       command: >-
         "$BQ_EMULATOR_BINARY" --duckdb
     test: current.exit_code == 2 && current.stdout == ""
+  # The shell's help lists its own flags, not the server's.
+  help:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --help
+    test: |
+      current.exit_code == 0 && current.stdout contains "--project-id" &&
+      current.stdout contains "--data-dir" && !(current.stdout contains "--grpc-port")
+  # Every flag that takes a value also takes it after '='.
+  flag_values_after_equals:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+        --project-id=test --format=csv --execute='SELECT 1 AS x'
+    test: current.exit_code == 0 && current.stdout == "x\r\n1\r\n"
+  # SQL can start with a comment, which looks like a flag.
+  execute_starting_with_comment:
+    exec:
+      command: |
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' -e '-- comment
+        SELECT 1 AS x'
+    test: current.exit_code == 0 && current.stdout == '{"x":"1"}' + "\n"
+  # Empty SQL is a mistake, such as an unset variable, rather than a request to read standard input.
+  execute_empty:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' -e ' '
+      stdin: SELECT 1;
+    test: current.exit_code == 2 && current.stdout == ""
+  server_flag_in_shell:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --port 9050 -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
+  # Shared flags follow the subcommand, as the shell's help lists them.
+  flag_before_shell:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" --project='{"projectId":"test"}' shell -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
+  unknown_flag:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --unknown -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
   # runn cannot give the shell a terminal, so a Go test drives it through a pty.
   terminal:
     exec:

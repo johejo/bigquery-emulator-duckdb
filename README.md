@@ -69,7 +69,8 @@ See the [Storage API guide](docs/storage-api.md) for writing rows, limits and st
 
 `shell` runs queries in the process instead of listening. It accepts `--project`, `--data-dir`,
 `--session-user` and the [JavaScript UDF limits](#javascript-udf-limits) as the server does, and uses the only registered project unless
-`--project-id` names one. `--dataset-id` sets the default dataset.
+`--project-id` names one. `--dataset-id` sets the default dataset. Its flags follow `shell`, and
+`shell --help` lists them.
 
 ```bash
 bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' < script.sql
@@ -94,7 +95,7 @@ bazel-bin/bigquery-emulator-duckdb shell --data-dir DIR --duckdb \
   -e 'SELECT bq_geography_text(g) AS g FROM test.ds.t'
 ```
 
-Standard input that is not a terminal, or the `-e` argument, runs as one query job, so a
+Standard input that is not a terminal, or the `-e` (`--execute`) argument, runs as one query job, so a
 multi-statement input is a script whose result is its last statement's. The shell exits with 1
 when the job fails.
 
