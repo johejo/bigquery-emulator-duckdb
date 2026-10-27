@@ -27,15 +27,11 @@ filegroup(
 native_archive(
     name = "libpython_native",
     src = glob(["install/lib/python3.11/config-*/libpython3.11.a"])[0],
-    target_compatible_with = ["@platforms//os:linux"],
 )
 
 cc_import(
     name = "libpython",
-    static_library = select({
-        "@platforms//os:linux": ":libpython_native",
-        "//conditions:default": glob(["install/lib/python3.11/config-*/libpython3.11.a"])[0],
-    }),
+    static_library = ":libpython_native",
 )
 
 cc_library(
