@@ -2080,19 +2080,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "UPDATE cannot set a field of a NULL STRUCT, or a field to DEFAULT"
-  label: "dml_update_struct_test:assign_array_struct_field_default"
-  label: "dml_update_struct_test:assign_struct_array_sub_subfield_default"
-  label: "dml_update_struct_test:assign_struct_field"
-  label: "dml_update_struct_test:assign_struct_field_default"
-  label: "dml_update_struct_test:assign_struct_field_null"
-  label: "dml_update_struct_test:assign_struct_sub_subfield_default"
-  label: "dml_update_struct_test:assign_struct_subfield_default"
-  label: "dml_update_struct_test:assign_two_struct_fields"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "Variance, standard deviation, covariance and correlation lose precision on high-precision NUMERIC values, return NaN instead of NULL for one row, and overflow to infinities"
   label: "stat_aggregation_test:corr_numeric_one_pair"

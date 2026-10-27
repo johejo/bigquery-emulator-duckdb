@@ -1467,6 +1467,7 @@ cc_test(
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public:parse_helpers",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",

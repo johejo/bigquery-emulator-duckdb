@@ -195,6 +195,9 @@ std::optional<std::string> UpdateItems(
     if (!target.names.contains(id) || !target.columns.contains(id)) {
       return Unsupported(scope, "UPDATE target");
     }
+    if (!path.empty() && item->set_value()->value()->Is<googlesql::ResolvedDMLDefault>()) {
+      throw std::invalid_argument("SET a struct field to DEFAULT is not supported in UPDATE.");
+    }
     // A field assignment uses that field's rounding mode and scale, rather than its column's.
     const FieldSchema* written = target.fields.at(id);
     for (const int index : path) {

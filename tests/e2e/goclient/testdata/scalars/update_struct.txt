@@ -1,0 +1,25 @@
+# BigQuery answers recorded with tools/bqanswers: field DEFAULT is rejected even when
+# the enclosing column has a default. Location prefixes are omitted from error matching.
+CREATE TEMP TABLE t (s STRUCT<a INT64, b INT64>);
+INSERT t VALUES (STRUCT(1, 2));
+UPDATE t SET s.a = DEFAULT WHERE TRUE;
+SELECT TO_JSON_STRING(s) FROM t
+=> error contains: SET a struct field to DEFAULT is not supported in UPDATE.
+
+CREATE TEMP TABLE t (s STRUCT<a INT64, b INT64> DEFAULT (10, 20));
+INSERT t VALUES (STRUCT(1, 2));
+UPDATE t SET s.a = DEFAULT WHERE TRUE;
+SELECT TO_JSON_STRING(s) FROM t
+=> error contains: SET a struct field to DEFAULT is not supported in UPDATE.
+
+CREATE TEMP TABLE t (s STRUCT<a ARRAY<INT64>, b INT64>);
+INSERT t VALUES (STRUCT([1, 2], 3));
+UPDATE t SET s.a = DEFAULT WHERE TRUE;
+SELECT TO_JSON_STRING(s) FROM t
+=> error contains: SET a struct field to DEFAULT is not supported in UPDATE.
+
+CREATE TEMP TABLE t (s STRUCT<a INT64, b INT64>);
+INSERT t VALUES (STRUCT(1, 2)), (STRUCT(3, 4));
+UPDATE t SET s.a = NULL WHERE TRUE;
+SELECT TO_JSON_STRING(ARRAY(SELECT s FROM t ORDER BY s.b))
+=> "[{\"a\":null,\"b\":2},{\"a\":null,\"b\":4}]"
