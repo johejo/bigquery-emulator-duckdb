@@ -30,7 +30,7 @@ func start(t *testing.T) *bigquery.Client {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--port", "0", `--project={"projectId":"test"}`)
+	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}

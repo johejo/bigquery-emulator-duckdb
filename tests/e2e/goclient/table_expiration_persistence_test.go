@@ -24,7 +24,7 @@ func TestTableExpirationPersistence(t *testing.T) {
 		t.Helper()
 		startup, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
-		p, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--port", "0",
+		p, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 			"--data-dir", dir, `--project={"projectId":"expiration"}`)
 		if err != nil {
 			t.Fatal(err)

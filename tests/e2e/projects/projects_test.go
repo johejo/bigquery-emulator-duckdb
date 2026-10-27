@@ -29,7 +29,7 @@ func server(t *testing.T, dir string, args ...string) *emulatorprocess.Process {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	p, err := emulatorprocess.Start(ctx, binary(t), dir,
-		append([]string{"--host", "127.0.0.1", "--port", "0"}, args...)...)
+		append([]string{"--host", "127.0.0.1", "--http-port", "0"}, args...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func rejected(t *testing.T, args ...string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	output, err := exec.CommandContext(ctx, binary(t),
-		append([]string{"--host", "127.0.0.1", "--port", "0"}, args...)...).CombinedOutput()
+		append([]string{"serve", "--host", "127.0.0.1", "--http-port", "0"}, args...)...).CombinedOutput()
 	var exit *exec.ExitError
 	if ctx.Err() != nil || !errors.As(err, &exit) || strings.Contains(string(output), "listening on") {
 		t.Fatalf("expected startup rejection for %q: %v\n%s", args, err, output)

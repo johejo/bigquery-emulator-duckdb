@@ -63,15 +63,15 @@ func (l *startupLog) text() string {
 	return l.buffer.String()
 }
 
-// Start waits for the startup announcement or ctx to expire. The caller supplies
-// all server arguments, including --host and --port; dir may be empty.
+// Start runs the serve command and waits for its startup announcement or ctx to expire. The
+// caller supplies all server arguments, including --host and --http-port; dir may be empty.
 // ctx bounds startup only. The caller owns the process after Start succeeds.
 func Start(ctx context.Context, binary, dir string, args ...string) (*Process, error) {
 	ready := make(chan string, 1)
 	p := &Process{
 		// Each isolated process also needs its own Storage listener. Explicit caller
 		// arguments later in the list override this default.
-		cmd:  exec.Command(binary, append([]string{"--grpc-port", "0"}, args...)...),
+		cmd:  exec.Command(binary, append([]string{"serve", "--grpc-port", "0"}, args...)...),
 		log:  &startupLog{ready: ready},
 		done: make(chan struct{}),
 	}

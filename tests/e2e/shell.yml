@@ -105,33 +105,33 @@ steps:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format yaml -e 'SELECT 1'
     test: current.exit_code == 2 && current.stdout == ""
-  project_id_is_required_with_several_projects:
+  default_project_is_required_with_several_projects:
     exec:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
         --project='{"projectId":"other"}' -e 'SELECT 1'
     test: current.exit_code == 2 && current.stdout == ""
-  project_id_sets_the_default_project:
+  default_project_sets_the_default_project:
     exec:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
-        --project='{"projectId":"other"}' --project-id other
+        --project='{"projectId":"other"}' --default-project other
       stdin: &other_table |
         CREATE SCHEMA other.ds;
         CREATE TABLE other.ds.t AS SELECT 'other' AS p;
         SELECT p FROM ds.t;
     test: current.exit_code == 0 && current.stdout == '{"p":"other"}' + "\n"
-  project_id_of_another_project:
+  default_project_of_another_project:
     exec:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
-        --project='{"projectId":"other"}' --project-id test
+        --project='{"projectId":"other"}' --default-project test
       stdin: *other_table
     test: current.exit_code == 1 && current.stdout == ""
-  unregistered_project_id:
+  unregistered_default_project:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --project-id missing
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --default-project missing
         -e 'SELECT 1'
     test: current.exit_code == 2 && current.stdout == ""
   # A DML statement's affected rows go to standard error, leaving standard output to results.
@@ -151,44 +151,44 @@ steps:
         trap 'rm -rf "$dir"' EXIT
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
           -e 'CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT 1 AS x'
-        "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --dataset-id ds -e 'SELECT x FROM t'
+        "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --default-dataset ds -e 'SELECT x FROM t'
     test: current.exit_code == 0 && current.stdout == '{"x":"1"}' + "\n"
-  # This switch compares expanded bounds with the underlying S2 bounds; the default
-  # retains BigQuery behavior. Function results themselves are covered by geography scalars.
-  geography_bounds_default:
+  # --semantics=googlesql drops BigQuery's differences, such as an empty CHR(0) and outward
+  # geography bounds; function results themselves are covered by scalars.
+  semantics_default:
     exec:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
-      stdin: &bounds |
-        SELECT IF(ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0)).xmin < 0,
-                  'expanded', 'unexpanded') AS bounds;
-    test: current.exit_code == 0 && current.stdout == '{"bounds":"expanded"}' + "\n"
-  geography_bounds_disabled:
+      stdin: &semantics |
+        SELECT LENGTH(CHR(0)) AS chr, IF(ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0)).xmin < 0,
+                                         'expanded', 'unexpanded') AS bounds;
+    test: current.exit_code == 0 && current.stdout == '{"chr":"0","bounds":"expanded"}' + "\n"
+  semantics_bigquery:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --expand-bounding-box=false
-      stdin: *bounds
-    test: current.exit_code == 0 && current.stdout == '{"bounds":"unexpanded"}' + "\n"
-  geography_bounds_enabled:
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics bigquery
+      stdin: *semantics
+    test: current.exit_code == 0 && current.stdout == '{"chr":"0","bounds":"expanded"}' + "\n"
+  semantics_googlesql:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --expand-bounding-box true
-      stdin: *bounds
-    test: current.exit_code == 0 && current.stdout == '{"bounds":"expanded"}' + "\n"
-  geography_bounds_invalid:
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: *semantics
+    test: current.exit_code == 0 && current.stdout == '{"chr":"1","bounds":"unexpanded"}' + "\n"
+  semantics_invalid:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" shell --expand-bounding-box=invalid
+        "$BQ_EMULATOR_BINARY" shell --semantics=reference
     test: current.exit_code == 2 && current.stdout == ""
-  geography_bounds_missing_value:
+  semantics_missing_value:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" shell --expand-bounding-box
+        "$BQ_EMULATOR_BINARY" shell --semantics
     test: current.exit_code == 2 && current.stdout == ""
-  geography_bounds_shell_only:
+  semantics_shell_only:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" --expand-bounding-box=false
+        "$BQ_EMULATOR_BINARY" serve --semantics=googlesql
     test: current.exit_code == 2 && current.stdout == ""
   # --duckdb runs DuckDB SQL on the emulator's database, where each project is a catalog and
   # bq_geography_text shows the S2 vertices of a stored GEOGRAPHY: POINT(0 0) is the x axis.
@@ -212,7 +212,13 @@ steps:
   duckdb_shell_only:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" --duckdb
+        "$BQ_EMULATOR_BINARY" serve --duckdb
+    test: current.exit_code == 2 && current.stdout == ""
+  # A command is required, since serving and the shell take different flags.
+  no_subcommand:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY"
     test: current.exit_code == 2 && current.stdout == ""
   # The shell's help lists its own flags, not the server's.
   help:
@@ -220,14 +226,14 @@ steps:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --help
     test: |
-      current.exit_code == 0 && current.stdout contains "--project-id" &&
+      current.exit_code == 0 && current.stdout contains "--default-project" &&
       current.stdout contains "--data-dir" && !(current.stdout contains "--grpc-port")
   # Every flag that takes a value also takes it after '='.
   flag_values_after_equals:
     exec:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
-        --project-id=test --format=csv --execute='SELECT 1 AS x'
+        --default-project=test --format=csv --execute='SELECT 1 AS x'
     test: current.exit_code == 0 && current.stdout == "x\r\n1\r\n"
   # SQL can start with a comment, which looks like a flag.
   execute_starting_with_comment:
@@ -246,9 +252,9 @@ steps:
   server_flag_in_shell:
     exec:
       command: >-
-        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --port 9050 -e 'SELECT 1'
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --http-port 9050 -e 'SELECT 1'
     test: current.exit_code == 2 && current.stdout == ""
-  # Shared flags follow the subcommand, as the shell's help lists them.
+  # Shared flags follow the command, as its help lists them.
   flag_before_shell:
     exec:
       command: >-

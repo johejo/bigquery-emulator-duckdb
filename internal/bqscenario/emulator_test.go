@@ -22,7 +22,7 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 	}
 	startup, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	process, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--port", "0", "--project", `{"projectId":"test"}`)
+	process, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--project", `{"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}

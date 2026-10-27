@@ -30,7 +30,7 @@ func newClient(t *testing.T, args ...string) *bigquery.Client {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	args = append([]string{"--host", "127.0.0.1", "--port", "0", `--project={"projectId":"test"}`}, args...)
+	args = append([]string{"--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`}, args...)
 	p, err := emulatorprocess.Start(ctx, binary(t), "", args...)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func rejected(t *testing.T, args ...string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, binary(t), append([]string{"--host", "127.0.0.1", "--port", "0"}, args...)...).CombinedOutput()
+	output, err := exec.CommandContext(ctx, binary(t), append([]string{"serve", "--host", "127.0.0.1", "--http-port", "0"}, args...)...).CombinedOutput()
 	var exit *exec.ExitError
 	if ctx.Err() != nil || !errors.As(err, &exit) || exit.ExitCode() != 2 || strings.Contains(string(output), "listening on") {
 		t.Fatalf("expected usage error: %v\n%s", err, output)

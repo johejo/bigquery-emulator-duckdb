@@ -54,7 +54,7 @@ func startEmulator(ctx context.Context, binary, dataDir string, projects []strin
 	if port == "" {
 		port = "0"
 	}
-	args := []string{"--host", "127.0.0.1", "--port", port, "--data-dir", dataDir}
+	args := []string{"--host", "127.0.0.1", "--http-port", port, "--data-dir", dataDir}
 	if sessionUser != "" {
 		args = append(args, "--session-user="+sessionUser)
 	}

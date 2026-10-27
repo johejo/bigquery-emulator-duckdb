@@ -11,8 +11,8 @@ class Emulator;
 
 struct ShellOptions {
   // Empty uses the only registered project.
-  std::string project_id;
-  std::string dataset_id;
+  std::string default_project;
+  std::string default_dataset;
   // Unset prints a table to a terminal and JSON lines otherwise.
   std::optional<shell::OutputFormat> format;
   // Runs this query instead of reading standard input.
