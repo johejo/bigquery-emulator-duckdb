@@ -760,6 +760,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       {.types = kDoubleIntervalTypes, .message = "No matching signature for operator *"},
   };
   static constexpr std::string_view kDivisionErrors[] = {"'division by zero'"};
+  static constexpr std::string_view kDoubleOverflowErrors[] = {"'double overflow'"};
+  static constexpr std::string_view kDoubleDivisionErrors[] = {
+      "'division by zero'",
+      "'double overflow'",
+  };
   static constexpr std::string_view kModErrors[] = {
       "'division by zero: MOD(' || $1 || ', ' || $2 || ')'",
   };
@@ -833,6 +838,15 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                   .spelling = "bq_add_timestamp_interval($2, $1)",
                   .conditions = kTimestampSecond,
               },
+              // An infinity from finite inputs is overflow; input infinities and NaNs
+              // retain IEEE behavior. Templates bind repeated arguments once.
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN isfinite($1) AND isfinite($2) AND isinf($1 + $2) "
+                              "THEN !1 ELSE $1 + $2 END",
+                  .conditions = kDouble,
+                  .errors = kDoubleOverflowErrors,
+              },
               {.arity = 2, .spelling = "($1 + $2)"},
           },
           {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
@@ -867,6 +881,13 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
               },
               {.arity = 2, .spelling = "bq_subtract_timestamps($1, $2)", .conditions = kTimestamp},
               {.arity = 2, .spelling = "bq_subtract_times($1, $2)", .conditions = kTime},
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN isfinite($1) AND isfinite($2) AND isinf($1 - $2) "
+                              "THEN !1 ELSE $1 - $2 END",
+                  .conditions = kDouble,
+                  .errors = kDoubleOverflowErrors,
+              },
               {.arity = 2, .spelling = "($1 - $2)"},
           },
           {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
@@ -892,6 +913,13 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      .spelling = "bq_multiply_interval($2, $1)",
                      .conditions = kInt64Interval,
                  },
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN isfinite($1) AND isfinite($2) AND isinf($1 * $2) "
+                                 "THEN !1 ELSE $1 * $2 END",
+                     .conditions = kDouble,
+                     .errors = kDoubleOverflowErrors,
+                 },
                  {.arity = 2, .spelling = "($1 * $2)"},
              },
              {
@@ -912,6 +940,14 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
               {.arity = 2, .spelling = "bq_divide_interval($1, $2)", .conditions = kIntervalInt64},
               {
                   .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                              "WHEN isfinite($1) AND isfinite($2) AND isinf($1 / $2) THEN !2 "
+                              "ELSE $1 / $2 END",
+                  .conditions = kDouble,
+                  .errors = kDoubleDivisionErrors,
+              },
+              {
+                  .arity = 2,
                   .spelling =
                       "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE "
                       "$1 / $2 END",
@@ -929,7 +965,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  {.arity = 1, .spelling = "(-$1)"},
              },
              {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
-      // SAFE_DIVIDE makes the zero divisor disappear.
+      // SAFE_DIVIDE returns NULL for both division by zero and finite-input overflow.
       Define("SAFE_DIVIDE",
              {
                  {
@@ -939,6 +975,12 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      .conditions = kBigNumeric,
                  },
                  {.arity = 2, .spelling = "bq_safe_divide_numeric($1, $2)", .conditions = kNumeric},
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN $2 = 0 OR (isfinite($1) AND isfinite($2) AND "
+                                 "isinf($1 / NULLIF($2, 0))) THEN NULL ELSE $1 / $2 END",
+                     .conditions = kDouble,
+                 },
                  {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
              },
              {.uses = {TypeUse::kBigNumeric}}),

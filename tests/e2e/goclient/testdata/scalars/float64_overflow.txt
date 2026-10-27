@@ -1,0 +1,78 @@
+# Finite-input arithmetic must not produce infinity. NULL propagation and SAFE behavior:
+# ../../../../../third_party/bigquery_docs/reference/standard-sql/operators.md
+# ../../../../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+# Overflow inputs also appear in GoogleSQL's arithmetic compliance test data.
+SELECT x + x FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: double overflow
+
+SELECT x - (-x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: double overflow
+
+SELECT x * x FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: double overflow
+
+SELECT 1 / x FROM UNNEST([CAST('4.94065645841247e-324' AS FLOAT64)]) AS x
+=> error contains: double overflow
+
+SELECT SAFE_ADD(x, x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+SELECT SAFE_SUBTRACT(x, -x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+SELECT SAFE_MULTIPLY(x, x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+SELECT SAFE_DIVIDE(1, x) FROM UNNEST([CAST('4.94065645841247e-324' AS FLOAT64)]) AS x
+=> null
+
+SELECT SAFE_DIVIDE(x, 0) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> null
+
+SELECT x + CAST(NULL AS FLOAT64) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+SELECT x - CAST(NULL AS FLOAT64) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+SELECT x * CAST(NULL AS FLOAT64) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+SELECT x / CAST(NULL AS FLOAT64) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> null
+
+# IEEE special values remain valid when an input is non-finite.
+SELECT x + 1 FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "Infinity"
+
+SELECT x - 1 FROM UNNEST([CAST('-inf' AS FLOAT64)]) AS x
+=> "-Infinity"
+
+SELECT x * 0 FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "NaN"
+
+SELECT x / 1 FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "Infinity"
+
+SELECT SAFE_ADD(x, 1) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "Infinity"
+
+SELECT SAFE_MULTIPLY(x, 0) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "NaN"
+
+SELECT SAFE_DIVIDE(x, 1) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "Infinity"
+
+# Subnormal finite results and underflow to zero are not overflow.
+SELECT x / 2 = 0 FROM UNNEST([CAST('4.94065645841247e-324' AS FLOAT64)]) AS x
+=> "true"
+
+# Operators remain conditional SQL expressions, including when argument binding is needed.
+SELECT IF(FALSE, x + x, 1) = 1 FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT COALESCE(1.0, x * x) = 1 FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT SAFE_ADD(RAND() + 1e308, 1e308)
+=> null
