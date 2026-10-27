@@ -13,7 +13,15 @@ call each other, such as expressions and scans, as one target.
 
 A header passes its includes' parsing time to every file that includes it. Include GoogleSQL's
 resolved AST, analyzer and script executor headers, about 30s each, only from sources (`just heavy-includes`
-checks), and declare a GoogleSQL type that a header only names, as `src/system_variables.h` does.
+checks), and forward-declare types from heavy GoogleSQL headers when only their names are needed,
+as `src/system_variables.h` does.
+
+Otherwise, include the header that defines a type by default. A forward declaration is an
+exception: new or changed declarations must have an adjacent comment explaining the concrete
+benefit at that location, such as keeping DuckDB headers out of a public interface. Merely using
+a pointer or reference, or not needing the complete definition, is not a benefit. Existing
+forward declarations are not precedent for adding more; review unrelated ones separately rather
+than expanding a refactor's scope.
 
 ## Partial support
 

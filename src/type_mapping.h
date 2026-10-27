@@ -10,7 +10,6 @@
 
 #include "absl/status/statusor.h"
 #include "duckdb.h"
-#include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
@@ -47,12 +46,6 @@ bool IsRange(duckdb_logical_type type);
 
 // Whether the DuckDB `type` is the STRUCT that keeps a STRUCT<>.
 bool IsEmptyStruct(duckdb_logical_type type);
-
-// Whether the DuckDB `type` is a LIST or an ARRAY.
-bool IsListLike(duckdb_logical_type type);
-
-// The element type of the DuckDB LIST or ARRAY `type`.
-LogicalType ElementType(duckdb_logical_type type);
 
 // The TableFieldSchema BigQuery reports for the result column `name` of DuckDB type `type`.
 FieldSchema ResultFieldSchema(const std::string& name, duckdb_logical_type type);

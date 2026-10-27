@@ -7,13 +7,7 @@
 #include <optional>
 #include <string>
 
-#include "absl/status/statusor.h"
 #include "nlohmann/json.hpp"
-
-namespace googlesql {
-class Type;
-class Value;
-}  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
 
@@ -59,6 +53,10 @@ class ResultRows {
 
   [[nodiscard]] size_t size() const;
   [[nodiscard]] bool empty() const { return size() == 0; }
+  // Read-only access for value adapters without a REST round-trip. The chunks are borrowed
+  // from this result, or nullptr for a default-constructed result.
+  [[nodiscard]] const ResultChunks* chunks() const { return chunks_.get(); }
+  [[nodiscard]] bool null_arrays() const { return null_arrays_; }
   // Encodes row `row`; throws std::out_of_range past the last one.
   [[nodiscard]] nlohmann::json at(size_t row,
                                   TimestampEncoding timestamps = TimestampEncoding::kMicros) const;
@@ -69,11 +67,6 @@ class ResultRows {
   [[nodiscard]] std::string String(size_t row, size_t column) const;
   [[nodiscard]] std::optional<std::string> OptionalString(size_t row, size_t column) const;
   [[nodiscard]] int64_t Int64(size_t row, size_t column) const;
-  // The value of `column` in row `row` as a GoogleSQL value of `type`, read from its vector, with
-  // a NULL array as `at` encodes it. Returns an error for a value `type` cannot hold, and throws
-  // std::out_of_range past the last row or column.
-  [[nodiscard]] absl::StatusOr<googlesql::Value> GoogleSqlValue(size_t row, size_t column,
-                                                                const googlesql::Type* type) const;
   [[nodiscard]] Iterator begin() const { return {this, 0}; }
   [[nodiscard]] Iterator end() const { return {this, size()}; }
 

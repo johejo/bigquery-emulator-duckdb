@@ -8,7 +8,6 @@
 #include "duckdb.h"
 #include "src/backend_error.h"
 #include "src/duckdb_handle.h"
-#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 
