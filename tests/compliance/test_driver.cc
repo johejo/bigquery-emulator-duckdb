@@ -197,7 +197,7 @@ absl::StatusOr<Value> ResultValue(const QueryResult& result, googlesql::TypeFact
     for (size_t column = 0; column < columns.size(); ++column) {
       GOOGLESQL_ASSIGN_OR_RETURN(
           values.emplace_back(),
-          GoogleSqlValueReader::Read(result.rows, row, column, columns.at(column).type));
+          ReadGoogleSqlValue(result.rows, row, column, columns.at(column).type));
     }
     GOOGLESQL_ASSIGN_OR_RETURN(rows.emplace_back(), Value::MakeStruct(row_type, std::move(values)));
   }

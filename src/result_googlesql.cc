@@ -237,17 +237,16 @@ absl::StatusOr<googlesql::Value> ToGoogleSqlValue(duckdb_vector vector, duckdb_l
 
 }  // namespace
 
-absl::StatusOr<googlesql::Value> GoogleSqlValueReader::Read(const ResultRows& rows, size_t row,
-                                                            size_t column,
-                                                            const googlesql::Type* type) {
-  const ResultChunks* chunks = rows.chunks_.get();
+absl::StatusOr<googlesql::Value> ReadGoogleSqlValue(const ResultRows& rows, size_t row,
+                                                    size_t column, const googlesql::Type* type) {
+  const ResultChunks* chunks = rows.chunks();
   if (chunks == nullptr || row >= chunks->row_count() || column >= chunks->column_count()) {
     throw std::out_of_range("Query result value is out of range");
   }
   absl::StatusOr<googlesql::Value> value;
   chunks->Runs(row, 1, [&](duckdb_data_chunk chunk, size_t index, size_t, size_t) {
     value = ToGoogleSqlValue(duckdb_data_chunk_get_vector(chunk, column), chunks->type(column),
-                             index, type, rows.null_arrays_);
+                             index, type, rows.null_arrays());
   });
   return value;
 }

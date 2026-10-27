@@ -902,8 +902,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   // A value of a result, which the emulator cannot hold in a variable when it cannot decode it.
   static absl::StatusOr<googlesql::Value> Decode(const QueryResult& result, size_t row,
                                                  size_t column, const googlesql::Type* type) {
-    absl::StatusOr<googlesql::Value> value =
-        GoogleSqlValueReader::Read(result.rows, row, column, type);
+    absl::StatusOr<googlesql::Value> value = ReadGoogleSqlValue(result.rows, row, column, type);
     if (!value.ok()) {
       return Unsupported("values of type " + type->DebugString() + " in variables");
     }

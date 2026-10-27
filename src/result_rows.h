@@ -53,6 +53,10 @@ class ResultRows {
 
   [[nodiscard]] size_t size() const;
   [[nodiscard]] bool empty() const { return size() == 0; }
+  // Read-only access for value adapters without a REST round-trip. The chunks are borrowed
+  // from this result, or nullptr for a default-constructed result.
+  [[nodiscard]] const ResultChunks* chunks() const { return chunks_.get(); }
+  [[nodiscard]] bool null_arrays() const { return null_arrays_; }
   // Encodes row `row`; throws std::out_of_range past the last one.
   [[nodiscard]] nlohmann::json at(size_t row,
                                   TimestampEncoding timestamps = TimestampEncoding::kMicros) const;
@@ -67,9 +71,6 @@ class ResultRows {
   [[nodiscard]] Iterator end() const { return {this, size()}; }
 
  private:
-  // The value adapter reads the same chunks and NULL array policy without a REST round-trip.
-  friend class GoogleSqlValueReader;
-
   std::shared_ptr<const ResultChunks> chunks_;
   bool null_arrays_ = false;
 };

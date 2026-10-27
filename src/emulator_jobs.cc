@@ -577,7 +577,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       WriteTextExtract(
           table.schema, result.rows.size(),
           [&](size_t row, size_t column, const googlesql::Type* type) {
-            return GoogleSqlValueReader::Read(result.rows, row, column, type);
+            return ReadGoogleSqlValue(result.rows, row, column, type);
           },
           options, encoding.compression, path);
     }

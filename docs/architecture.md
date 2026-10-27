@@ -13,7 +13,7 @@ runs, so that the statement fails rather than a later read.
 [`ResultChunks`](../src/result_chunks.h) owns the chunks and their database lifetime;
 [`vector_value`](../src/vector_value.h) reads their physical values. Both targets are independent
 of GoogleSQL. [`ResultRows`](../src/result_rows.h) encodes REST cells, while the separate
-[`GoogleSqlValueReader`](../src/result_googlesql.h) adapter converts values for scripts and
+[`ReadGoogleSqlValue`](../src/result_googlesql.h) adapter converts values for scripts and
 compliance tests. Encoders still use GoogleSQL where BigQuery's value validation or formatting
 requires it.
 
