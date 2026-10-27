@@ -32,6 +32,7 @@
 #include "googlesql/public/json_value.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/numeric_value.h"
+#include "googlesql/public/parse_helpers.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
@@ -305,6 +306,14 @@ class EmulatorTestDriver : public googlesql::TestDriver {
   absl::StatusOr<Value> ExecuteStatement(const std::string& sql,
                                          const std::map<std::string, Value>& parameters,
                                          googlesql::TypeFactory* type_factory) override {
+    // This driver compares only query results, not DML's modified-row count and table
+    // snapshot. Reject other statements before execution: a successful UPDATE followed
+    // by an unsupported result would otherwise mutate the shared test database and
+    // cause unrelated later statements to fail against the wrong input rows.
+    if (googlesql::GetStatementKind(sql, GetSupportedLanguageOptions()) !=
+        googlesql::RESOLVED_QUERY_STMT) {
+      return absl::UnimplementedError("Only queries are compared: " + sql);
+    }
     GOOGLESQL_ASSIGN_OR_RETURN(QueryParameters query_parameters, ToQueryParameters(parameters));
     const std::shared_ptr<const Job> job =
         emulator_->RunQuery(QueryRequest{.project_id = kProject,
