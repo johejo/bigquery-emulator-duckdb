@@ -39,6 +39,25 @@ using function_catalog::FunctionDefinition;
 using function_catalog::Rule;
 namespace {
 
+// Window offsets, bucket counts and LIMIT/OFFSET require a non-NULL integer lower bound.
+// A scalar callback keeps the argument single-evaluated and constant-foldable, including in
+// correlated subqueries, where DuckDB rejects a LIMIT containing a lambda.
+void CheckedInteger(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(
+      info, input, output,
+      [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
+        if (arguments.IsNull(0)) {
+          return absl::OutOfRangeError(arguments.String(2));
+        }
+        const int64_t value = arguments.Int(0);
+        if (value < arguments.Int(1)) {
+          return absl::OutOfRangeError(arguments.String(3));
+        }
+        return value;
+      },
+      /*nulls=*/false);
+}
+
 // The public names, backend calls and arities used by both registration and translation.
 // GoogleSQL preserves BigQuery's errors and nonfinite results, such as SIN(+inf) = NaN.
 struct TrigonometricFunction {
@@ -280,6 +299,8 @@ std::span<const function_catalog::NamedDefinition<Rule>> TrigonometricFunctions(
 }
 
 void RegisterMathFunctions(duckdb_connection connection, const Options& options) {
+  Register(connection, "bq_checked_integer", {kBigint, kBigint, kVarchar, kVarchar}, kBigint,
+           CheckedInteger, /*nulls=*/false);
   RegisterWithContext(connection, "bq_trunc_digits", {kDouble, kBigint}, kDouble,
                       ApplyWithContext<TruncDigits>, options.trunc_early_positive_zero);
   for (const auto& [name, function] :

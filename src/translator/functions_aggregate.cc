@@ -665,6 +665,29 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
           .message = "The third argument (the default expression) to LEAD must be constant",
       },
   };
+  static constexpr std::string_view kOffsetDefaults[] = {"", "1", "NULL"};
+  static constexpr std::string_view kLagArguments[] = {
+      "$1",
+      "bq_checked_integer($2, 0, 'The offset to the function LAG must not be null', "
+      "'The offset to the function LAG must not be negative')",
+      "$3",
+  };
+  static constexpr std::string_view kLeadArguments[] = {
+      "$1",
+      "bq_checked_integer($2, 0, 'The offset to the function LEAD must not be null', "
+      "'The offset to the function LEAD must not be negative')",
+      "$3",
+  };
+  static constexpr std::string_view kNthValueArguments[] = {
+      "$1",
+      "bq_checked_integer($2, 1, 'The N value for the NthValue function must not be NULL', "
+      "'The N value for the NthValue function must be positive')",
+  };
+  static constexpr std::string_view kNtileArguments[] = {
+      "bq_checked_integer($1, 1, "
+      "'The N value (number of buckets) for the NTILE function must not be NULL', "
+      "'The N value (number of buckets) for the NTILE function must be positive')",
+  };
   static constexpr std::string_view kTfIdfArguments[] = {"$1", "$2", "$3"};
   static constexpr std::string_view kTfIdfDefaults[] = {"", "32000", "5"};
   static constexpr auto kAnalyticsBacking = std::tuple{
@@ -673,11 +696,17 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
       Define("DENSE_RANK", {{.function = "dense_rank"}}),
       Define("PERCENT_RANK", {{.function = "percent_rank"}}),
       Define("CUME_DIST", {{.function = "cume_dist"}}),
-      Define("NTILE", {{.function = "ntile"}}),
+      Define("NTILE", {{.function = "ntile", .arguments = kNtileArguments}}),
 
       Define("LAG",
              {
-                 {.function = "lag", .carries = true, .constant_arguments = kLagConstants},
+                 {
+                     .function = "lag",
+                     .arguments = kLagArguments,
+                     .defaults = kOffsetDefaults,
+                     .carries = true,
+                     .constant_arguments = kLagConstants,
+                 },
              },
              {
                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
@@ -685,7 +714,13 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
 
       Define("LEAD",
              {
-                 {.function = "lead", .carries = true, .constant_arguments = kLeadConstants},
+                 {
+                     .function = "lead",
+                     .arguments = kLeadArguments,
+                     .defaults = kOffsetDefaults,
+                     .carries = true,
+                     .constant_arguments = kLeadConstants,
+                 },
              },
              {
                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
@@ -709,7 +744,12 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
 
       Define("NTH_VALUE",
              {
-                 {.function = "nth_value", .nulls = kModifier, .carries = true},
+                 {
+                     .function = "nth_value",
+                     .arguments = kNthValueArguments,
+                     .nulls = kModifier,
+                     .carries = true,
+                 },
              },
              {
                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},

@@ -346,32 +346,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "An invalid argument, such as a NULL or negative offset, does not fail as BigQuery does"
-  label: "limit_queries_test:param_limit_negative"
-  label: "limit_queries_test:param_offset_negative"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "An invalid argument, such as a NULL or negative offset, does not fail as BigQuery does"
-  label: "analytic_lag_test:lag_negative_offset"
-  label: "analytic_lag_test:lag_null_offset"
-  label: "analytic_lead_test:lead_negative_offset"
-  label: "analytic_lead_test:lead_null_offset"
-  label: "analytic_nth_value_test:nth_value_negative_n"
-  label: "analytic_nth_value_test:nth_value_null_n"
-  label: "analytic_nth_value_test:nth_value_zero_n"
-  label: "analytic_ntile_test:ntile_null_bucket_count"
-  label: "limit_queries_test:expr_limit_null"
-  label: "limit_queries_test:expr_offset_null"
-  label: "limit_queries_test:limit_null"
-  label: "limit_queries_test:offset_null"
-  label: "limit_queries_test:param_limit_null"
-  label: "limit_queries_test:param_offset_null"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects ARRAYs in aggregate functions with DISTINCT, which GoogleSQL accepts"
   label: "aggregation_distinct_queries_test:aggregation_distinct_count_6"
   label: "elementwise_aggregation_test:aggregate_elementwise_avg_testtable_bignumeric_array_val_distinct"

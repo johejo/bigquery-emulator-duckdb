@@ -847,13 +847,18 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     if (!count) {
       return std::nullopt;
     }
-    result->sql = "SELECT q.*" + from + result->Order() + " LIMIT " + *count;
+    const auto checked = [](const std::string& sql) {
+      return "bq_checked_integer(" + sql +
+             ", 0, 'Limit requires non-null count and offset', "
+             "'Limit requires non-negative count and offset')";
+    };
+    result->sql = "SELECT q.*" + from + result->Order() + " LIMIT " + checked(*count);
     if (limit->offset() != nullptr) {
       const auto offset = Expression(*limit->offset(), scope, {});
       if (!offset) {
         return std::nullopt;
       }
-      result->sql += " OFFSET " + *offset;
+      result->sql += " OFFSET " + checked(*offset);
     }
   }
   return result;
