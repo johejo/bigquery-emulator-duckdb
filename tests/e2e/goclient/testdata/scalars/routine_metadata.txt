@@ -1,6 +1,6 @@
 # Persistent routine metadata, as BigQuery answers. Project IDs are normalized to PROJECT.
-# https://cloud.google.com/bigquery/docs/information-schema-routines
-# https://cloud.google.com/bigquery/docs/information-schema-parameters
+# third_party/bigquery_docs/information-schema-routines.md
+# third_party/bigquery_docs/information-schema-parameters.md
 
 CREATE OR REPLACE FUNCTION scalars.metadata_explicit_f(x INT64) RETURNS INT64 AS (x + 1) OPTIONS(description = 'explicit result');
 SELECT REPLACE(REPLACE(TO_JSON_STRING(ARRAY(SELECT AS STRUCT specific_catalog, specific_schema, specific_name, routine_catalog, routine_schema, routine_name, routine_type, data_type, routine_body, routine_definition, external_language, is_deterministic, security_type, ddl, connection FROM scalars.INFORMATION_SCHEMA.ROUTINES WHERE routine_name = 'metadata_explicit_f')), CONCAT('`', @@project_id, '`'), 'PROJECT'), @@project_id, 'PROJECT')

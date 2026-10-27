@@ -237,7 +237,7 @@ func TestTablesInsertAppliesPrecisionAndScale(t *testing.T) {
 
 // tables.insert and tables.patch reject field names that differ only in case, at any depth, as
 // BigQuery does; its error names the field by its path from the top of the schema.
-// https://cloud.google.com/bigquery/docs/schemas#column_names
+// third_party/bigquery_docs/schemas.md
 func TestTableSchemasRejectFieldNamesDifferingInCase(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

@@ -1,5 +1,5 @@
 # EXECUTE IMMEDIATE rejects multiple INTO rows, outer variables and nested control statements.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
+# third_party/bigquery_docs/reference/standard-sql/procedural-language.md
 
 DECLARE x INT64; EXECUTE IMMEDIATE "SELECT * FROM UNNEST([1, 2])" INTO x
 => error:

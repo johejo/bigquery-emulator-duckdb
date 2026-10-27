@@ -1,6 +1,6 @@
 # A Cloud SQL MySQL connection named us.mysql, with tests/e2e/mysql.sql loaded.
 # The mapping documents neither the errors/rounding below nor the JSON result type.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#mysql_mapping
+# third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md
 
 SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('-01:00:00' AS TIME) AS x")
 ?>

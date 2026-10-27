@@ -1,5 +1,5 @@
 desc: SQL procedure strictMode and argument modes survive API creation, updates and DDL
-# Fields follow https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
+# Fields follow third_party/bigquery_docs/reference/rest/v2/routines.md.
 # The Go client does not expose strictMode, so check it through the HTTP runner.
 runners:
   req: ${BQ_EMULATOR_API}

@@ -26,7 +26,7 @@ import (
 )
 
 // External DuckDB physical types still use the documented Storage Read wire types:
-// https://docs.cloud.google.com/bigquery/docs/reference/storage#data_format
+// third_party/bigquery_docs/reference/storage.md
 // Expected values come from the fixture's literal values.
 func TestReadDuckDBPhysicalTypes(t *testing.T) {
 	t.Parallel()

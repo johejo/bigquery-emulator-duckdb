@@ -1,7 +1,7 @@
 ## Text analysis functions
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions
+# third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md
 # The expected values are the examples of the text analysis documentation:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis
+# third_party/bigquery_docs/reference/standard-sql/text-analysis.md
 
 # LOG_ANALYZER, the default, splits at delimiters and lowercases ASCII letters.
 SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.')

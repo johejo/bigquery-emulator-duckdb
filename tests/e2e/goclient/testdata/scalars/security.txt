@@ -1,4 +1,4 @@
-# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user
+# third_party/bigquery_docs/reference/standard-sql/security_functions.md
 # The E2E server uses the identity from the documented example.
 SELECT SESSION_USER()
 => "jdoe@example.com"

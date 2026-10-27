@@ -1,6 +1,6 @@
-# Sources: https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_bool
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_int64
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_time
+# Sources: third_party/bigquery_docs/reference/standard-sql/conversion_functions.md
+# third_party/bigquery_docs/reference/standard-sql/conversion_functions.md
+# third_party/bigquery_docs/reference/standard-sql/conversion_functions.md
 # UNNEST keeps the analyzer from folding the casts.
 
 SELECT CAST(x AS BOOL) FROM UNNEST(['0']) AS x

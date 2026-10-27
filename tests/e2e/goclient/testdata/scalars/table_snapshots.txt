@@ -1,6 +1,6 @@
 # Table snapshots, as BigQuery answers. Each case uses a dataset of its own, since a snapshot needs
 # a permanent table.
-# https://cloud.google.com/bigquery/docs/table-snapshots-intro
+# third_party/bigquery_docs/table-snapshots-intro.md
 
 CREATE SCHEMA IF NOT EXISTS scalars_snapshot_drop_table;
 CREATE OR REPLACE TABLE scalars_snapshot_drop_table.base (id INT64);

@@ -39,7 +39,7 @@ EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Authors (id
 
 -- Person, account, ownership and transfer rows from BigQuery's documented FinGraph example,
 -- without its TIMESTAMP columns.
--- https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-schema-statements#fingraph_example
+-- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
 CREATE TABLE scalar_graph.TransferAccount (id INT64, is_blocked BOOL);
 INSERT scalar_graph.TransferAccount VALUES (7, FALSE), (16, TRUE), (20, FALSE);
 CREATE TABLE scalar_graph.Transfer (id INT64, to_id INT64, amount INT64);

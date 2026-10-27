@@ -1,5 +1,5 @@
 ## GEOGRAPHY predicates
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The examples of ST_CONTAINS and ST_COVERS test points on the exterior, the boundary and the
 # interior of a polygon; ST_WITHIN and ST_COVEREDBY are documented as those with the arguments
 # swapped, and ST_DISJOINT as the negation of ST_INTERSECTS. The descriptions give the rest, with

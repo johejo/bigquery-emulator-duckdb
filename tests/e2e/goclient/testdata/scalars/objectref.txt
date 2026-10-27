@@ -1,5 +1,5 @@
 # ObjectRef functions, whose ObjectRef and fetched metadata BigQuery documents:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions
+# third_party/bigquery_docs/reference/standard-sql/objectref_functions.md
 #
 # tools/e2e serves tests/e2e/gcs/objectref/hello.txt, which holds "hello\n", from fake GCS, and
 # connects us.storage of the project test as a Cloud resource connection.

@@ -10,7 +10,7 @@ import (
 )
 
 // CREATE TABLE ignores NULL option values, without enabling partition expiration or encryption.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_statement
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestCreateTableNullOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func TestCreateTableNullOptions(t *testing.T) {
 // An option's VALUE "is a constant expression containing only literals, query parameters, and
 // scalar functions", which cannot contain functions such as REPEAT, and expiration_timestamp is a
 // TIMESTAMP
-// (https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language).
+// (third_party/bigquery_docs/reference/standard-sql/data-definition-language.md).
 // BigQuery's answers settle the rest: a STRING literal converts to the TIMESTAMP and a STRING
 // expression does not, a bare script variable is ambiguous, CURRENT_TIMESTAMP() is not after the
 // creation time, and the messages.

@@ -1,7 +1,7 @@
 ## GEOGRAPHY component boundaries
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # Closed lines have empty boundaries, as documented by ST_ISCLOSED.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_BOUNDARY(CAST(NULL AS GEOGRAPHY))
 => null

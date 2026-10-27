@@ -1,6 +1,6 @@
 # Job locations, as BigQuery answers. A job that names INFORMATION_SCHEMA regions of several
 # locations runs in the US, and names a region of another location as a dataset of the project.
-# https://cloud.google.com/bigquery/docs/locations
+# third_party/bigquery_docs/locations.md
 
 SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA, `region-us`.INFORMATION_SCHEMA.SCHEMATA
 => error contains: :region-eu was not found in location US

@@ -152,7 +152,7 @@ func TestQueryToADestinationTable(t *testing.T) {
 // replaces. CREATE_NEVER fails for a table that does not exist, and a result with column names that
 // differ only in case, or a DDL statement, cannot be written to a table. Neither can a table or
 // view be defined with duplicate column names:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
+// third_party/bigquery_docs/reference/standard-sql/query-syntax.md
 func TestQueryDestinationTableEdges(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

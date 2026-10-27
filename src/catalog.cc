@@ -106,7 +106,7 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SessionizeSchema(
 }
 
 // OBJ.MAKE_REF and OBJ.FETCH_METADATA, in the obj namespace, over the ObjectRef STRUCT.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions
+// third_party/bigquery_docs/reference/standard-sql/objectref_functions.md
 void AddObjectRefFunctions(googlesql::SimpleCatalog& catalog) {
   const googlesql::Type* objectref = nullptr;
   if (!catalog.type_factory()

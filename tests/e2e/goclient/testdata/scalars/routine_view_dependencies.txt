@@ -1,7 +1,7 @@
 # Persistent routine and view dependencies, as BigQuery answers.
 # Cases use distinct objects in the scalars fixture dataset.
-# https://cloud.google.com/bigquery/docs/user-defined-functions
-# https://cloud.google.com/bigquery/docs/table-functions
+# third_party/bigquery_docs/user-defined-functions.md
+# third_party/bigquery_docs/table-functions.md
 
 # A persistent UDF whose body changes after a view is created.
 CREATE OR REPLACE FUNCTION scalars.dep_changed(x INT64) RETURNS INT64 AS (x + 1);

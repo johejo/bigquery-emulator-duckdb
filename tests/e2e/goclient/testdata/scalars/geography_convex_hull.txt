@@ -5,7 +5,7 @@ SELECT ST_CONVEXHULL(ST_GEOGFROMTEXT('POINT(0 0)'))
 
 # The documentation example returns POINT(0.999999999999943 1), but BigQuery returned
 # POINT(1 1) when these observations were collected. Preserve this difference for rechecking
-# if BigQuery changes its behavior: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_convexhull
+# if BigQuery changes its behavior: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 SELECT ST_CONVEXHULL(ST_GEOGFROMTEXT('POINT(1 1)'))
 => "POINT(1 1)"
 

@@ -313,7 +313,7 @@ func TestAlterTableAlterColumnSetOptions(t *testing.T) {
 }
 
 // Expected behavior follows BigQuery's ALTER COLUMN SET/DROP DEFAULT documentation:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_column_set_default_statement
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestAlterTableColumnDefault(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

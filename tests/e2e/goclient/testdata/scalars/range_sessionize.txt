@@ -49,7 +49,7 @@ WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session
 
 # The range column names a RANGE column of the input, and each partitioning column one of its
 # columns.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize
+# third_party/bigquery_docs/reference/standard-sql/range-functions.md
 WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'missing', [])
 => error:
 

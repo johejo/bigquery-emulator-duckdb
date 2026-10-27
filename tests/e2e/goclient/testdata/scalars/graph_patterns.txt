@@ -1,6 +1,6 @@
 # Graph patterns join path matches on the identity of shared variables; independent paths
 # form a cross product. Labels on a shared variable constrain all of its occurrences.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#graph_pattern
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 # FinGraph has directed edges 10:1->2, 11:2->1, 12:1->1, 13:1->2.
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
 => "8"
@@ -32,7 +32,7 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-
 => "2"
 
 # Modes constrain each path separately, so edges and nodes may recur in other paths.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person), (b)-[e]-(c:Person) RETURN COUNT(*) AS result)
 => "7"
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person)-[e]-(c:Person) RETURN COUNT(*) AS result)

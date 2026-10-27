@@ -1,5 +1,5 @@
 # Expected values: BigQuery JSON function documentation (examples and rules):
-# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/json_functions
+# third_party/bigquery_docs/reference/standard-sql/json_functions.md
 # Empty arrays and typed NULL arrays also follow GoogleSQL compliance data in
 # functions_testlib_json.cc, GetFunctionTestsJsonFlatten and
 # GetFunctionTestsJsonArrayAppend / GetFunctionTestsJsonArrayInsert. STRUCT<> values follow the

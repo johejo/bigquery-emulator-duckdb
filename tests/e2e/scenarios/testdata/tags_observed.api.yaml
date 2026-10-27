@@ -193,7 +193,7 @@ cases:
       query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags = NULL)
     expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {"complete": true}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {}}
 # BigQuery returned no tags option rows after clearing both objects, despite the
-# empty-array description at https://cloud.google.com/bigquery/docs/tags.
+# empty-array description at third_party/bigquery_docs/tags.md.
 # The answer sidecar preserves project johejo-sandbox and run g5wkavi5eo73shfwnkcvivsl6k.
   - name: ddl_empty_tags
     template: tags_sql

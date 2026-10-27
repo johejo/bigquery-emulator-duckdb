@@ -1,7 +1,7 @@
 # SAME and ALL_DIFFERENT compare element identity, not property values.
 # NULL arguments raise an error, even when other arguments already decide the result.
-# Sources: https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#same_predicate
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#all_different_predicate
+# Sources: third_party/bigquery_docs/reference/standard-sql/graph-operators.md
+# third_party/bigquery_docs/reference/standard-sql/graph-operators.md
 # FinGraph's Knows edges are 10:1->2, 11:2->1, 12:1->1, 13:1->2.
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE SAME(a, b) RETURN COUNT(*) AS result)
 => "3"

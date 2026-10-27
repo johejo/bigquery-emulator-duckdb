@@ -156,7 +156,7 @@ func TestProtobufTypes(t *testing.T) {
 }
 
 // GEOGRAPHY fields are protobuf strings of WKT or GeoJSON, at any depth.
-// https://cloud.google.com/bigquery/docs/supported-data-types
+// third_party/bigquery_docs/supported-data-types.md
 func TestGeography(t *testing.T) {
 	rest, _, write := clients(t)
 	path := table(t, rest, "storage_write_geography", "id INT64, name STRING, g GEOGRAPHY, gs ARRAY<GEOGRAPHY>")
@@ -204,7 +204,7 @@ func TestGeography(t *testing.T) {
 
 // Column rounding modes apply when values are written, including nested fields. The ties are
 // BigQuery's DDL rounding_mode examples; precision overflow must reject the entire append.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_option_list
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestRoundingModes(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []storagepb.WriteStream_Type{
@@ -340,7 +340,7 @@ func TestReconnectAndDefaultDestinationSwitch(t *testing.T) {
 }
 
 // FOR SYSTEM_TIME AS OF reads the rows a table had before an append committed.
-// https://cloud.google.com/bigquery/docs/time-travel
+// third_party/bigquery_docs/time-travel.md
 func TestTimeTravelBeforeAppend(t *testing.T) {
 	rest, _, write := clients(t)
 	path := table(t, rest, "storage_write_time_travel", "id INT64, name STRING")
@@ -605,7 +605,7 @@ func TestDefaultStreamAndAtomicBadBatch(t *testing.T) {
 }
 
 // Visibility, offset errors and finalize/commit behavior are specified in storage.proto and
-// https://cloud.google.com/bigquery/docs/write-api-streaming and write-api-batch.
+// third_party/bigquery_docs/write-api-streaming.md and write-api-batch.
 func TestExplicitStreamVisibilityOffsetsAndFinalize(t *testing.T) {
 	for _, kind := range []storagepb.WriteStream_Type{storagepb.WriteStream_COMMITTED, storagepb.WriteStream_BUFFERED, storagepb.WriteStream_PENDING} {
 		t.Run(kind.String(), func(t *testing.T) {
@@ -940,7 +940,7 @@ func TestStreamsFollowTableIdentity(t *testing.T) {
 }
 
 // A table snapshot is read-only, so the Storage Write API cannot write to it.
-// https://cloud.google.com/bigquery/docs/table-snapshots-intro
+// third_party/bigquery_docs/table-snapshots-intro.md
 func TestWriteToTableSnapshot(t *testing.T) {
 	rest, _, write := clients(t)
 	path := table(t, rest, "storage_write_snapshot", "id INT64 NOT NULL, name STRING")

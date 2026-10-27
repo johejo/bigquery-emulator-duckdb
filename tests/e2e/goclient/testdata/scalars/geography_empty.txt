@@ -1,5 +1,5 @@
 ## Empty GEOGRAPHY values
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # ST_ISEMPTY documents the equivalence of empty shapes; ST_CLUSTERDBSCAN shows their canonical
 # WKT. The individual function descriptions specify empty inputs, counts, measures and errors.
 # Exact error messages, GeoJSON formatting and spheroid validation order come from BigQuery's

@@ -1,5 +1,5 @@
 # BigQuery requires LAG/LEAD default expressions to be constant:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions
+# third_party/bigquery_docs/reference/standard-sql/navigation_functions.md
 # Error text is also covered by GoogleSQL's analytic_lag/lead tests.
 
 SELECT LAG(x, 2, x) OVER (ORDER BY x) FROM UNNEST([1]) AS x

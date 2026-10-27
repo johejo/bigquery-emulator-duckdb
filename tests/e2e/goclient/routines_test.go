@@ -35,7 +35,7 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 }
 
 // Persistent SQL UDFs that CREATE FUNCTION defines are called by other queries through their
-// dataset, as https://cloud.google.com/bigquery/docs/user-defined-functions describes, and
+// dataset, as third_party/bigquery_docs/user-defined-functions.md describes, and
 // routines.get and routines.list describe them.
 func TestPersistentSqlUdfs(t *testing.T) {
 	t.Parallel()
@@ -237,7 +237,7 @@ func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 }
 
 // API fields and replacement semantics follow the Routine resource and routines.update
-// documentation: https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
+// documentation: third_party/bigquery_docs/reference/rest/v2/routines.md.
 func TestRoutineInsertUpdate(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

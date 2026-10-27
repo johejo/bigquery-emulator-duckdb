@@ -1,7 +1,7 @@
 version: 1
 description: >-
   Storage Write's AppendRows takes GEOGRAPHY values as protobuf strings. BigQuery documents WKT and
-  GeoJSON (https://cloud.google.com/bigquery/docs/supported-data-types); it also takes hex-encoded
+  GeoJSON (third_party/bigquery_docs/supported-data-types.md); it also takes hex-encoded
   WKB, as tabledata.insertAll does. The expectations are BigQuery's answers in the sidecar. Each
   row is a serialized `g` field.
 vars:

@@ -471,7 +471,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
              ReadTableRelation(backend_, source);
     }
     // BigQuery cannot append a copy to a table whose additional columns have defaults
-    // (https://cloud.google.com/bigquery/docs/default-values#limitations).
+    // (third_party/bigquery_docs/default-values.md).
     if (copy.write_disposition == WriteDisposition::kWriteAppend) {
       std::vector<FieldSchema> destination;
       try {

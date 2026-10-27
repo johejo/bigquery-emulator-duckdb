@@ -140,8 +140,8 @@ func TestQueryRuntimeError(t *testing.T) {
 // Result columns take the names and types GoogleSQL resolves, rather than DuckDB's: a column
 // without a name is f0_, f1_ and so on, a duplicate column after the first is renamed, and a
 // value table of structs comes back as their fields. A dry run reports the same schema.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#implicit_aliases
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
+// third_party/bigquery_docs/reference/standard-sql/query-syntax.md
+// third_party/bigquery_docs/reference/standard-sql/query-syntax.md
 func TestResultSchema(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -308,7 +308,7 @@ func TestLargeResult(t *testing.T) {
 }
 
 // A DML statement reports the rows it changed, none where it matches none.
-// https://cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2
+// third_party/bigquery_docs/reference/rest/v2/Job.md
 func TestDMLAffectedRows(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

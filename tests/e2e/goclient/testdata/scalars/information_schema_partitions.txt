@@ -1,6 +1,6 @@
 # INFORMATION_SCHEMA.PARTITIONS partition IDs and row counts, as BigQuery documents them.
-# https://cloud.google.com/bigquery/docs/information-schema-partitions
-# https://cloud.google.com/bigquery/docs/partitioned-tables
+# third_party/bigquery_docs/information-schema-partitions.md
+# third_party/bigquery_docs/partitioned-tables.md
 
 # Rows with NULL go into __NULL__, and dates before 1960-01-01 or after 2159-12-31 into
 # __UNPARTITIONED__.

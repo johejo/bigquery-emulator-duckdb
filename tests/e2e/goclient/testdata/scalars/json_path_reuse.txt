@@ -1,6 +1,6 @@
 ## JSON extraction with repeated paths across rows and chunks
 
-# Semantics: https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions
+# Semantics: third_party/bigquery_docs/reference/standard-sql/json_functions.md
 SELECT COUNTIF(JSON_VALUE(CONCAT('{"a":', CAST(x AS STRING), '}'), '$.a') = CAST(x AS STRING)) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
 => "4097"
 

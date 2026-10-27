@@ -1,5 +1,5 @@
 # Temporary UDF validation and deliberately unsupported forms.
-# https://cloud.google.com/bigquery/docs/user-defined-functions
+# third_party/bigquery_docs/user-defined-functions.md
 
 @{test_hint = 1} CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT 1
 => error contains: The emulator does not support
@@ -59,7 +59,7 @@ DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f() AS (x); SELECT f()
 DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f(y ANY TYPE) AS (x + y); SELECT f(1)
 => error:
 
-# https://cloud.google.com/bigquery/docs/user-defined-functions#templated-sql-udf-parameters
+# third_party/bigquery_docs/user-defined-functions.md
 CREATE TEMP FUNCTION f(x ANY TYPE) AS (x + 1); SELECT f('a')
 => error:
 
@@ -80,7 +80,7 @@ CREATE TEMP FUNCTION f() AS (1); CREATE TEMP FUNCTION F() AS (2); SELECT f()
 => error:
 
 # OR REPLACE and IF NOT EXISTS cannot be combined.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_function_statement
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 CREATE OR REPLACE TEMP FUNCTION IF NOT EXISTS f() AS (1); SELECT f()
 => error:
 

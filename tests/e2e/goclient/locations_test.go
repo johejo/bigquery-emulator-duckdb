@@ -11,7 +11,7 @@ import (
 )
 
 // Datasets, their tables and the jobs that use them are in a location, as
-// https://cloud.google.com/bigquery/docs/locations describes: a job runs where the datasets it
+// third_party/bigquery_docs/locations.md describes: a job runs where the datasets it
 // names are, or where its request says, and every dataset it uses must be there. The project is
 // one of its own, so that the datasets of other tests do not show up in INFORMATION_SCHEMA.
 func TestLocations(t *testing.T) {

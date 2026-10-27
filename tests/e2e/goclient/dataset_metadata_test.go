@@ -107,7 +107,7 @@ func TestDatasetMetadata(t *testing.T) {
 	}
 	check(ddl, metadata{"altered", "", map[string]string{"tier": "1"}})
 	// An empty labels array removes all labels.
-	// https://cloud.google.com/bigquery/docs/deleting-labels
+	// third_party/bigquery_docs/deleting-labels.md
 	if err := run("ALTER SCHEMA go_dataset_metadata_ddl SET OPTIONS (labels = [])"); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestDatasetMetadata(t *testing.T) {
 	delete(created, ddl.DatasetID)
 	check(ddl, metadata{})
 	// DROP SCHEMA refuses a dataset that holds tables unless it says CASCADE.
-	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#drop_schema_statement
+	// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 	if err := run("CREATE TABLE go_dataset_metadata_ddl.t (x INT64)"); err != nil {
 		t.Fatal(err)
 	}

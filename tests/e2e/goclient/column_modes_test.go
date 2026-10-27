@@ -10,7 +10,7 @@ import (
 )
 
 // Column schemas declare REQUIRED mode, but queries do not propagate it:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestCreateTableAsSelectColumnModes(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -64,8 +64,8 @@ func TestCreateTableAsSelectColumnModes(t *testing.T) {
 
 // BigQuery rejects ADD COLUMN with a default or top-level REQUIRED mode, even for an empty
 // table. Defaults must be set after adding the column:
-// https://cloud.google.com/bigquery/docs/default-values#limitations
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement
+// third_party/bigquery_docs/default-values.md
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestAlterTableAddColumnModes(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -105,7 +105,7 @@ func TestAlterTableAddColumnModes(t *testing.T) {
 
 // NOT NULL applies to fields inside records, including records in arrays. A nullable parent
 // record may itself be NULL. LIKE AS SELECT inherits these modes from the source schema.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
+// third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 func TestCreateTableAsSelectNestedColumnModes(t *testing.T) {
 	ctx := t.Context()
 	client := newClient(t)

@@ -1,5 +1,5 @@
 # Parameterized STRING and BYTES reject overlong writes without truncating them.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#parameterized_data_types
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
 # LIKE cases were answered by BigQuery in unverified/create_table_copies.txt.
 
 CREATE TEMP TABLE src (s STRING(3)); CREATE TEMP TABLE dst LIKE src AS SELECT 'abc' AS s; SELECT s FROM dst

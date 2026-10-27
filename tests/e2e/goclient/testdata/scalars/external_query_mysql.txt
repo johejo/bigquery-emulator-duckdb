@@ -1,4 +1,4 @@
-# MySQL mapping: https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#mysql_mapping
+# MySQL mapping: third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md
 # tools/e2e loads tests/e2e/mysql.sql into us.mysql. The server defaults to +09:00.
 
 SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(-9223372036854775808 AS SIGNED) AS x')

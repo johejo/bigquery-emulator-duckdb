@@ -1,5 +1,5 @@
 # Source: BigQuery's ST_INTERSECTSBOX example and definition: a closed longitude/latitude box.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(10, 10), -90, 0, 90, 20)
 => "true"
@@ -84,7 +84,7 @@ SELECT SAFE.ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, 0, 361, 1)
 
 # BigQuery accepts reversed latitude bounds although the documentation describes lat1 as
 # the minimum and lat2 as the maximum. Observed with (0, 2, 2, 0).
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(1, 1), 0, 2, 2, 0)
 => "true"

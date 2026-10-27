@@ -1,6 +1,6 @@
 ## Regular expression functions
 
-# Matching behavior from https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains
+# Matching behavior from third_party/bigquery_docs/reference/standard-sql/string_functions.md
 # Exercise a repeated pattern across chunks, and changes to the pattern within a chunk.
 SELECT COUNTIF(REGEXP_CONTAINS(CAST(x AS STRING), r'^[0-9]+$')) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
 => "4097"

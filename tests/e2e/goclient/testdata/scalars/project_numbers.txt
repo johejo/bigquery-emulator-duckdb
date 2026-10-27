@@ -1,7 +1,7 @@
 # A project's number as a SQL qualifier, as BigQuery answers: it names the project as its ID
 # does, and INFORMATION_SCHEMA names the project by its ID, test. The test project's number is
 # 123456789012.
-# https://cloud.google.com/bigquery/docs/resource-hierarchy#projects
+# third_party/bigquery_docs/resource-hierarchy.md
 
 SELECT COUNT(*) FROM `123456789012.scalars.t`
 => "4"

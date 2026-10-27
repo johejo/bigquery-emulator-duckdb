@@ -1,5 +1,5 @@
 ## GEOGRAPHY closed point set difference
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # Results follow the documented closure of the point set difference. ST_EQUALS avoids relying
 # on component and vertex ordering. The polygon with a hole is the documentation's example.
 

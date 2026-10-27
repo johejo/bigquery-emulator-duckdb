@@ -1,5 +1,5 @@
 # OPTIONAL MATCH preserves incoming rows and represents missing matches as NULL.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_match
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 # FinGraph has Owns 1->7; persons 2 and 3 have no Owns edge.
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) RETURN COUNT(*) AS result)
 => "3"

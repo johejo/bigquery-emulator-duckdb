@@ -1,6 +1,6 @@
 ## Repeated and changing string function parameters
 
-# Semantics: https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions
+# Semantics: third_party/bigquery_docs/reference/standard-sql/string_functions.md
 SELECT STRING_AGG(TRIM('xyabxy', chars), ',' ORDER BY offset) FROM UNNEST(['xy', 'xy', 'x', '', 'xy']) AS chars WITH OFFSET AS offset
 => "ab,ab,yabxy,xyabxy,ab"
 

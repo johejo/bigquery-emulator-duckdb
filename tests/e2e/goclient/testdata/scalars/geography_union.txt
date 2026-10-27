@@ -1,5 +1,5 @@
 ## GEOGRAPHY point set union
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The documented example fixes the linestring spelling. The point set union definition gives
 # the remaining equalities; ST_EQUALS avoids depending on undocumented vertex ordering.
 # The array overload ignores NULL elements; a NULL argument makes either overload NULL.

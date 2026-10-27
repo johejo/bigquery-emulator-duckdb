@@ -1,6 +1,6 @@
 # Endpoint predicates describe the stored edge orientation, independent of traversal.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#is_source_predicate
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#is_destination_predicate
+# third_party/bigquery_docs/reference/standard-sql/graph-operators.md
+# third_party/bigquery_docs/reference/standard-sql/graph-operators.md
 
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS SOURCE OF e AS result)
 => "true"

@@ -3,7 +3,7 @@ runners:
   req: ${BQ_EMULATOR_API}
 steps:
   # The bq reference uses Count:INTEGER:42 as a parameter example.
-  # https://cloud.google.com/bigquery/docs/reference/bq-cli-reference#bq_query
+  # third_party/bigquery_docs/reference/bq-cli-reference.md
   legacy_integer_type:
     req:
       /bigquery/v2/projects/test/queries:
@@ -72,7 +72,7 @@ steps:
                   parameterValue: {value: '1'}
     test: current.res.status == 400
   # INTERVAL strings use the canonical year-month day hour:minute:second format.
-  # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#interval_type
+  # third_party/bigquery_docs/reference/standard-sql/data-types.md
   invalid_interval_value:
     req:
       /bigquery/v2/projects/test/queries:
@@ -88,7 +88,7 @@ steps:
                   parameterValue: {value: '1 DAY'}
     test: current.res.status == 400
   # Arrays cannot directly contain arrays.
-  # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#array_type
+  # third_party/bigquery_docs/reference/standard-sql/data-types.md
   nested_arrays:
     req:
       /bigquery/v2/projects/test/queries:

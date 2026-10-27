@@ -1,5 +1,5 @@
 # BigQuery's documented examples and answers obtained with tools/bqanswers.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(-122, 47), min_level => 12)
 => [{"v":"6093613931972369317"}]

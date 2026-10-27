@@ -1,5 +1,5 @@
 # EXTERNAL_QUERY rejects the PostgreSQL types that BigQuery's mapping lists as unsupported:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#unsupported_data_types
+# third_party/bigquery_docs/reference/standard-sql/federated_query_functions.md
 #
 # tools/e2e connects us.postgres of the project test to an empty PostgreSQL server.
 

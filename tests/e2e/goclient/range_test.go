@@ -169,7 +169,7 @@ func TestRangeColumns(t *testing.T) {
 }
 
 // The rows and both session sets are from BigQuery's RANGE_SESSIONIZE examples:
-// https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize
+// third_party/bigquery_docs/reference/standard-sql/range-functions.md
 func TestRangeSessionize(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -295,7 +295,7 @@ func TestRangeSessionizeElementTypes(t *testing.T) {
 
 // A CSV load writes a RANGE as "[start, end)", quoted for its comma, where NULL and UNBOUNDED are
 // unbounded ends; the values are those of BigQuery's CSV loading documentation:
-// https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
+// third_party/bigquery_docs/loading-data-cloud-storage-csv.md
 func TestRangeLoadCSV(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

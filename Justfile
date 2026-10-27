@@ -2,6 +2,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 # Nix apps supply test dependencies separately from the build tools. Outside Nix, use PATH.
 _test_env := 'env PATH="${TEST_TOOLS_PATH:+$TEST_TOOLS_PATH:}$PATH"'
+_test_go := _test_env + " go"
 
 # Formatters and the files they cover are in treefmt.toml.
 fmt:
@@ -53,7 +54,7 @@ go-test *args:
     if [[ -n "${GO_TEST_JSON:-}" ]]; then \
         {{ _test_env }} gotestsum --format pkgname --hide-summary=skipped --jsonfile "$GO_TEST_JSON" -- "$@" ./internal/... ./tools/...; \
     else \
-        {{ _test_env }} go test "$@" ./internal/... ./tools/...; \
+        {{ _test_go }} test "$@" ./internal/... ./tools/...; \
     fi
 
 go-tidy:
@@ -69,7 +70,7 @@ test: go-test
 [positional-arguments]
 e2e *args:
     bazelisk build //:bigquery-emulator-duckdb
-    {{ _test_env }} go run ./tools/e2e "$@"
+    {{ _test_go }} run ./tools/e2e "$@"
 
 # GoogleSQL's compliance tests against the emulator; not part of `check`, since they take long.
 # Extra arguments go to `bazelisk test`, such as --test_arg=--gtest_filter=...
@@ -101,37 +102,53 @@ run *args:
 
 check: lint test e2e docs-check
 
+# Snapshot new citations and localize references. Uses ADC, or DEVELOPERKNOWLEDGE_API_KEY when set.
+bigquery-docs-sync:
+    go run ./tools/bigquerydocs sync
+
+# List cited pages and their source files, without network access.
+bigquery-docs-scan:
+    go run ./tools/bigquerydocs scan
+
+# Validate snapshots and citations offline.
+bigquery-docs-check:
+    go run ./tools/bigquerydocs check
+
+# Explicitly refresh all saved and newly cited pages.
+bigquery-docs-refresh:
+    go run ./tools/bigquerydocs refresh
+
 # Generates SQL, DDL option, REST and function reports: tools/restprobe probes emulators started
 # from the binary, running the calls //:function_probe builds for functions.
-_restprobe := _test_env + " go run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
+_restprobe := _test_go + " run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 _sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
 _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
 _function_probe := _restprobe + " functions " + justfile_directory() + "/bazel-bin/function_probe " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/tools/function_probe_hints.txt"
 _option_probe := _restprobe + " options " + justfile_directory() + "/tools/ddl_options.json"
-_storage_probe := _test_env + " go run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
+_storage_probe := _test_go + " run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 
 # Regenerates the compatibility tables for functions, SQL, DDL options, REST and Storage RPCs.
 docs:
     bazelisk build //:function_probe //:bigquery-emulator-duckdb
-    {{ _function_probe }} > docs/functions.md.tmp && mv docs/functions.md.tmp docs/functions.md
-    {{ _sql_probe }} > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
-    {{ _option_probe }} > docs/options.md.tmp && mv docs/options.md.tmp docs/options.md
-    {{ _api_probe }} > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
+    {{ _function_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/functions.md > docs/functions.md.tmp && mv docs/functions.md.tmp docs/functions.md
+    {{ _sql_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/sql.md > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
+    {{ _option_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/options.md > docs/options.md.tmp && mv docs/options.md.tmp docs/options.md
+    {{ _api_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/api.md > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
     {{ _storage_probe }} > docs/storage.md.tmp && mv docs/storage.md.tmp docs/storage.md
 
 # Fails when function, SQL, DDL option, REST or Storage docs are stale.
 docs-check:
     bazelisk build //:function_probe //:bigquery-emulator-duckdb
-    {{ _function_probe }} | diff -u docs/functions.md - || { echo "docs/functions.md is stale; run just docs" >&2; exit 1; }
-    {{ _sql_probe }} | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
-    {{ _option_probe }} | diff -u docs/options.md - || { echo "docs/options.md is stale; run just docs" >&2; exit 1; }
-    {{ _api_probe }} | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }
+    {{ _function_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/functions.md | diff -u docs/functions.md - || { echo "docs/functions.md is stale; run just docs" >&2; exit 1; }
+    {{ _sql_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/sql.md | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
+    {{ _option_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/options.md | diff -u docs/options.md - || { echo "docs/options.md is stale; run just docs" >&2; exit 1; }
+    {{ _api_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/api.md | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }
     {{ _storage_probe }} | diff -u docs/storage.md - || { echo "docs/storage.md is stale; run just docs" >&2; exit 1; }
 
 # Regenerates docs/options.md alone, while editing tools/ddl_options.json.
 docs-options:
     bazelisk build //:bigquery-emulator-duckdb
-    {{ _option_probe }} > docs/options.md.tmp && mv docs/options.md.tmp docs/options.md
+    {{ _option_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/options.md > docs/options.md.tmp && mv docs/options.md.tmp docs/options.md
 
 # Refreshes the option names and types in tools/ddl_options.json from BigQuery's DDL reference.
 update-ddl-options:

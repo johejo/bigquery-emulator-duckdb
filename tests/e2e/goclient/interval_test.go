@@ -52,7 +52,7 @@ func TestIntervalResults(t *testing.T) {
 }
 
 // INTERVAL query parameters retain their independent month, day and microsecond parts.
-// EXTRACT follows https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#extract.
+// EXTRACT follows third_party/bigquery_docs/reference/standard-sql/interval_functions.md.
 func TestIntervalParameters(t *testing.T) {
 	t.Parallel()
 	query := newClient(t).Query(`SELECT @i AS i, EXTRACT(MONTH FROM @i) AS m,
@@ -150,7 +150,7 @@ func TestIntervalColumns(t *testing.T) {
 
 // A CSV load reads an INTERVAL in the form Y-M D H:M:S[.F]; the values are those of BigQuery's
 // CSV loading documentation:
-// https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
+// third_party/bigquery_docs/loading-data-cloud-storage-csv.md
 // Loads from other formats, whose forms BigQuery does not document, are unsupported.
 func TestIntervalLoad(t *testing.T) {
 	t.Parallel()

@@ -1,5 +1,5 @@
 # strict_mode defaults to TRUE and validates names and types at creation, without executing.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 CREATE OR REPLACE PROCEDURE scalars.strict_default(x INT64)
 BEGIN SELECT x + 1; END;
 CALL scalars.strict_default(41)

@@ -1,5 +1,5 @@
 # Source: BigQuery's ST_CLOSESTPOINT definition (point on the first input minimizing distance).
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT TYPEOF(ST_CLOSESTPOINT(ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 1)))
 => "GEOGRAPHY"

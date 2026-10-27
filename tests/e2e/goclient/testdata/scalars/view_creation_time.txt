@@ -1,5 +1,5 @@
 # The creation time of a view, as BigQuery answers.
-# https://cloud.google.com/bigquery/docs/information-schema-tables
+# third_party/bigquery_docs/information-schema-tables.md
 
 # CREATE OR REPLACE VIEW gives the view a creation time of its own.
 DECLARE created TIMESTAMP;

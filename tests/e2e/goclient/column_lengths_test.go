@@ -11,7 +11,7 @@ import (
 
 // STRING(L) limits Unicode characters; BYTES(L) limits bytes. Parameters apply to writes,
 // including fields in STRUCTs and ARRAYs, and remain in the table schema.
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#parameterized_data_types
+// third_party/bigquery_docs/reference/standard-sql/data-types.md
 func TestColumnLengthWrites(t *testing.T) {
 	ctx := t.Context()
 	client := newClient(t)
@@ -164,8 +164,8 @@ func TestColumnLengthWrites(t *testing.T) {
 }
 
 // Base64 text is decoded before applying BYTES(L), including nested JSON fields.
-// https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-json#details_of_loading_json_data
-// https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
+// third_party/bigquery_docs/loading-data-cloud-storage-json.md
+// third_party/bigquery_docs/loading-data-cloud-storage-csv.md
 func TestColumnLengthLoadBytes(t *testing.T) {
 	ctx := t.Context()
 	client := newClient(t)

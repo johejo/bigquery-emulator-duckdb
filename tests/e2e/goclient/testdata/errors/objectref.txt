@@ -1,5 +1,5 @@
 # OBJ.MAKE_REF, which checks the authorizer and details it is given:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref
+# third_party/bigquery_docs/reference/standard-sql/objectref_functions.md
 
 SELECT OBJ.MAKE_REF('gs://cloud-samples-data/x.png', 'storage').authorizer
 => error contains: Connection id storage is not in the expected format. Supported formats are projects/{project}/locations/{location}/connections/{connection} or {project}.{location}.{connection} or {location}.{connection}; error in OBJ.MAKE_REF expression

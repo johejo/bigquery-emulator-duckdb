@@ -1,5 +1,5 @@
 # Boundary percentages select no rows or the whole table, respectively.
-# https://cloud.google.com/bigquery/docs/table-sampling
+# third_party/bigquery_docs/table-sampling.md
 
 SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (0 PERCENT)
 => "0"
@@ -26,7 +26,7 @@ SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (100.1 PERCENT)
 => error:
 
 # BigQuery's TABLESAMPLE syntax does not include REPEATABLE.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
+# third_party/bigquery_docs/reference/standard-sql/query-syntax.md
 SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (50 PERCENT) REPEATABLE (42)
 => error:
 

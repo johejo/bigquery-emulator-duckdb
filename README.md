@@ -248,7 +248,7 @@ when `STORAGE_EMULATOR_HOST` is set, and from the public Storage API otherwise, 
 Default Credentials when they are available and anonymous access otherwise.
 
 GCS source URIs support one `*` in the object name, following the
-[BigQuery wildcard examples](https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards):
+[BigQuery wildcard examples](third_party/bigquery_docs/batch-loading-data.md):
 `gs://bucket/events/*.jsonl` and `gs://bucket/events/part-*` include subfolders, while
 `gs://bucket/events/part-*.jsonl` matches only files in `events`. Bucket-name wildcards and
 multiple asterisks are rejected. Wildcard expansion requires permission to list objects;

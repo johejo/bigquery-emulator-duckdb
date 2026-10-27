@@ -1,8 +1,8 @@
 version: 1
 # Expectations follow the DDL tags / REST resourceTags representations:
-# https://cloud.google.com/bigquery/docs/tags
-# https://cloud.google.com/bigquery/docs/reference/rest/v2/tables#Table.FIELDS.resource_tags
-# https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets#Dataset.FIELDS.resource_tags
+# third_party/bigquery_docs/tags.md
+# third_party/bigquery_docs/reference/rest/v2/tables.md
+# third_party/bigquery_docs/reference/rest/v2/datasets.md
 # Synthetic keys deliberately use the emulator's IAM exception: no Cloud tag definitions.
 # Do not collect this local exception as an expected BigQuery response.
 description: DDL and REST share resource tag metadata, preserving it across unrelated patches.

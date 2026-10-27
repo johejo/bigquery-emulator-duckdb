@@ -1,4 +1,4 @@
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr
+# third_party/bigquery_docs/reference/standard-sql/string_functions.md
 # BigQuery: positions beyond the end return an empty string;
 # lengths beyond the end take the rest; negative lengths fail unless an argument is NULL.
 # GoogleSQL's GetFunctionTestsSubstr also covers these INT64 and NULL boundaries.

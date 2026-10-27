@@ -1,5 +1,5 @@
-# Sources: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb
+# Sources: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The tessellated line is the observed BigQuery answer in known_bugs.txt, read as WKT or hex WKB.
 SELECT ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)', planar => TRUE)
 => "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"

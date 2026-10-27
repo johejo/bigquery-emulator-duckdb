@@ -12,7 +12,7 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-// The dataset locations BigQuery lists, https://cloud.google.com/bigquery/docs/locations.
+// The dataset locations BigQuery lists, third_party/bigquery_docs/locations.md.
 constexpr std::string_view kLocations[] = {
     "US",
     "EU",

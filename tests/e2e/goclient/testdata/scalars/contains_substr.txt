@@ -1,5 +1,5 @@
 # CONTAINS_SUBSTR examples and recursive search rules:
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr
+# third_party/bigquery_docs/reference/standard-sql/string_functions.md
 
 SELECT CONTAINS_SUBSTR('the blue house', CONCAT('Blue ', 'house'))
 => "true"
@@ -72,7 +72,7 @@ SELECT CONTAINS_SUBSTR(r, 'toast') FROM (SELECT 'Avocado toast' AS breakfast, 'T
 => "true"
 
 # Scalar leaves are cast to STRING; spellings follow BigQuery's conversion rules.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_string
+# third_party/bigquery_docs/reference/standard-sql/conversion_functions.md
 SELECT CONTAINS_SUBSTR(-9223372036854775808, '-9223372036854775808')
 => "true"
 
@@ -202,7 +202,7 @@ SELECT CONTAINS_SUBSTR('abc', 'a', json_scope => s) FROM UNNEST(['JSON_VALUES'])
 => "true"
 
 # BigQuery accepts FLOAT64 although the documented list of searchable input types omits it.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr
+# third_party/bigquery_docs/reference/standard-sql/string_functions.md
 
 SELECT CONTAINS_SUBSTR(1.25, '1.25')
 => "true"

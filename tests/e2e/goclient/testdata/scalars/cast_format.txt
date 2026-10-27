@@ -1,5 +1,5 @@
 # CAST and SAFE_CAST with FORMAT and AT TIME ZONE.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/format-elements#formatting_syntax
+# third_party/bigquery_docs/reference/standard-sql/format-elements.md
 #
 # Expected values: BigQuery's format-elements examples, unless a comment says otherwise or the
 # case is in an "Answered by BigQuery" section. Inputs come from UNNEST so that the analyzer does

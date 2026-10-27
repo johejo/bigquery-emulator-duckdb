@@ -1,6 +1,6 @@
 ## String arguments borrowed from DuckDB vectors
 
-# SUBSTR semantics: https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr
+# SUBSTR semantics: third_party/bigquery_docs/reference/standard-sql/string_functions.md
 # Exercise short inline strings, longer strings, UTF-8 and embedded NULs.
 SELECT STRING_AGG(SUBSTR(value, 2, 3), ',' ORDER BY offset) FROM UNNEST(['abcde', 'abcdefghijklmnop', 'あいうえお', 'a\u0000bc']) AS value WITH OFFSET AS offset
 => "bcd,bcd,いうえ,\u0000bc"

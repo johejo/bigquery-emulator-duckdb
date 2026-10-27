@@ -18,7 +18,7 @@ SELECT ST_AREA(ST_GEOGFROMTEXT('fullglobe'))
 
 # The documentation describes distances between vertices, but BigQuery returns the distance
 # to the antipode for a full polygon, which has no vertices (ST_NUMPOINTS above).
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 SELECT ST_MAXDISTANCE(ST_GEOGFROMTEXT('fullglobe'), ST_GEOGPOINT(0, 0))
 => "2.001511821194711E7"
 
@@ -58,7 +58,7 @@ SELECT ST_EQUALS(ST_UNION([ST_GEOGFROMTEXT('POLYGON((0 0, 90 0, 0 90, 0 0))'), S
 
 # Source: the documented accessor, measurement and point set semantics, including that only
 # the full polygon is closed and that the full polygon has no interior rings.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_ISCLOSED(ST_GEOGFROMTEXT('fullglobe'))
 => "true"

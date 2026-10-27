@@ -1,5 +1,5 @@
 ## ST_ASGEOJSON
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # The documentation requires RFC 7946 GeoJSON whose planar edges stay within 10 meters of the
 # geodesic ones. Formatting, the order of rings and parts, and the vertices added come from
 # BigQuery's answers to unverified cases. Points, the empty geography and the full polygon are in
@@ -47,7 +47,7 @@ SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(LINESTRING(0 0, 1 1), PO
 => "{ \"type\": \"GeometryCollection\", \"geometries\": [ { \"type\": \"LineString\", \"coordinates\": [ [0, 0], [1, 1] ] }, { \"type\": \"MultiPolygon\", \"coordinates\": [ [ [ [5, 5], [5.5, 5.00018942673343], [6, 5], [5.75031027478082, 5.25015368825097], [5.50042016156242, 5.50020814671064], [5.25031997160035, 5.75015853532852], [5, 6], [5, 5] ] ], [ [ [7, 7], [7.5, 7.00026390407536], [8, 7], [7.75042593029853, 7.25020929364123], [7.50057447155328, 7.50028233618444], [7.25043578259815, 7.75021421545573], [7, 8], [7, 7] ] ] ] } ] } "
 
 ## ST_GEOGFROMGEOJSON
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 # ST_GEOGFROM's documentation reads this polygon as ST_GEOGFROMGEOJSON does. Its edges stay within
 # 10 meters of the geodesic ones, so no vertices are added.
 
@@ -286,7 +286,7 @@ SELECT ST_GEOGFROMGEOJSON('{"type": "Point", "coordinates": [1, 2], "abcdefghijk
 => error: ST_GeogFromGeoJSON failed: Unexpected token: tuvwxyz": tru}
 
 ## ST_GEOGFROM
-# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 SELECT ST_GEOGFROM('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))')
 => "POLYGON((2 0, 2 2, 0 2, 0 0, 2 0))"

@@ -1,5 +1,5 @@
 # BigQuery's documented FinGraph rows and quantified-path examples.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#quantified_path_pattern
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 # The documented six (hops, dst_account_id) rows, sorted into one scalar.
 SELECT STRING_AGG(CONCAT(CAST(hops AS STRING), ':', CAST(dst_account_id AS STRING)), ',' ORDER BY hops, dst_account_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (src:Account WHERE src.id = 7)-[e:Transfers]->{1,3}(dst:Account) WHERE src.id != dst.id RETURN ARRAY_LENGTH(e) AS hops, dst.id AS dst_account_id)
 => "1:16,1:16,2:20,2:20,3:16,3:16"
@@ -8,7 +8,7 @@ SELECT STRING_AGG(CONCAT(CAST(hops AS STRING), ':', CAST(dst_account_id AS STRIN
 SELECT STRING_AGG(CONCAT(CAST(src AS STRING), ':', CAST(dst AS STRING)), ',' ORDER BY src, dst) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (src:Account)((:Account)-[:Transfers]->(mid:Account WHERE mid.is_blocked)){1,2}-[:Transfers]->(dst:Account) RETURN src.id AS src, dst.id AS dst)
 => "7:20,7:20,20:20"
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH TRAIL (a:Account)-[:Transfers]->{4}(b:Account) RETURN COUNT(*) AS result)
 => "6"
 SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH TRAIL (WALK (a:Account)-[:Transfers]->{4}(b:Account)) RETURN COUNT(*) AS result)

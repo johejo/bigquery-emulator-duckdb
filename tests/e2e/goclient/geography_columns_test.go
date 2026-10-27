@@ -58,7 +58,7 @@ func TestGeographyColumns(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Invalid text fails; a clockwise WKT shell encloses the region on its left:
-	// https://cloud.google.com/bigquery/docs/geospatial-data#polygon_orientation
+	// third_party/bigquery_docs/geospatial-data.md
 	var rowErrors bigquery.PutMultiError
 	inserter.SkipInvalidRows = true
 	err := inserter.Put(ctx, []*bigquery.ValuesSaver{
@@ -71,8 +71,8 @@ func TestGeographyColumns(t *testing.T) {
 
 	// Both also take GeoJSON geometries and hex-encoded WKB, whose polygons are oriented as WKT's
 	// are; POINT(2 4) is ST_GEOGFROM's example:
-	// https://cloud.google.com/bigquery/docs/geospatial-data#loading_data
-	// https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom
+	// third_party/bigquery_docs/geospatial-data.md
+	// third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 	if err := inserter.Put(ctx, []*bigquery.ValuesSaver{
 		row(int64(3), `{"type": "Point", "coordinates": [1, 2]}`, nil, nil),
 		row(int64(13), pointWkb, nil, nil),
@@ -172,7 +172,7 @@ func TestGeographyColumns(t *testing.T) {
 }
 
 // A Parquet load reads a binary column as WKB into a GEOGRAPHY field, also REPEATED:
-// https://cloud.google.com/bigquery/docs/geospatial-data#loading_data
+// third_party/bigquery_docs/geospatial-data.md
 func TestGeographyParquetWkb(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

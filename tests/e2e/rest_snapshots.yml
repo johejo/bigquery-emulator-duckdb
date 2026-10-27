@@ -1,5 +1,5 @@
 desc: tables.list reports a table snapshot's type without its snapshotDefinition, which tables.get reports, and a SNAPSHOT copy job takes destinationExpirationTime
-# Fields follow https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list.
+# Fields follow third_party/bigquery_docs/reference/rest/v2/tables/list.md.
 # The Go client does not expose the type of a listed table, so check it through the HTTP runner.
 runners:
   req: ${BQ_EMULATOR_API}

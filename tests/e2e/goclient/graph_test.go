@@ -10,8 +10,8 @@ import (
 )
 
 // The fixture and answers are the FinGraph examples from BigQuery's graph reference:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-schema-statements#fingraph_example
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_call
+// third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+// third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 func TestPropertyGraph(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -92,8 +92,8 @@ func TestPropertyGraph(t *testing.T) {
 
 // A GQL query returns the rows its last RETURN orders. The fixture and answers are the FinGraph
 // examples from BigQuery's graph reference, without TIMESTAMP columns and with INT64 amounts:
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_for
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_return
+// third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+// third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 func TestGqlQueryOrder(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

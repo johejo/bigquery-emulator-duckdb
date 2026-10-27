@@ -1,6 +1,6 @@
 # BigQuery documentation and observed answers for oriented polygons.
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md
 
 # ST_GEOGFROMTEXT's documented example.
 SELECT ST_CONTAINS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))'), ST_GEOGPOINT(1, 1))

@@ -13,7 +13,7 @@ import (
 
 // CREATE SNAPSHOT TABLE keeps the rows a table has when it runs in a read-only table snapshot,
 // which records the table it was made of and when, and which CREATE TABLE CLONE restores.
-// https://cloud.google.com/bigquery/docs/table-snapshots-intro
+// third_party/bigquery_docs/table-snapshots-intro.md
 func TestCreateSnapshotTable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -63,7 +63,7 @@ func TestCreateSnapshotTable(t *testing.T) {
 	status := mustRun(`CREATE SNAPSHOT TABLE snap CLONE base
 	  OPTIONS (friendly_name = 'Snap', labels = [('env', 'dev')])`)
 	after := time.Now().Add(time.Second)
-	// https://cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2.FIELDS.statement_type
+	// third_party/bigquery_docs/reference/rest/v2/Job.md
 	if got := status.Statistics.Details.(*bigquery.QueryStatistics).StatementType; got != "CREATE_SNAPSHOT_TABLE" {
 		t.Errorf("statement type = %q, want CREATE_SNAPSHOT_TABLE", got)
 	}
@@ -104,7 +104,7 @@ func TestCreateSnapshotTable(t *testing.T) {
 	}
 
 	// A snapshot's metadata can change, as a standard table's does.
-	// https://cloud.google.com/bigquery/docs/table-snapshots-update
+	// third_party/bigquery_docs/table-snapshots-update.md
 	expiration := time.Now().Add(24 * time.Hour).Truncate(time.Millisecond)
 	updated, err := dataset.Table("snap").Update(ctx, bigquery.TableMetadataToUpdate{
 		Description:    "updated",
@@ -120,8 +120,8 @@ func TestCreateSnapshotTable(t *testing.T) {
 	}
 
 	// INFORMATION_SCHEMA reports the snapshot, its base table and when it was made.
-	// https://cloud.google.com/bigquery/docs/information-schema-tables
-	// https://cloud.google.com/bigquery/docs/information-schema-snapshots
+	// third_party/bigquery_docs/information-schema-tables.md
+	// third_party/bigquery_docs/information-schema-snapshots.md
 	read := func(sql string) [][]bigquery.Value {
 		t.Helper()
 		query := client.Query(sql)
@@ -227,7 +227,7 @@ func TestCreateSnapshotTable(t *testing.T) {
 
 	// CREATE TABLE CLONE restores a snapshot as a standard table, which takes the default
 	// expiration of its dataset, here none, rather than the snapshot's.
-	// https://cloud.google.com/bigquery/docs/table-snapshots-restore
+	// third_party/bigquery_docs/table-snapshots-restore.md
 	mustRun("CREATE TABLE restored CLONE snap")
 	mustRun("INSERT restored (id) VALUES (8)")
 	if got, want := ids("restored"), []int64{1, 2, 8}; !reflect.DeepEqual(got, want) {
@@ -256,7 +256,7 @@ func TestCreateSnapshotTable(t *testing.T) {
 	}
 	mustRun("DROP SNAPSHOT TABLE IF EXISTS snap")
 	// tables.delete deletes a snapshot too.
-	// https://cloud.google.com/bigquery/docs/table-snapshots-delete
+	// third_party/bigquery_docs/table-snapshots-delete.md
 	mustRun("CREATE SNAPSHOT TABLE deleted CLONE base")
 	if err := dataset.Table("deleted").Delete(ctx); err != nil {
 		t.Errorf("deleting a table snapshot: %v", err)
