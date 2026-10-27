@@ -100,6 +100,12 @@ struct MediaUpload {
   std::string content;
 };
 
+// A jobs.query request.
+struct JobsQuery {
+  QueryRequest query;
+  ResultPage page;
+};
+
 using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest, ExtractRequest>;
 
 std::string Param(const httplib::Request& request, const char* name);
@@ -116,8 +122,7 @@ bool IsMultipartUpload(const httplib::Request& request);
 MediaUpload ParseMultipartUpload(const httplib::Request& request);
 
 // jobs.query, whose body is the query configuration and its page.
-QueryRequest ParseQuery(const std::string& project_id, const nlohmann::json& body);
-ResultPage ParseQueryPage(const nlohmann::json& body);
+JobsQuery ParseQuery(const std::string& project_id, const nlohmann::json& body);
 // jobs.getQueryResults and tabledata.list, whose page is in the query string.
 ResultPage ParseResultPage(const httplib::Request& request);
 // jobs.insert with a job resource of any supported type.

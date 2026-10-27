@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "cases": {
+    "number_table_id": {
+      "project": "johejo-sandbox",
+      "run": "qyzd7b2f6yrrqlvrkejrbtudt3",
+      "steps": {
+        "wait": {
+          "destinationTable": "1",
+          "status": {
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "snake_case_field": {
+      "project": "johejo-sandbox",
+      "run": "qyzd7b2f6yrrqlvrkejrbtudt3",
+      "steps": {
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "unknown_query_field": {
+      "project": "johejo-sandbox",
+      "run": "qyzd7b2f6yrrqlvrkejrbtudt3",
+      "steps": {
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "rdjklqfunpnfesikkhgbgvf3we",
+      "steps": {
+        "insert": {
+          "state": "DONE",
+          "status": 200
+        }
+      }
+    },
+    "insert_unknown_nested_field": {
+      "project": "johejo-sandbox",
+      "run": "rdjklqfunpnfesikkhgbgvf3we",
+      "steps": {
+        "insert": {
+          "state": "DONE",
+          "status": 200
+        }
+      }
+    },
+    "query_unknown_nested_field": {
+      "project": "johejo-sandbox",
+      "run": "rdjklqfunpnfesikkhgbgvf3we",
+      "steps": {
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "query_unknown_parameter_field": {
+      "project": "johejo-sandbox",
+      "run": "rdjklqfunpnfesikkhgbgvf3we",
+      "steps": {
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

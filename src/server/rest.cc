@@ -208,9 +208,8 @@ class RestServer::Impl {
     // jobs
     Route("bigquery.jobs.query", {},
           Json([this](const httplib::Request& request, httplib::Response&) {
-            const json body = ParseBody(request);
-            const auto job = emulator_.RunQuery(ParseQuery(Param(request, "projectId"), body));
-            return QueryResponse(*job, ParseQueryPage(body));
+            const JobsQuery query = ParseQuery(Param(request, "projectId"), ParseBody(request));
+            return QueryResponse(*emulator_.RunQuery(query.query), query.page);
           }));
     // Ignores timeoutMs, since jobs finish before they are inserted, and
     // formatOptions.timestampOutputFormat.

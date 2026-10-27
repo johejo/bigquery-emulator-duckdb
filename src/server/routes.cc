@@ -139,6 +139,23 @@ std::string ProtoPath(std::string_view path) {
   return result;
 }
 
+// The JSON name of the protocol buffer field `name`, such as "enableListInference" for
+// "enable_list_inference". BigQuery takes fields by either name, as protocol buffers' JSON
+// parsers do; bq sends parquetOptions.enable_list_inference.
+std::string JsonName(std::string_view name) {
+  std::string result;
+  bool upper = false;
+  for (const char c : name) {
+    if (c == '_') {
+      upper = true;
+    } else {
+      result += upper ? static_cast<char>(std::toupper(static_cast<unsigned char>(c))) : c;
+      upper = false;
+    }
+  }
+  return result;
+}
+
 // The protocol buffer type of the scalar `parameter` in BigQuery's errors. `enum_type` is the
 // enum's full name, such as "google.cloud.bigquery.v2.Routine.Language".
 std::string ProtoType(const QueryParameter& parameter, std::string_view enum_type) {
@@ -197,14 +214,32 @@ std::optional<json> ScalarValue(const QueryParameter& parameter, const json& val
   return std::nullopt;
 }
 
+// Whether `value` of the field `property` is its default, which BigQuery cannot tell from
+// leaving the field out. A message never is: an empty one is set.
+bool IsDefault(const json& value, const json& property) {
+  if (property.contains("$ref")) {
+    return false;
+  }
+  if (property.contains("default")) {
+    const auto& text = property["default"].get_ref<const std::string&>();
+    return value.is_string() ? value == text : value.dump() == text;
+  }
+  if (value.is_string()) {
+    return value.get_ref<const std::string&>().empty() ||
+           (value == "0" && property.value("format", "").ends_with("int64"));
+  }
+  return value == false || value == 0 || ((value.is_array() || value.is_object()) && value.empty());
+}
+
 // NOLINTBEGIN(bugprone-easily-swappable-parameters): a value and its schema.
 json CheckValue(const json& value, const json& property, const ResourceMask& accepted,
-                const std::string& path, const std::string& enum_type);
+                UnknownFields unknown, const std::string& path, const std::string& enum_type);
 
 json CheckObject(const json& value, const json& schema, const ResourceMask& accepted,
-                 const std::string& path) {
+                 UnknownFields unknown, const std::string& path) {
   const json& properties = schema.at("properties");
-  const auto& id = schema.at("id").get_ref<const std::string&>();
+  // Schemas nested in another, such as those of QueryParameterType.structTypes, have no id.
+  const std::string id = schema.value("id", "");
   for (const auto& [name, child] : accepted.fields) {
     if (!properties.contains(name)) {
       throw std::logic_error(std::format("The {} schema has no field {}", id, name));
@@ -215,10 +250,14 @@ json CheckObject(const json& value, const json& schema, const ResourceMask& acce
         std::format("Invalid value at '{}', {}", ProtoPath(path), value.dump()));
   }
   json result = json::object();
-  for (const auto& [name, field] : value.items()) {
+  for (const auto& [key, field] : value.items()) {
+    const std::string name = properties.contains(key) ? key : JsonName(key);
     if (!properties.contains(name)) {
+      if (unknown == UnknownFields::kIgnore) {
+        continue;
+      }
       throw ApiError::Invalid(std::format(
-          "Invalid JSON payload received. Unknown name \"{}\" at '{}': Cannot find field.", name,
+          "Invalid JSON payload received. Unknown name \"{}\" at '{}': Cannot find field.", key,
           ProtoPath(path)));
     }
     if (field.is_null()) {
@@ -230,35 +269,40 @@ json CheckObject(const json& value, const json& schema, const ResourceMask& acce
     type_name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
     const std::string enum_type = std::format("google.cloud.bigquery.v2.{}.{}", id, type_name);
     const auto child = accepted.fields.find(name);
-    const bool output_only = properties[name].value("readOnly", false);
-    // Output-only fields are checked, as BigQuery does, but ignored.
-    if (!output_only && !accepted.all && child == accepted.fields.end()) {
-      throw ApiError::Unsupported(field_path);
-    }
+    const bool handled = accepted.all || child != accepted.fields.end();
     const ResourceMask everything{.all = true, .fields = {}};
     json checked =
-        CheckValue(field, properties[name],
-                   accepted.all || output_only ? everything : child->second, field_path, enum_type);
-    if (!output_only) {
-      result[name] = std::move(checked);
+        CheckValue(field, properties[name], accepted.all || !handled ? everything : child->second,
+                   unknown, field_path, enum_type);
+    // Output-only fields are checked, as BigQuery does, but ignored, as are the defaults of
+    // fields the emulator does not handle, which clients such as bq send.
+    if (properties[name].value("readOnly", false)) {
+      continue;
     }
+    if (!handled) {
+      if (IsDefault(checked, properties[name])) {
+        continue;
+      }
+      throw ApiError::Unsupported(field_path);
+    }
+    result[name] = std::move(checked);
   }
   return result;
 }
 
 json CheckValue(const json& value, const json& property, const ResourceMask& accepted,
-                const std::string& path, const std::string& enum_type) {
+                UnknownFields unknown, const std::string& path, const std::string& enum_type) {
   const json& schema = property.contains("$ref")
                            ? Discovery()["schemas"][property["$ref"].get<std::string>()]
                            : property;
   const std::string type = schema.value("type", "");
   if (type == "object" && schema.contains("properties")) {
-    return CheckObject(value, schema, accepted, path);
+    return CheckObject(value, schema, accepted, unknown, path);
   }
   if (type == "array" && value.is_array()) {
     json result = json::array();
     for (size_t i = 0; i < value.size(); ++i) {
-      result.push_back(CheckValue(value[i], schema["items"], accepted,
+      result.push_back(CheckValue(value[i], schema["items"], accepted, unknown,
                                   std::format("{}[{}]", path, i), enum_type));
     }
     return result;
@@ -270,7 +314,7 @@ json CheckValue(const json& value, const json& property, const ResourceMask& acc
     }
     json result = json::object();
     for (const auto& [key, entry] : value.items()) {
-      result[key] = CheckValue(entry, schema["additionalProperties"], accepted,
+      result[key] = CheckValue(entry, schema["additionalProperties"], accepted, unknown,
                                std::format("{}.{}", path, key), enum_type);
     }
     return result;
@@ -309,11 +353,13 @@ ResourceMask MaskOf(std::initializer_list<std::string_view> paths) {
   return mask;
 }
 
-json CheckResource(const json& resource, std::string_view schema, const ResourceMask& accepted) {
+json CheckResource(const json& resource, std::string_view schema, const ResourceMask& accepted,
+                   UnknownFields unknown) {
   // Named in errors like the request field that holds the resource, such as "routine".
   std::string path(schema);
   path.front() = static_cast<char>(std::tolower(static_cast<unsigned char>(path.front())));
-  return CheckObject(resource, Discovery()["schemas"].at(std::string(schema)), accepted, path);
+  return CheckObject(resource, Discovery()["schemas"].at(std::string(schema)), accepted, unknown,
+                     path);
 }
 
 const json& Discovery() {

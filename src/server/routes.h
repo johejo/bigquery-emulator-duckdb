@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <map>
@@ -55,13 +56,19 @@ ApiMethod FindApiMethod(std::string_view id);
 // them; every method handles some of the API-wide ones.
 void CheckQueryParameters(const ApiMethod& method, const std::vector<std::string>& accepted,
                           const httplib::Request& request);
+// What CheckResource does with a field the schema lacks, at any depth. BigQuery rejects one in
+// routines.insert, but ignores one in jobs.insert and jobs.query.
+enum class UnknownFields : std::uint8_t { kReject, kIgnore };
+
 // Checks a request's resource against the discovery document's schema `schema`, such as
 // "Routine", and returns it without null and output-only fields and with the scalars BigQuery
-// converts, such as integers given for strings, converted. Rejects a field the schema lacks or a
-// value its type does not allow as invalid, with BigQuery's messages, and a field `accepted`
-// leaves out as unsupported. The handler supports `accepted`, which can still reject some of their
-// values. Throws std::logic_error when `accepted` names a field the schema lacks.
+// converts, such as integers given for strings, converted. Handles a field the schema lacks as
+// `unknown` says, rejects a value its type does not allow as invalid, with BigQuery's messages,
+// and a field `accepted` leaves out as unsupported. The handler supports `accepted`, which can
+// still reject some of their values. Throws std::logic_error when `accepted` names a field the
+// schema lacks.
 nlohmann::json CheckResource(const nlohmann::json& resource, std::string_view schema,
-                             const ResourceMask& accepted);
+                             const ResourceMask& accepted,
+                             UnknownFields unknown = UnknownFields::kReject);
 
 }  // namespace bigquery_emulator_duckdb::server

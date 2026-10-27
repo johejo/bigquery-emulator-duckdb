@@ -50,9 +50,9 @@ emulator rejected.
 | [`jobs.delete`](../third_party/bigquery_docs/reference/rest/v2/jobs/delete.md) | `DELETE projects/{projectsId}/jobs/{jobsId}/delete` | Supported |  |
 | [`jobs.get`](../third_party/bigquery_docs/reference/rest/v2/jobs/get.md) | `GET projects/{projectsId}/jobs/{jobsId}` | Supported | See [Locations](compatibility.md#locations). |
 | [`jobs.getQueryResults`](../third_party/bigquery_docs/reference/rest/v2/jobs/getQueryResults.md) | `GET projects/{projectsId}/queries/{queriesId}` | Supported | Ignores `timeoutMs` and `formatOptions.timestampOutputFormat`. See [Locations](compatibility.md#locations). |
-| [`jobs.insert`](../third_party/bigquery_docs/reference/rest/v2/jobs/insert.md) | `POST projects/{projectsId}/jobs` | Partial | See [Jobs](compatibility.md#jobs), [Locations](compatibility.md#locations) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies). Unsupported: Avro extracts; clustering for a destination table; destinationEncryptionConfiguration; extracting models; multiple destination URIs. |
+| [`jobs.insert`](../third_party/bigquery_docs/reference/rest/v2/jobs/insert.md) | `POST projects/{projectsId}/jobs` | Partial | See [Jobs](compatibility.md#jobs), [Locations](compatibility.md#locations) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies). Unsupported: Avro extracts; destinationEncryptionConfiguration; job.configuration.extract.sourceModel; job.configuration.query.clustering; multiple destination URIs. |
 | [`jobs.list`](../third_party/bigquery_docs/reference/rest/v2/jobs/list.md) | `GET projects/{projectsId}/jobs` | Supported | Ignores `allUsers`. See [Jobs](compatibility.md#jobs). |
-| [`jobs.query`](../third_party/bigquery_docs/reference/rest/v2/jobs/query.md) | `POST projects/{projectsId}/queries` | Partial | Ignores `timeoutMs`, `labels` and `useQueryCache`. See [Locations](compatibility.md#locations). Unsupported: destinationEncryptionConfiguration; legacy SQL. |
+| [`jobs.query`](../third_party/bigquery_docs/reference/rest/v2/jobs/query.md) | `POST projects/{projectsId}/queries` | Partial | Ignores `timeoutMs`, `labels`, `useQueryCache` and `requestId`. See [Locations](compatibility.md#locations). Unsupported: destinationEncryptionConfiguration; legacy SQL. |
 
 ## models
 
