@@ -20,7 +20,7 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Graphs](#graphs) | 0 | 3 | 0 |
+| [Graphs](#graphs) | 0 | 4 | 0 |
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 24 | 7 | 2 |
@@ -34,6 +34,7 @@ rejected.
 | `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: property graph creation modes or options. |
 | `DROP PROPERTY GRAPH` | Partial | Unsupported: this DROP PROPERTY GRAPH form. |
 | `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints. |
+| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: the GQL CALL statement. |
 
 ## Queries
 

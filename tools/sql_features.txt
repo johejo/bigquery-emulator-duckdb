@@ -48,8 +48,19 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person) RETURN a IS NOT DESTINATION e AS is_not_destination)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person), (b:Person), (c:Person) WHERE SAME(a, b, c) RETURN ALL_DIFFERENT(a, b, c) AS different)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) WHERE ALL_DIFFERENT(e, f) RETURN SAME(e, f) AS same_edge)
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.name ORDER BY p.name
+query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) FILTER WHERE a.id <> b.id LET n = b.id + 1 RETURN a.name, n
+query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a, COUNT(*) AS n GROUP BY a NEXT RETURN a.name, n
+query GQL queries | GRAPH d.g MATCH (p:Person) WITH DISTINCT p RETURN p.id
+query GQL queries | GRAPH d.g MATCH (p:Person) FOR tag IN ['x', 'y'] WITH OFFSET RETURN p.id, tag, offset
+query GQL queries | GRAPH d.g MATCH (p:Person) ORDER BY p.id DESC OFFSET 1 LIMIT 1 RETURN p.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id ORDER BY p.id SKIP 1
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id UNION ALL MATCH (p:Person) RETURN p.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id INTERSECT DISTINCT MATCH (p:Person)-[:Knows]->(:Person) RETURN p.id
+query GQL queries | GRAPH d.g MATCH (p:Person) CALL (p) { MATCH (p)-[:Knows]->(q:Person) RETURN q.id AS friend_id } RETURN p.id, friend_id
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
+note GQL queries | [Graph limits](compatibility.md#graphs).
 
 section Queries
 

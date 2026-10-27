@@ -710,6 +710,9 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     }
     return linear.graph_input ? std::optional<Relation>(*linear.graph_input) : std::nullopt;
   }
+  if (scan.Is<googlesql::ResolvedGraphCallScan>()) {
+    return Unsupported(scope, "the GQL CALL statement");
+  }
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
     return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
   }
@@ -863,8 +866,13 @@ std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& s
     return Unsupported(scope, "hints");
   }
   auto result = ScanBody(scan, scope);
-  // Ordering from a subquery is not a promise of ordering for its parent scan.
-  if (result && !scan.is_ordered()) {
+  // Ordering from a subquery is not a promise of ordering for its parent scan. A GQL query's
+  // ORDER BY marks only its OrderByScan. The next statement's reference to it, such as LIMIT's,
+  // and the linear and graph table scans that output it keep its order, as the reference
+  // implementation's do.
+  if (result && !scan.is_ordered() && !scan.Is<googlesql::ResolvedGraphRefScan>() &&
+      !scan.Is<googlesql::ResolvedGraphLinearScan>() &&
+      !scan.Is<googlesql::ResolvedGraphTableScan>()) {
     result->ordering.clear();
   }
   return result;

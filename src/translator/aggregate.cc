@@ -51,9 +51,16 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          std::vector<std::string>* intermediates = nullptr) {
   const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
-  if (HasGraph(call.type()) || std::ranges::any_of(call.argument_list(), [](const auto& argument) {
-        return HasGraph(argument->type());
-      })) {
+  // A graph value's STRUCT is equal to another exactly when their identities are, so functions
+  // that only count or compare whole values opt in. BigQuery does not group paths, which
+  // GoogleSQL lets DISTINCT do.
+  if ((HasGraph(call.type()) ||
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return HasGraph(argument->type()); })) &&
+      (!functions.HasTypeUse(name, TypeUse::kGraphValues) ||
+       (call.distinct() && std::ranges::any_of(call.argument_list(), [](const auto& argument) {
+          return argument->type()->IsGraphPath();
+        })))) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with graph values");
   }
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
@@ -509,18 +516,26 @@ Scope WithCorrelatedColumns(const googlesql::ResolvedAggregateScan& aggregate, c
   return local;
 }
 
+// What a GROUP BY key groups by: INTERVAL values by their lengths and graph elements by
+// identity.
+std::string GroupKey(const googlesql::Type* type, const std::string& sql) {
+  return type->IsGraphElement() ? "struct_extract(" + sql + ", '$id')" : IntervalKey(type, sql);
+}
+
 }  // namespace
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
-  if (std::ranges::any_of(aggregate.group_by_list(),
-                          [](const auto& key) { return HasGraph(key->expr()->type()); })) {
-    return Unsupported(scope, "GROUP BY with graph values");
-  }
   // Keys with INTERVAL values group by their lengths, and return the first of equal values in input
-  // order, as BigQuery does.
+  // order, as BigQuery does. Graph elements group by identity, as SAME compares them.
   const bool grouping_sets =
       !aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty();
+  if (std::ranges::any_of(aggregate.group_by_list(), [&](const auto& key) {
+        const googlesql::Type* type = key->expr()->type();
+        return HasGraph(type) && (grouping_sets || !type->IsGraphElement());
+      })) {
+    return Unsupported(scope, "GROUP BY with graph values");
+  }
   if (!aggregate.collation_list().empty()) {
     return Unsupported(scope, "GROUP BY with collation");
   }
@@ -624,7 +639,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         return std::nullopt;
       }
       const std::string name = "_partition" + std::to_string(partition.size());
-      partition_values.push_back(IntervalKey(key->expr()->type(), *sql) + " AS " + name);
+      partition_values.push_back(GroupKey(key->expr()->type(), *sql) + " AS " + name);
       partition.push_back("q." + name);
     }
     std::vector<std::string> inner;
@@ -668,9 +683,10 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         return std::nullopt;
       }
       const int id = key->column().column_id();
-      if (const googlesql::Type* type = key->expr()->type(); HasInterval(type)) {
+      if (const googlesql::Type* type = key->expr()->type();
+          HasInterval(type) || type->IsGraphElement()) {
         projections.push_back("first(" + *sql + ") AS " + ColumnName(id));
-        keys.push_back(IntervalKey(type, *sql));
+        keys.push_back(GroupKey(type, *sql));
       } else {
         projections.push_back(*sql + " AS " + ColumnName(id));
         keys.push_back(std::to_string(projections.size()));

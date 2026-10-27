@@ -37,16 +37,21 @@ NODE TABLES (scalar_graph.Person AS Authors KEY (id) LABEL Author,
 EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Authors (id)
   DESTINATION KEY (dst) REFERENCES Readers (id));
 
--- Account/transfer rows from BigQuery's documented FinGraph example.
+-- Person, account, ownership and transfer rows from BigQuery's documented FinGraph example,
+-- without its TIMESTAMP columns.
 -- https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-schema-statements#fingraph_example
 CREATE TABLE scalar_graph.TransferAccount (id INT64, is_blocked BOOL);
 INSERT scalar_graph.TransferAccount VALUES (7, FALSE), (16, TRUE), (20, FALSE);
 CREATE TABLE scalar_graph.Transfer (id INT64, to_id INT64, amount INT64);
 INSERT scalar_graph.Transfer VALUES (7, 16, 300), (7, 16, 100), (16, 20, 300), (20, 7, 500), (20, 16, 200);
+CREATE TABLE scalar_graph.PersonOwnAccount (id INT64, account_id INT64);
+INSERT scalar_graph.PersonOwnAccount VALUES (1, 7), (2, 20), (3, 16);
 CREATE PROPERTY GRAPH scalar_graph.TransferGraph
 NODE TABLES (scalar_graph.TransferAccount AS Account KEY (id), scalar_graph.Person KEY (id))
 EDGE TABLES (scalar_graph.Transfer KEY (id, to_id, amount) SOURCE KEY (id) REFERENCES Account (id)
-  DESTINATION KEY (to_id) REFERENCES Account (id) LABEL Transfers);
+  DESTINATION KEY (to_id) REFERENCES Account (id) LABEL Transfers,
+  scalar_graph.PersonOwnAccount KEY (id, account_id) SOURCE KEY (id) REFERENCES Person (id)
+  DESTINATION KEY (account_id) REFERENCES Account (id) LABEL Owns);
 
 CREATE SCHEMA IF NOT EXISTS scalars;
 CREATE SCHEMA IF NOT EXISTS scalars_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
