@@ -131,7 +131,7 @@ func pythonWorkerClient(t *testing.T, binary string, timeout time.Duration, memo
 	ctx := t.Context()
 	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	process, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--port", "0",
+	process, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 		`--project={"projectId":"python-worker"}`, fmt.Sprintf("--python-timeout-ms=%d", timeout.Milliseconds()),
 		fmt.Sprintf("--python-memory-mib=%d", memoryMiB))
 	if err != nil {

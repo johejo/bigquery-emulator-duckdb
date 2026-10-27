@@ -68,7 +68,7 @@ func firstLine(text string) string {
 func startEmulator(binary string, args ...string) (*emulatorprocess.Process, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	return emulatorprocess.Start(ctx, binary, "", append([]string{"--host", "127.0.0.1", "--port", "0",
+	return emulatorprocess.Start(ctx, binary, "", append([]string{"--host", "127.0.0.1", "--http-port", "0",
 		"--project", `{"projectId":"test","numericId":"123456789012"}`}, args...)...)
 }
 

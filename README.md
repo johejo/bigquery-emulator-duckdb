@@ -19,7 +19,7 @@ bazelisk build //:bigquery-emulator-duckdb
 Run the server:
 
 ```bash
-bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050 \
+bazel-bin/bigquery-emulator-duckdb serve --host 0.0.0.0 --http-port 9050 \
   --project='{"projectId":"test"}'
 ```
 
@@ -68,9 +68,9 @@ See the [Storage API guide](docs/storage-api.md) for writing rows, limits and st
 ### Run queries without a server
 
 `shell` runs queries in the process instead of listening. It accepts `--project`, `--data-dir`,
-`--session-user` and the [JavaScript UDF limits](#javascript-udf-limits) as the server does, and uses the only registered project unless
-`--project-id` names one. `--dataset-id` sets the default dataset. Its flags follow `shell`, and
-`shell --help` lists them.
+`--session-user` and the [JavaScript UDF limits](#javascript-udf-limits) as `serve` does, and uses the only registered project unless
+`--default-project` names one. `--default-dataset` sets the default dataset. Each command's
+flags follow its name, and `serve --help` and `shell --help` list them.
 
 ```bash
 bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' < script.sql
@@ -78,12 +78,14 @@ bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' -e 'SE
 # {"x":"1"}
 ```
 
-For comparing geography bounds, `shell --expand-bounding-box=false` disables their outward
-expansion by one floating-point step. The default is `true`, matching BigQuery.
+For comparing results with GoogleSQL's reference implementation (`just reference`),
+`shell --semantics=googlesql` drops every BigQuery difference the emulator selects: queries can
+call exactly GoogleSQL's built-in functions, which behave as GoogleSQL's do, and geography bounds
+are not expanded outward by one floating-point step. The default, `bigquery`, matches BigQuery.
 
 ```sh
 bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' \
-  --expand-bounding-box=false -e 'SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0)) AS bounds'
+  --semantics=googlesql -e 'SELECT LENGTH(CHR(0)) AS n'
 ```
 
 For debugging the emulator itself, `shell --duckdb` runs the input as DuckDB SQL on the
@@ -118,7 +120,7 @@ or `@FILE` to read that object from a local file. Relative paths are resolved fr
 directory; bare file paths, `file://` URIs and `@-` are not accepted.
 
 ```bash
-just run --project='{"projectId":"test","numericId":"123456789012","friendlyName":"Local test"}' \
+just run serve --project='{"projectId":"test","numericId":"123456789012","friendlyName":"Local test"}' \
   --project=@./another-project.json
 ```
 
@@ -145,7 +147,7 @@ client and project. The value must be nonempty and is returned unchanged. Withou
 the function is unsupported. Stored views use the executing process's identity; it is not persisted.
 
 ```sh
-just run --project='{"projectId":"test"}' --session-user='alice@example.com'
+just run serve --project='{"projectId":"test"}' --session-user='alice@example.com'
 ```
 
 ## JavaScript UDF limits
@@ -156,7 +158,7 @@ minutes, and the calls of one query may allocate 256 MiB on each thread that run
 integers. A call past either limit fails its query.
 
 ```sh
-just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
+just run serve --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 ```
 
 ## Python UDFs
@@ -200,7 +202,7 @@ Spanner takes `spanner://projects/PROJECT/instances/INSTANCE/databases/DATABASE`
 Spanner uses Application Default Credentials. For example:
 
 ```sh
-SPANNER_EMULATOR_HOST=localhost:9010 bazel-bin/bigquery-emulator-duckdb \
+SPANNER_EMULATOR_HOST=localhost:9010 bazel-bin/bigquery-emulator-duckdb serve \
   --project='{"projectId":"test"}' \
   --connection='test.us.spanner=spanner://projects/test/instances/test/databases/test'
 ```
@@ -214,14 +216,14 @@ Connections are not persisted in the data directory. See
 [EXTERNAL_QUERY](docs/compatibility.md#external_query) for limits. For PostgreSQL:
 
 ```sh
-just run --project='{"projectId":"test"}' \
+just run serve --project='{"projectId":"test"}' \
   --connection='test.us.orders=postgresql://postgres@localhost:5432/orders'
 ```
 
 For MySQL:
 
 ```sh
-just run --project='{"projectId":"test"}' \
+just run serve --project='{"projectId":"test"}' \
   --connection='test.us.orders=mysql:host=localhost port=3306 user=root database=orders'
 ```
 

@@ -26,7 +26,7 @@ func TestEmptyIdentity(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
-			output, err := exec.CommandContext(ctx, binary(t), args...).CombinedOutput()
+			output, err := exec.CommandContext(ctx, binary(t), append([]string{"serve"}, args...)...).CombinedOutput()
 			var exit *exec.ExitError
 			if ctx.Err() != nil || !errors.As(err, &exit) || exit.ExitCode() != 2 || strings.Contains(string(output), "listening on") {
 				t.Fatalf("expected usage error: %v\n%s", err, output)
@@ -38,7 +38,7 @@ func TestEmptyIdentity(t *testing.T) {
 func TestUnconfigured(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary(t), "", "--host", "127.0.0.1", "--port", "0", `--project={"projectId":"test"}`)
+	p, err := emulatorprocess.Start(ctx, binary(t), "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestConfigured(t *testing.T) {
 		t.Run(args[0], func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
-			args = append([]string{"--host", "127.0.0.1", "--port", "0", `--project={"projectId":"one"}`, `--project={"projectId":"two"}`}, args...)
+			args = append([]string{"--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"one"}`, `--project={"projectId":"two"}`}, args...)
 			p, err := emulatorprocess.Start(ctx, binary(t), "", args...)
 			if err != nil {
 				t.Fatal(err)

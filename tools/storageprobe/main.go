@@ -403,7 +403,7 @@ func main() {
 }
 
 func run(ctx context.Context, binary string, w io.Writer) error {
-	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--port", "0",
+	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 		"--project", `{"projectId":"`+project+`"}`)
 	if err != nil {
 		return err

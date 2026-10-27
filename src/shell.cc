@@ -211,11 +211,11 @@ class Shell {
 }  // namespace
 
 int RunShell(Emulator& emulator, const ShellOptions& options) {
-  std::string project_id = options.project_id;
+  std::string project_id = options.default_project;
   if (project_id.empty()) {
     const auto& projects = emulator.ListProjects();
     if (projects.size() != 1) {
-      std::cerr << "--project-id is required unless exactly one project is registered\n";
+      std::cerr << "--default-project is required unless exactly one project is registered\n";
       return 2;
     }
     project_id = projects.front().project_id;
@@ -229,7 +229,7 @@ int RunShell(Emulator& emulator, const ShellOptions& options) {
   }
   const shell::OutputFormat format = options.format.value_or(
       isatty(STDOUT_FILENO) != 0 ? shell::OutputFormat::kPretty : shell::OutputFormat::kJsonl);
-  Shell shell(emulator, project_id, options.dataset_id, format, options.duckdb);
+  Shell shell(emulator, project_id, options.default_dataset, format, options.duckdb);
   if (options.execute.has_value()) {
     return shell.Run(*options.execute) ? 0 : 1;
   }

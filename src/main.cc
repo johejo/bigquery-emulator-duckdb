@@ -18,8 +18,11 @@
 #include <vector>
 
 #include "CLI/CLI.hpp"
+#include "src/backend_initializer.h"
+#include "src/builtin_function_options.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/project.h"
 #include "src/python_worker.h"
@@ -31,6 +34,9 @@
 #include "src/udf_duckdb/register.h"
 
 namespace {
+
+constexpr const char* kUdfs = "UDF limits";
+constexpr const char* kDebugging = "Debugging";
 
 // What both the server and the shell configure.
 struct EmulatorFlags {
@@ -81,29 +87,34 @@ void AddEmulatorFlags(CLI::App& app, EmulatorFlags& flags) {
          },
          "How long one JavaScript UDF call may run (default: 300000)")
       ->type_name("MS")
-      ->check(positive);
+      ->check(positive)
+      ->group(kUdfs);
   app.add_option_function<uint32_t>(
          "--javascript-memory-mib",
          [&flags](uint32_t value) { flags.javascript.memory = size_t{value} << 20U; },
          "How much memory JavaScript UDF calls may allocate per query on each thread "
          "(default: 256)")
       ->type_name("MIB")
-      ->check(positive);
+      ->check(positive)
+      ->group(kUdfs);
   app.add_option("--python-worker", flags.python.worker,
                  "Override the Python worker with an external executable")
-      ->type_name("PATH");
+      ->type_name("PATH")
+      ->group(kDebugging);
   app.add_option_function<uint32_t>(
          "--python-timeout-ms",
          [&flags](uint32_t value) { flags.python.call_time = std::chrono::milliseconds(value); },
          "Python UDF call timeout, including worker startup (default: 300000)")
       ->type_name("MS")
-      ->check(positive);
+      ->check(positive)
+      ->group(kUdfs);
   app.add_option_function<uint32_t>(
          "--python-memory-mib",
          [&flags](uint32_t value) { flags.python.memory = size_t{value} << 20U; },
          "Python worker memory limit (default: 256)")
       ->type_name("MIB")
-      ->check(positive);
+      ->check(positive)
+      ->group(kUdfs);
 }
 
 // Blocks SIGINT and SIGTERM in the calling thread and every thread it starts afterwards, so that
@@ -126,34 +137,40 @@ void WaitForShutdown(const sigset_t& signals, bigquery_emulator_duckdb::Server& 
 }
 
 int Run(int argc, char* const* argv) {
-  CLI::App app("Serves the BigQuery REST API and BigQuery Storage API backed by DuckDB.",
-               "bigquery-emulator-duckdb");
+  CLI::App app("Emulates BigQuery backed by DuckDB.", "bigquery-emulator-duckdb");
+  app.require_subcommand(1);
   // A repeated flag takes its last value, except where it is repeatable; subcommands inherit this.
   app.option_defaults()->multi_option_policy(CLI::MultiOptionPolicy::TakeLast);
-  EmulatorFlags flags;
-  AddEmulatorFlags(app, flags);
-  bigquery_emulator_duckdb::ServerOptions options;
-  const CLI::Validator port = CLI::Range(0, 65535).description("");
-  app.add_option("--host", options.host, "Address to listen on (default: 0.0.0.0)")
-      ->type_name("HOST");
-  app.add_option("--port", options.port, "Port to listen on (default: 9050)")
-      ->type_name("PORT")
-      ->check(port);
-  app.add_option("--grpc-port", options.grpc_port,
-                 "BigQuery Storage gRPC port (default: 9060; 0 chooses a free port)")
-      ->type_name("PORT")
-      ->check(port);
 
-  CLI::App* shell =
-      app.add_subcommand("shell", "Run queries from standard input without listening");
+  CLI::App* serve =
+      app.add_subcommand("serve", "Serve the BigQuery REST API and BigQuery Storage API");
+  EmulatorFlags serve_flags;
+  AddEmulatorFlags(*serve, serve_flags);
+  bigquery_emulator_duckdb::ServerOptions server_options;
+  const CLI::Validator port = CLI::Range(0, 65535).description("");
+  serve->add_option("--host", server_options.host, "Address to listen on (default: 0.0.0.0)")
+      ->type_name("HOST");
+  serve->add_option("--http-port", server_options.port, "REST API port (default: 9050)")
+      ->type_name("PORT")
+      ->check(port);
+  serve
+      ->add_option("--grpc-port", server_options.grpc_port,
+                   "BigQuery Storage gRPC port (default: 9060)")
+      ->type_name("PORT")
+      ->check(port);
+  serve->footer("Port 0 chooses a free port.");
+
+  CLI::App* shell = app.add_subcommand("shell", "Run queries in the process without listening");
   EmulatorFlags shell_flags;
   AddEmulatorFlags(*shell, shell_flags);
   bigquery_emulator_duckdb::ShellOptions shell_options;
   shell
-      ->add_option("--project-id", shell_options.project_id,
+      ->add_option("--default-project", shell_options.default_project,
                    "Project that runs queries (default: the only registered project)")
       ->type_name("ID");
-  shell->add_option("--dataset-id", shell_options.dataset_id, "Default dataset")
+  shell
+      ->add_option("--default-dataset", shell_options.default_dataset,
+                   "Dataset that unqualified table names refer to")
       ->type_name("DATASET");
   shell
       ->add_option_function<std::string>(
@@ -177,54 +194,65 @@ int Run(int argc, char* const* argv) {
           },
           "Run SQL as one job instead of reading standard input")
       ->type_name("SQL");
-  googlesql_geography::Options geography{.expand_bounding_box = true};
+  bool googlesql_semantics = false;
   shell
-      ->add_option("--expand-bounding-box", geography.expand_bounding_box,
-                   "Round geography bounds outward as BigQuery does (default: true)")
-      ->type_name("true|false")
-      ->check(CLI::IsMember({"true", "false"}).description(""));
-  shell->add_flag("--duckdb", shell_options.duckdb,
-                  "Run SQL as DuckDB statements on the emulator's database, where "
-                  "bq_geography_text(column) shows a stored GEOGRAPHY (for debugging)");
+      ->add_option_function<std::string>(
+          "--semantics",
+          [&googlesql_semantics](const std::string& value) {
+            if (value != "bigquery" && value != "googlesql") {
+              throw CLI::ValidationError("--semantics", "must be bigquery or googlesql");
+            }
+            googlesql_semantics = value == "googlesql";
+          },
+          "bigquery, or googlesql to evaluate functions as GoogleSQL's reference "
+          "implementation does, without BigQuery's differences (default: bigquery)")
+      ->type_name("SEMANTICS")
+      ->group(kDebugging);
+  shell
+      ->add_flag("--duckdb", shell_options.duckdb,
+                 "Run SQL as DuckDB statements on the emulator's database, where "
+                 "bq_geography_text(column) shows a stored GEOGRAPHY")
+      ->group(kDebugging);
 
   try {
     app.parse(argc, argv);
-    // The shell takes its flags, including the ones it shares with the server, after its name.
-    const auto server_flags = app.get_options();
-    if (const auto before = std::ranges::find_if(
-            server_flags, [](const CLI::Option* option) { return option->count() > 0; });
-        shell->parsed() && before != server_flags.end()) {
-      throw CLI::ValidationError((*before)->get_name(), "must follow the shell subcommand");
-    }
   } catch (const CLI::ParseError& error) {
     return app.exit(error) == 0 ? 0 : 2;
   }
 
-  const EmulatorFlags& used = shell->parsed() ? shell_flags : flags;
+  const EmulatorFlags& used = shell->parsed() ? shell_flags : serve_flags;
   std::vector<bigquery_emulator_duckdb::Project> projects;
   std::ranges::transform(used.projects, std::back_inserter(projects),
                          bigquery_emulator_duckdb::ReadProjectArgument);
   std::vector<bigquery_emulator_duckdb::ExternalConnection> connections;
   std::ranges::transform(used.connections, std::back_inserter(connections),
                          bigquery_emulator_duckdb::ParseConnectionArgument);
+  const bigquery_emulator_duckdb::BackendInitializer udfs =
+      bigquery_emulator_duckdb::udf_duckdb::UdfInitializer(used.javascript, used.python);
 
   if (shell->parsed()) {
-    bigquery_emulator_duckdb::Emulator emulator(
-        used.data_dir, projects, used.session_user,
-        bigquery_emulator_duckdb::udf_duckdb::UdfInitializer(used.javascript, used.python),
-        connections, geography);
+    if (googlesql_semantics) {
+      // GoogleSQL does not implement GEOGRAPHY, so its bounds have no BigQuery adjustment either.
+      const googlesql_geography::Options geography;
+      const bigquery_emulator_duckdb::functions_duckdb::Options functions;
+      bigquery_emulator_duckdb::Emulator emulator(
+          used.data_dir, projects, used.session_user, udfs, connections, geography, functions,
+          bigquery_emulator_duckdb::ExcludedFunctionIds(),
+          bigquery_emulator_duckdb::FunctionDeclarations::kGoogleSQL);
+      return bigquery_emulator_duckdb::RunShell(emulator, shell_options);
+    }
+    bigquery_emulator_duckdb::Emulator emulator(used.data_dir, projects, used.session_user, udfs,
+                                                connections);
     return bigquery_emulator_duckdb::RunShell(emulator, shell_options);
   }
 
   const sigset_t signals = BlockShutdownSignals();
-  bigquery_emulator_duckdb::Emulator emulator(
-      used.data_dir, projects, used.session_user,
-      bigquery_emulator_duckdb::udf_duckdb::UdfInitializer(used.javascript, used.python),
-      connections, geography);
-  bigquery_emulator_duckdb::Server server(emulator, options);
+  bigquery_emulator_duckdb::Emulator emulator(used.data_dir, projects, used.session_user, udfs,
+                                              connections);
+  bigquery_emulator_duckdb::Server server(emulator, server_options);
   if (!server.Start()) {
-    std::cerr << "Failed to bind REST " << options.host << ":" << options.port << " or gRPC "
-              << options.host << ":" << options.grpc_port << '\n';
+    std::cerr << "Failed to bind REST " << server_options.host << ":" << server_options.port
+              << " or gRPC " << server_options.host << ":" << server_options.grpc_port << '\n';
     return 1;
   }
   std::thread shutdown([&] { WaitForShutdown(signals, server); });

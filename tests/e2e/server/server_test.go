@@ -60,14 +60,14 @@ func TestOccupiedPort(t *testing.T) {
 
 func rejected(t *testing.T, port string, code int) {
 	t.Helper()
-	rejectedListener(t, "--port", port, code)
+	rejectedListener(t, "--http-port", port, code)
 }
 
 func rejectedListener(t *testing.T, flag, port string, code int) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, binary(t), "--host", "127.0.0.1", "--port", "0", "--grpc-port", "0", flag, port).CombinedOutput()
+	output, err := exec.CommandContext(ctx, binary(t), "serve", "--host", "127.0.0.1", "--http-port", "0", "--grpc-port", "0", flag, port).CombinedOutput()
 	var exit *exec.ExitError
 	if ctx.Err() != nil || !errors.As(err, &exit) || exit.ExitCode() != code || strings.Contains(string(output), "listening on") {
 		t.Fatalf("expected exit %d before listening: %v\n%s", code, err, output)
@@ -78,7 +78,7 @@ func rejectedListener(t *testing.T, flag, port string, code int) {
 func TestShutdownAfterAnnouncement(t *testing.T) {
 	for range 10 {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
-		p, err := emulatorprocess.Start(ctx, binary(t), "", "--host", "127.0.0.1", "--port", "0")
+		p, err := emulatorprocess.Start(ctx, binary(t), "", "--host", "127.0.0.1", "--http-port", "0")
 		cancel()
 		if err != nil {
 			t.Fatal(err)
@@ -93,7 +93,7 @@ func start(t *testing.T, args ...string) *emulatorprocess.Process {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary(t), "", append([]string{"--port", "0"}, args...)...)
+	p, err := emulatorprocess.Start(ctx, binary(t), "", append([]string{"--http-port", "0"}, args...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
