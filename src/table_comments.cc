@@ -71,11 +71,12 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
   }
 }
 
-std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata,
+std::string TableCommentStatement(const TableReference& table, TableMetadata metadata,
                                   const std::vector<FieldSchema>& schema) {
   ValidateLabels(metadata.labels);
   ValidateResourceTags(metadata.resource_tags);
   ValidatePartitioning(metadata, schema);
+  metadata.primary_key = PrimaryKeyColumns(metadata.primary_key, schema);
   json comment = metadata.ToJson();
   if (!metadata.tag_order.empty()) {
     comment["tagOrder"] = metadata.tag_order;
@@ -96,6 +97,11 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
   if (view.metadata.require_partition_filter) {
     throw ApiError::Unsupported("requirePartitionFilter on views");
   }
+  // BigQuery keeps the primary key tables.patch gives a view, but rejects one tables.insert gives
+  // it; what it does with one on a materialized view is not known.
+  if (!view.metadata.primary_key.empty() && view.materialized) {
+    throw ApiError::Unsupported("tableConstraints on materialized views");
+  }
   if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
     if (view.materialized) {
       throw ApiError::Unsupported("partitioning or clustering of materialized views");
@@ -107,7 +113,9 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
   if (view.metadata.default_rounding_mode != RoundingMode::kUnspecified) {
     throw ApiError::Unsupported("defaultRoundingMode on views");
   }
-  json comment = view.metadata.ToJson();
+  ViewMetadata stored = view;
+  stored.metadata.primary_key = PrimaryKeyColumns(view.metadata.primary_key, view.schema);
+  json comment = stored.metadata.ToJson();
   if (!view.metadata.tag_order.empty()) {
     comment["tagOrder"] = view.metadata.tag_order;
   }

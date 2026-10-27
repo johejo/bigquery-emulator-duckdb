@@ -47,10 +47,10 @@ struct BaseTableDefinition {
 };
 
 // What a table or view carries besides its schema: Table.description, friendlyName, labels and
-// resourceTags, and a table's partitioning and clustering, which only shape how BigQuery stores it,
-// the defaultRoundingMode that NUMERIC and BIGNUMERIC fields added to it later take, the
-// cloneDefinition of a clone or snapshotDefinition of a table snapshot, and its expiration. An
-// empty description or friendly name, or kUnspecified rounding mode, is unset.
+// resourceTags, a table's unenforced primary key, its partitioning and clustering, which only
+// shape how BigQuery stores it, the defaultRoundingMode that NUMERIC and BIGNUMERIC fields added
+// to it later take, the cloneDefinition of a clone or snapshotDefinition of a table snapshot, and
+// its expiration. An empty description or friendly name, or kUnspecified rounding mode, is unset.
 struct TableMetadata {
   std::string description;
   std::string friendly_name;
@@ -64,6 +64,8 @@ struct TableMetadata {
   // Queries must have a predicate eligible for partition elimination.
   bool require_partition_filter = false;
   std::vector<std::string> clustering;  // Clustering.fields.
+  // TableConstraints.primaryKey.columns; empty when the table has no primary key.
+  std::vector<std::string> primary_key;
   RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
   std::optional<BaseTableDefinition> clone;
   // A table snapshot is read-only: only its metadata can change.
@@ -77,9 +79,10 @@ struct TableMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !partitioned() && !require_partition_filter &&
-           clustering.empty() && default_rounding_mode == RoundingMode::kUnspecified &&
-           !clone.has_value() && !snapshot.has_value() && !expiration_time.has_value() &&
-           !restored_from_snapshot && creation_time == 0;
+           clustering.empty() && primary_key.empty() &&
+           default_rounding_mode == RoundingMode::kUnspecified && !clone.has_value() &&
+           !snapshot.has_value() && !expiration_time.has_value() && !restored_from_snapshot &&
+           creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -155,8 +158,10 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // resourceTags patches merge keys and preserve their order. An empty object is a no-op on
 // tables, and null clears table tags. Empty patches on tagged datasets and null dataset tags
 // remain unsupported. Full updates replace resourceTags.
-// tables.update replaces the description, friendly name, labels, clustering, default rounding mode
-// and expiration, including the required partition filter.
+// tables.update replaces the description, friendly name, labels, clustering, primary key, default
+// rounding mode and expiration, including the required partition filter. tables.patch keeps the
+// primary key when tableConstraints has none. Both drop the foreign keys of tableConstraints, as
+// DDL does.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
 // cloneDefinition and snapshotDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
@@ -195,6 +200,13 @@ void ValidateResourceTags(const std::map<std::string, std::string>& tags);
 // since the emulator does not encrypt tables with Cloud KMS keys. Null or {} leaves it unset.
 void RejectEncryptionConfiguration(const nlohmann::json& body, const char* key,
                                    const std::string& what);
+
+// The columns of `primary_key` as `schema` spells them, which BigQuery reports whatever case
+// they are given in. Throws ApiError::Invalid for a column `schema` lacks or of a type BigQuery
+// rejects. BigQuery takes a REST primary key that names a column twice. BigQuery's documentation
+// says that primary key columns cannot have default values, but it creates such tables.
+std::vector<std::string> PrimaryKeyColumns(const std::vector<std::string>& primary_key,
+                                           const std::vector<FieldSchema>& schema);
 
 // Throws ApiError::Invalid for partitioning or clustering that `schema` cannot have: a field it
 // lacks, or of a type, mode or depth BigQuery rejects, more than 4 clustering fields, or a range

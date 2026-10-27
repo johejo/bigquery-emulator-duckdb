@@ -106,10 +106,19 @@ The option cannot be enabled on an unpartitioned table or view.
 Parameterized columns accept literal defaults only. `tables.update` and `tables.patch` cannot
 add or change defaults, and the Storage Write API cannot write to a table with defaults.
 
+### Primary and foreign keys
+
+Tables keep their primary keys, which `tables.get` reports, but
+`INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `KEY_COLUMN_USAGE` are unsupported. Foreign keys in
+`CREATE TABLE` and `tableConstraints` are accepted and dropped, and `ALTER TABLE ADD FOREIGN KEY`
+and `DROP CONSTRAINT` are unsupported.
+
+`tableConstraints` on materialized views are unsupported until BigQuery's behavior is verified.
+
 ### ALTER TABLE
 
-Supported actions are `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS`, and `ALTER COLUMN`
-with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`. Other actions are unsupported. Column options
+Supported actions are `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS`, `ADD PRIMARY KEY`,
+`DROP PRIMARY KEY`, and `ALTER COLUMN` with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`. Other actions are unsupported. Column options
 have the limits described under [Options and expiration](#options-and-expiration).
 
 ### Copies and clones
@@ -354,7 +363,6 @@ such as on macOS.
 
 Graph DDL rejects:
 
-- Element tables without a `KEY` clause, since tables do not keep their primary keys.
 - Keys of type FLOAT64, BIGNUMERIC, INTERVAL, RANGE, GEOGRAPHY, JSON, ARRAY or STRUCT, and keys
   other than columns.
 - Computed properties, measures and property options.

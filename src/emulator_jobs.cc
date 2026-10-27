@@ -493,8 +493,11 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         }
       }
     }
+    // As BigQuery answers, a copy of one table takes its primary key, replacing a truncated
+    // table's, while an appended table keeps its own and a copy of several tables takes none.
+    const bool keyed = copy.source_tables.size() == 1 && !source_metadata.primary_key.empty();
     TableMetadata metadata;
-    if (copy.operation != CopyOperation::kCopy) {
+    if (copy.operation != CopyOperation::kCopy || keyed) {
       bool exists = true;
       try {
         GetTable(copy.destination_table, /*include_row_count=*/false);
@@ -504,7 +507,11 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         }
         exists = false;
       }
-      metadata = CopiedMetadata(copy, first_source, std::move(source_metadata), exists);
+      if (copy.operation != CopyOperation::kCopy) {
+        metadata = CopiedMetadata(copy, first_source, std::move(source_metadata), exists);
+      } else if (!exists || copy.write_disposition == WriteDisposition::kWriteTruncate) {
+        metadata.primary_key = source_metadata.primary_key;
+      }
     }
     metadata.expiration_time = copy.destination_expiration_time;
     const QueryResult result =
@@ -663,8 +670,11 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     }
     appended = Join(columns, ", ");
   }
-  // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
-  if (existing.has_value() && !metadata.empty()) {
+  // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known, besides the
+  // primary key a copy gives the table it truncates.
+  TableMetadata replaced = metadata;
+  replaced.primary_key.clear();
+  if (existing.has_value() && !replaced.empty()) {
     throw ApiError::Unsupported("setting the expiration of an existing destination table " +
                                 TableName(destination));
   }

@@ -1,0 +1,1006 @@
+{
+  "version": 1,
+  "cases": {
+    "added_primary_key_column_case": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "Ab"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "array_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type ARRAY. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type ARRAY. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "clone_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "copy_job_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "completed_copy": {},
+        "copy": {},
+        "fixture": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "copy_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "create_default_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "default_on_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Key column a cannot be modified or removed. column's default_value_expression changed:  -> 1",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Key column a cannot be modified or removed. column's default_value_expression changed:  -> 1",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "drop_missing_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: Constraint primary key",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: Constraint primary key",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
+        }
+      }
+    },
+    "drop_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Column `a` cannot be dropped in table `t`. Columns used in table partitioning or clustering or as part of key constraints cannot be dropped.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Column `a` cannot be dropped in table `t`. Columns used in table partitioning or clustering or as part of key constraints cannot be dropped.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "enforced_added_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Enforcement of primary keys is not supported",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Enforcement of primary keys is not supported",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "enforced_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Enforcement of primary keys is not supported",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Enforcement of primary keys is not supported",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "float_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type FLOAT. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type FLOAT. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "json_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type JSON. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type JSON. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "like_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "patch_empty_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "patch_empty_table_constraints": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "update": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "patch_missing_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "update": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column c was not found.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column c was not found.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_null_table_constraints": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "patch_without_table_constraints": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "update": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "primary_key_column_case": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "Ab"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "second_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 409,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Already Exists: Constraint primary key",
+                    "reason": "duplicate"
+                  }
+                ],
+                "message": "Already Exists: Constraint primary key",
+                "status": "ALREADY_EXISTS"
+              }
+            },
+            "status": 409
+          }
+        }
+      }
+    },
+    "snapshot_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "struct_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type RECORD. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type RECORD. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "update_without_table_constraints": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "view_table_constraints": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot specify the table constraints when creating view.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot specify the table constraints when creating view.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bignumeric_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "bytes_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "copy_job_into_existing_table": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "completed_copy": {},
+        "copy": {},
+        "fixture": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "copy_job_several_keyed_tables": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "completed_copy": {},
+        "copy": {},
+        "fixture": {},
+        "table": {}
+      }
+    },
+    "description_on_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "drop_default_on_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Key column a cannot be modified or removed. column's default_value_expression changed: 1 -> ",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Key column a cannot be modified or removed. column's default_value_expression changed: 1 -> ",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "geography_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type GEOGRAPHY. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type GEOGRAPHY. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "interval_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type INTERVAL. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type INTERVAL. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_view_table_constraints": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "patch": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "range_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type RANGE. Invalid column: a.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type RANGE. Invalid column: a.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "rest_duplicate_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a",
+                "a"
+              ]
+            }
+          }
+        },
+        "update": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a",
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "rest_float_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "update": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Primary key column cannot be of type FLOAT. Invalid column: f.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Primary key column cannot be of type FLOAT. Invalid column: f.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "rest_primary_key_column_case": {
+      "project": "johejo-sandbox",
+      "run": "x5zrl7aityo74pma4dfcuydzi5",
+      "steps": {
+        "insert": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        },
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "b"
+              ]
+            }
+          }
+        },
+        "update": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "b"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "bool_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "copy_job_appending_to_keyed_table": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "completed_copy": {},
+        "copy": {},
+        "fixture": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "b"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "copy_job_one_of_several_tables_keyed": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "completed_copy": {},
+        "copy": {},
+        "fixture": {},
+        "table": {}
+      }
+    },
+    "copy_job_several_tables_sharing_key": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "completed_copy": {},
+        "copy": {},
+        "fixture": {},
+        "table": {}
+      }
+    },
+    "date_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "datetime_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "query_job_truncating_keyed_table": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "completed_query": {},
+        "fixture": {},
+        "table": {}
+      }
+    },
+    "query_truncating_keyed_table": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {}
+      }
+    },
+    "time_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "66yr2eomvnbfsbkxbqjpyj37ne",
+      "steps": {
+        "fixture": {},
+        "statement": {},
+        "table": {
+          "tableConstraints": {
+            "primaryKey": {
+              "columns": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

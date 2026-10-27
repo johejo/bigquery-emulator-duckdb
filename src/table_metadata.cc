@@ -186,6 +186,24 @@ std::vector<std::string> ParseClustering(const json& value) {
 // The member `key` of `body`, or null when it has none.
 json Member(const json& body, const char* key) { return body.value(key, json()); }
 
+// TableConstraints.primaryKey.columns of `value`, a TableConstraints object or null; its
+// foreignKeys are dropped.
+std::vector<std::string> ParsePrimaryKey(const json& value) {
+  const json primary_key = value.is_object() ? Member(value, "primaryKey") : json();
+  const json columns = primary_key.is_object() ? Member(primary_key, "columns") : json();
+  if ((!value.is_null() && !value.is_object()) ||
+      (!primary_key.is_null() && !primary_key.is_object()) ||
+      (!columns.is_null() && !columns.is_array())) {
+    throw ApiError::Invalid("Field tableConstraints.primaryKey.columns must be an array");
+  }
+  std::vector<std::string> names;
+  std::ranges::transform(columns.is_array() ? columns : json::array(), std::back_inserter(names),
+                         [](const json& column) {
+                           return StringValue(column, "tableConstraints.primaryKey.columns");
+                         });
+  return names;
+}
+
 // Reads the partitioning of a Table resource `table` into `metadata`.
 void ParsePartitioning(const json& table, TableMetadata& metadata) {
   metadata.time_partitioning = ParseTimePartitioning(Member(table, "timePartitioning"));
@@ -445,6 +463,9 @@ json TableMetadata::ToJson() const {
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
+  if (!primary_key.empty()) {
+    fields["tableConstraints"] = {{"primaryKey", {{"columns", primary_key}}}};
+  }
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
@@ -565,6 +586,14 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
   } else if (!patch) {
     metadata.clustering.clear();
   }
+  // As BigQuery answers, tables.patch keeps the primary key when tableConstraints is an object
+  // without one.
+  if (const auto it = body.find("tableConstraints");
+      it != body.end() && (!patch || !it->is_object() || it->contains("primaryKey"))) {
+    metadata.primary_key = ParsePrimaryKey(*it);
+  } else if (!patch) {
+    metadata.primary_key.clear();
+  }
 }
 
 DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
@@ -645,6 +674,30 @@ void ValidateLabels(const std::map<std::string, std::string>& labels) {
       throw ApiError::Invalid(std::format("Label value \"{}\" {}", value, problem));
     }
   }
+}
+
+std::vector<std::string> PrimaryKeyColumns(const std::vector<std::string>& primary_key,
+                                           const std::vector<FieldSchema>& schema) {
+  std::vector<std::string> columns;
+  for (const std::string& name : primary_key) {
+    const FieldSchema* field = FindField(schema, name);
+    if (field == nullptr) {
+      throw ApiError::Invalid("Primary key column " + name + " was not found.");
+    }
+    // BigQuery's answers; what it says of BOOL, DATE, TIME and DATETIME columns is not known.
+    static constexpr FieldType kRejected[] = {
+        FieldType::kFloat, FieldType::kGeography, FieldType::kInterval,
+        FieldType::kJson,  FieldType::kRange,     FieldType::kRecord,
+    };
+    if (field->mode == FieldMode::kRepeated ||
+        std::ranges::find(kRejected, field->type) != std::end(kRejected)) {
+      throw ApiError::Invalid(std::format(
+          "Primary key column cannot be of type {}. Invalid column: {}.",
+          field->mode == FieldMode::kRepeated ? "ARRAY" : FieldTypeName(field->type), field->name));
+    }
+    columns.push_back(field->name);
+  }
+  return columns;
 }
 
 void ValidatePartitioning(const TableMetadata& metadata, const std::vector<FieldSchema>& schema) {

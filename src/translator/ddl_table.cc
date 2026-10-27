@@ -450,7 +450,35 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
   return true;
 }
 
-// BigQuery's primary and foreign keys are never enforced, so they are dropped.
+// Whether the emulator takes `key`; BigQuery takes only an unnamed NOT ENFORCED primary key,
+// without options.
+bool SupportedPrimaryKey(const googlesql::ResolvedPrimaryKey& key, const Scope& scope) {
+  if (!key.unenforced()) {
+    throw std::invalid_argument("Enforcement of primary keys is not supported");
+  }
+  if (!key.constraint_name().empty() || key.option_list_size() > 0) {
+    Unsupported(scope, "named primary keys or primary key options");
+    return false;
+  }
+  return true;
+}
+
+// Records the primary key of `create` on `metadata`. Foreign keys are dropped.
+bool PrimaryKey(const googlesql::ResolvedCreateTableStmtBase& create, TableMetadata& metadata,
+                const Scope& scope) {
+  const googlesql::ResolvedPrimaryKey* key = create.primary_key();
+  if (key == nullptr) {
+    return true;
+  }
+  if (!SupportedPrimaryKey(*key, scope)) {
+    return false;
+  }
+  for (const int offset : key->column_offset_list()) {
+    metadata.primary_key.push_back(create.column_definition_list(offset)->name());
+  }
+  return true;
+}
+
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
   if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP &&
@@ -682,8 +710,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
 
 }  // namespace
 
-// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT
-// and SET OPTIONS, applied to the table as it is when the statement runs.
+// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT,
+// ADD and DROP PRIMARY KEY and SET OPTIONS, applied to the table as it is when the statement runs.
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope) {
   const auto path = TargetTable(alter.name_path(), scope);
@@ -692,6 +720,19 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
     return std::nullopt;
   }
   TableAlteration alteration{.table = *target, .if_exists = alter.is_if_exists()};
+  // BigQuery rejects an enforced primary key before anything else about the statement.
+  if (std::ranges::any_of(alter.alter_action_list(), [&](const auto& action) {
+        if (!action->template Is<googlesql::ResolvedAddConstraintAction>()) {
+          return false;
+        }
+        const auto* constraint =
+            action->template GetAs<googlesql::ResolvedAddConstraintAction>()->constraint();
+        return constraint->template Is<googlesql::ResolvedPrimaryKey>() &&
+               !SupportedPrimaryKey(*constraint->template GetAs<googlesql::ResolvedPrimaryKey>(),
+                                    scope);
+      })) {
+    return std::nullopt;
+  }
   for (const auto& action : alter.alter_action_list()) {
     // BigQuery documents a list of ADD COLUMN or of DROP COLUMN actions, but not a mix of kinds.
     if (action->node_kind() != alter.alter_action_list(0)->node_kind()) {
@@ -770,6 +811,19 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
           .drop = true,
           .if_exists = drop.is_if_exists(),
       });
+    } else if (action->Is<googlesql::ResolvedAddConstraintAction>() &&
+               action->GetAs<googlesql::ResolvedAddConstraintAction>()
+                   ->constraint()
+                   ->Is<googlesql::ResolvedPrimaryKey>()) {
+      const auto& key = *action->GetAs<googlesql::ResolvedAddConstraintAction>()
+                             ->constraint()
+                             ->GetAs<googlesql::ResolvedPrimaryKey>();
+      alteration.actions.emplace_back(PrimaryKeyAction{.columns = key.column_name_list()});
+    } else if (action->Is<googlesql::ResolvedDropPrimaryKeyAction>()) {
+      alteration.actions.emplace_back(PrimaryKeyAction{
+          .drop = true,
+          .if_exists = action->GetAs<googlesql::ResolvedDropPrimaryKeyAction>()->is_if_exists(),
+      });
     } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
       OptionUpdates updates;
       if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
@@ -814,7 +868,8 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope);
-  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
+  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope) ||
+      !PrimaryKey(create, *metadata, scope)) {
     return std::nullopt;
   }
   TableDefinition table{
@@ -941,7 +996,8 @@ std::optional<std::string> CreateTableAsSelect(
     description = LikeDescription(create, scope);
   } else {
     auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope);
-    if (metadata && PartitioningAndClustering(create, *metadata, scope)) {
+    if (metadata && PartitioningAndClustering(create, *metadata, scope) &&
+        PrimaryKey(create, *metadata, scope)) {
       description = TableDescription{.schema = {}, .metadata = *std::move(metadata)};
     }
   }
