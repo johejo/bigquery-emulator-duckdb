@@ -1,3 +1,4 @@
+load("@bigquery_emulator_duckdb//third_party/python:native_archive.bzl", "native_archive")
 load("@rules_cc//cc:cc_import.bzl", "cc_import")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
@@ -23,9 +24,18 @@ filegroup(
     ),
 )
 
+native_archive(
+    name = "libpython_native",
+    src = glob(["install/lib/python3.11/config-*/libpython3.11.a"])[0],
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
 cc_import(
     name = "libpython",
-    static_library = glob(["install/lib/python3.11/config-*/libpython3.11.a"])[0],
+    static_library = select({
+        "@platforms//os:linux": ":libpython_native",
+        "//conditions:default": glob(["install/lib/python3.11/config-*/libpython3.11.a"])[0],
+    }),
 )
 
 cc_library(

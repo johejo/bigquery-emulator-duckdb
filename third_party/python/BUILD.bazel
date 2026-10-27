@@ -51,4 +51,7 @@ alias(
     }),
 )
 
-exports_files(["BUILD.python.bazel"])
+exports_files([
+    "BUILD.python.bazel",
+    "native_archive.bzl",
+])
