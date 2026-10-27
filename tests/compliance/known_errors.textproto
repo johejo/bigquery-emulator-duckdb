@@ -1815,12 +1815,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "SPLIT of NULL differs"
-  label: "strings_test:split_nulls"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1e29"

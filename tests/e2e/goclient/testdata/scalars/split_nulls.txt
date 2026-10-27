@@ -1,0 +1,16 @@
+# NULL propagation from GoogleSQL compliance testdata/strings.test (split_nulls).
+# Read inputs from rows to exercise the backend rather than constant folding.
+SELECT SPLIT(value) IS NULL FROM UNNEST([CAST(NULL AS STRING)]) AS value
+=> "true"
+
+SELECT SPLIT(value, ',') IS NULL FROM UNNEST([CAST(NULL AS STRING)]) AS value
+=> "true"
+
+SELECT SPLIT('x', delimiter) IS NULL FROM UNNEST([CAST(NULL AS STRING)]) AS delimiter
+=> "true"
+
+SELECT SPLIT(CAST(NULL AS STRING), delimiter) IS NULL FROM UNNEST([CAST(NULL AS STRING)]) AS delimiter
+=> "true"
+
+SELECT SPLIT(b'x', delimiter) IS NULL FROM UNNEST([CAST(NULL AS BYTES)]) AS delimiter
+=> "true"

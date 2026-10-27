@@ -409,7 +409,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
              {
                  {
                      .arity = {1, 2},
-                     .spelling = "split($1, $2)",
+                     .spelling = "IF($2 IS NULL, NULL, split($1, $2))",
                      .conditions = ArgumentType<TYPE_STRING>::kFirst,
                      .defaults = kCommaDefault,
                  },
