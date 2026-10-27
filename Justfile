@@ -59,7 +59,7 @@ go-test *args:
 go-tidy:
     go mod tidy
 
-lint: fmt-check duckdb-version-check go-vet go-staticcheck cppcheck tidy heavy-includes
+lint: fmt-check duckdb-version-check go-vet go-staticcheck cppcheck tidy heavy-includes bigquery-answers-validate
 
 test: go-test
     bazelisk test //...
@@ -91,7 +91,7 @@ reference sql:
 bigquery-answers project path=(justfile_directory() + "/tests/e2e/goclient/testdata/unverified"):
     go run ./tools/bqanswers {{ quote(project) }} {{ quote(path) }}
 
-# Checks API case files without authentication, requests or modifying answers.
+# Checks SQL case formats and API scenarios without authentication, requests or modifying answers.
 bigquery-answers-validate path=(justfile_directory() + "/tests/e2e/goclient/testdata/unverified"):
     go run ./tools/bqanswers -validate unused {{ quote(path) }}
 

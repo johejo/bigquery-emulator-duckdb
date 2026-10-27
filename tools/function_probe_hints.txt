@@ -105,7 +105,7 @@ values wkt | 'fullglobe' | 'POINT(3 5)' | 'GeometryCollection EMPTY' | 'LINESTRI
 elements ^ST_GEOGFROMTEXT\( | wkt | STRING
 # Named parser options are omitted by signature-generated calls.
 extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE)
-extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POINT(1 2)', planar => TRUE)
+extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)', planar => TRUE)
 extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POINT(1 2)', make_valid => TRUE)
 note ST_GEOGFROMTEXT See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 values geojson_text | '{"type": "Point", "coordinates": [3, 5]}' | '{"type": "GeometryCollection", "geometries": []}' | '{"type": "LineString", "coordinates": [[0, 0], [1, 1]]}' | '{"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [0, 1], [0, 0]]]}' | '{"type": "MultiPolygon", "coordinates": [[[[0, 0], [1, 0], [0, 1], [0, 0]]], [[[5, 5], [6, 5], [5, 6], [5, 5]]]]}' | '{"type": "GeometryCollection", "geometries": [{"type": "Point", "coordinates": [9, 9]}, {"type": "LineString", "coordinates": [[0, 0], [1, 1]]}]}'
@@ -120,7 +120,9 @@ elements ^ST_GEOGFROMWKB\( | wkb_text | STRING
 argument ^ST_GEOGFROMWKB\( | BYTES | FROM_HEX('010100000000000000000000400000000000001040')
 extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB(FROM_HEX('010100000000000000000000400000000000001040'), oriented => TRUE)
 extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB('010100000000000000000000400000000000001040', oriented => TRUE)
-extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB(FROM_HEX('010100000000000000000000400000000000001040'), planar => TRUE)
+extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040'), planar => TRUE)
+extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040', planar => TRUE)
+extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB('010100000000000000000000400000000000001040', make_valid => TRUE)
 note ST_GEOGFROMWKB See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
 # BigQuery also measures nonempty points over the spheroid, which the emulator rejects.

@@ -7,7 +7,7 @@ jobs and resources. Agents write and validate cases, but do not execute them on 
 ```sh
 just bigquery-answers PROJECT                      # All pending SQL and API cases.
 just bigquery-answers PROJECT PATH                 # One file or directory.
-just bigquery-answers-validate                      # Offline validation of API cases.
+just bigquery-answers-validate                      # Offline validation of SQL and API cases.
 just bigquery-answers-validate PATH
 ```
 
@@ -18,6 +18,10 @@ resources, jobs and streams in the cases. Directory arguments process `*.txt`, `
 
 SQL files keep the existing query / `?>` format described in
 [the unverified cases README](../../tests/e2e/goclient/testdata/unverified/README.md).
+Offline validation checks that every SQL case has a query and a `?>` marker, parameters are JSON
+objects, and recorded answers are JSON or `error: ` messages. It checks the case format, not SQL
+syntax. All files are validated before authentication or answer collection. `just check` includes
+this validation for the unverified directory.
 API scenarios use YAML with JSON-compatible values; JSON objects can be embedded directly.
 Legacy JSON scenarios remain supported. Observations are collected from BigQuery; they are not
 assertions against guessed results. Filled answers are skipped on subsequent runs. For YAML,

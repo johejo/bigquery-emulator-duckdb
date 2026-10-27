@@ -8,7 +8,7 @@
 // parameter, as JSON of an entry of the request's queryParameters.
 //
 // A directory processes each *.txt, *.api.yaml, *.api.yml and *.api.json file. API scenarios can use REST, multipart
-// uploads and BigQuery Storage gRPC; see README.md in this directory. -validate checks scenarios
+// uploads and BigQuery Storage gRPC; see README.md in this directory. -validate checks SQL case formats and API scenarios
 // without authenticating or sending requests.
 //
 //	bqanswers [-validate] [-timeout 2m] PROJECT FILE_OR_DIRECTORY
@@ -96,7 +96,7 @@ func parseAnswer(body io.Reader) (string, error) {
 }
 
 func main() {
-	validate := flag.Bool("validate", false, "validate API scenarios without authentication or requests")
+	validate := flag.Bool("validate", false, "validate SQL case formats and API scenarios without authentication or requests")
 	timeout := flag.Duration("timeout", 2*time.Minute, "deadline for each scenario step, including polling")
 	flag.Parse()
 	if flag.NArg() != 2 || *timeout <= 0 {
@@ -137,10 +137,18 @@ func run(project, path string, validate bool, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
-	// Validate every scenario before any mutations, including files that already have answers.
+	// Validate every file before authentication or mutations, including answered cases.
 	for _, file := range paths {
 		if bqscenario.IsFile(file) {
 			if err := bqscenario.ValidateCollection(file); err != nil {
+				return err
+			}
+		} else {
+			content, err := os.ReadFile(file)
+			if err != nil {
+				return err
+			}
+			if _, err := parseSQLCases(file, strings.Split(string(content), "\n")); err != nil {
 				return err
 			}
 		}
@@ -199,33 +207,20 @@ func fillFile(path string, query func(string, []json.RawMessage) (string, error)
 		return err
 	}
 	lines := strings.Split(string(content), "\n")
+	cases, err := parseSQLCases(path, lines)
+	if err != nil {
+		return err
+	}
 	var failures []error
-	var sql []string
-	var parameters []json.RawMessage
-	for i, text := range lines {
-		switch {
-		case text == "?>":
-			got, err := query(strings.Join(sql, "\n"), parameters)
-			if err != nil {
-				failures = append(failures, fmt.Errorf("%s:%d: %w", path, i+1, err))
-			} else {
-				lines[i] = "?> " + got
-			}
-			sql, parameters = nil, nil
-		case strings.HasPrefix(text, "?> "):
-			sql, parameters = nil, nil
-		case strings.HasPrefix(text, "param> "):
-			parameter := json.RawMessage(strings.TrimPrefix(text, "param> "))
-			if !json.Valid(parameter) {
-				failures = append(failures, fmt.Errorf("%s:%d: invalid parameter JSON", path, i+1))
-			}
-			parameters = append(parameters, parameter)
-		case text == "" || strings.HasPrefix(text, "#"):
-			if len(sql) > 0 {
-				sql = append(sql, text)
-			}
-		default:
-			sql = append(sql, text)
+	for _, c := range cases {
+		if c.answered {
+			continue
+		}
+		got, err := query(c.sql, c.parameters)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s:%d: %w", path, c.line+1, err))
+		} else {
+			lines[c.line] = "?> " + got
 		}
 	}
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {

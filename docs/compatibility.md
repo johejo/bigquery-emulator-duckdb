@@ -198,11 +198,11 @@ BigQuery loads as NULL.
 - `ST_ASGEOJSON` is unsupported for shapes that cross the antimeridian or touch a pole.
 - Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
   holes that collapse are unsupported.
-- `ST_GEOGFROMTEXT`'s and `ST_GEOGFROMWKB`'s `planar = TRUE` and `make_valid = TRUE` are
-  unsupported, as is `ST_GEOGFROMGEOJSON`'s `make_valid`.
+- `ST_GEOGFROMTEXT`'s and `ST_GEOGFROMWKB`'s `make_valid = TRUE` are unsupported, as is
+  `ST_GEOGFROMGEOJSON`'s `make_valid`.
 - `S2_COVERINGCELLIDS` does not support `max_cells` above 2,147,483,647.
-- GeoJSON polygons with an edge along a pole, such as `ST_ASGEOJSON`'s full polygon, are
-  unsupported.
+- Planar polygons with an edge along a pole, including GeoJSON polygons such as
+  `ST_ASGEOJSON`'s full polygon, are unsupported.
 
 `ST_BOUNDINGBOX` latitude bounds can differ from BigQuery in the last floating-point bit.
 
