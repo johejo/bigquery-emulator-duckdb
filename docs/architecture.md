@@ -210,6 +210,31 @@ For analysis, `RoutineCatalog` resolves view and routine definitions against the
 and dataset, shares their dependency state and detects recursion. This lets queries use current
 definitions while keeping job-local objects out of persistent dependencies.
 
+## Function type probes
+
+The existing `//:function_probe` enumerates GoogleSQL signatures and builds calls using
+`tools/function_probe_hints.txt`; `tools/restprobe functions` aggregates their outcomes per
+function. That is separate from the specification-driven type coverage in
+[function-types.md](function-types.md).
+
+`tools/functioncoverage` is a Go extractor for reviewed classes of type tables in the saved
+BigQuery documentation. `just function-types-update` generates `tools/function_types.json`, a
+reviewable list of concrete argument and result types with local source pages. Currently it
+extracts unary INPUT/OUTPUT tables and binary input matrices from the mathematical and aggregate
+function pages, with explicit rules for synonyms and optional arguments. Unknown table shapes
+or types fail generation; other function domains are not inferred from emulator registrations.
+To expand coverage, add a reviewed extraction rule and its source snapshot, regenerate the
+catalog, and review the concrete signatures. Keep function-specific valid samples in the
+catalog's generation rules and general typed samples in `internal/functioncoverage`.
+
+`tools/restprobe function-types` binds data arguments as typed columns, executes every catalog
+form and compares the REST result schema with the documented type. Missing samples or analyzer
+rejections remain visible as Untested; functions absent from the catalog are Not enumerated.
+Syntax-like options can explicitly remain literals. A function cannot be Supported when an
+enumerated form is Untested. `just docs-function-types` regenerates this report alone;
+`just docs` includes it, and `just docs-check` checks both catalog and report freshness offline.
+These probes do not verify result values or establish semantic compatibility.
+
 ## DDL option probes
 
 `tools/ddl_options.json` is a snapshot of the option lists in BigQuery's DDL reference. `groups`

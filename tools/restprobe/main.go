@@ -8,6 +8,7 @@
 //	restprobe -emulator BINARY options CATALOG
 //	restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE
 //	restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE
+//	restprobe -emulator BINARY function-types CATALOG FUNCTIONS_FILE
 //
 // FUNCTION_PROBE is //:function_probe, which builds the calls. CATALOG is tools/ddl_options.json.
 package main
@@ -98,6 +99,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY options CATALOG")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE")
+		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY function-types CATALOG FUNCTIONS_FILE")
 	}
 	flag.Parse()
 	args := flag.Args()
@@ -109,6 +111,8 @@ func main() {
 		err = probeOptions(os.Stdout, *binary, args[1])
 	case *binary != "" && len(args) == 3 && args[0] == "api":
 		err = probeAPI(os.Stdout, *binary, args[1], args[2])
+	case *binary != "" && len(args) == 3 && args[0] == "function-types":
+		err = probeFunctionTypes(os.Stdout, *binary, args[1], args[2])
 	case *binary != "" && len(args) == 4 && args[0] == "functions":
 		err = probeFunctions(os.Stdout, *binary, args[1], args[2:])
 	default:
