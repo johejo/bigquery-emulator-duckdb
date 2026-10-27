@@ -1,0 +1,43 @@
+# Expected values: follow-up BigQuery answers from unverified/trunc.txt.
+# BigQuery's early zero results differ from GoogleSQL, but zero and nonfinite
+# inputs are preserved.
+
+SELECT FORMAT('%t', TRUNC(x, -308)) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, -309)) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, -9223372036854775808)) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, -309)) FROM UNNEST([CAST('-0.0' AS FLOAT64)]) x
+=> "-0.0"
+
+SELECT FORMAT('%t', TRUNC(x, -9223372036854775808)) FROM UNNEST([CAST('-0.0' AS FLOAT64)]) x
+=> "-0.0"
+
+SELECT FORMAT('%t', TRUNC(x, -9223372036854775808)) FROM UNNEST([CAST('-inf' AS FLOAT64)]) x
+=> "-inf"
+
+SELECT FORMAT('%t', TRUNC(x, -309)) FROM UNNEST([-1.7976931348623157e308]) x
+=> "0.0"
+
+# BigQuery answers for ordinary precisions, including the early-exit boundary.
+SELECT FORMAT('%t', TRUNC(x, -1)) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, 1)) FROM UNNEST([-1e-100]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, 0)) FROM UNNEST([-0.1]) x
+=> "-0.0"
+
+SELECT FORMAT('%t', TRUNC(x, 1)) FROM UNNEST([-0.01]) x
+=> "0.0"
+
+SELECT FORMAT('%t', TRUNC(x, 1)) FROM UNNEST([-0.0625]) x
+=> "-0.0"
+
+SELECT FORMAT('%t', TRUNC(x, 1)) FROM UNNEST([-0.03125]) x
+=> "-0.0"

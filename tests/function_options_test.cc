@@ -74,6 +74,10 @@ TEST(FunctionOptionsTest, RegistrationsOwnIndependentPolicies) {
         Case{.sql = "SELECT bq_double_string(-0.0::DOUBLE) = '-0'", .expected = bigquery},
         Case{.sql = "SELECT bq_format('%g', -0.0::DOUBLE) = '-0'", .expected = bigquery},
         Case{
+            .sql = "SELECT NOT signbit(bq_trunc_digits(-2.0::DOUBLE, -310))",
+            .expected = bigquery,
+        },
+        Case{
             .sql = "SELECT bq_format_date('%G', DATE '0900-01-04') = '900'",
             .expected = bigquery || std::string_view(native_year.data()) == "900",
         },

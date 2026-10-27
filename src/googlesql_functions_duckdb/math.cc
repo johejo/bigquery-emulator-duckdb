@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <span>
 #include <string>
 #include <string_view>
@@ -198,6 +200,33 @@ absl::Status GenerateArray(T start, T end, T step, bool extended_limit, std::vec
                                                                                   out);
 }
 
+// BigQuery returns positive zero at DecimalRounding's early zero exits, unlike
+// GoogleSQL's copysign(0, value). Match those exits, not every zero result:
+// subnormal truncation, zero inputs and digits == 0 still preserve the sign.
+bool TruncDigits(double value, int64_t digits, bool early_positive_zero, double* out,
+                 absl::Status* error) {
+  if (early_positive_zero && value != 0.0 && std::isfinite(value) && digits != 0) {
+    constexpr int kMaxExponent = std::numeric_limits<double>::max_exponent10;
+    constexpr int kMinExponent =
+        std::numeric_limits<double>::min_exponent10 - std::numeric_limits<double>::digits10 - 1;
+    if (digits < -kMaxExponent) {
+      *out = 0.0;
+      return true;
+    }
+    if (digits <= -kMinExponent) {
+      int exponent = 0;
+      std::frexp(std::abs(value), &exponent);
+      // DecimalRounding's conservative bound: 10^-digits > 2 * abs(value).
+      // The range checks above also make negation and multiplication safe.
+      if (-digits * (digits < 0 ? 3 : 4) > exponent + 1) {
+        *out = 0.0;
+        return true;
+      }
+    }
+  }
+  return fn::TruncDecimal(value, digits, out, error);
+}
+
 // Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix,
@@ -251,6 +280,8 @@ std::span<const function_catalog::NamedDefinition<Rule>> TrigonometricFunctions(
 }
 
 void RegisterMathFunctions(duckdb_connection connection, const Options& options) {
+  RegisterWithContext(connection, "bq_trunc_digits", {kDouble, kBigint}, kDouble,
+                      ApplyWithContext<TruncDigits>, options.trunc_early_positive_zero);
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
            {"bq_sqrt", Apply<fn::Sqrt<double>>},
