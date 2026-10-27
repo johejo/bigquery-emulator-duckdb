@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"
@@ -16,8 +15,6 @@
 namespace googlesql {
 class TableValuedFunction;
 class AnalyzerOutput;
-class TVFInputArgumentType;
-class TVFSignature;
 class TypeFactory;
 }  // namespace googlesql
 
@@ -27,8 +24,8 @@ class TableSource;
 struct TemporaryTables;
 
 // A catalog whose tables come from a TableSource and whose functions and types are the
-// GoogleSQL built-ins. Tables are looked up lazily, when the analyzer first refers to them,
-// and are kept for the lifetime of the catalog, so use one catalog per statement: a table
+// GoogleSQL built-ins plus BigQuery-specific declarations. Tables are looked up lazily,
+// when the analyzer first refers to them, and kept for its lifetime. Use one per statement: a table
 // changed by a later DDL statement would otherwise still be served with its old schema.
 class BigQueryCatalog : public googlesql::CatalogWrapper {
  public:
@@ -68,9 +65,6 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
 
  private:
   ExcludedFunctionIds excluded_function_ids_;
-  absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> ExternalQuerySchema(
-      const std::vector<googlesql::TVFInputArgumentType>& arguments);
-
   TableSource& source_;
   googlesql::TypeFactory* type_factory_;
   std::string default_project_;
