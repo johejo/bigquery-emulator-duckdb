@@ -1,0 +1,28 @@
+cc_library(
+    name = "analyzer_functions",
+    srcs = [
+        "declarations.h",
+        "external_query.cc",
+        "functions.cc",
+        "objectref.cc",
+        "range_sessionize.cc",
+        "text.cc",
+    ],
+    hdrs = ["functions.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//:connection_id",
+        "//:field_schema",
+        "//:language_options",
+        "//:table_source",
+        "//:type_mapping",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:simple_catalog",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+    ],
+    visibility = ["//:__pkg__"],
+)

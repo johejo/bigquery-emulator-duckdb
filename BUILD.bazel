@@ -337,7 +337,26 @@ cc_library(
     srcs = ["src/builtin_function_options.cc"],
     hdrs = ["src/builtin_function_options.h"],
     copts = ["-std=c++20"],
-    implementation_deps = ["@googlesql//googlesql/public:builtin_function_cc_proto"],
+    implementation_deps = [
+        ":language_options",
+        "@googlesql//googlesql/public:builtin_function_cc_proto",
+        "@googlesql//googlesql/public:builtin_function_options",
+    ],
+)
+
+cc_library(
+    name = "builtin_catalog",
+    srcs = ["src/builtin_catalog.cc"],
+    hdrs = ["src/builtin_catalog.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//src/analyzer_functions",
+        "@abseil-cpp//absl/status",
+        "@googlesql//googlesql/public:builtin_function_options",
+        "@googlesql//googlesql/public:simple_catalog",
+        "@googlesql//googlesql/public:type",
+    ],
+    deps = [":builtin_function_options"],
 )
 
 cc_library(
@@ -349,25 +368,21 @@ cc_library(
     hdrs = ["src/catalog.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":connection_id",
+        ":builtin_catalog",
         ":field_schema",
         ":information_schema",
         ":language_options",
         ":table_path",
         ":table_source",
         ":type_mapping",
+        "//src/analyzer_functions",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/public:analyzer_output",
-        "@googlesql//googlesql/public:builtin_function_cc_proto",
-        "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:language_options",
-        "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:simple_catalog_util",
         "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
     ],
     deps = [
         ":builtin_function_options",

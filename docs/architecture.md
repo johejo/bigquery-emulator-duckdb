@@ -32,8 +32,15 @@ The transport validates parameter names and types, and handlers reject unsupport
 of DuckDB execution. The main entry points are:
 
 - [analyzer.cc](../src/analyzer.cc): statement analysis and query result schemas.
-- [catalog.cc](../src/catalog.cc): tables loaded through `TableSource`, built-in functions and
-  routines; [table_path.cc](../src/table_path.cc) applies the default project and dataset.
+- [catalog.cc](../src/catalog.cc): table and graph name resolution through `TableSource`,
+  and statement-local ownership of `EXTERNAL_QUERY`; [table_path.cc](../src/table_path.cc)
+  applies the default project and dataset.
+- [builtin_catalog.cc](../src/builtin_catalog.cc): construction and caching of shared builtin
+  catalogs by function exclusion list. [analyzer_functions](../src/analyzer_functions/) supplies
+  BigQuery-specific function declarations missing from GoogleSQL, including argument constraints,
+  defaults and TVF result schemas. It also builds `EXTERNAL_QUERY` with the statement's source,
+  project and type factory. These declarations serve analysis, independently of the translation
+  registry and backend registration.
 - [type_mapping.cc](../src/type_mapping.cc): REST schema, GoogleSQL and DuckDB type conversions.
 - [information_schema.cc](../src/information_schema.cc): metadata rows computed during analysis
   and carried into the translated query. Dataset, table and routine views have separate
