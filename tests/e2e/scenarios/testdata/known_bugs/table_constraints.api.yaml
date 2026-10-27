@@ -1,0 +1,86 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run ahjpbnimu3gaa5n7mq3w4pvcah; the answers
+# sidecar keeps the observations.
+description: >-
+  Primary key cases the emulator answers otherwise: it drops foreign keys, and reports analyzer
+  errors with a caret rather than BigQuery's "at [line:column]".
+vars:
+  dataset: e2e_${run}_${case}
+cases:
+  - name: foreign_key_table_constraints
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED)
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CREATE TABLE `${project}.${dataset}.f` (a INT64,
+              FOREIGN KEY (a) REFERENCES `${project}.${dataset}.t` (a) NOT ENFORCED)
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/f
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      fixture: {}
+      statement: {}
+      table:
+        tableConstraints:
+          foreignKeys:
+            - name: fk$1
+              referencedTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+              columnReferences: [{referencingColumn: a, referencedColumn: a}]
+  - name: missing_primary_key_column
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (a INT64, PRIMARY KEY (c) NOT ENFORCED)
+            useLegacySql: false
+            location: US
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      statement:
+        status: 400
+        reason: invalidQuery
+        message: >-
+          Unsupported primary key column c either does not exist or is a pseudocolumn at [1:114]

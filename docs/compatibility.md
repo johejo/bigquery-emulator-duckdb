@@ -109,12 +109,11 @@ add or change defaults, and the Storage Write API cannot write to a table with d
 ### Primary and foreign keys
 
 Tables keep their primary keys, which `tables.get` reports, but
-`INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `KEY_COLUMN_USAGE` are unsupported. Foreign keys in `CREATE TABLE` and `tableConstraints` are accepted and dropped, and
-`ALTER TABLE ADD FOREIGN KEY` and `DROP CONSTRAINT` are unsupported.
+`INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `KEY_COLUMN_USAGE` are unsupported. Foreign keys in
+`CREATE TABLE` and `tableConstraints` are accepted and dropped, and `ALTER TABLE ADD FOREIGN KEY`
+and `DROP CONSTRAINT` are unsupported.
 
-Primary keys on views, and copying a table with a primary key through `CREATE TABLE LIKE`, `COPY`,
-`CLONE`, `CREATE SNAPSHOT TABLE` or a copy job, are unsupported until BigQuery's behavior is
-verified.
+`tableConstraints` on materialized views are unsupported until BigQuery's behavior is verified.
 
 ### ALTER TABLE
 

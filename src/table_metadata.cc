@@ -586,7 +586,10 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
   } else if (!patch) {
     metadata.clustering.clear();
   }
-  if (const auto it = body.find("tableConstraints"); it != body.end()) {
+  // As BigQuery answers, tables.patch keeps the primary key when tableConstraints is an object
+  // without one.
+  if (const auto it = body.find("tableConstraints");
+      it != body.end() && (!patch || !it->is_object() || it->contains("primaryKey"))) {
     metadata.primary_key = ParsePrimaryKey(*it);
   } else if (!patch) {
     metadata.primary_key.clear();
@@ -673,22 +676,28 @@ void ValidateLabels(const std::map<std::string, std::string>& labels) {
   }
 }
 
-void ValidatePrimaryKey(const std::vector<std::string>& primary_key,
-                        const std::vector<FieldSchema>& schema) {
-  for (auto name = primary_key.begin(); name != primary_key.end(); ++name) {
-    const FieldSchema* field = FindField(schema, *name);
+std::vector<std::string> PrimaryKeyColumns(const std::vector<std::string>& primary_key,
+                                           const std::vector<FieldSchema>& schema) {
+  std::vector<std::string> columns;
+  for (const std::string& name : primary_key) {
+    const FieldSchema* field = FindField(schema, name);
     if (field == nullptr) {
-      throw ApiError::Invalid("The primary key column cannot be found in the schema: " + *name);
+      throw ApiError::Invalid("Primary key column " + name + " was not found.");
     }
-    if (std::ranges::any_of(primary_key.begin(), name, [&](const std::string& other) {
-          return FindField(schema, other) == field;
-        })) {
-      throw ApiError::Invalid("Duplicate primary key column: " + field->name);
+    // BigQuery's answers; what it says of BOOL, DATE, TIME and DATETIME columns is not known.
+    static constexpr FieldType kRejected[] = {
+        FieldType::kFloat, FieldType::kGeography, FieldType::kInterval,
+        FieldType::kJson,  FieldType::kRange,     FieldType::kRecord,
+    };
+    if (field->mode == FieldMode::kRepeated ||
+        std::ranges::find(kRejected, field->type) != std::end(kRejected)) {
+      throw ApiError::Invalid(std::format(
+          "Primary key column cannot be of type {}. Invalid column: {}.",
+          field->mode == FieldMode::kRepeated ? "ARRAY" : FieldTypeName(field->type), field->name));
     }
-    if (!field->default_value_expression.empty()) {
-      throw ApiError::Invalid("Primary key column " + field->name + " cannot have a default value");
-    }
+    columns.push_back(field->name);
   }
+  return columns;
 }
 
 void ValidatePartitioning(const TableMetadata& metadata, const std::vector<FieldSchema>& schema) {

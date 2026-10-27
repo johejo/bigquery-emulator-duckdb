@@ -159,8 +159,9 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // tables, and null clears table tags. Empty patches on tagged datasets and null dataset tags
 // remain unsupported. Full updates replace resourceTags.
 // tables.update replaces the description, friendly name, labels, clustering, primary key, default
-// rounding mode and expiration, including the required partition filter. Both drop the foreign keys
-// of tableConstraints, as DDL does.
+// rounding mode and expiration, including the required partition filter. tables.patch keeps the
+// primary key when tableConstraints has none. Both drop the foreign keys of tableConstraints, as
+// DDL does.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
 // cloneDefinition and snapshotDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
@@ -200,11 +201,12 @@ void ValidateResourceTags(const std::map<std::string, std::string>& tags);
 void RejectEncryptionConfiguration(const nlohmann::json& body, const char* key,
                                    const std::string& what);
 
-// Throws ApiError::Invalid for a primary key that `schema` cannot have: one on a field it lacks,
-// that names a field twice, or on a field with a default value, which BigQuery documents that
-// primary key columns cannot have.
-void ValidatePrimaryKey(const std::vector<std::string>& primary_key,
-                        const std::vector<FieldSchema>& schema);
+// The columns of `primary_key` as `schema` spells them, which BigQuery reports whatever case
+// they are given in. Throws ApiError::Invalid for a column `schema` lacks or of a type BigQuery
+// rejects. BigQuery takes a REST primary key that names a column twice. BigQuery's documentation
+// says that primary key columns cannot have default values, but it creates such tables.
+std::vector<std::string> PrimaryKeyColumns(const std::vector<std::string>& primary_key,
+                                           const std::vector<FieldSchema>& schema);
 
 // Throws ApiError::Invalid for partitioning or clustering that `schema` cannot have: a field it
 // lacks, or of a type, mode or depth BigQuery rejects, more than 4 clustering fields, or a range

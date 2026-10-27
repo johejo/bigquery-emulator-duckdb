@@ -1,0 +1,813 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, in run ahjpbnimu3gaa5n7mq3w4pvcah and, from
+# geography_primary_key on, run x5zrl7aityo74pma4dfcuydzi5 and, from bool_primary_key on, run
+# 66yr2eomvnbfsbkxbqjpyj37ne; the answers sidecar keeps the observations. Rejections observe their status, reason and message.
+#
+# The DDL reference says that primary key columns cannot have default values
+# (third_party/bigquery_docs/reference/standard-sql/data-definition-language.md, under ALTER
+# COLUMN SET DEFAULT), but BigQuery creates a table with a defaulted primary key column, as
+# create_default_primary_key_column shows; it rejects only setting a default afterwards.
+description: Primary keys in DDL, copies and tables.patch and tables.update.
+vars:
+  dataset: e2e_${run}_${case}
+  table: t
+  fixture: CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED)
+templates:
+  statement:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US}
+        observe: {error: /body/error}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${statement}', useLegacySql: false, location: US}
+        observe: {error: /body/error}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US}
+        observe: {error: /body/error}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${statement}', useLegacySql: false, location: US}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rest_update:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema: {fields: [{name: a, type: INTEGER}, {name: b, type: STRING}]}
+            tableConstraints: {primaryKey: {columns: [a]}}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: update
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: ${update}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rest_rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema: {fields: [{name: a, type: INTEGER}, {name: b, type: STRING}]}
+            tableConstraints: {primaryKey: {columns: [a]}}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: update
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: ${update}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  copy_job:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US}
+        observe: {error: /body/error}
+      - name: copy
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            configuration: {copy: '${copy}'}
+            jobReference: {projectId: '${project}', location: US}
+        bind: {job: /body/jobReference/jobId}
+        observe: {error: /body/error}
+      - name: completed_copy
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {errorResult: /body/status/errorResult}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/c
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: enforced_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a INT64, PRIMARY KEY (a))
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalidQuery
+        message: Enforcement of primary keys is not supported
+  - name: enforced_added_primary_key
+    template: rejected
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.t` DROP PRIMARY KEY, ADD PRIMARY KEY (b)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalidQuery
+        message: Enforcement of primary keys is not supported
+  - name: second_primary_key
+    template: rejected
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.t` ADD PRIMARY KEY (b) NOT ENFORCED
+    expect:
+      fixture: {}
+      statement:
+        status: 409
+        reason: duplicate
+        message: 'Already Exists: Constraint primary key'
+  - name: drop_missing_primary_key
+    template: rejected
+    vars:
+      fixture: CREATE TABLE `${project}.${dataset}.t` (a INT64)
+      statement: ALTER TABLE `${project}.${dataset}.t` DROP PRIMARY KEY
+    expect:
+      fixture: {}
+      statement:
+        status: 404
+        reason: notFound
+        message: 'Not found: Constraint primary key'
+  - name: drop_primary_key_column
+    template: rejected
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.t` DROP COLUMN a
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: >-
+          Column `a` cannot be dropped in table `t`. Columns used in table partitioning or
+          clustering or as part of key constraints cannot be dropped.
+  - name: default_on_primary_key_column
+    template: rejected
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.t` ALTER COLUMN a SET DEFAULT 1
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: >-
+          Key column a cannot be modified or removed. column's default_value_expression changed:  -> 1
+  - name: create_default_primary_key_column
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INT64 DEFAULT 1, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: primary_key_column_case
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (Ab INT64, PRIMARY KEY (aB) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [Ab]}}}
+  - name: added_primary_key_column_case
+    template: statement
+    vars:
+      fixture: CREATE TABLE `${project}.${dataset}.t` (Ab INT64)
+      statement: ALTER TABLE `${project}.${dataset}.t` ADD PRIMARY KEY (aB) NOT ENFORCED
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [Ab]}}}
+  - name: array_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a ARRAY<INT64>, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: 'Primary key column cannot be of type ARRAY. Invalid column: a.'
+  - name: struct_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a STRUCT<x INT64>, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: 'Primary key column cannot be of type RECORD. Invalid column: a.'
+  - name: float_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a FLOAT64, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: 'Primary key column cannot be of type FLOAT. Invalid column: a.'
+  - name: json_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a JSON, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: 'Primary key column cannot be of type JSON. Invalid column: a.'
+  - name: like_primary_key
+    template: statement
+    vars:
+      table: l
+      statement: CREATE TABLE `${project}.${dataset}.l` LIKE `${project}.${dataset}.t`
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: copy_primary_key
+    template: statement
+    vars:
+      table: c
+      statement: CREATE TABLE `${project}.${dataset}.c` COPY `${project}.${dataset}.t`
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: clone_primary_key
+    template: statement
+    vars:
+      table: c
+      statement: CREATE TABLE `${project}.${dataset}.c` CLONE `${project}.${dataset}.t`
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: snapshot_primary_key
+    template: statement
+    vars:
+      table: s
+      statement: CREATE SNAPSHOT TABLE `${project}.${dataset}.s` CLONE `${project}.${dataset}.t`
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: patch_without_table_constraints
+    template: rest_update
+    vars:
+      method: PATCH
+      update: {description: x}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {tableConstraints: {primaryKey: {columns: [a]}}}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: patch_empty_table_constraints
+    template: rest_update
+    vars:
+      method: PATCH
+      update: {tableConstraints: {}}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {tableConstraints: {primaryKey: {columns: [a]}}}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: patch_null_table_constraints
+    template: rest_update
+    vars:
+      method: PATCH
+      update: {tableConstraints: null}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {}
+      table: {}
+  - name: patch_empty_primary_key
+    template: rest_update
+    vars:
+      method: PATCH
+      update: {tableConstraints: {primaryKey: {columns: []}}}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {}
+      table: {}
+  - name: update_without_table_constraints
+    template: rest_update
+    vars:
+      method: PUT
+      update:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        schema: {fields: [{name: a, type: INTEGER}, {name: b, type: STRING}]}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {}
+      table: {}
+  - name: patch_missing_primary_key_column
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema: {fields: [{name: a, type: INTEGER}, {name: b, type: STRING}]}
+            tableConstraints: {primaryKey: {columns: [a]}}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: update
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: {tableConstraints: {primaryKey: {columns: [c]}}}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {status: 400, reason: invalid, message: Primary key column c was not found.}
+  - name: view_table_constraints
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: v}
+            view: {query: SELECT 1 AS a, useLegacySql: false}
+            tableConstraints: {primaryKey: {columns: [a]}}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Cannot specify the table constraints when creating view.
+  - name: copy_job_primary_key
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US}
+        observe: {error: /body/error}
+      - name: copy
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            configuration:
+              copy:
+                sourceTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: c}
+            jobReference: {projectId: '${project}', location: US}
+        bind: {job: /body/jobReference/jobId}
+        observe: {error: /body/error}
+      - name: completed_copy
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {errorResult: /body/status/errorResult}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/c
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      fixture: {}
+      copy: {}
+      completed_copy: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: geography_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a GEOGRAPHY, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: >-
+          Primary key column cannot be of type GEOGRAPHY. Invalid column: a.
+  - name: interval_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INTERVAL, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: >-
+          Primary key column cannot be of type INTERVAL. Invalid column: a.
+  - name: range_primary_key
+    template: rejected
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a RANGE<DATE>, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: >-
+          Primary key column cannot be of type RANGE. Invalid column: a.
+  - name: bytes_primary_key
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a BYTES, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: bignumeric_primary_key
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (a BIGNUMERIC, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: drop_default_on_primary_key_column
+    template: rejected
+    vars:
+      fixture: 'CREATE TABLE `${project}.${dataset}.t` (a INT64 DEFAULT 1, PRIMARY KEY (a) NOT ENFORCED)'
+      statement: >-
+        ALTER TABLE `${project}.${dataset}.t` ALTER COLUMN a DROP DEFAULT
+    expect:
+      fixture: {}
+      statement:
+        status: 400
+        reason: invalid
+        message: "Key column a cannot be modified or removed. column's default_value_expression changed: 1 -> "
+  - name: description_on_primary_key_column
+    template: statement
+    vars:
+      statement: >-
+        ALTER TABLE `${project}.${dataset}.t` ALTER COLUMN a SET OPTIONS (description = 'x')
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: rest_primary_key_column_case
+    template: rest_update
+    vars:
+      method: PATCH
+      update: {tableConstraints: {primaryKey: {columns: [B]}}}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {tableConstraints: {primaryKey: {columns: [b]}}}
+      table: {tableConstraints: {primaryKey: {columns: [b]}}}
+  - name: rest_duplicate_primary_key_column
+    template: rest_update
+    vars:
+      method: PATCH
+      update: {tableConstraints: {primaryKey: {columns: [a, a]}}}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update: {tableConstraints: {primaryKey: {columns: [a, a]}}}
+      table: {tableConstraints: {primaryKey: {columns: [a, a]}}}
+  - name: rest_float_primary_key
+    template: rest_rejected
+    vars:
+      method: PATCH
+      update:
+        schema: {fields: [{name: a, type: INTEGER}, {name: b, type: STRING}, {name: f, type: FLOAT}]}
+        tableConstraints: {primaryKey: {columns: [f]}}
+    expect:
+      insert: {tableConstraints: {primaryKey: {columns: [a]}}}
+      update:
+        status: 400
+        reason: invalid
+        message: 'Primary key column cannot be of type FLOAT. Invalid column: f.'
+  - name: patch_view_table_constraints
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: v}
+            view: {query: SELECT 1 AS a, useLegacySql: false}
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/v
+          body: {tableConstraints: {primaryKey: {columns: [a]}}}
+        observe: {tableConstraints: /body/tableConstraints, error: /body/error}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      patch: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: copy_job_several_keyed_tables
+    template: copy_job
+    vars:
+      fixture: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED);
+        CREATE TABLE `${project}.${dataset}.u` (a INT64, b STRING, PRIMARY KEY (b) NOT ENFORCED)
+      copy:
+        sourceTables:
+          - {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+          - {projectId: '${project}', datasetId: '${dataset}', tableId: u}
+        destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: c}
+    expect:
+      fixture: {}
+      copy: {}
+      completed_copy: {}
+      table: {}
+  - name: copy_job_into_existing_table
+    template: copy_job
+    vars:
+      fixture: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED);
+        CREATE TABLE `${project}.${dataset}.c` (a INT64, b STRING, PRIMARY KEY (b) NOT ENFORCED)
+      copy:
+        sourceTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: c}
+        writeDisposition: WRITE_TRUNCATE
+    expect:
+      fixture: {}
+      copy: {}
+      completed_copy: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: bool_primary_key
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a BOOL, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: date_primary_key
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a DATE, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: time_primary_key
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a TIME, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: datetime_primary_key
+    template: statement
+    vars:
+      fixture: SELECT 1
+      statement: CREATE TABLE `${project}.${dataset}.t` (a DATETIME, PRIMARY KEY (a) NOT ENFORCED)
+    expect:
+      fixture: {}
+      statement: {}
+      table: {tableConstraints: {primaryKey: {columns: [a]}}}
+  - name: query_truncating_keyed_table
+    template: statement
+    vars:
+      statement: >-
+        CREATE OR REPLACE TABLE `${project}.${dataset}.t` AS SELECT 1 AS a, 'x' AS b
+    expect:
+      fixture: {}
+      statement: {}
+      table: {}
+  - name: copy_job_appending_to_keyed_table
+    template: copy_job
+    vars:
+      fixture: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED);
+        CREATE TABLE `${project}.${dataset}.c` (a INT64, b STRING, PRIMARY KEY (b) NOT ENFORCED)
+      copy:
+        sourceTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: c}
+        writeDisposition: WRITE_APPEND
+    expect:
+      fixture: {}
+      copy: {}
+      completed_copy: {}
+      table: {tableConstraints: {primaryKey: {columns: [b]}}}
+  - name: copy_job_several_tables_sharing_key
+    template: copy_job
+    vars:
+      fixture: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED);
+        CREATE TABLE `${project}.${dataset}.u` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED)
+      copy:
+        sourceTables:
+          - {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+          - {projectId: '${project}', datasetId: '${dataset}', tableId: u}
+        destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: c}
+    expect:
+      fixture: {}
+      copy: {}
+      completed_copy: {}
+      table: {}
+  - name: copy_job_one_of_several_tables_keyed
+    template: copy_job
+    vars:
+      fixture: >-
+        CREATE TABLE `${project}.${dataset}.t` (a INT64, b STRING, PRIMARY KEY (a) NOT ENFORCED);
+        CREATE TABLE `${project}.${dataset}.u` (a INT64, b STRING)
+      copy:
+        sourceTables:
+          - {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+          - {projectId: '${project}', datasetId: '${dataset}', tableId: u}
+        destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: c}
+    expect:
+      fixture: {}
+      copy: {}
+      completed_copy: {}
+      table: {}
+  - name: query_job_truncating_keyed_table
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US}
+        observe: {error: /body/error}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            configuration:
+              query:
+                query: SELECT 1 AS a, 'x' AS b
+                useLegacySql: false
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                writeDisposition: WRITE_TRUNCATE
+            jobReference: {projectId: '${project}', location: US}
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_query
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {errorResult: /body/status/errorResult}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      fixture: {}
+      completed_query: {}
+      table: {}

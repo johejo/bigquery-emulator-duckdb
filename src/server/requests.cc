@@ -660,6 +660,9 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
     request.materialized = true;
     request.view = body["materializedView"];
   } else if (body.contains("view")) {
+    if (!body.value("tableConstraints", json()).is_null()) {
+      throw ApiError::Invalid("Cannot specify the table constraints when creating view.");
+    }
     request.view = body["view"];
   } else {
     request.schema = SchemaFromJson(body.value("schema", json::object()));

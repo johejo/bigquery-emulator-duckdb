@@ -24,9 +24,10 @@ struct ViewMetadata {
 // The metadata a table or view comment records, or none for a comment of someone else's.
 TableMetadata CommentMetadata(const std::optional<std::string>& comment);
 
-// The statement that records `metadata` on the DuckDB table `table`, whose schema is `schema`.
-// Throws ApiError::Invalid for metadata BigQuery rejects.
-std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata,
+// The statement that records `metadata` on the DuckDB table `table`, whose schema is `schema`,
+// with its primary key spelled as `schema` spells the columns. Throws ApiError::Invalid for
+// metadata BigQuery rejects.
+std::string TableCommentStatement(const TableReference& table, TableMetadata metadata,
                                   const std::vector<FieldSchema>& schema);
 
 // The statement that records `view` on the DuckDB view `table`. Throws ApiError::Invalid for

@@ -454,7 +454,7 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
 // without options.
 bool SupportedPrimaryKey(const googlesql::ResolvedPrimaryKey& key, const Scope& scope) {
   if (!key.unenforced()) {
-    throw std::invalid_argument("PRIMARY KEY must be NOT ENFORCED");
+    throw std::invalid_argument("Enforcement of primary keys is not supported");
   }
   if (!key.constraint_name().empty() || key.option_list_size() > 0) {
     Unsupported(scope, "named primary keys or primary key options");
@@ -567,10 +567,6 @@ std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
                     statement == "CREATE SNAPSHOT TABLE" ? "snapshot" : "clone",
                     reference.project_id, reference.dataset_id, reference.table_id, rejected,
                     takes_snapshots ? "TABLE, SNAPSHOT" : "TABLE"));
-  }
-  // Whether BigQuery copies a primary key, as it does the other metadata, is not known.
-  if (description && !description->metadata.primary_key.empty()) {
-    return Unsupported(scope, std::string(statement) + " of a table with a primary key");
   }
   if (description) {
     description->metadata.clone.reset();
@@ -724,6 +720,19 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
     return std::nullopt;
   }
   TableAlteration alteration{.table = *target, .if_exists = alter.is_if_exists()};
+  // BigQuery rejects an enforced primary key before anything else about the statement.
+  if (std::ranges::any_of(alter.alter_action_list(), [&](const auto& action) {
+        if (!action->template Is<googlesql::ResolvedAddConstraintAction>()) {
+          return false;
+        }
+        const auto* constraint =
+            action->template GetAs<googlesql::ResolvedAddConstraintAction>()->constraint();
+        return constraint->template Is<googlesql::ResolvedPrimaryKey>() &&
+               !SupportedPrimaryKey(*constraint->template GetAs<googlesql::ResolvedPrimaryKey>(),
+                                    scope);
+      })) {
+    return std::nullopt;
+  }
   for (const auto& action : alter.alter_action_list()) {
     // BigQuery documents a list of ADD COLUMN or of DROP COLUMN actions, but not a mix of kinds.
     if (action->node_kind() != alter.alter_action_list(0)->node_kind()) {
@@ -809,9 +818,6 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
       const auto& key = *action->GetAs<googlesql::ResolvedAddConstraintAction>()
                              ->constraint()
                              ->GetAs<googlesql::ResolvedPrimaryKey>();
-      if (!SupportedPrimaryKey(key, scope)) {
-        return std::nullopt;
-      }
       alteration.actions.emplace_back(PrimaryKeyAction{.columns = key.column_name_list()});
     } else if (action->Is<googlesql::ResolvedDropPrimaryKeyAction>()) {
       alteration.actions.emplace_back(PrimaryKeyAction{
