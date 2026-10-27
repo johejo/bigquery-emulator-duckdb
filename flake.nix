@@ -45,8 +45,6 @@
             treefmt
           ];
           devPackages = with pkgs; formatPackages ++ [
-            # tools/update_bigquery_functions.sh fetches upstream documentation.
-            curlMinimal
             git
             go-tools
             just

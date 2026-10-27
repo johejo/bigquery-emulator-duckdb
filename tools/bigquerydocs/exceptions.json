@@ -30,14 +30,14 @@
     "reason": "Report URL construction; bigquerydocs render localizes the generated citations."
   },
   {
-    "file": "tools/update_bigquery_functions.sh",
-    "contains": "readonly base=",
-    "reason": "Explicit upstream index update command, not a citation."
+    "file": "tools/bigqueryfunctions/main.go",
+    "contains": "const base =",
+    "reason": "Base URI of the function index's relative page names and of the snapshot's links, not a citation."
   },
   {
-    "file": "Justfile",
-    "contains": "curl -fsSL https://docs.cloud.google.com/bigquery/docs/",
-    "reason": "Explicit upstream DDL metadata update command requiring HTML, not a citation."
+    "file": "tools/ddloptions/main_test.go",
+    "contains": "const ddl =",
+    "reason": "Link target in a test fixture of the DDL reference snapshot, not a citation."
   },
   {
     "file": "tools/bigquery_functions.txt",

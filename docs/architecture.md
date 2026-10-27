@@ -223,9 +223,10 @@ form takes. `implementation` names the DDL handlers' context in `src/ddl_option_
 `tests/ddl_options_catalog_test.cc` parses each type and sample with the emulator's analyzer
 settings, and compares types with the handlers' definitions, which must all appear in the catalog.
 
-`just update-ddl-options` refreshes names and types from the reference with `tools/ddloptions`,
-keeping samples and contexts. A new option has no samples, and a new list a context without a
-template, so both stay Untested until someone adds samples that meet the reference's constraints.
+`just update-ddl-options` refreshes names and types from the reference's snapshot under
+`third_party/bigquery_docs/` with `tools/ddloptions`, keeping samples and contexts. A new option
+has no samples, and a new list a context without a template, so both stay Untested until someone
+adds samples that meet the reference's constraints.
 
 See [compatibility.md](compatibility.md) for query and API limits and
 [storage-api.md](storage-api.md) for Storage client behavior.

@@ -1,12 +1,13 @@
-// Command ddloptions refreshes the DDL option catalog from BigQuery's DDL reference, which it reads
-// from standard input, keeping reviewed samples and templates. A new option has no samples and a
+// Command ddloptions refreshes the DDL option catalog from the Markdown snapshot of BigQuery's DDL
+// reference, which it reads from standard input, keeping reviewed samples and templates. A new option has no samples and a
 // new option list a context without a template, so both stay Untested until reviewed. It never
 // queries BigQuery.
 //
-//	curl -fsSL REFERENCE_URL | ddloptions CATALOG
+//	ddloptions CATALOG < third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -20,37 +21,121 @@ import (
 )
 
 // optionTables returns the rows after the header of each option table, by the anchor of the
-// heading above it.
+// heading above it. The Markdown drops the headings' anchors, and several statements name their
+// lists alike, so the link to the list in the statement's syntax, the last one in its section,
+// gives the anchor, and the heading's name does where no such link exists.
 func optionTables(r io.Reader) (map[string][][]string, error) {
-	tables := map[string][][]string{}
-	tokenizer := html.NewTokenizer(r)
+	type table struct {
+		heading, link string
+		rows          [][]string
+	}
+	var found []table
 	heading := ""
-	var table [][]string
+	links := map[string]string{}
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, 1<<20)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		if m := headingLine.FindStringSubmatch(line); m != nil {
+			if m[1] == "##" {
+				links = map[string]string{}
+			}
+			heading = strings.Trim(m[2], "`")
+			continue
+		}
+		for _, m := range selfLink.FindAllStringSubmatch(line, -1) {
+			links[m[1]] = m[2]
+		}
+		var rows [][]string
+		switch {
+		case strings.HasPrefix(line, "<table"):
+			j := i
+			for j < len(lines) && !strings.HasPrefix(lines[j], "</table>") {
+				j++
+			}
+			var err error
+			if rows, err = htmlRows(strings.Join(lines[i:min(j+1, len(lines))], "\n")); err != nil {
+				return nil, err
+			}
+			i = j
+		case strings.HasPrefix(line, "|"):
+			for ; i < len(lines) && strings.HasPrefix(lines[i], "|"); i++ {
+				if !separatorRow.MatchString(lines[i]) {
+					rows = append(rows, pipeRow(lines[i]))
+				}
+			}
+			i--
+		default:
+			continue
+		}
+		if len(rows) > 0 && len(rows[0]) > 0 && slices.Contains([]string{"NAME", "Name", "Options"}, rows[0][0]) {
+			found = append(found, table{heading, links[heading], rows[1:]})
+		}
+	}
+	tables := map[string][][]string{}
+	for _, t := range found {
+		anchor := t.heading
+		if t.link != "" {
+			anchor = t.link
+		}
+		if fixed, ok := misspelledLinks[anchor]; ok {
+			anchor = fixed
+		}
+		if _, ok := tables[anchor]; ok {
+			return nil, fmt.Errorf("duplicate option table: %s", anchor)
+		}
+		tables[anchor] = t.rows
+	}
+	return tables, nil
+}
+
+// misspelledLinks maps links that miss their heading's anchor to the anchor.
+var misspelledLinks = map[string]string{
+	"organziation_set_options_list": "organization_set_options_list",
+}
+
+var (
+	headingLine  = regexp.MustCompile("^(#{2,5}) (.*)$")
+	selfLink     = regexp.MustCompile("\\[`([^`]*)`\\]\\([^)]*/data-definition-language#([^)]*)\\)")
+	separatorRow = regexp.MustCompile(`^\|[-|: ]*$`)
+	markdownLink = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+)
+
+// pipeRow returns the text of a Markdown table row's cells.
+func pipeRow(line string) []string {
+	var row []string
+	for _, cell := range strings.Split(strings.Trim(line, "|"), "|") {
+		cell = markdownLink.ReplaceAllString(cell, "$1")
+		cell = html.UnescapeString(strings.NewReplacer("`", "", "*", "").Replace(cell))
+		row = append(row, strings.Join(strings.Fields(cell), " "))
+	}
+	return row
+}
+
+// htmlRows returns the text of an HTML table's cells.
+func htmlRows(fragment string) ([][]string, error) {
+	tokenizer := html.NewTokenizer(strings.NewReader(fragment))
+	var rows [][]string
 	var row []string
 	var cell *strings.Builder
 	for {
 		switch tokenizer.Next() {
 		case html.ErrorToken:
 			if tokenizer.Err() == io.EOF {
-				return tables, nil
+				return rows, nil
 			}
 			return nil, tokenizer.Err()
 		case html.StartTagToken:
-			token := tokenizer.Token()
-			switch token.Data {
-			case "h2", "h3", "h4", "h5":
-				heading = ""
-				for _, a := range token.Attr {
-					if a.Key == "id" {
-						heading = a.Val
-					}
-				}
-			case "table":
-				table = [][]string{}
+			switch tokenizer.Token().Data {
 			case "tr":
-				if table != nil {
-					row = []string{}
-				}
+				row = []string{}
 			case "td", "th":
 				if row != nil {
 					cell = &strings.Builder{}
@@ -69,19 +154,10 @@ func optionTables(r io.Reader) (map[string][][]string, error) {
 					cell = nil
 				}
 			case "tr":
-				if row != nil && table != nil {
-					table = append(table, row)
+				if row != nil {
+					rows = append(rows, row)
 					row = nil
 				}
-			case "table":
-				if len(table) > 0 && len(table[0]) > 0 &&
-					slices.Contains([]string{"NAME", "Name", "Options"}, table[0][0]) {
-					if _, ok := tables[heading]; ok {
-						return nil, fmt.Errorf("duplicate option table: %s", heading)
-					}
-					tables[heading] = table[1:]
-				}
-				table = nil
 			}
 		}
 	}
@@ -202,7 +278,7 @@ func refresh(catalog *ddloptions.Catalog, r io.Reader) error {
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: ddloptions CATALOG < REFERENCE_HTML")
+		fmt.Fprintln(os.Stderr, "usage: ddloptions CATALOG < REFERENCE_MARKDOWN")
 		os.Exit(2)
 	}
 	path := os.Args[1]

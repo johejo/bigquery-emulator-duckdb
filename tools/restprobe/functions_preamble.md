@@ -4,7 +4,7 @@
 
 This page lists every function in the [BigQuery function list](../third_party/bigquery_docs/reference/standard-sql/functions-all.md),
 grouped by the page that documents it, and whether the emulator runs it.
-`tools/update_bigquery_functions.sh` scrapes the list into `tools/bigquery_functions.txt`.
+`just update-bigquery-functions` reads the list into `tools/bigquery_functions.txt`.
 
 `//:function_probe` builds a call for every signature the analyzer knows, from the samples and
 queries in `tools/function_probe_hints.txt`, and `tools/restprobe` runs the calls. Optional date

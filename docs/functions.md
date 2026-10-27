@@ -4,7 +4,7 @@
 
 This page lists every function in the [BigQuery function list](../third_party/bigquery_docs/reference/standard-sql/functions-all.md),
 grouped by the page that documents it, and whether the emulator runs it.
-`tools/update_bigquery_functions.sh` scrapes the list into `tools/bigquery_functions.txt`.
+`just update-bigquery-functions` reads the list into `tools/bigquery_functions.txt`.
 
 `//:function_probe` builds a call for every signature the analyzer knows, from the samples and
 queries in `tools/function_probe_hints.txt`, and `tools/restprobe` runs the calls. Optional date
@@ -61,7 +61,7 @@ functions.
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
-| [ObjectRef functions](#objectref-functions) | 1 | 1 | 2 | 0 |
+| [ObjectRef functions](#objectref-functions) | 1 | 1 | 3 | 0 |
 | [Range functions](#range-functions) | 7 | 1 | 0 | 0 |
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
@@ -495,6 +495,7 @@ functions.
 | [`OBJ.FETCH_METADATA`](../third_party/bigquery_docs/reference/standard-sql/objectref_functions.md) | Supported | Emulator function | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. |
 | [`OBJ.GET_ACCESS_URL`](../third_party/bigquery_docs/reference/standard-sql/objectref_functions.md) | Unsupported |  |  |
 | [`OBJ.GET_READ_URL`](../third_party/bigquery_docs/reference/standard-sql/objectref_functions.md) | Unsupported |  |  |
+| [`OBJ.LIST`](../third_party/bigquery_docs/reference/standard-sql/objectref_functions.md) | Unsupported |  |  |
 | [`OBJ.MAKE_REF`](../third_party/bigquery_docs/reference/standard-sql/objectref_functions.md) | Partial | Emulator function | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. Unsupported: function OBJ.MAKE_REF. |
 
 ## Range functions

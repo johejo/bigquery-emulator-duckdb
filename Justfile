@@ -150,6 +150,10 @@ docs-options:
     bazelisk build //:bigquery-emulator-duckdb
     {{ _option_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/options.md > docs/options.md.tmp && mv docs/options.md.tmp docs/options.md
 
-# Refreshes the option names and types in tools/ddl_options.json from BigQuery's DDL reference.
+# Refreshes the option names and types in tools/ddl_options.json from the saved DDL reference.
 update-ddl-options:
-    curl -fsSL https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language | go run ./tools/ddloptions tools/ddl_options.json
+    go run ./tools/ddloptions tools/ddl_options.json < third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+
+# Regenerates tools/bigquery_functions.txt from the saved BigQuery function list.
+update-bigquery-functions:
+    go run ./tools/bigqueryfunctions tools/bigquery_functions.txt third_party/bigquery_docs/reference/standard-sql/functions-all.md third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md
