@@ -48,7 +48,7 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **92 of 406 functions**. The remaining **314** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **92 of 407 functions**. The remaining **315** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Details by domain
 
@@ -289,6 +289,7 @@ Type signatures are enumerated for **92 of 406 functions**. The remaining **314*
 | `OBJ.FETCH_METADATA` | 0 | Not enumerated |
 | `OBJ.GET_ACCESS_URL` | 0 | Not enumerated |
 | `OBJ.GET_READ_URL` | 0 | Not enumerated |
+| `OBJ.LIST` | 0 | Not enumerated |
 | `OBJ.MAKE_REF` | 0 | Not enumerated |
 | [OCTET_LENGTH](function-types/string.md#octet_length) | 2 | Supported |
 | `PARSE_BIGNUMERIC` | 0 | Not enumerated |
