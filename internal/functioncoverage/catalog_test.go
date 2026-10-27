@@ -21,8 +21,8 @@ func TestQueryBindsTypes(t *testing.T) {
 }
 
 func TestMissingSampleDoesNotDropForm(t *testing.T) {
-	sql, reason := Query(Function{Name: "F"}, Signature{Arguments: []string{"ARRAY<DATE>"}, Result: "DATE"})
-	if sql != "" || reason != "no sample for ARRAY<DATE>" {
+	sql, reason := Query(Function{Name: "F"}, Signature{Arguments: []string{"ARRAY<NO_SAMPLE>"}, Result: "DATE"})
+	if sql != "" || reason != "no sample for ARRAY<NO_SAMPLE>" {
 		t.Fatalf("sql=%q reason=%q", sql, reason)
 	}
 }
@@ -32,9 +32,9 @@ func TestReadRejectsInvalidCatalog(t *testing.T) {
 		`{"unexpected":true}`,
 		`{"functions":[]} {}`,
 		`{"functions":[{"name":"F","source":"https://example.com","signatures":[{"arguments":["INT64"],"result":"INT64"}]}]}`,
-		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/x.md","signatures":[]}]}`,
-		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/x.md","signatures":[{"arguments":["INT64"],"result":"INT64","literal_arguments":[0]}]}]}`,
-		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/x.md","signatures":[{"arguments":["INT64"],"result":"INT64"},{"arguments":["INT64"],"result":"FLOAT64"}]}]}`,
+		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[]}]}`,
+		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[{"arguments":["INT64"],"result":"INT64","literal_arguments":[0]}]}]}`,
+		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[{"arguments":["INT64"],"result":"INT64"},{"arguments":["INT64"],"result":"FLOAT64"}]}]}`,
 	} {
 		path := filepath.Join(t.TempDir(), "catalog.json")
 		if err := os.WriteFile(path, []byte(data), 0600); err != nil {

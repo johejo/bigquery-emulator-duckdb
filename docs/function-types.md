@@ -4,17 +4,34 @@
 
 This report probes documented input-type combinations independently of the emulator's function
 registrations. The reviewed catalog is `tools/function_types.json`; `just function-types-update`
-extracts it from the checked-in official documentation. Currently it covers the numeric type
-tables in [mathematical functions](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md)
-and the `AVG` and `SUM` tables in [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md),
-including mixed-type binary calls, documented synonyms, and optional precision and rounding-mode
-types. Functions without enumerated signatures are explicitly listed as **Not enumerated**.
-Generic types, container types, and other argument domains still need enumeration; this is not a
-claim of exhaustive BigQuery type coverage.
+extracts reviewed type tables and expands reviewed prose domains from the checked-in official
+documentation:
+
+- [Mathematical functions](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md):
+  numeric input/output tables, mixed-type pairs, synonyms and optional precision and rounding modes.
+- [String functions](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) and
+  [hash functions](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md):
+  STRING/BYTES forms, optional positional arguments and array results.
+- [Array functions](../third_party/bigquery_docs/reference/standard-sql/array_functions.md) and
+  [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md):
+  concrete element and value types, including nested STRUCTs and ARRAYs of STRUCTs.
+- [Statistical aggregates](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md):
+  numeric inputs, including mixed-type pairs.
+- [Conditional expressions](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md):
+  same-type alternatives across scalar and container types.
+- [Range functions](../third_party/bigquery_docs/reference/standard-sql/range-functions.md):
+  DATE, DATETIME and TIMESTAMP element types.
+
+Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
+Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
+MEASURE values are not enumerated. Function-specific notes identify other unenumerated domains.
+Functions without signatures are explicitly listed as **Not enumerated**. This is not a claim of
+exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
-could select another overload. Syntax-like options such as rounding modes remain literals. A **Supported** row means the call runs and its REST result type matches
-the documented return type. It does not establish result-value, NULL, error, boundary, or
+could select another overload. Syntax-like options such as rounding modes and SPLIT delimiters
+remain literals. A **Supported** row means the call runs and its REST result type matches the
+documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
 valid sample, not every possible argument value. Rounding-mode calls use `ROUND_HALF_EVEN`.
 
@@ -27,7 +44,7 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **23 of 406 functions**. The remaining **383** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **92 of 406 functions**. The remaining **314** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Coverage
 
@@ -40,23 +57,23 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `AEAD.DECRYPT_STRING` | 0 | Not enumerated |
 | `AEAD.ENCRYPT` | 0 | Not enumerated |
 | `AGG` | 0 | Not enumerated |
-| `ANY_VALUE` | 0 | Not enumerated |
+| [ANY_VALUE](#any_value) | 40 | Supported |
 | `APPENDS` | 0 | Not enumerated |
 | `APPROX_COUNT_DISTINCT` | 0 | Not enumerated |
 | `APPROX_QUANTILES` | 0 | Not enumerated |
 | `APPROX_TOP_COUNT` | 0 | Not enumerated |
 | `APPROX_TOP_SUM` | 0 | Not enumerated |
 | `ARRAY` | 0 | Not enumerated |
-| `ARRAY_AGG` | 0 | Not enumerated |
-| `ARRAY_CONCAT` | 0 | Not enumerated |
-| `ARRAY_CONCAT_AGG` | 0 | Not enumerated |
-| `ARRAY_FIRST` | 0 | Not enumerated |
-| `ARRAY_LAST` | 0 | Not enumerated |
-| `ARRAY_LENGTH` | 0 | Not enumerated |
-| `ARRAY_REVERSE` | 0 | Not enumerated |
-| `ARRAY_SLICE` | 0 | Not enumerated |
-| `ARRAY_TO_STRING` | 0 | Not enumerated |
-| `ASCII` | 0 | Not enumerated |
+| [ARRAY_AGG](#array_agg) | 20 | Supported |
+| [ARRAY_CONCAT](#array_concat) | 40 | Supported |
+| [ARRAY_CONCAT_AGG](#array_concat_agg) | 20 | Partial |
+| [ARRAY_FIRST](#array_first) | 20 | Partial |
+| [ARRAY_LAST](#array_last) | 20 | Partial |
+| [ARRAY_LENGTH](#array_length) | 20 | Supported |
+| [ARRAY_REVERSE](#array_reverse) | 20 | Supported |
+| [ARRAY_SLICE](#array_slice) | 20 | Supported |
+| [ARRAY_TO_STRING](#array_to_string) | 4 | Broken |
+| [ASCII](#ascii) | 2 | Supported |
 | `ASIN` | 0 | Not enumerated |
 | `ASINH` | 0 | Not enumerated |
 | `ATAN` | 0 | Not enumerated |
@@ -69,7 +86,7 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `BIT_OR` | 0 | Not enumerated |
 | `BIT_XOR` | 0 | Not enumerated |
 | `BOOL` | 0 | Not enumerated |
-| `BYTE_LENGTH` | 0 | Not enumerated |
+| [BYTE_LENGTH](#byte_length) | 2 | Supported |
 | `CASE` | 0 | Not enumerated |
 | `CAST` | 0 | Not enumerated |
 | `CBRT` | 0 | Not enumerated |
@@ -79,13 +96,13 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `CHARACTER_LENGTH` | 0 | Not enumerated |
 | `CHAR_LENGTH` | 0 | Not enumerated |
 | `CHR` | 0 | Not enumerated |
-| `COALESCE` | 0 | Not enumerated |
+| [COALESCE](#coalesce) | 80 | Supported |
 | `CODE_POINTS_TO_BYTES` | 0 | Not enumerated |
 | `CODE_POINTS_TO_STRING` | 0 | Not enumerated |
 | `COLLATE` | 0 | Not enumerated |
-| `CONCAT` | 0 | Not enumerated |
+| [CONCAT](#concat) | 4 | Supported |
 | `CONTAINS_SUBSTR` | 0 | Not enumerated |
-| `CORR` | 0 | Not enumerated |
+| [CORR](#corr) | 16 | Supported |
 | `COS` | 0 | Not enumerated |
 | `COSH` | 0 | Not enumerated |
 | `COSINE_DISTANCE` | 0 | Not enumerated |
@@ -93,8 +110,8 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `COTH` | 0 | Not enumerated |
 | `COUNT` | 0 | Not enumerated |
 | `COUNTIF` | 0 | Not enumerated |
-| `COVAR_POP` | 0 | Not enumerated |
-| `COVAR_SAMP` | 0 | Not enumerated |
+| [COVAR_POP](#covar_pop) | 16 | Supported |
+| [COVAR_SAMP](#covar_samp) | 16 | Supported |
 | `CSC` | 0 | Not enumerated |
 | `CSCH` | 0 | Not enumerated |
 | `CUME_DIST` | 0 | Not enumerated |
@@ -127,14 +144,14 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `EDGES` | 0 | Not enumerated |
 | `EDIT_DISTANCE` | 0 | Not enumerated |
 | `ELEMENT_ID` | 0 | Not enumerated |
-| `ENDS_WITH` | 0 | Not enumerated |
+| [ENDS_WITH](#ends_with) | 2 | Supported |
 | `ERROR` | 0 | Not enumerated |
 | `EUCLIDEAN_DISTANCE` | 0 | Not enumerated |
 | [EXP](#exp) | 4 | Supported |
 | `EXTERNAL_OBJECT_TRANSFORM` | 0 | Not enumerated |
 | `EXTERNAL_QUERY` | 0 | Not enumerated |
 | `EXTRACT` | 0 | Not enumerated |
-| `FARM_FINGERPRINT` | 0 | Not enumerated |
+| [FARM_FINGERPRINT](#farm_fingerprint) | 2 | Supported |
 | `FIRST_VALUE` | 0 | Not enumerated |
 | `FLOAT64` | 0 | Not enumerated |
 | [FLOOR](#floor) | 4 | Supported |
@@ -147,7 +164,7 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `FROM_BASE64` | 0 | Not enumerated |
 | `FROM_HEX` | 0 | Not enumerated |
 | `GAP_FILL` | 0 | Not enumerated |
-| `GENERATE_ARRAY` | 0 | Not enumerated |
+| [GENERATE_ARRAY](#generate_array) | 8 | Supported |
 | `GENERATE_DATE_ARRAY` | 0 | Not enumerated |
 | `GENERATE_RANGE_ARRAY` | 0 | Not enumerated |
 | `GENERATE_TIMESTAMP_ARRAY` | 0 | Not enumerated |
@@ -159,10 +176,10 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `HLL_COUNT.MERGE` | 0 | Not enumerated |
 | `HLL_COUNT.MERGE_PARTIAL` | 0 | Not enumerated |
 | `IEEE_DIVIDE` | 0 | Not enumerated |
-| `IF` | 0 | Not enumerated |
-| `IFNULL` | 0 | Not enumerated |
+| [IF](#if) | 40 | Supported |
+| [IFNULL](#ifnull) | 40 | Supported |
 | `INITCAP` | 0 | Not enumerated |
-| `INSTR` | 0 | Not enumerated |
+| [INSTR](#instr) | 6 | Supported |
 | `INT64` | 0 | Not enumerated |
 | `IS_ACYCLIC` | 0 | Not enumerated |
 | `IS_INF` | 0 | Not enumerated |
@@ -221,21 +238,21 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `LAX_STRING` | 0 | Not enumerated |
 | `LEAD` | 0 | Not enumerated |
 | `LEAST` | 0 | Not enumerated |
-| `LEFT` | 0 | Not enumerated |
-| `LENGTH` | 0 | Not enumerated |
+| [LEFT](#left) | 2 | Supported |
+| [LENGTH](#length) | 2 | Supported |
 | [LN](#ln) | 4 | Supported |
 | [LOG](#log) | 20 | Supported |
 | [LOG10](#log10) | 4 | Supported |
 | `LOGICAL_AND` | 0 | Not enumerated |
 | `LOGICAL_OR` | 0 | Not enumerated |
-| `LOWER` | 0 | Not enumerated |
-| `LPAD` | 0 | Not enumerated |
-| `LTRIM` | 0 | Not enumerated |
+| [LOWER](#lower) | 2 | Supported |
+| [LPAD](#lpad) | 4 | Supported |
+| [LTRIM](#ltrim) | 3 | Supported |
 | `MAKE_INTERVAL` | 0 | Not enumerated |
-| `MAX` | 0 | Not enumerated |
+| [MAX](#max) | 15 | Supported |
 | `MAX_BY` | 0 | Not enumerated |
-| `MD5` | 0 | Not enumerated |
-| `MIN` | 0 | Not enumerated |
+| [MD5](#md5) | 2 | Supported |
+| [MIN](#min) | 15 | Supported |
 | `MIN_BY` | 0 | Not enumerated |
 | [MOD](#mod) | 9 | Supported |
 | `NET.HOST` | 0 | Not enumerated |
@@ -258,7 +275,7 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `OBJ.GET_ACCESS_URL` | 0 | Not enumerated |
 | `OBJ.GET_READ_URL` | 0 | Not enumerated |
 | `OBJ.MAKE_REF` | 0 | Not enumerated |
-| `OCTET_LENGTH` | 0 | Not enumerated |
+| [OCTET_LENGTH](#octet_length) | 2 | Supported |
 | `PARSE_BIGNUMERIC` | 0 | Not enumerated |
 | `PARSE_DATE` | 0 | Not enumerated |
 | `PARSE_DATETIME` | 0 | Not enumerated |
@@ -275,29 +292,29 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | [POW](#pow) | 16 | Supported |
 | [POWER](#power) | 16 | Supported |
 | `RAND` | 0 | Not enumerated |
-| `RANGE` | 0 | Not enumerated |
+| [RANGE](#range) | 3 | Supported |
 | `RANGE_BUCKET` | 0 | Not enumerated |
-| `RANGE_CONTAINS` | 0 | Not enumerated |
-| `RANGE_END` | 0 | Not enumerated |
-| `RANGE_INTERSECT` | 0 | Not enumerated |
-| `RANGE_OVERLAPS` | 0 | Not enumerated |
+| [RANGE_CONTAINS](#range_contains) | 6 | Supported |
+| [RANGE_END](#range_end) | 3 | Supported |
+| [RANGE_INTERSECT](#range_intersect) | 3 | Supported |
+| [RANGE_OVERLAPS](#range_overlaps) | 3 | Supported |
 | `RANGE_SESSIONIZE` | 0 | Not enumerated |
-| `RANGE_START` | 0 | Not enumerated |
+| [RANGE_START](#range_start) | 3 | Supported |
 | `RANK` | 0 | Not enumerated |
-| `REGEXP_CONTAINS` | 0 | Not enumerated |
-| `REGEXP_EXTRACT` | 0 | Not enumerated |
-| `REGEXP_EXTRACT_ALL` | 0 | Not enumerated |
-| `REGEXP_INSTR` | 0 | Not enumerated |
-| `REGEXP_REPLACE` | 0 | Not enumerated |
-| `REGEXP_SUBSTR` | 0 | Not enumerated |
-| `REPEAT` | 0 | Not enumerated |
-| `REPLACE` | 0 | Not enumerated |
-| `REVERSE` | 0 | Not enumerated |
-| `RIGHT` | 0 | Not enumerated |
+| [REGEXP_CONTAINS](#regexp_contains) | 2 | Supported |
+| [REGEXP_EXTRACT](#regexp_extract) | 6 | Supported |
+| [REGEXP_EXTRACT_ALL](#regexp_extract_all) | 2 | Supported |
+| [REGEXP_INSTR](#regexp_instr) | 8 | Supported |
+| [REGEXP_REPLACE](#regexp_replace) | 2 | Supported |
+| [REGEXP_SUBSTR](#regexp_substr) | 6 | Supported |
+| [REPEAT](#repeat) | 2 | Supported |
+| [REPLACE](#replace) | 2 | Supported |
+| [REVERSE](#reverse) | 2 | Supported |
+| [RIGHT](#right) | 2 | Supported |
 | [ROUND](#round) | 10 | Broken |
 | `ROW_NUMBER` | 0 | Not enumerated |
-| `RPAD` | 0 | Not enumerated |
-| `RTRIM` | 0 | Not enumerated |
+| [RPAD](#rpad) | 4 | Supported |
+| [RTRIM](#rtrim) | 3 | Supported |
 | `S2_CELLIDFROMPOINT` | 0 | Not enumerated |
 | `S2_COVERINGCELLIDS` | 0 | Not enumerated |
 | [SAFE_ADD](#safe_add) | 16 | Supported |
@@ -311,23 +328,23 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `SEC` | 0 | Not enumerated |
 | `SECH` | 0 | Not enumerated |
 | `SESSION_USER` | 0 | Not enumerated |
-| `SHA1` | 0 | Not enumerated |
-| `SHA256` | 0 | Not enumerated |
-| `SHA512` | 0 | Not enumerated |
+| [SHA1](#sha1) | 2 | Supported |
+| [SHA256](#sha256) | 2 | Supported |
+| [SHA512](#sha512) | 2 | Supported |
 | [SIGN](#sign) | 4 | Supported |
 | `SIN` | 0 | Not enumerated |
 | `SINH` | 0 | Not enumerated |
 | `SOUNDEX` | 0 | Not enumerated |
 | `SOURCE_NODE_ID` | 0 | Not enumerated |
-| `SPLIT` | 0 | Not enumerated |
+| [SPLIT](#split) | 3 | Supported |
 | [SQRT](#sqrt) | 4 | Supported |
-| `STARTS_WITH` | 0 | Not enumerated |
-| `STDDEV` | 0 | Not enumerated |
-| `STDDEV_POP` | 0 | Not enumerated |
-| `STDDEV_SAMP` | 0 | Not enumerated |
+| [STARTS_WITH](#starts_with) | 2 | Supported |
+| [STDDEV](#stddev) | 4 | Supported |
+| [STDDEV_POP](#stddev_pop) | 4 | Supported |
+| [STDDEV_SAMP](#stddev_samp) | 4 | Supported |
 | `STRING` | 0 | Not enumerated |
-| `STRING_AGG` | 0 | Not enumerated |
-| `STRPOS` | 0 | Not enumerated |
+| [STRING_AGG](#string_agg) | 4 | Supported |
+| [STRPOS](#strpos) | 2 | Supported |
 | `ST_ANGLE` | 0 | Not enumerated |
 | `ST_AREA` | 0 | Not enumerated |
 | `ST_ASBINARY` | 0 | Not enumerated |
@@ -397,8 +414,8 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `ST_WITHIN` | 0 | Not enumerated |
 | `ST_X` | 0 | Not enumerated |
 | `ST_Y` | 0 | Not enumerated |
-| `SUBSTR` | 0 | Not enumerated |
-| `SUBSTRING` | 0 | Not enumerated |
+| [SUBSTR](#substr) | 4 | Supported |
+| [SUBSTRING](#substring) | 4 | Supported |
 | [SUM](#sum) | 5 | Supported |
 | `TAN` | 0 | Not enumerated |
 | `TANH` | 0 | Not enumerated |
@@ -420,12 +437,12 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `TIME_TRUNC` | 0 | Not enumerated |
 | `TO_BASE32` | 0 | Not enumerated |
 | `TO_BASE64` | 0 | Not enumerated |
-| `TO_CODE_POINTS` | 0 | Not enumerated |
+| [TO_CODE_POINTS](#to_code_points) | 2 | Supported |
 | `TO_HEX` | 0 | Not enumerated |
 | `TO_JSON` | 0 | Not enumerated |
 | `TO_JSON_STRING` | 0 | Not enumerated |
-| `TRANSLATE` | 0 | Not enumerated |
-| `TRIM` | 0 | Not enumerated |
+| [TRANSLATE](#translate) | 2 | Supported |
+| [TRIM](#trim) | 3 | Supported |
 | [TRUNC](#trunc) | 8 | Broken |
 | `TYPEOF` | 0 | Not enumerated |
 | `UNICODE` | 0 | Not enumerated |
@@ -433,10 +450,10 @@ Type signatures are enumerated for **23 of 406 functions**. The remaining **383*
 | `UNIX_MICROS` | 0 | Not enumerated |
 | `UNIX_MILLIS` | 0 | Not enumerated |
 | `UNIX_SECONDS` | 0 | Not enumerated |
-| `UPPER` | 0 | Not enumerated |
-| `VARIANCE` | 0 | Not enumerated |
-| `VAR_POP` | 0 | Not enumerated |
-| `VAR_SAMP` | 0 | Not enumerated |
+| [UPPER](#upper) | 2 | Supported |
+| [VARIANCE](#variance) | 4 | Supported |
+| [VAR_POP](#var_pop) | 4 | Supported |
+| [VAR_SAMP](#var_samp) | 4 | Supported |
 | `VECTOR_INDEX.STATISTICS` | 0 | Not enumerated |
 | `VECTOR_SEARCH` | 0 | Not enumerated |
 
@@ -451,6 +468,309 @@ Source: [ABS](../third_party/bigquery_docs/reference/standard-sql/mathematical_f
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## ANY_VALUE
+
+Source: [ANY_VALUE](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL` | `BOOL` | Supported |  |
+| `STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `DATE` | `DATE` | Supported |  |
+| `DATETIME` | `DATETIME` | Supported |  |
+| `TIME` | `TIME` | Supported |  |
+| `TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL` | `INTERVAL` | Supported |  |
+| `GEOGRAPHY` | `GEOGRAPHY` | Supported |  |
+| `JSON` | `JSON` | Supported |  |
+| `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `STRUCT<x INT64, label STRING>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## ARRAY_AGG
+
+Source: [ARRAY_AGG](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `ARRAY<INT64>` | Supported |  |
+| `NUMERIC` | `ARRAY<NUMERIC>` | Supported |  |
+| `BIGNUMERIC` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `FLOAT64` | `ARRAY<FLOAT64>` | Supported |  |
+| `BOOL` | `ARRAY<BOOL>` | Supported |  |
+| `STRING` | `ARRAY<STRING>` | Supported |  |
+| `BYTES` | `ARRAY<BYTES>` | Supported |  |
+| `DATE` | `ARRAY<DATE>` | Supported |  |
+| `DATETIME` | `ARRAY<DATETIME>` | Supported |  |
+| `TIME` | `ARRAY<TIME>` | Supported |  |
+| `TIMESTAMP` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `INTERVAL` | `ARRAY<INTERVAL>` | Supported |  |
+| `GEOGRAPHY` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `JSON` | `ARRAY<JSON>` | Supported |  |
+| `RANGE<DATE>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `RANGE<DATETIME>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `STRUCT<x INT64, label STRING>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## ARRAY_CONCAT
+
+Source: [ARRAY_CONCAT](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<INT64>, ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<NUMERIC>, ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>, ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<FLOAT64>, ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<BOOL>, ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<STRING>, ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<BYTES>, ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATE>, ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<DATETIME>, ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIME>, ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<TIMESTAMP>, ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<INTERVAL>, ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<GEOGRAPHY>, ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<JSON>, ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATE>>, ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>, ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>, ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>, ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## ARRAY_CONCAT_AGG
+
+Source: [ARRAY_CONCAT_AGG](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
+| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
+| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
+
+## ARRAY_FIRST
+
+Source: [ARRAY_FIRST](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `INT64` | Supported |  |
+| `ARRAY<NUMERIC>` | `NUMERIC` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `BIGNUMERIC` | Supported |  |
+| `ARRAY<FLOAT64>` | `FLOAT64` | Supported |  |
+| `ARRAY<BOOL>` | `BOOL` | Supported |  |
+| `ARRAY<STRING>` | `STRING` | Supported |  |
+| `ARRAY<BYTES>` | `BYTES` | Supported |  |
+| `ARRAY<DATE>` | `DATE` | Supported |  |
+| `ARRAY<DATETIME>` | `DATETIME` | Supported |  |
+| `ARRAY<TIME>` | `TIME` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `TIMESTAMP` | Supported |  |
+| `ARRAY<INTERVAL>` | `INTERVAL` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `GEOGRAPHY` | Unsupported | function ERROR with GEOGRAPHY |
+| `ARRAY<JSON>` | `JSON` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `RANGE<DATE>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `RANGE<DATETIME>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+
+## ARRAY_LAST
+
+Source: [ARRAY_LAST](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `INT64` | Supported |  |
+| `ARRAY<NUMERIC>` | `NUMERIC` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `BIGNUMERIC` | Supported |  |
+| `ARRAY<FLOAT64>` | `FLOAT64` | Supported |  |
+| `ARRAY<BOOL>` | `BOOL` | Supported |  |
+| `ARRAY<STRING>` | `STRING` | Supported |  |
+| `ARRAY<BYTES>` | `BYTES` | Supported |  |
+| `ARRAY<DATE>` | `DATE` | Supported |  |
+| `ARRAY<DATETIME>` | `DATETIME` | Supported |  |
+| `ARRAY<TIME>` | `TIME` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `TIMESTAMP` | Supported |  |
+| `ARRAY<INTERVAL>` | `INTERVAL` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `GEOGRAPHY` | Unsupported | function ERROR with GEOGRAPHY |
+| `ARRAY<JSON>` | `JSON` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `RANGE<DATE>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `RANGE<DATETIME>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+
+## ARRAY_LENGTH
+
+Source: [ARRAY_LENGTH](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `INT64` | Supported |  |
+| `ARRAY<NUMERIC>` | `INT64` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `INT64` | Supported |  |
+| `ARRAY<FLOAT64>` | `INT64` | Supported |  |
+| `ARRAY<BOOL>` | `INT64` | Supported |  |
+| `ARRAY<STRING>` | `INT64` | Supported |  |
+| `ARRAY<BYTES>` | `INT64` | Supported |  |
+| `ARRAY<DATE>` | `INT64` | Supported |  |
+| `ARRAY<DATETIME>` | `INT64` | Supported |  |
+| `ARRAY<TIME>` | `INT64` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `INT64` | Supported |  |
+| `ARRAY<INTERVAL>` | `INT64` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `INT64` | Supported |  |
+| `ARRAY<JSON>` | `INT64` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `INT64` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `INT64` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `INT64` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `INT64` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `INT64` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `INT64` | Supported |  |
+
+## ARRAY_REVERSE
+
+Source: [ARRAY_REVERSE](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## ARRAY_SLICE
+
+Source: [ARRAY_SLICE](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>, INT64, INT64` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>, INT64, INT64` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>, INT64, INT64` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>, INT64, INT64` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>, INT64, INT64` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>, INT64, INT64` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>, INT64, INT64` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>, INT64, INT64` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>, INT64, INT64` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>, INT64, INT64` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>, INT64, INT64` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>, INT64, INT64` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>, INT64, INT64` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>, INT64, INT64` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>, INT64, INT64` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>, INT64, INT64` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>, INT64, INT64` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>, INT64, INT64` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, INT64, INT64` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, INT64, INT64` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## ARRAY_TO_STRING
+
+Source: [ARRAY_TO_STRING](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<STRING>, STRING` | `STRING` | Broken | `SELECT ARRAY_TO_STRING(a0, a1) AS result FROM (SELECT ARRAY<STRING>[CAST('abc' AS STRING)] AS a0, CAST('abc' AS STRING) AS a1)`: Binder Error: The "arg" argument in function "string_agg" must be a constant expression |
+| `ARRAY<STRING>, STRING, STRING` | `STRING` | Broken | `SELECT ARRAY_TO_STRING(a0, a1, a2) AS result FROM (SELECT ARRAY<STRING>[CAST('abc' AS STRING)] AS a0, CAST('abc' AS STRING) AS a1, CAST('abc' AS STRING) AS a2)`: Binder Error: The "arg" argument in function "string_agg" must be a constant expression |
+| `ARRAY<BYTES>, BYTES` | `BYTES` | Supported |  |
+| `ARRAY<BYTES>, BYTES, BYTES` | `BYTES` | Supported |  |
+
+## ASCII
+
+Source: [ASCII](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+| `BYTES` | `INT64` | Supported |  |
+
 ## AVG
 
 Source: [AVG](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
@@ -462,6 +782,15 @@ Source: [AVG](../third_party/bigquery_docs/reference/standard-sql/aggregate_func
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 | `INTERVAL` | `INTERVAL` | Supported |  |
+
+## BYTE_LENGTH
+
+Source: [BYTE_LENGTH](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+| `BYTES` | `INT64` | Supported |  |
 
 ## CEIL
 
@@ -485,6 +814,177 @@ Source: [CEILING](../third_party/bigquery_docs/reference/standard-sql/mathematic
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## COALESCE
+
+Source: [COALESCE](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md).
+
+Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `NUMERIC` | Supported |  |
+| `NUMERIC, NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL` | `BOOL` | Supported |  |
+| `BOOL, BOOL` | `BOOL` | Supported |  |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `DATE` | `DATE` | Supported |  |
+| `DATE, DATE` | `DATE` | Supported |  |
+| `DATETIME` | `DATETIME` | Supported |  |
+| `DATETIME, DATETIME` | `DATETIME` | Supported |  |
+| `TIME` | `TIME` | Supported |  |
+| `TIME, TIME` | `TIME` | Supported |  |
+| `TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL` | `INTERVAL` | Supported |  |
+| `INTERVAL, INTERVAL` | `INTERVAL` | Supported |  |
+| `GEOGRAPHY` | `GEOGRAPHY` | Supported |  |
+| `GEOGRAPHY, GEOGRAPHY` | `GEOGRAPHY` | Supported |  |
+| `JSON` | `JSON` | Supported |  |
+| `JSON, JSON` | `JSON` | Supported |  |
+| `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `STRUCT<x INT64, label STRING>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<x INT64, label STRING>, STRUCT<x INT64, label STRING>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>, STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>, STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<INT64>, ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<NUMERIC>, ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>, ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<FLOAT64>, ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<BOOL>, ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<STRING>, ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<BYTES>, ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATE>, ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<DATETIME>, ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIME>, ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<TIMESTAMP>, ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<INTERVAL>, ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<GEOGRAPHY>, ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<JSON>, ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATE>>, ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>, ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>, ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>, ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## CONCAT
+
+Source: [CONCAT](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+Only same-type STRING and BYTES forms are enumerated; implicit conversions to STRING are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+
+## CORR
+
+Source: [CORR](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `FLOAT64` | Supported |  |
+| `INT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+
+## COVAR_POP
+
+Source: [COVAR_POP](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `FLOAT64` | Supported |  |
+| `INT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+
+## COVAR_SAMP
+
+Source: [COVAR_SAMP](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `FLOAT64` | Supported |  |
+| `INT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+
 ## DIV
 
 Source: [DIV](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -501,6 +1001,15 @@ Source: [DIV](../third_party/bigquery_docs/reference/standard-sql/mathematical_f
 | `BIGNUMERIC, NUMERIC` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 
+## ENDS_WITH
+
+Source: [ENDS_WITH](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `BOOL` | Supported |  |
+| `BYTES, BYTES` | `BOOL` | Supported |  |
+
 ## EXP
 
 Source: [EXP](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -512,6 +1021,15 @@ Source: [EXP](../third_party/bigquery_docs/reference/standard-sql/mathematical_f
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## FARM_FINGERPRINT
+
+Source: [FARM_FINGERPRINT](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+| `BYTES` | `INT64` | Supported |  |
+
 ## FLOOR
 
 Source: [FLOOR](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -522,6 +1040,152 @@ Source: [FLOOR](../third_party/bigquery_docs/reference/standard-sql/mathematical
 | `NUMERIC` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
+
+## GENERATE_ARRAY
+
+Source: [GENERATE_ARRAY](../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+Same-type numeric inputs are enumerated; mixed-type inputs are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `ARRAY<INT64>` | Supported |  |
+| `INT64, INT64, INT64` | `ARRAY<INT64>` | Supported |  |
+| `NUMERIC, NUMERIC` | `ARRAY<NUMERIC>` | Supported |  |
+| `NUMERIC, NUMERIC, NUMERIC` | `ARRAY<NUMERIC>` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC, BIGNUMERIC` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `FLOAT64, FLOAT64` | `ARRAY<FLOAT64>` | Supported |  |
+| `FLOAT64, FLOAT64, FLOAT64` | `ARRAY<FLOAT64>` | Supported |  |
+
+## IF
+
+Source: [IF](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md).
+
+Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BOOL, INT64, INT64` | `INT64` | Supported |  |
+| `BOOL, NUMERIC, NUMERIC` | `NUMERIC` | Supported |  |
+| `BOOL, BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `BOOL, FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL, BOOL, BOOL` | `BOOL` | Supported |  |
+| `BOOL, STRING, STRING` | `STRING` | Supported |  |
+| `BOOL, BYTES, BYTES` | `BYTES` | Supported |  |
+| `BOOL, DATE, DATE` | `DATE` | Supported |  |
+| `BOOL, DATETIME, DATETIME` | `DATETIME` | Supported |  |
+| `BOOL, TIME, TIME` | `TIME` | Supported |  |
+| `BOOL, TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `BOOL, INTERVAL, INTERVAL` | `INTERVAL` | Supported |  |
+| `BOOL, GEOGRAPHY, GEOGRAPHY` | `GEOGRAPHY` | Supported |  |
+| `BOOL, JSON, JSON` | `JSON` | Supported |  |
+| `BOOL, RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `BOOL, RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `BOOL, RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `BOOL, STRUCT<x INT64, label STRING>, STRUCT<x INT64, label STRING>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `BOOL, STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>, STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `BOOL, STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>, STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `BOOL, ARRAY<INT64>, ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `BOOL, ARRAY<NUMERIC>, ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `BOOL, ARRAY<BIGNUMERIC>, ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `BOOL, ARRAY<FLOAT64>, ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `BOOL, ARRAY<BOOL>, ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `BOOL, ARRAY<STRING>, ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `BOOL, ARRAY<BYTES>, ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `BOOL, ARRAY<DATE>, ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `BOOL, ARRAY<DATETIME>, ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `BOOL, ARRAY<TIME>, ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `BOOL, ARRAY<TIMESTAMP>, ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `BOOL, ARRAY<INTERVAL>, ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `BOOL, ARRAY<GEOGRAPHY>, ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `BOOL, ARRAY<JSON>, ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `BOOL, ARRAY<RANGE<DATE>>, ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `BOOL, ARRAY<RANGE<DATETIME>>, ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `BOOL, ARRAY<RANGE<TIMESTAMP>>, ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `BOOL, ARRAY<STRUCT<x INT64, label STRING>>, ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `BOOL, ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `BOOL, ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## IFNULL
+
+Source: [IFNULL](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md).
+
+Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL, BOOL` | `BOOL` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `DATE, DATE` | `DATE` | Supported |  |
+| `DATETIME, DATETIME` | `DATETIME` | Supported |  |
+| `TIME, TIME` | `TIME` | Supported |  |
+| `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL, INTERVAL` | `INTERVAL` | Supported |  |
+| `GEOGRAPHY, GEOGRAPHY` | `GEOGRAPHY` | Supported |  |
+| `JSON, JSON` | `JSON` | Supported |  |
+| `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `STRUCT<x INT64, label STRING>, STRUCT<x INT64, label STRING>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>, STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>, STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `ARRAY<INT64>, ARRAY<INT64>` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>, ARRAY<NUMERIC>` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>, ARRAY<BIGNUMERIC>` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>, ARRAY<FLOAT64>` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>, ARRAY<BOOL>` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>, ARRAY<STRING>` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>, ARRAY<BYTES>` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>, ARRAY<DATE>` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>, ARRAY<DATETIME>` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>, ARRAY<TIME>` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>, ARRAY<TIMESTAMP>` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>, ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>, ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>, ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>, ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>, ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>, ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>, ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## INSTR
+
+Source: [INSTR](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `INT64` | Supported |  |
+| `STRING, STRING, INT64` | `INT64` | Supported |  |
+| `STRING, STRING, INT64, INT64` | `INT64` | Supported |  |
+| `BYTES, BYTES` | `INT64` | Supported |  |
+| `BYTES, BYTES, INT64` | `INT64` | Supported |  |
+| `BYTES, BYTES, INT64, INT64` | `INT64` | Supported |  |
+
+## LEFT
+
+Source: [LEFT](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+
+## LENGTH
+
+Source: [LENGTH](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+| `BYTES` | `INT64` | Supported |  |
 
 ## LN
 
@@ -572,6 +1236,89 @@ Source: [LOG10](../third_party/bigquery_docs/reference/standard-sql/mathematical
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## LOWER
+
+Source: [LOWER](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
+## LPAD
+
+Source: [LPAD](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `STRING, INT64, STRING` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+| `BYTES, INT64, BYTES` | `BYTES` | Supported |  |
+
+## LTRIM
+
+Source: [LTRIM](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+
+## MAX
+
+Source: [MAX](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL` | `BOOL` | Supported |  |
+| `STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `DATE` | `DATE` | Supported |  |
+| `DATETIME` | `DATETIME` | Supported |  |
+| `TIME` | `TIME` | Supported |  |
+| `TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL` | `INTERVAL` | Supported |  |
+| `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+
+## MD5
+
+Source: [MD5](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
+## MIN
+
+Source: [MIN](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL` | `BOOL` | Supported |  |
+| `STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `DATE` | `DATE` | Supported |  |
+| `DATETIME` | `DATETIME` | Supported |  |
+| `TIME` | `TIME` | Supported |  |
+| `TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL` | `INTERVAL` | Supported |  |
+| `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+
 ## MOD
 
 Source: [MOD](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -587,6 +1334,15 @@ Source: [MOD](../third_party/bigquery_docs/reference/standard-sql/mathematical_f
 | `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, NUMERIC` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+
+## OCTET_LENGTH
+
+Source: [OCTET_LENGTH](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+| `BYTES` | `INT64` | Supported |  |
 
 ## POW
 
@@ -634,6 +1390,173 @@ Source: [POWER](../third_party/bigquery_docs/reference/standard-sql/mathematical
 | `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
 
+## RANGE
+
+Source: [RANGE](../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `DATE, DATE` | `RANGE<DATE>` | Supported |  |
+| `DATETIME, DATETIME` | `RANGE<DATETIME>` | Supported |  |
+| `TIMESTAMP, TIMESTAMP` | `RANGE<TIMESTAMP>` | Supported |  |
+
+## RANGE_CONTAINS
+
+Source: [RANGE_CONTAINS](../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `RANGE<DATE>, RANGE<DATE>` | `BOOL` | Supported |  |
+| `RANGE<DATE>, DATE` | `BOOL` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `BOOL` | Supported |  |
+| `RANGE<DATETIME>, DATETIME` | `BOOL` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `BOOL` | Supported |  |
+| `RANGE<TIMESTAMP>, TIMESTAMP` | `BOOL` | Supported |  |
+
+## RANGE_END
+
+Source: [RANGE_END](../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `RANGE<DATE>` | `DATE` | Supported |  |
+| `RANGE<DATETIME>` | `DATETIME` | Supported |  |
+| `RANGE<TIMESTAMP>` | `TIMESTAMP` | Supported |  |
+
+## RANGE_INTERSECT
+
+Source: [RANGE_INTERSECT](../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+
+## RANGE_OVERLAPS
+
+Source: [RANGE_OVERLAPS](../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `RANGE<DATE>, RANGE<DATE>` | `BOOL` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `BOOL` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `BOOL` | Supported |  |
+
+## RANGE_START
+
+Source: [RANGE_START](../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `RANGE<DATE>` | `DATE` | Supported |  |
+| `RANGE<DATETIME>` | `DATETIME` | Supported |  |
+| `RANGE<TIMESTAMP>` | `TIMESTAMP` | Supported |  |
+
+## REGEXP_CONTAINS
+
+Source: [REGEXP_CONTAINS](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `BOOL` | Supported |  |
+| `BYTES, BYTES` | `BOOL` | Supported |  |
+
+## REGEXP_EXTRACT
+
+Source: [REGEXP_EXTRACT](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `STRING, STRING, INT64` | `STRING` | Supported |  |
+| `STRING, STRING, INT64, INT64` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES, INT64` | `BYTES` | Supported |  |
+| `BYTES, BYTES, INT64, INT64` | `BYTES` | Supported |  |
+
+## REGEXP_EXTRACT_ALL
+
+Source: [REGEXP_EXTRACT_ALL](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `ARRAY<STRING>` | Supported |  |
+| `BYTES, BYTES` | `ARRAY<BYTES>` | Supported |  |
+
+## REGEXP_INSTR
+
+Source: [REGEXP_INSTR](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `INT64` | Supported |  |
+| `STRING, STRING, INT64` | `INT64` | Supported |  |
+| `STRING, STRING, INT64, INT64` | `INT64` | Supported |  |
+| `STRING, STRING, INT64, INT64, INT64` | `INT64` | Supported |  |
+| `BYTES, BYTES` | `INT64` | Supported |  |
+| `BYTES, BYTES, INT64` | `INT64` | Supported |  |
+| `BYTES, BYTES, INT64, INT64` | `INT64` | Supported |  |
+| `BYTES, BYTES, INT64, INT64, INT64` | `INT64` | Supported |  |
+
+## REGEXP_REPLACE
+
+Source: [REGEXP_REPLACE](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES, BYTES` | `BYTES` | Supported |  |
+
+## REGEXP_SUBSTR
+
+Source: [REGEXP_SUBSTR](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `STRING, STRING, INT64` | `STRING` | Supported |  |
+| `STRING, STRING, INT64, INT64` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES, INT64` | `BYTES` | Supported |  |
+| `BYTES, BYTES, INT64, INT64` | `BYTES` | Supported |  |
+
+## REPEAT
+
+Source: [REPEAT](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+
+## REPLACE
+
+Source: [REPLACE](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES, BYTES` | `BYTES` | Supported |  |
+
+## REVERSE
+
+Source: [REVERSE](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
+## RIGHT
+
+Source: [RIGHT](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+
 ## ROUND
 
 Source: [ROUND](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -650,6 +1573,27 @@ Source: [ROUND](../third_party/bigquery_docs/reference/standard-sql/mathematical
 | `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, INT64, STRING` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+
+## RPAD
+
+Source: [RPAD](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `STRING, INT64, STRING` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+| `BYTES, INT64, BYTES` | `BYTES` | Supported |  |
+
+## RTRIM
+
+Source: [RTRIM](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
 
 ## SAFE_ADD
 
@@ -754,6 +1698,33 @@ Source: [SAFE_SUBTRACT](../third_party/bigquery_docs/reference/standard-sql/math
 | `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
 
+## SHA1
+
+Source: [SHA1](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
+## SHA256
+
+Source: [SHA256](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
+## SHA512
+
+Source: [SHA512](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
 ## SIGN
 
 Source: [SIGN](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -764,6 +1735,16 @@ Source: [SIGN](../third_party/bigquery_docs/reference/standard-sql/mathematical_
 | `NUMERIC` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
+
+## SPLIT
+
+Source: [SPLIT](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `ARRAY<STRING>` | Supported |  |
+| `STRING, STRING` | `ARRAY<STRING>` | Supported |  |
+| `BYTES, BYTES` | `ARRAY<BYTES>` | Supported |  |
 
 ## SQRT
 
@@ -776,6 +1757,92 @@ Source: [SQRT](../third_party/bigquery_docs/reference/standard-sql/mathematical_
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## STARTS_WITH
+
+Source: [STARTS_WITH](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `BOOL` | Supported |  |
+| `BYTES, BYTES` | `BOOL` | Supported |  |
+
+## STDDEV
+
+Source: [STDDEV](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## STDDEV_POP
+
+Source: [STDDEV_POP](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## STDDEV_SAMP
+
+Source: [STDDEV_SAMP](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## STRING_AGG
+
+Source: [STRING_AGG](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+The delimiter is sampled as a literal; nonconstant delimiter expressions are not covered.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+
+## STRPOS
+
+Source: [STRPOS](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `INT64` | Supported |  |
+| `BYTES, BYTES` | `INT64` | Supported |  |
+
+## SUBSTR
+
+Source: [SUBSTR](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `STRING, INT64, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+| `BYTES, INT64, INT64` | `BYTES` | Supported |  |
+
+## SUBSTRING
+
+Source: [SUBSTRING](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `STRING, INT64, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+| `BYTES, INT64, INT64` | `BYTES` | Supported |  |
+
 ## SUM
 
 Source: [SUM](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
@@ -787,6 +1854,34 @@ Source: [SUM](../third_party/bigquery_docs/reference/standard-sql/aggregate_func
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 | `INTERVAL` | `INTERVAL` | Supported |  |
+
+## TO_CODE_POINTS
+
+Source: [TO_CODE_POINTS](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `ARRAY<INT64>` | Supported |  |
+| `BYTES` | `ARRAY<INT64>` | Supported |  |
+
+## TRANSLATE
+
+Source: [TRANSLATE](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES, BYTES` | `BYTES` | Supported |  |
+
+## TRIM
+
+Source: [TRIM](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
 
 ## TRUNC
 
@@ -802,3 +1897,45 @@ Source: [TRUNC](../third_party/bigquery_docs/reference/standard-sql/mathematical
 | `NUMERIC, INT64` | `NUMERIC` | Broken | `SELECT TRUNC(a0, a1) AS result FROM (SELECT CAST(2 AS NUMERIC) AS a0, CAST(2 AS INT64) AS a1)`: Binder Error: The "precision" argument in function "trunc" must be a constant expression |
 | `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+
+## UPPER
+
+Source: [UPPER](../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+
+## VARIANCE
+
+Source: [VARIANCE](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## VAR_POP
+
+Source: [VAR_POP](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## VAR_SAMP
+
+Source: [VAR_SAMP](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |

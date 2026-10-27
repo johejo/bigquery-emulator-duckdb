@@ -18,6 +18,10 @@ func TestTypedResponse(t *testing.T) {
 		{"float alias", `{"schema":{"fields":[{"type":"FLOAT"}]}}`, "FLOAT64", probereport.Runs},
 		{"boolean alias", `{"schema":{"fields":[{"type":"BOOLEAN"}]}}`, "BOOL", probereport.Runs},
 		{"wrong type", `{"schema":{"fields":[{"type":"NUMERIC"}]}}`, "BIGNUMERIC", probereport.Broken},
+		{"nested record", `{"schema":{"fields":[{"type":"RECORD","fields":[{"name":"x","type":"INTEGER"}]}]}}`, "STRUCT<x INT64>", probereport.Runs},
+		{"wrong nested type", `{"schema":{"fields":[{"type":"RECORD","fields":[{"name":"x","type":"NUMERIC"}]}]}}`, "STRUCT<x BIGNUMERIC>", probereport.Broken},
+		{"range", `{"schema":{"fields":[{"type":"RANGE","rangeElementType":{"type":"DATE"}}]}}`, "RANGE<DATE>", probereport.Runs},
+		{"wrong range element", `{"schema":{"fields":[{"type":"RANGE","rangeElementType":{"type":"DATETIME"}}]}}`, "RANGE<DATE>", probereport.Broken},
 		{"wrong cardinality", `{"schema":{"fields":[{"type":"INTEGER","mode":"REPEATED"}]}}`, "INT64", probereport.Broken},
 		{"unsupported", `{"error":{"message":"The emulator does not support F"}}`, "INT64", probereport.Unsupported},
 		{"analyzer rejection", `{"error":{"message":"INVALID_ARGUMENT: No matching signature"}}`, "INT64", probereport.Untested},
@@ -41,7 +45,7 @@ func TestTypedResponse(t *testing.T) {
 }
 
 func TestTypeCoverageKeepsUntestedAndUnenumerated(t *testing.T) {
-	catalog := functioncoverage.Catalog{Functions: []functioncoverage.Function{{Name: "F", Source: "third_party/bigquery_docs/f.md", Signatures: []functioncoverage.Signature{
+	catalog := functioncoverage.Catalog{Functions: []functioncoverage.Function{{Name: "F", Source: "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md", Signatures: []functioncoverage.Signature{
 		{Arguments: []string{"INT64"}, Result: "INT64"}, {Arguments: []string{"NO_SAMPLE"}, Result: "INT64"},
 	}}}}
 	calls := typeCalls(catalog)

@@ -65,10 +65,7 @@ func typedResponse(r response, sql, want string) (probereport.Probe, error) {
 		return probereport.Probe{}, fmt.Errorf("jobs.query: HTTP %d: %s", r.status, r.body)
 	}
 	var schema struct {
-		Fields []struct {
-			Type string `json:"type"`
-			Mode string `json:"mode"`
-		} `json:"fields"`
+		Fields []functioncoverage.Field `json:"fields"`
 	}
 	if err := json.Unmarshal(body["schema"], &schema); err != nil {
 		return probereport.Probe{}, fmt.Errorf("query schema: %w", err)
@@ -76,17 +73,9 @@ func typedResponse(r response, sql, want string) (probereport.Probe, error) {
 	if len(schema.Fields) != 1 {
 		return probereport.Probe{}, fmt.Errorf("query returned %d fields, want one", len(schema.Fields))
 	}
-	got := schema.Fields[0].Type
-	switch got {
-	case "INTEGER":
-		got = "INT64"
-	case "FLOAT":
-		got = "FLOAT64"
-	case "BOOLEAN":
-		got = "BOOL"
-	}
-	if schema.Fields[0].Mode == "REPEATED" {
-		got = "ARRAY<" + got + ">"
+	got, err := schema.Fields[0].SQLType()
+	if err != nil {
+		return probereport.Probe{}, err
 	}
 	if got != want {
 		return probereport.Probe{Outcome: probereport.Broken, Detail: "return type " + got + ", documented " + want}, nil
@@ -179,7 +168,11 @@ func writeFunctionTypes(w io.Writer, known map[string]bool, catalog functioncove
 		fmt.Fprintf(w, "| [%s](#%s) | %d | %s |\n", name, strings.ToLower(strings.ReplaceAll(name, ".", "")), len(entries), status)
 	}
 	for _, f := range catalog.Functions {
-		fmt.Fprintf(w, "\n## %s\n\nSource: [%s](../%s).\n\n| Input types | Return type | Status | Notes |\n| --- | --- | --- | --- |\n", f.Name, f.Name, f.Source)
+		fmt.Fprintf(w, "\n## %s\n\nSource: [%s](../%s).\n", f.Name, f.Name, f.Source)
+		if f.Note != "" {
+			fmt.Fprintf(w, "\n%s\n", f.Note)
+		}
+		fmt.Fprint(w, "\n| Input types | Return type | Status | Notes |\n| --- | --- | --- | --- |\n")
 		for _, call := range byName[f.Name] {
 			status := probereport.Status(map[probereport.Outcome]int{call.probe.Outcome: 1})
 			fmt.Fprintf(w, "| `%s` | `%s` | %s | %s |\n", strings.Join(call.signature.Arguments, ", "), call.signature.Result, status, probereport.Escape(call.probe.Detail))

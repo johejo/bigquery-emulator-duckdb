@@ -24,6 +24,7 @@ type Signature struct {
 type Function struct {
 	Name       string      `json:"name"`
 	Source     string      `json:"source"`
+	Note       string      `json:"note,omitempty"`
 	Signatures []Signature `json:"signatures"`
 }
 
@@ -100,9 +101,15 @@ func Sample(t string) (string, bool) {
 	if t == "INTERVAL" {
 		return "INTERVAL 2 DAY", true
 	}
+	if t == "GEOGRAPHY" {
+		return "ST_GEOGPOINT(1, 2)", true
+	}
+	if t == "JSON" {
+		return `JSON '{"a": [1, 2]}'`, true
+	}
 	value, ok := values[t]
 	if !ok {
-		return "", false
+		return containerSample(t)
 	}
 	return "CAST(" + value + " AS " + t + ")", true
 }

@@ -163,6 +163,11 @@ func generate(root string) (functioncoverage.Catalog, error) {
 			}
 		}
 	}
+	domains, err := proseDomains(root)
+	if err != nil {
+		return c, err
+	}
+	c.Functions = append(c.Functions, domains...)
 	slices.SortFunc(c.Functions, func(a, b functioncoverage.Function) int { return strings.Compare(a.Name, b.Name) })
 	return c, c.Validate()
 }

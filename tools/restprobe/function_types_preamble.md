@@ -4,17 +4,34 @@
 
 This report probes documented input-type combinations independently of the emulator's function
 registrations. The reviewed catalog is `tools/function_types.json`; `just function-types-update`
-extracts it from the checked-in official documentation. Currently it covers the numeric type
-tables in [mathematical functions](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md)
-and the `AVG` and `SUM` tables in [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md),
-including mixed-type binary calls, documented synonyms, and optional precision and rounding-mode
-types. Functions without enumerated signatures are explicitly listed as **Not enumerated**.
-Generic types, container types, and other argument domains still need enumeration; this is not a
-claim of exhaustive BigQuery type coverage.
+extracts reviewed type tables and expands reviewed prose domains from the checked-in official
+documentation:
+
+- [Mathematical functions](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md):
+  numeric input/output tables, mixed-type pairs, synonyms and optional precision and rounding modes.
+- [String functions](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) and
+  [hash functions](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md):
+  STRING/BYTES forms, optional positional arguments and array results.
+- [Array functions](../third_party/bigquery_docs/reference/standard-sql/array_functions.md) and
+  [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md):
+  concrete element and value types, including nested STRUCTs and ARRAYs of STRUCTs.
+- [Statistical aggregates](../third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md):
+  numeric inputs, including mixed-type pairs.
+- [Conditional expressions](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md):
+  same-type alternatives across scalar and container types.
+- [Range functions](../third_party/bigquery_docs/reference/standard-sql/range-functions.md):
+  DATE, DATETIME and TIMESTAMP element types.
+
+Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
+Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
+MEASURE values are not enumerated. Function-specific notes identify other unenumerated domains.
+Functions without signatures are explicitly listed as **Not enumerated**. This is not a claim of
+exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
-could select another overload. Syntax-like options such as rounding modes remain literals. A **Supported** row means the call runs and its REST result type matches
-the documented return type. It does not establish result-value, NULL, error, boundary, or
+could select another overload. Syntax-like options such as rounding modes and SPLIT delimiters
+remain literals. A **Supported** row means the call runs and its REST result type matches the
+documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
 valid sample, not every possible argument value. Rounding-mode calls use `ROUND_HALF_EVEN`.
 
