@@ -1277,6 +1277,7 @@ cc_binary(
         "//src/udf/javascript:limits",
         "//src/udf/python:options",
         "//src/udf_duckdb:register",
+        "@cli11",
     ],
 )
 
