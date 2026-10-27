@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "cases": {
+    "external_runtime_version": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "externalRuntimeOptions": {
+            "runtimeVersion": "python-3.11"
+          },
+          "status": 200
+        }
+      }
+    },
+    "null_description": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "number_description": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "description": "1",
+          "status": 200
+        }
+      }
+    },
+    "output_only_creation_time": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'routine.creation_time' (TYPE_INT64), \"abc\"",
+                        "field": "routine.creation_time"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'routine.creation_time' (TYPE_INT64), \"abc\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'routine.creation_time' (TYPE_INT64), \"abc\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "string_strict_mode": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "status": 200
+        }
+      }
+    },
+    "top_level_runtime_version": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid JSON payload received. Unknown name \"runtimeVersion\" at 'routine': Cannot find field.",
+                        "field": "routine"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid JSON payload received. Unknown name \"runtimeVersion\" at 'routine': Cannot find field.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid JSON payload received. Unknown name \"runtimeVersion\" at 'routine': Cannot find field.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unknown_enum_value": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'routine.language' (type.googleapis.com/google.cloud.bigquery.v2.Routine.Language), \"COBOL\"",
+                        "field": "routine.language"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'routine.language' (type.googleapis.com/google.cloud.bigquery.v2.Routine.Language), \"COBOL\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'routine.language' (type.googleapis.com/google.cloud.bigquery.v2.Routine.Language), \"COBOL\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unknown_field": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid JSON payload received. Unknown name \"unknownField\" at 'routine': Cannot find field.",
+                        "field": "routine"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid JSON payload received. Unknown name \"unknownField\" at 'routine': Cannot find field.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid JSON payload received. Unknown name \"unknownField\" at 'routine': Cannot find field.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unknown_nested_field": {
+      "project": "johejo-sandbox",
+      "run": "qxheyy6baeakfiglko34u3tln4",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid JSON payload received. Unknown name \"unknownField\" at 'routine.routine_reference': Cannot find field.",
+                        "field": "routine.routine_reference"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid JSON payload received. Unknown name \"unknownField\" at 'routine.routine_reference': Cannot find field.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid JSON payload received. Unknown name \"unknownField\" at 'routine.routine_reference': Cannot find field.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

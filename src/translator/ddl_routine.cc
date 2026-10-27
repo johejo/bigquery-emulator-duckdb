@@ -141,7 +141,7 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
       if (text != "python-3.11") {
         return Unsupported(scope, "Python runtime " + text);
       }
-      resource["runtimeVersion"] = text;
+      resource["externalRuntimeOptions"]["runtimeVersion"] = text;
     } else if (python && !value.is_null() && name == DdlOptionId::kEntryPoint && !text.empty() &&
                text.find('\0') == std::string::npos) {
       resource["pythonOptions"]["entryPoint"] = text;
@@ -149,7 +149,8 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
       return Unsupported(scope, "CREATE FUNCTION option " + option->name());
     }
   }
-  if (python && (!resource.contains("runtimeVersion") || !resource.contains("pythonOptions"))) {
+  if (python &&
+      (!resource.contains("externalRuntimeOptions") || !resource.contains("pythonOptions"))) {
     return Unsupported(scope, "Python UDFs without runtime_version and entry_point");
   }
   const googlesql::FunctionSignature& signature = create.signature();

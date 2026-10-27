@@ -71,7 +71,6 @@ cc_library(
     hdrs = ["requests.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":routes",
         "//:api_error",
         "//:httplib",
         "//:query_parameters",
@@ -80,6 +79,7 @@ cc_library(
     linkstatic = True,
     visibility = ["//:__pkg__"],
     deps = [
+        ":routes",
         "//:emulator",
         "//:field_schema",
         "//:references",
@@ -96,6 +96,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":requests",
+        ":routes",
         "//:api_error",
         "//:backend",
         "//:emulator",

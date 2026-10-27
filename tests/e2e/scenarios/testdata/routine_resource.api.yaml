@@ -1,0 +1,186 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run qxheyy6baeakfiglko34u3tln4; the answers
+# sidecar keeps the observations. Rejections observe their status, reason and message.
+#
+# BigQuery parses the Routine resource as protocol buffers' JSON mapping does, and more leniently:
+# it takes the integer 1 for the string description and the string "false" for the boolean
+# strictMode. It checks the types of output-only fields such as creationTime before ignoring them.
+description: >-
+  routines.insert checks the Routine resource against its schema: unknown fields, values of the
+  wrong JSON type, unknown enum values, null fields and the externalRuntimeOptions.runtimeVersion
+  of Python routines, which is not a top-level field.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  accepted:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+          body: ${routine}
+        observe:
+          status: /status
+          externalRuntimeOptions: /body/externalRuntimeOptions
+          description: /body/description
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+          body: ${routine}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: unknown_field
+    template: rejected
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        definitionBody: '1'
+        unknownField: 1
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid JSON payload received. Unknown name "unknownField" at 'routine': Cannot find
+          field.
+  - name: unknown_nested_field
+    template: rejected
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f, unknownField: x}
+        routineType: SCALAR_FUNCTION
+        definitionBody: '1'
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid JSON payload received. Unknown name "unknownField" at 'routine.routine_reference':
+          Cannot find field.
+  - name: top_level_runtime_version
+    template: rejected
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        language: PYTHON
+        runtimeVersion: python-3.11
+        pythonOptions: {entryPoint: f}
+        returnType: {typeKind: INT64}
+        definitionBody: 'def f(): return 1'
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid JSON payload received. Unknown name "runtimeVersion" at 'routine': Cannot find
+          field.
+  - name: external_runtime_version
+    template: accepted
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        language: PYTHON
+        externalRuntimeOptions: {runtimeVersion: python-3.11}
+        pythonOptions: {entryPoint: f}
+        returnType: {typeKind: INT64}
+        definitionBody: 'def f(): return 1'
+    expect:
+      insert:
+        status: 200
+        externalRuntimeOptions: {runtimeVersion: python-3.11}
+  - name: number_description
+    template: accepted
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        definitionBody: '1'
+        description: 1
+    expect:
+      insert:
+        status: 200
+        description: '1'
+  - name: string_strict_mode
+    template: accepted
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: p}
+        routineType: PROCEDURE
+        definitionBody: 'BEGIN SELECT 1; END'
+        strictMode: 'false'
+    expect:
+      insert:
+        status: 200
+  - name: unknown_enum_value
+    template: rejected
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        definitionBody: '1'
+        language: COBOL
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'routine.language'
+          (type.googleapis.com/google.cloud.bigquery.v2.Routine.Language), "COBOL"
+  - name: null_description
+    template: accepted
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        definitionBody: '1'
+        description: null
+    expect:
+      insert:
+        status: 200
+  - name: output_only_creation_time
+    template: rejected
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        definitionBody: '1'
+        creationTime: 'abc'
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: Invalid value at 'routine.creation_time' (TYPE_INT64), "abc"

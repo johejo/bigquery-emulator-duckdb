@@ -1,5 +1,5 @@
 desc: Python routine definitions round-trip through DDL and the REST API
-# Field names and types follow the Routine and PythonOptions REST reference.
+# Field names and types follow the Routine, PythonOptions and ExternalRuntimeOptions REST reference.
 runners:
   req: ${BQ_EMULATOR_API}
 steps:
@@ -20,7 +20,7 @@ steps:
               routineReference: {projectId: test, datasetId: rest_python, routineId: api}
               routineType: SCALAR_FUNCTION
               language: PYTHON
-              runtimeVersion: python-3.11
+              externalRuntimeOptions: {runtimeVersion: python-3.11}
               pythonOptions: {entryPoint: identity}
               arguments: [{name: x, dataType: {typeKind: STRING}}]
               returnType: {typeKind: STRING}
@@ -28,7 +28,7 @@ steps:
               description: Python API routine
     test: |
       current.res.status == 200 && current.res.body.language == 'PYTHON' &&
-      current.res.body.runtimeVersion == 'python-3.11' &&
+      current.res.body.externalRuntimeOptions == {'runtimeVersion': 'python-3.11'} &&
       current.res.body.pythonOptions == {'entryPoint': 'identity'}
   call:
     req:
@@ -57,7 +57,7 @@ steps:
     test: |
       current.res.status == 200 && current.res.body.description == 'DDL routine' &&
       current.res.body.definitionBody == 'def other(x): return x' &&
-      current.res.body.runtimeVersion == 'python-3.11' &&
+      current.res.body.externalRuntimeOptions == {'runtimeVersion': 'python-3.11'} &&
       current.res.body.pythonOptions == {'entryPoint': 'other'}
   reject_packages:
     req:
@@ -68,7 +68,7 @@ steps:
               routineReference: {projectId: test, datasetId: rest_python, routineId: packages}
               routineType: SCALAR_FUNCTION
               language: PYTHON
-              runtimeVersion: python-3.11
+              externalRuntimeOptions: {runtimeVersion: python-3.11}
               pythonOptions: {entryPoint: f, packages: ['numpy']}
               returnType: {typeKind: INT64}
               definitionBody: 'def f(): return 1'

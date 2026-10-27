@@ -113,17 +113,6 @@ steps:
               strictMode: true
               definitionBody: 'BEGIN SELECT missing_column; END'
     test: current.res.status == 400
-  strict_invalid_type:
-    req:
-      /projects/rest-routines/datasets/procedures/routines/p:
-        put:
-          body:
-            application/json:
-              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
-              routineType: PROCEDURE
-              strictMode: 'false'
-              definitionBody: 'BEGIN SELECT 1; END'
-    test: current.res.status == 400
   output_arguments:
     req:
       /projects/rest-routines/datasets/procedures/routines:

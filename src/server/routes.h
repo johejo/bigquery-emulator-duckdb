@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <initializer_list>
 #include <map>
 #include <string>
 #include <string_view>
@@ -33,6 +34,16 @@ struct ApiMethod {
   std::map<std::string, QueryParameter, std::less<>> parameters;
 };
 
+// A JSON field mask, with whole fields taking precedence over their children.
+struct ResourceMask {
+  bool all = false;
+  std::map<std::string, ResourceMask> fields;
+};
+
+// The mask of dot-separated field paths such as "arguments.name". A path may pass through
+// repeated fields, which then stand for each of their elements.
+ResourceMask MaskOf(std::initializer_list<std::string_view> paths);
+
 // The parsed discovery document.
 const nlohmann::json& Discovery();
 // The discovery document's method `id`, such as "bigquery.tables.get". Throws std::logic_error
@@ -44,5 +55,13 @@ ApiMethod FindApiMethod(std::string_view id);
 // them; every method handles some of the API-wide ones.
 void CheckQueryParameters(const ApiMethod& method, const std::vector<std::string>& accepted,
                           const httplib::Request& request);
+// Checks a request's resource against the discovery document's schema `schema`, such as
+// "Routine", and returns it without null and output-only fields and with the scalars BigQuery
+// converts, such as integers given for strings, converted. Rejects a field the schema lacks or a
+// value its type does not allow as invalid, with BigQuery's messages, and a field `accepted`
+// leaves out as unsupported. The handler supports `accepted`, which can still reject some of their
+// values. Throws std::logic_error when `accepted` names a field the schema lacks.
+nlohmann::json CheckResource(const nlohmann::json& resource, std::string_view schema,
+                             const ResourceMask& accepted);
 
 }  // namespace bigquery_emulator_duckdb::server

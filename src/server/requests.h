@@ -12,6 +12,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/server/routes.h"
 #include "src/table_metadata.h"
 
 namespace httplib {
@@ -55,12 +56,6 @@ struct ListPage {
 
 // A missing value matches any value of the label, including the empty string.
 using DatasetFilter = std::map<std::string, std::optional<std::string>>;
-
-// A JSON field mask, with whole fields taking precedence over their children.
-struct ResourceMask {
-  bool all = false;
-  std::map<std::string, ResourceMask> fields;
-};
 
 struct RoutineListRequest {
   ListPage page;

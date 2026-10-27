@@ -27,38 +27,26 @@
 namespace bigquery_emulator_duckdb::server {
 namespace {
 
-constexpr auto kRoutineReferenceFields = std::to_array<std::string_view>({
-    "projectId",
-    "datasetId",
-    "routineId",
-});
-
-constexpr auto kIgnoredRoutineFields = std::to_array<std::string_view>({
-    "routineReference",
-    "creationTime",
-    "lastModifiedTime",
-    "etag",
-    "buildStatus",
-});
-
-constexpr auto kRoutineFields = std::to_array<std::string_view>({
-    "routineType",
-    "language",
-    "arguments",
-    "returnType",
-    "returnTableType",
-    "definitionBody",
-    "description",
-    "strictMode",
-    "runtimeVersion",
-    "pythonOptions",
-});
-
-constexpr auto kRoutineArgumentFields = std::to_array<std::string_view>({
-    "name",
-    "argumentKind",
-    "dataType",
-});
+// The routine fields ParseRoutine handles, although it supports only some of their values.
+const ResourceMask& RoutineFields() {
+  static const ResourceMask* const kFields = new ResourceMask(MaskOf({
+      "routineReference",
+      "routineType",
+      "language",
+      "arguments.name",
+      "arguments.argumentKind",
+      "arguments.dataType",
+      "arguments.mode",
+      "returnType",
+      "returnTableType",
+      "definitionBody",
+      "description",
+      "strictMode",
+      "pythonOptions.entryPoint",
+      "externalRuntimeOptions.runtimeVersion",
+  }));
+  return *kFields;
+}
 
 constexpr auto kProcedureArgumentModes = std::to_array<std::string_view>({
     "IN",
@@ -672,49 +660,25 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
 }
 
 Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
-  if (!body.is_object()) {
-    throw ApiError::Invalid("Invalid routine resource");
-  }
-  const json reference = body.value("routineReference", json::object());
-  if (!reference.is_object()) {
-    throw ApiError::Invalid("Invalid routine reference");
-  }
-  for (const auto& [name, value] : reference.items()) {
-    if (std::ranges::find(kRoutineReferenceFields, name) == kRoutineReferenceFields.end()) {
-      throw ApiError::Invalid("Invalid routine reference field: " + name);
-    }
-  }
-  const std::string id = StringField(reference, "routineId", "routine ID");
+  json resource = CheckResource(body, "Routine", RoutineFields());
+  const json reference = resource.value("routineReference", json::object());
+  resource.erase("routineReference");
+  const std::string id = reference.value("routineId", "");
   if (id.empty()) {
     throw ApiError::Invalid("Required parameter is missing: routineId");
   }
-  if (StringField(reference, "projectId", "project ID") != dataset.project_id ||
-      StringField(reference, "datasetId", "dataset ID") != dataset.dataset_id) {
+  if (reference.value("projectId", "") != dataset.project_id ||
+      reference.value("datasetId", "") != dataset.dataset_id) {
     throw ApiError::Invalid("Routine reference does not match the request path");
   }
-  json resource = json::object();
-  for (const auto& [name, value] : body.items()) {
-    if (std::ranges::find(kIgnoredRoutineFields, name) != kIgnoredRoutineFields.end() ||
-        value.is_null()) {
-      continue;
-    }
-    if (std::ranges::find(kRoutineFields, name) == kRoutineFields.end()) {
-      throw ApiError::Unsupported("routine field " + name);
-    }
-    resource[name] = value;
-  }
-  const std::string type = StringField(resource, "routineType", "routine type");
+  const std::string type = resource.value("routineType", "");
   const bool procedure = type == "PROCEDURE";
   const bool tvf = type == "TABLE_VALUED_FUNCTION";
   if (!procedure && !tvf && type != "SCALAR_FUNCTION") {
     throw ApiError::Unsupported(
         "routines other than SQL scalar functions, table functions and procedures");
   }
-  if (procedure) {
-    if (resource.contains("strictMode") && !resource["strictMode"].is_boolean()) {
-      throw ApiError::Invalid("Invalid routine strictMode");
-    }
-  } else if (resource.contains("strictMode")) {
+  if (!procedure && resource.contains("strictMode")) {
     throw ApiError::Unsupported("strictMode on functions");
   }
   if (resource.contains("returnType") && (procedure || tvf)) {
@@ -723,58 +687,43 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   if (resource.contains("returnTableType") && !tvf) {
     throw ApiError::Invalid("Only table functions can have returnTableType");
   }
-  const std::string language =
-      resource.contains("language") ? StringField(resource, "language", "routine language") : "SQL";
+  const std::string language = resource.value("language", "SQL");
   if (language != "SQL" && language != "PYTHON") {
     throw ApiError::Unsupported("non-SQL routines other than Python scalar functions");
   }
   resource["language"] = language;
   if (language == "PYTHON") {
-    if (procedure || tvf ||
-        StringField(resource, "runtimeVersion", "runtimeVersion") != "python-3.11" ||
-        !resource.contains("returnType")) {
+    if (procedure || tvf || !resource.contains("returnType") ||
+        resource.value(json::json_pointer("/externalRuntimeOptions/runtimeVersion"), "") !=
+            "python-3.11") {
       throw ApiError::Unsupported("Python routines without a fixed result and python-3.11 runtime");
     }
-    const json python = resource.value("pythonOptions", json::object());
-    if (!python.is_object() || python.size() != 1 ||
-        StringField(python, "entryPoint", "Python entry point").empty()) {
-      throw ApiError::Unsupported("Python options other than entryPoint, or a missing entryPoint");
+    if (resource.value(json::json_pointer("/pythonOptions/entryPoint"), "").empty()) {
+      throw ApiError::Unsupported("Python routines without an entryPoint");
     }
-    if (resource.contains("strictMode")) {
-      throw ApiError::Unsupported("Python strictMode");
-    }
-  } else if (resource.contains("runtimeVersion") || resource.contains("pythonOptions")) {
+  } else if (resource.contains("externalRuntimeOptions") || resource.contains("pythonOptions")) {
     throw ApiError::Unsupported("Python options on SQL routines");
   }
-  if (StringField(resource, "definitionBody", "routine body").empty()) {
+  if (resource.value("definitionBody", "").empty()) {
     throw ApiError::Invalid("Required parameter is missing: definitionBody");
-  }
-  if (resource.contains("description")) {
-    StringField(resource, "description", "routine description");
   }
   if (!resource.contains("arguments")) {
     resource["arguments"] = json::array();
   }
-  if (!resource["arguments"].is_array()) {
-    throw ApiError::Invalid("Invalid routine arguments");
-  }
   for (const json& argument : resource["arguments"]) {
-    if (!argument.is_object() || StringField(argument, "name", "argument name").empty()) {
+    if (argument.value("name", "").empty()) {
       throw ApiError::Invalid("Invalid routine argument");
     }
-    for (const auto& [name, value] : argument.items()) {
-      if (std::ranges::find(kRoutineArgumentFields, name) == kRoutineArgumentFields.end() &&
-          !(procedure && name == "mode")) {
-        throw ApiError::Unsupported("routine argument field " + name);
+    if (argument.contains("mode")) {
+      const std::string mode = argument["mode"].get<std::string>();
+      if (!procedure) {
+        throw ApiError::Unsupported("routine argument field mode");
       }
-    }
-    if (procedure && argument.contains("mode")) {
-      const std::string mode = StringField(argument, "mode", "argument mode");
       if (std::ranges::find(kProcedureArgumentModes, mode) == kProcedureArgumentModes.end()) {
         throw ApiError::Unsupported("procedure argument mode " + mode);
       }
     }
-    const std::string kind = StringField(argument, "argumentKind", "argument kind");
+    const std::string kind = argument.value("argumentKind", "");
     if ((procedure || tvf) && kind == "ANY_TYPE") {
       throw ApiError::Unsupported("procedure or TVF arguments of ANY TYPE");
     }

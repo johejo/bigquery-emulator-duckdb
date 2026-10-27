@@ -2,15 +2,19 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <initializer_list>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -120,7 +124,197 @@ bool Fits(const QueryParameter& parameter, std::string_view value) {
   return true;
 }
 
+// The name of a field path such as "routine.routineReference" in BigQuery's errors, which spell
+// fields as in protocol buffers: "routine.routine_reference".
+std::string ProtoPath(std::string_view path) {
+  std::string result;
+  for (const char c : path) {
+    if (std::isupper(static_cast<unsigned char>(c)) != 0) {
+      result += '_';
+      result += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    } else {
+      result += c;
+    }
+  }
+  return result;
+}
+
+// The protocol buffer type of the scalar `parameter` in BigQuery's errors. `enum_type` is the
+// enum's full name, such as "google.cloud.bigquery.v2.Routine.Language".
+std::string ProtoType(const QueryParameter& parameter, std::string_view enum_type) {
+  if (!parameter.values.empty()) {
+    return std::format("type.googleapis.com/{}", enum_type);
+  }
+  if (parameter.type == "boolean") {
+    return "TYPE_BOOL";
+  }
+  if (parameter.type == "number") {
+    return parameter.format == "float" ? "TYPE_FLOAT" : "TYPE_DOUBLE";
+  }
+  if (parameter.format.ends_with("int32") || parameter.format.ends_with("int64")) {
+    std::string type = "TYPE_" + parameter.format;
+    std::ranges::transform(type, type.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    return type;
+  }
+  return parameter.format == "byte" ? "TYPE_BYTES" : "TYPE_STRING";
+}
+
+// `value` as a value of the scalar `parameter`, or nothing when it is not one. BigQuery parses
+// JSON as protocol buffers do, which also take integers as strings and 64-bit integers, which
+// are strings, as numbers; it also takes integers as strings and "true" and "false" as booleans.
+std::optional<json> ScalarValue(const QueryParameter& parameter, const json& value) {
+  if (parameter.type == "boolean") {
+    if (value.is_boolean()) {
+      return value;
+    }
+    if (value == "true" || value == "false") {
+      return value == "true";
+    }
+    return std::nullopt;
+  }
+  if (parameter.type == "number") {
+    if (!value.is_string()) {
+      return value.is_number() ? std::optional(value) : std::nullopt;
+    }
+    const auto& text = value.get_ref<const std::string&>();
+    double number = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), number);
+    if (text == "NaN" || text == "Infinity" || text == "-Infinity" ||
+        (error == std::errc() && end == text.data() + text.size())) {
+      return value;
+    }
+    return std::nullopt;
+  }
+  if (value.is_number_integer() && parameter.values.empty()) {
+    return Fits(parameter, value.dump())
+               ? std::optional(parameter.type == "integer" ? value : json(value.dump()))
+               : std::nullopt;
+  }
+  if (value.is_string() && Fits(parameter, value.get_ref<const std::string&>())) {
+    return parameter.type == "integer" ? json::parse(value.get_ref<const std::string&>()) : value;
+  }
+  return std::nullopt;
+}
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): a value and its schema.
+json CheckValue(const json& value, const json& property, const ResourceMask& accepted,
+                const std::string& path, const std::string& enum_type);
+
+json CheckObject(const json& value, const json& schema, const ResourceMask& accepted,
+                 const std::string& path) {
+  const json& properties = schema.at("properties");
+  const auto& id = schema.at("id").get_ref<const std::string&>();
+  for (const auto& [name, child] : accepted.fields) {
+    if (!properties.contains(name)) {
+      throw std::logic_error(std::format("The {} schema has no field {}", id, name));
+    }
+  }
+  if (!value.is_object()) {
+    throw ApiError::Invalid(
+        std::format("Invalid value at '{}', {}", ProtoPath(path), value.dump()));
+  }
+  json result = json::object();
+  for (const auto& [name, field] : value.items()) {
+    if (!properties.contains(name)) {
+      throw ApiError::Invalid(std::format(
+          "Invalid JSON payload received. Unknown name \"{}\" at '{}': Cannot find field.", name,
+          ProtoPath(path)));
+    }
+    if (field.is_null()) {
+      continue;
+    }
+    const std::string field_path = std::format("{}.{}", path, name);
+    // The enum a field holds is named after it, such as Routine.Language for Routine.language.
+    std::string type_name = name;
+    type_name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
+    const std::string enum_type = std::format("google.cloud.bigquery.v2.{}.{}", id, type_name);
+    const auto child = accepted.fields.find(name);
+    const bool output_only = properties[name].value("readOnly", false);
+    // Output-only fields are checked, as BigQuery does, but ignored.
+    if (!output_only && !accepted.all && child == accepted.fields.end()) {
+      throw ApiError::Unsupported(field_path);
+    }
+    const ResourceMask everything{.all = true, .fields = {}};
+    json checked =
+        CheckValue(field, properties[name],
+                   accepted.all || output_only ? everything : child->second, field_path, enum_type);
+    if (!output_only) {
+      result[name] = std::move(checked);
+    }
+  }
+  return result;
+}
+
+json CheckValue(const json& value, const json& property, const ResourceMask& accepted,
+                const std::string& path, const std::string& enum_type) {
+  const json& schema = property.contains("$ref")
+                           ? Discovery()["schemas"][property["$ref"].get<std::string>()]
+                           : property;
+  const std::string type = schema.value("type", "");
+  if (type == "object" && schema.contains("properties")) {
+    return CheckObject(value, schema, accepted, path);
+  }
+  if (type == "array" && value.is_array()) {
+    json result = json::array();
+    for (size_t i = 0; i < value.size(); ++i) {
+      result.push_back(CheckValue(value[i], schema["items"], accepted,
+                                  std::format("{}[{}]", path, i), enum_type));
+    }
+    return result;
+  }
+  // A map, or a google.protobuf.Struct, whose schema has no properties.
+  if (type == "object" && value.is_object()) {
+    if (!schema.contains("additionalProperties")) {
+      return value;
+    }
+    json result = json::object();
+    for (const auto& [key, entry] : value.items()) {
+      result[key] = CheckValue(entry, schema["additionalProperties"], accepted,
+                               std::format("{}.{}", path, key), enum_type);
+    }
+    return result;
+  }
+  if (type == "any") {
+    return value;
+  }
+  if (type != "array" && type != "object") {
+    const QueryParameter parameter = ReadQueryParameter(schema);
+    if (std::optional<json> scalar = ScalarValue(parameter, value); scalar.has_value()) {
+      return *std::move(scalar);
+    }
+    throw ApiError::Invalid(std::format("Invalid value at '{}' ({}), {}", ProtoPath(path),
+                                        ProtoType(parameter, enum_type), value.dump()));
+  }
+  throw ApiError::Invalid(std::format("Invalid value at '{}', {}", ProtoPath(path), value.dump()));
+}
+// NOLINTEND(bugprone-easily-swappable-parameters)
+
 }  // namespace
+
+ResourceMask MaskOf(std::initializer_list<std::string_view> paths) {
+  ResourceMask mask;
+  for (std::string_view path : paths) {
+    ResourceMask* field = &mask;
+    while (true) {
+      const size_t dot = path.find('.');
+      field = &field->fields[std::string(path.substr(0, dot))];
+      if (dot == std::string_view::npos) {
+        break;
+      }
+      path.remove_prefix(dot + 1);
+    }
+    field->all = true;
+  }
+  return mask;
+}
+
+json CheckResource(const json& resource, std::string_view schema, const ResourceMask& accepted) {
+  // Named in errors like the request field that holds the resource, such as "routine".
+  std::string path(schema);
+  path.front() = static_cast<char>(std::tolower(static_cast<unsigned char>(path.front())));
+  return CheckObject(resource, Discovery()["schemas"].at(std::string(schema)), accepted, path);
+}
 
 const json& Discovery() {
   static const json* const kDocument = new json(json::parse(DiscoveryDocument()));
