@@ -9,8 +9,15 @@
 namespace bigquery_emulator_duckdb {
 
 ExcludedFunctionIds BigQueryExcludedFunctionIds() {
-  // GoogleSQL implements MONTHS_BETWEEN, but BigQuery has no such built-in function.
-  return {googlesql::FN_MONTHS_BETWEEN_DATE, googlesql::FN_MONTHS_BETWEEN_DATETIME};
+  // GoogleSQL implements these functions, but BigQuery has no such built-ins.
+  return {
+      googlesql::FN_MONTHS_BETWEEN_DATE, googlesql::FN_MONTHS_BETWEEN_DATETIME,
+      googlesql::FN_ARRAY_AVG_INT32,     googlesql::FN_ARRAY_AVG_INT64,
+      googlesql::FN_ARRAY_AVG_UINT32,    googlesql::FN_ARRAY_AVG_UINT64,
+      googlesql::FN_ARRAY_AVG_FLOAT,     googlesql::FN_ARRAY_AVG_DOUBLE,
+      googlesql::FN_ARRAY_AVG_NUMERIC,   googlesql::FN_ARRAY_AVG_BIGNUMERIC,
+      googlesql::FN_ARRAY_AVG_INTERVAL,
+  };
 }
 
 googlesql::BuiltinFunctionOptions AnalyzerBuiltinFunctionOptions(

@@ -1,0 +1,13 @@
+# Observed BigQuery answers recorded with tools/bqanswers: ARRAY_AVG is GoogleSQL-only.
+# Ignore the location and spelling suggestion when matching the missing-function error.
+SELECT ARRAY_AVG([1, 2, 3])
+=> error contains: Function not found: ARRAY_AVG
+
+SELECT ARRAY_AVG([NUMERIC '99999999999999999999999999999.999999999', NUMERIC '99999999999999999999999999999.999999999'])
+=> error contains: Function not found: ARRAY_AVG
+
+SELECT ARRAY_AVG([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)])
+=> error contains: Function not found: ARRAY_AVG
+
+SELECT ARRAY_AVG([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)])
+=> error contains: Function not found: ARRAY_AVG

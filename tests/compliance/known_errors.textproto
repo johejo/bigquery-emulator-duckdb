@@ -1706,7 +1706,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "ARRAY_AVG overflows to an infinity on large FLOAT64 values and fails on large NUMERIC values where BigQuery averages them"
+  reason: "GoogleSQL-only ARRAY_AVG rewrites to AVG, which overflows on large NUMERIC inputs; BigQuery has no ARRAY_AVG"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_4qS1lLNqJ_o_99999999>"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_SZg36vYOvN4_99, NULL>"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<99999999_C5LR8bBMNA0_99999999>"
@@ -1715,7 +1715,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ARRAY_AVG overflows to an infinity on large FLOAT64 values and fails on large NUMERIC values where BigQuery averages them"
+  reason: "GoogleSQL-only ARRAY_AVG rewrites to AVG, which differs on extreme FLOAT64 inputs; BigQuery has no ARRAY_AVG"
   label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_1L-8QnCUN9A_157e@308>"
   label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_MMZF774CJJk_08, NULL>"
   label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_esyov0xpM84_157e@308>"

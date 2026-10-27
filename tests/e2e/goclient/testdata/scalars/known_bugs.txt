@@ -6,6 +6,17 @@
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
 
+# AVG boundary answers recorded with tools/bqanswers while checking ARRAY_AVG.
+# These are separate aggregate bugs, not evidence that BigQuery supports ARRAY_AVG.
+SELECT AVG(x) FROM UNNEST([NUMERIC '99999999999999999999999999999.999999999', NUMERIC '99999999999999999999999999999.999999999']) AS x
+!> "99999999999999999999999999999.999999999"
+
+SELECT AVG(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+!> "1.7976931348623157E308"
+
+SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x
+!> "NaN"
+
 # BigQuery reports where the exception was thrown; QuickJS keeps only where an Error was created.
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()
