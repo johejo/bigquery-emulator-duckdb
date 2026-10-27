@@ -47,7 +47,7 @@ build --@rules_python//python/config_settings:bootstrap_impl=script
 # macOS build compatibility.
 build:macos --features=-header_modules
 build:macos --features=-parse_headers
-# The static CPython archive contains LLVM bitcode, which Apple's linker reads poorly.
+# CPython's cached native-code conversion needs a newer LLVM bitcode reader than Apple's.
 build:macos --linkopt=-fuse-ld=lld
 build:macos --host_linkopt=-fuse-ld=lld
 
