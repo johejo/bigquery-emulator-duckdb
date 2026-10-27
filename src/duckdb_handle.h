@@ -20,7 +20,7 @@ class Handle {
   Handle(Handle&& other) noexcept : handle_(other.release()) {}
   Handle(const Handle&) = delete;
   Handle& operator=(const Handle&) = delete;
-  T get() const { return handle_; }
+  [[nodiscard]] T get() const { return handle_; }
   T* out() { return &handle_; }
   T release() { return std::exchange(handle_, nullptr); }
 
@@ -37,6 +37,19 @@ struct DuckFree {
   void operator()(const void* pointer) const { duckdb_free(const_cast<void*>(pointer)); }
 };
 using DuckString = std::unique_ptr<const char, DuckFree>;
+
+// Whether the DuckDB `type` is a LIST or an ARRAY.
+inline bool IsListLike(duckdb_logical_type type) {
+  return duckdb_get_type_id(type) == DUCKDB_TYPE_LIST ||
+         duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
+}
+
+// The element type of the DuckDB LIST or ARRAY `type`.
+inline LogicalType ElementType(duckdb_logical_type type) {
+  return LogicalType(duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY
+                         ? duckdb_array_type_child_type(type)
+                         : duckdb_list_type_child_type(type));
+}
 
 template <typename T>
 inline T VectorElement(duckdb_vector vector, idx_t row) {

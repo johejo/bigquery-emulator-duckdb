@@ -36,6 +36,7 @@
 #include "src/location.h"
 #include "src/parquet_metadata.h"
 #include "src/references.h"
+#include "src/result_googlesql.h"
 #include "src/schema_sql.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
@@ -576,7 +577,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       WriteTextExtract(
           table.schema, result.rows.size(),
           [&](size_t row, size_t column, const googlesql::Type* type) {
-            return result.rows.GoogleSqlValue(row, column, type);
+            return GoogleSqlValueReader::Read(result.rows, row, column, type);
           },
           options, encoding.compression, path);
     }

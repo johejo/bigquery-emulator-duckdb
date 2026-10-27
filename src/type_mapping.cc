@@ -651,17 +651,6 @@ absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field) {
   return DuckDbFieldType(field, TypeUse::kParameter);
 }
 
-bool IsListLike(duckdb_logical_type type) {
-  return duckdb_get_type_id(type) == DUCKDB_TYPE_LIST ||
-         duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
-}
-
-LogicalType ElementType(duckdb_logical_type type) {
-  return LogicalType(duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY
-                         ? duckdb_array_type_child_type(type)
-                         : duckdb_list_type_child_type(type));
-}
-
 FieldSchema ResultFieldSchema(const std::string& name, duckdb_logical_type type) {
   FieldSchema field;
   field.name = name;

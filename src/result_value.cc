@@ -7,11 +7,12 @@
 #include "googlesql/public/value.h"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/result_googlesql.h"
 
 namespace bigquery_emulator_duckdb {
 
 googlesql::Value ResultValue(const QueryResult& result, const googlesql::Type* type) {
-  absl::StatusOr<googlesql::Value> value = result.rows.GoogleSqlValue(0, 0, type);
+  absl::StatusOr<googlesql::Value> value = GoogleSqlValueReader::Read(result.rows, 0, 0, type);
   if (!value.ok()) {
     throw ApiError::UnsupportedQuery("option values of type " + type->DebugString());
   }
