@@ -170,12 +170,14 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
     return absl::OutOfRangeError(
         "ST_GeogFromText failed: Options make_valid and oriented are not compatible.");
   }
-  if (args.Bool(2) || args.Bool(3)) {
+  if (args.Bool(3)) {
     return absl::UnimplementedError(
-        "The emulator does not support ST_GEOGFROMTEXT with planar or make_valid set to TRUE");
+        "The emulator does not support ST_GEOGFROMTEXT with make_valid set to TRUE");
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
-                             googlesql_geography::ReadWkt(args.String(0), args.Bool(1)));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Geography geography,
+      googlesql_geography::ReadWkt(args.String(0), args.Bool(1),
+                                   "ST_GeogFromText failed: ", args.Bool(2)));
   return EncodeGeography(geography);
 }
 
@@ -201,14 +203,20 @@ absl::StatusOr<std::string> GeogFromHexWkb(const Arguments& args) {
 
 template <bool kHex>
 absl::StatusOr<std::string> GeogFromOrientedWkb(const Arguments& args) {
-  if (args.Bool(2) || args.Bool(3)) {
+  if (args.Bool(1) && args.Bool(2)) {
+    return absl::OutOfRangeError(
+        "ST_GeogFromWKB: Options planar and oriented are not compatible.; in planar WKB "
+        "geography; error in ST_GeogFromWKB expression");
+  }
+  if (args.Bool(3)) {
     return absl::UnimplementedError(
-        "The emulator does not support ST_GEOGFROMWKB with planar or make_valid set to TRUE");
+        "The emulator does not support ST_GEOGFROMWKB with make_valid set to TRUE");
   }
   const auto geography =
-      kHex ? googlesql_geography::ReadHexWkb(args.String(0),
-                                             "ST_GeogFromWKBHex failed: ", args.Bool(1))
-           : googlesql_geography::ReadWkb(args.String(0), "ST_GeogFromWKB failed: ", args.Bool(1));
+      kHex ? googlesql_geography::ReadHexWkb(
+                 args.String(0), "ST_GeogFromWKBHex failed: ", args.Bool(1), args.Bool(2))
+           : googlesql_geography::ReadWkb(args.String(0), "ST_GeogFromWKB failed: ", args.Bool(1),
+                                          args.Bool(2));
   if (!geography.ok()) {
     return geography.status();
   }

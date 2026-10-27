@@ -82,7 +82,6 @@ END;
 SELECT COUNT(*) FROM committed
 !> "1"
 
-# ST_GEOGFROMWKB's planar argument is unsupported. BigQuery adds the planar edge's midpoints
-# until it is close enough to the geodesic one.
+# BigQuery adds the planar edge's midpoints until it is close enough to the geodesic one.
 SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040'), planar => TRUE)
-!> "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
+=> "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"

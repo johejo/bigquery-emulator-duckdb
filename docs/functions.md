@@ -261,8 +261,8 @@ functions.
 | [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Supported | S2 function |  |
 | [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Supported | S2 function |  |
 | [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
-| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMTEXT with planar or make_valid set to TRUE. |
-| [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMWKB with planar or make_valid set to TRUE. |
+| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMTEXT with make_valid set to TRUE. |
+| [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMWKB with make_valid set to TRUE. |
 | [`ST_GEOGPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpoint) | Supported | S2 function |  |
 | [`ST_GEOGPOINTFROMGEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpointfromgeohash) | Supported | S2 function |  |
 | [`ST_GEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geohash) | Supported | S2 function |  |

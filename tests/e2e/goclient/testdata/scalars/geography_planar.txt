@@ -1,0 +1,52 @@
+# Sources: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb
+# The tessellated line is the observed BigQuery answer in known_bugs.txt, read as WKT or hex WKB.
+SELECT ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)', planar => TRUE)
+=> "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
+
+SELECT ST_GEOGFROMWKB('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040', planar => TRUE)
+=> "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
+
+# Planar points have no edges to tessellate.
+SELECT ST_GEOGFROMTEXT('POINT(1 2)', planar => TRUE)
+=> "POINT(1 2)"
+
+SELECT ST_GEOGFROMWKB(ST_ASBINARY(ST_GEOGPOINT(1, 2)), planar => TRUE)
+=> "POINT(1 2)"
+
+SELECT ST_GEOGFROMTEXT('GEOMETRYCOLLECTION EMPTY', planar => TRUE)
+=> "GEOMETRYCOLLECTION EMPTY"
+
+SELECT ST_GEOGFROMWKB('010700000000000000', planar => TRUE)
+=> "GEOMETRYCOLLECTION EMPTY"
+
+SELECT ST_GEOGFROMTEXT(NULL, planar => TRUE)
+=> null
+
+SELECT ST_GEOGFROMWKB(CAST(NULL AS BYTES), planar => TRUE)
+=> null
+
+SELECT ST_GEOGFROMWKB(CAST(NULL AS STRING), planar => TRUE)
+=> null
+
+SELECT ST_GEOGFROMTEXT('POINT(1 2)', planar => NULL)
+=> null
+
+SELECT ST_GEOGFROMWKB(ST_ASBINARY(ST_GEOGPOINT(1, 2)), planar => NULL)
+=> null
+
+SELECT SAFE.ST_GEOGFROMTEXT('POINT(0 91)', planar => TRUE)
+=> null
+
+SELECT SAFE.ST_GEOGFROMWKB('zz', planar => TRUE)
+=> null
+
+SELECT SAFE.ST_GEOGFROMWKB(b'', planar => TRUE)
+=> null
+
+# The two options cannot both be TRUE (documented for both parsers).
+SELECT SAFE.ST_GEOGFROMTEXT('POINT(1 2)', oriented => TRUE, planar => TRUE)
+=> null
+
+SELECT SAFE.ST_GEOGFROMWKB(ST_ASBINARY(ST_GEOGPOINT(1, 2)), oriented => TRUE, planar => TRUE)
+=> null

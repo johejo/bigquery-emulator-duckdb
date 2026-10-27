@@ -22,8 +22,8 @@ constexpr size_t kWkbHeaderDigits = 10;
 
 }  // namespace
 
-absl::StatusOr<Geography> ReadHexWkb(std::string_view text, std::string_view failed,
-                                     bool oriented) {
+absl::StatusOr<Geography> ReadHexWkb(std::string_view text, std::string_view failed, bool oriented,
+                                     bool planar) {
   const auto* const invalid =
       std::ranges::find_if(text, [](unsigned char c) { return std::isxdigit(c) == 0; });
   std::string bytes;
@@ -34,7 +34,7 @@ absl::StatusOr<Geography> ReadHexWkb(std::string_view text, std::string_view fai
         "Failed to decode invalid hexadecimal string due to character at offset " +
         std::to_string(invalid - text.begin()) + ": " + std::string(text));
   }
-  return ReadWkb(bytes, failed, oriented);
+  return ReadWkb(bytes, failed, oriented, planar);
 }
 
 absl::StatusOr<Geography> ReadGeography(std::string_view text, bool oriented,
