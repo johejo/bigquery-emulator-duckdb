@@ -25,3 +25,10 @@ and of `protobuf~` and `googleapis~`; the patch points those at the canonical na
 for the `http_archive` of file-based-test-driver to fix `Match` and `GetContents`, which pass the
 data of a `string_view` that is not NUL-terminated to `stat()` and so fail to find a `.test` file
 at random. It stays as long as that test does.
+
+`compliance_expected_results.patch` compares code-based Base32 tests with their existing
+expected values and statuses when the reference implementation returns `UNIMPLEMENTED`.
+The open-source reference implementation omits Base32; comparing against its error would
+otherwise mark working functions as known errors. The fallback is limited to Base32's
+feature-independent vectors, including SAFE calls. Drop it once the reference implementation
+supports Base32.

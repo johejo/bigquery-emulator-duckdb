@@ -1,0 +1,22 @@
+diff --git a/googlesql/compliance/sql_test_base.cc b/googlesql/compliance/sql_test_base.cc
+--- a/googlesql/compliance/sql_test_base.cc
++++ b/googlesql/compliance/sql_test_base.cc
+@@ -1674,6 +1674,18 @@
+     }
+     SCOPED_TRACE(sql);
+     // TODO: Should we do something with 'is_deterministic_output'?
++    // Base32 is absent from the open-source reference implementation. Its
++    // feature-independent test vectors still check the engine's results.
++    if (absl::IsUnimplemented(reference_result.status()) &&
++        (absl::StartsWith(full_name_, "code:to_base32_") ||
++         absl::StartsWith(full_name_, "code:from_base32_") ||
++         absl::StartsWith(full_name_, "code:safe_error_mode__safe_to_base32_") ||
++         absl::StartsWith(full_name_, "code:safe_error_mode__safe_from_base32_"))) {
++      EXPECT_THAT(RunSQL(sql, params),
++                  Returns(expected_value, expected_status, float_margin))
++          << "FullName: " << full_name();
++      return;
++    }
+     EXPECT_THAT(RunSQL(sql, params), Returns(reference_result, float_margin))
+         << "FullName: " << full_name() << "; "
+         << "Labels: " << absl::StrJoin(GetCodeBasedLabels(), ", ");
