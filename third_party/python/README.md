@@ -8,9 +8,10 @@ separate interpreter.
 
 The bundled `libssl.a` and `libcrypto.a` are excluded. CPython and the emulator's other dependencies
 link the same Bazel OpenSSL instead, avoiding duplicate crypto symbols. The static CPython archive
-contains LLVM bitcode. `native_archive.bzl` compiles it to native code with LLVM lld before any
-executable links it. Bazel caches this action from the input archive, C++ toolchain and conversion
-options, so relinking the emulator or tests does not repeat CPython's optimization and code
+contains LLVM bitcode. `BUILD.python.bazel` selects `native_archive_linux.bzl` or
+`native_archive_macos.bzl` to compile it to native code with LLVM lld before any executable links
+it. Bazel caches this action from the input archive, C++ toolchain and conversion options, so
+relinking the emulator or tests does not repeat CPython's optimization and code
 generation. The whole input archive is loaded, leaving external references for the final link
 to resolve against the shared Bazel dependencies above.
 

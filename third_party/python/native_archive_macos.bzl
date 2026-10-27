@@ -1,10 +1,12 @@
-"""Compile CPython's full-LTO archive once instead of at every executable link."""
+"""Convert CPython's full-LTO archive using saved Mach-O LTO objects."""
 
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cpp_toolchain", "use_cc_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
-def _macos_objects(ctx, toolchain):
+def _macos_native_archive_impl(ctx):
+    toolchain = find_cpp_toolchain(ctx)
+    archive = ctx.actions.declare_file(ctx.label.name + ".a")
     objects = ctx.actions.declare_directory(ctx.label.name + ".lto")
     dylib = ctx.actions.declare_file(ctx.label.name + ".dylib")
     features = cc_common.configure_features(
@@ -53,49 +55,10 @@ def _macos_objects(ctx, toolchain):
         progress_message = "Compile CPython's LTO archive to native code %{label}",
         use_default_shell_env = True,
     )
-    return objects
-
-def _native_archive_impl(ctx):
-    toolchain = find_cpp_toolchain(ctx)
-    archive = ctx.actions.declare_file(ctx.label.name + ".a")
-    if ctx.target_platform_has_constraint(ctx.attr._macos[platform_common.ConstraintValueInfo]):
-        objects = _macos_objects(ctx, toolchain)
-        ctx.actions.run_shell(
-            command = '"$1" rcs "$2" "$3"/*.o',
-            arguments = [toolchain.ar_executable, archive.path, objects.path],
-            inputs = depset([objects], transitive = [toolchain.all_files]),
-            outputs = [archive],
-            mnemonic = "PythonNativeArchive",
-            progress_message = "Archive CPython's native code %{label}",
-            use_default_shell_env = True,
-        )
-        return [DefaultInfo(files = depset([archive]))]
-
-    obj = ctx.actions.declare_file(ctx.label.name + ".o")
-    args = ctx.actions.args()
-    args.add_all([
-        "-fuse-ld=lld",
-        "-flto",
-        "-nostdlib",
-        "-r",
-        "-Wl,--whole-archive",
-    ])
-    args.add(ctx.file.src)
-    args.add("-Wl,--no-whole-archive")
-    args.add("-o", obj)
-    ctx.actions.run(
-        executable = toolchain.compiler_executable,
-        arguments = [args],
-        inputs = depset([ctx.file.src], transitive = [toolchain.all_files]),
-        outputs = [obj],
-        mnemonic = "PythonNativeObject",
-        progress_message = "Compile CPython's LTO archive to native code %{label}",
-        use_default_shell_env = True,
-    )
-    ctx.actions.run(
-        executable = toolchain.ar_executable,
-        arguments = ["rcs", archive.path, obj.path],
-        inputs = depset([obj], transitive = [toolchain.all_files]),
+    ctx.actions.run_shell(
+        command = '"$1" rcs "$2" "$3"/*.o',
+        arguments = [toolchain.ar_executable, archive.path, objects.path],
+        inputs = depset([objects], transitive = [toolchain.all_files]),
         outputs = [archive],
         mnemonic = "PythonNativeArchive",
         progress_message = "Archive CPython's native code %{label}",
@@ -103,11 +66,10 @@ def _native_archive_impl(ctx):
     )
     return [DefaultInfo(files = depset([archive]))]
 
-native_archive = rule(
-    implementation = _native_archive_impl,
+macos_native_archive = rule(
+    implementation = _macos_native_archive_impl,
     attrs = {
         "src": attr.label(allow_single_file = [".a"], mandatory = True),
-        "_macos": attr.label(default = "@platforms//os:macos"),
     },
     fragments = ["cpp"],
     toolchains = use_cc_toolchain(),
