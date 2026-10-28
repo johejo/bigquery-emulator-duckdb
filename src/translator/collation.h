@@ -41,6 +41,11 @@ std::string CollationKey(const std::string& sql, const std::string& specificatio
 // the value, so that its value translates as one without them.
 bool OnlyCollations(const googlesql::AnnotationMap* annotations);
 
+// The collation specification of a column with `annotations` whose operation the resolved AST
+// does not record, such as a set operation's, which compares the column under its own collation;
+// "" for none. The collations of its ARRAY elements or STRUCT fields do not count.
+std::string ColumnCollation(const googlesql::AnnotationMap* annotations);
+
 // Whether `annotations` hold a non-empty collation at any depth. Operations whose collation the
 // resolved AST does not record, such as set operations, reject such columns.
 bool HasCollation(const googlesql::AnnotationMap* annotations);

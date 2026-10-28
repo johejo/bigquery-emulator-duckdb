@@ -403,16 +403,12 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   const bool distinct = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT ||
                         set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT ||
                         set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT;
-  // DISTINCT compares rows by their columns' collations, which the resolved AST does not record.
-  if (distinct &&
-      std::ranges::any_of(set.column_list(), [](const googlesql::ResolvedColumn& column) {
-        return HasCollation(column.type_annotation_map());
-      })) {
-    return Unsupported(scope, "set operation DISTINCT with collation");
-  }
   Relation result;
   std::vector<std::string> names;
-  bool intervals = false;
+  // Whether DISTINCT compares a column by keys: INTERVAL values by their lengths, and strings by
+  // their collation keys under the column's collation, which the resolved AST does not record.
+  bool keys = false;
+  std::vector<std::string> collations;
   for (const auto& column : set.column_list()) {
     if (distinct && column.type()->IsStruct()) {
       const std::string name =
@@ -428,7 +424,8 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
                                    : "INTERSECT DISTINCT or EXCEPT DISTINCT";
       throw std::invalid_argument("Type ARRAY is not supported in " + name + " operation");
     }
-    intervals = intervals || column.type()->IsInterval();
+    collations.push_back(ColumnCollation(column.type_annotation_map()));
+    keys = keys || column.type()->IsInterval() || !collations.back().empty();
     names.push_back(ColumnName(column.column_id()));
     result.columns.emplace(column.column_id(), "q." + names.back());
   }
@@ -444,21 +441,22 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
     }
     parts.push_back("SELECT " + Join(*projections, ", ") + relation->From());
   }
-  if (set.op_type() == googlesql::ResolvedSetOperationScan::UNION_ALL || !intervals) {
+  if (set.op_type() == googlesql::ResolvedSetOperationScan::UNION_ALL || !keys) {
     result.sql = Join(parts, op->second);
     return result;
   }
-  // INTERVAL columns compare by their keys, and each distinct row is the first input row of its
-  // keys, as BigQuery returns it.
+  // Each distinct row is the first input row of its keys, as BigQuery returns it.
+  const auto key = [&](int i, const std::string& sql) {
+    return set.column_list(i).type()->IsInterval() ? IntervalKey(sql)
+                                                   : CollationKey(sql, collations.at(i));
+  };
   std::vector<std::string> compared;
   std::vector<std::string> keyed;
   std::vector<std::string> matches;
   for (int i = 0; i < set.column_list_size(); ++i) {
     const std::string& name = names.at(i);
-    const bool interval = set.column_list(i).type()->IsInterval();
-    compared.push_back(interval ? IntervalKey("r." + name) : "r." + name);
-    keyed.push_back(
-        std::format("{} AS {}", interval ? IntervalKey("q." + name) : "q." + name, name));
+    compared.push_back(key(i, "r." + name));
+    keyed.push_back(std::format("{} AS {}", key(i, "q." + name), name));
     matches.push_back(std::format("k.{} IS NOT DISTINCT FROM {}", name, compared.back()));
   }
   std::vector<std::string> keyed_parts;

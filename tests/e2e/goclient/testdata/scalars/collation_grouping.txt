@@ -81,3 +81,57 @@ CREATE TEMP TABLE t (x STRING COLLATE 'und:ci');
 INSERT t (x) VALUES ('b'), ('A'), ('a'), ('B');
 SELECT ARRAY(SELECT AS STRUCT x, COUNT(*) AS n FROM t GROUP BY x ORDER BY x)
 => [{"v":{"f":[{"v":"A"},{"v":"2"}]}},{"v":{"f":[{"v":"b"},{"v":"2"}]}}]
+
+# Set operations with DISTINCT compare rows by their columns' collations. BigQuery's answer: they
+# return the first of equal rows in input order.
+SELECT ARRAY(
+  SELECT x FROM UNNEST([COLLATE('a', 'und:ci')]) AS x
+  UNION DISTINCT
+  SELECT x FROM UNNEST(['A', 'b']) AS x
+  ORDER BY x
+)
+=> [{"v":"a"},{"v":"b"}]
+
+SELECT ARRAY(
+  SELECT x FROM UNNEST(['A']) AS x
+  INTERSECT DISTINCT
+  SELECT x FROM UNNEST([COLLATE('a', 'und:ci')]) AS x
+)
+=> [{"v":"A"}]
+
+SELECT (
+  SELECT COUNT(*) FROM (
+    SELECT x FROM UNNEST(['A', 'b', 'a']) AS x
+    INTERSECT DISTINCT
+    SELECT x FROM UNNEST([COLLATE('a', 'und:ci'), 'c']) AS x
+  )
+)
+=> "1"
+
+SELECT ARRAY(
+  SELECT x FROM UNNEST(['A', 'b', 'a', 'B']) AS x
+  EXCEPT DISTINCT
+  SELECT x FROM UNNEST([COLLATE('a', 'und:ci')]) AS x
+)
+=> [{"v":"b"}]
+
+SELECT ARRAY(
+  SELECT IFNULL(x, 'null') FROM (
+    SELECT x FROM UNNEST([COLLATE('a', 'und:ci'), NULL]) AS x
+    EXCEPT DISTINCT
+    SELECT x FROM UNNEST(['A']) AS x
+  )
+)
+=> [{"v":"null"}]
+
+# Each column compares by its own collation.
+SELECT (
+  SELECT COUNT(*) FROM (
+    SELECT COLLATE('a', 'und:ci') AS x, 'y' AS y
+    UNION DISTINCT
+    SELECT 'A', 'y'
+    UNION DISTINCT
+    SELECT 'A', 'Y'
+  )
+)
+=> "2"

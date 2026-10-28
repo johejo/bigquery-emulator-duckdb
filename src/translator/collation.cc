@@ -72,6 +72,14 @@ bool OnlyCollations(const googlesql::AnnotationMap* annotations) {
   return others->Empty();
 }
 
+std::string ColumnCollation(const googlesql::AnnotationMap* annotations) {
+  if (annotations == nullptr) {
+    return "";
+  }
+  const googlesql::SimpleValue* collation = annotations->GetAnnotation(kCollation);
+  return collation != nullptr && collation->has_string_value() ? collation->string_value() : "";
+}
+
 bool HasCollation(const googlesql::AnnotationMap* annotations) {
   bool found = false;
   if (annotations != nullptr) {

@@ -75,7 +75,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                 " cannot be used with DISTINCT modifier.");
   }
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
-      !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
       !IsBuiltinFunction(*call.function()) || call.where_expr() != nullptr) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with modifiers");
@@ -85,6 +84,12 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
        !aggregate->group_by_list().empty() || !aggregate->group_by_aggregate_list().empty() ||
        aggregate->having_expr() != nullptr)) {
     return Unsupported(scope, "aggregate " + name + " with HAVING or GROUP BY");
+  }
+  // BigQuery rejects HAVING MAX or MIN over collated values, which GoogleSQL accepts.
+  if (aggregate != nullptr && aggregate->having_modifier() != nullptr &&
+      HasCollation(aggregate->having_modifier()->having_expr()->type_annotation_map())) {
+    throw std::invalid_argument("Unsupported having modifier in the aggregate function " +
+                                call.function()->Name() + ".");
   }
   const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr ||
@@ -98,14 +103,28 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                ? call.argument_list().at(argument)->type()->kind()
                : googlesql::TYPE_UNKNOWN;
   };
+  // Calls that compare values, such as MIN and DISTINCT ones, record the collation they compare
+  // under.
+  const auto collation = OperationCollation(call.collation_list(), scope);
+  if (!collation) {
+    return std::nullopt;
+  }
+  if (!collation->empty() && functions.HasTypeUse(name, TypeUse::kRejectsCollation)) {
+    throw std::invalid_argument("Function '" + call.function()->Name() + "' with collation '" +
+                                *collation + "' is not supported.");
+  }
   const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
-    return (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
+    return candidate.collated == !collation->empty() &&
+           (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
            (candidate.distinct != AggregateRule::Distinct::kRequired || call.distinct()) &&
            std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
              return std::ranges::find(condition.types, type_of(condition.argument - 1)) !=
                     condition.types.end();
            });
   });
+  if (rule == entry->aggregates.end() && !collation->empty()) {
+    return Unsupported(scope, "aggregate or analytic function " + name + " with collation");
+  }
   if (rule != entry->aggregates.end()) {
     for (const auto& requirement : rule->constant_arguments) {
       if (requirement.argument > call.argument_list().size()) {
@@ -161,7 +180,15 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
     arguments.push_back(*sql);
   }
-  const std::vector<std::string> args = AggregateArguments(*rule, arguments);
+  std::vector<std::string> keyed = arguments;
+  if (rule->collated) {
+    for (std::size_t i = 0; i < arguments.size(); ++i) {
+      keyed.push_back(call.argument_list(static_cast<int>(i))->type()->IsString()
+                          ? CollationKey(arguments.at(i), *collation)
+                          : arguments.at(i));
+    }
+  }
+  const std::vector<std::string> args = AggregateArguments(*rule, keyed);
   const auto finish = [&](const std::string& sql, const std::string& tail) {
     if (rule->finish_after_scan && intermediates != nullptr) {
       const std::string column = scope.context.FreshName("_agg");

@@ -1,0 +1,107 @@
+# Collated MIN, MAX, COUNT(DISTINCT), GREATEST and LEAST compare strings as the collation does and
+# return the original values:
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+
+SELECT MAX(x) FROM UNNEST([COLLATE('a', 'und:ci'), 'B']) AS x
+=> "B"
+
+SELECT MIN(x) FROM UNNEST([COLLATE('a', 'und:ci'), 'B']) AS x
+=> "a"
+
+# BigQuery's answers: MIN and MAX return the first of equal values in input order.
+SELECT MAX(x) FROM UNNEST(['A', COLLATE('a', 'und:ci')]) AS x
+=> "A"
+
+SELECT MAX(x) FROM UNNEST(['b', COLLATE('a', 'und:ci'), 'B', 'A']) AS x
+=> "b"
+
+SELECT MIN(x) FROM UNNEST(['B', COLLATE('b', 'und:ci')]) AS x
+=> "B"
+
+SELECT MAX(x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'b', NULL]) AS x
+=> "b"
+
+SELECT MAX(COLLATE(x, 'und:ci')) FROM UNNEST(CAST([] AS ARRAY<STRING>)) AS x
+=> null
+
+SELECT MIN(x) FROM UNNEST([COLLATE('a', 'und:ci'), '']) AS x
+=> ""
+
+# A collated column compares by its collation.
+CREATE TEMP TABLE t (x STRING COLLATE 'und:ci');
+INSERT t (x) VALUES ('a'), ('B');
+SELECT MAX(x) FROM t
+=> "B"
+
+SELECT ARRAY(SELECT MAX(x) OVER () FROM UNNEST([COLLATE('a', 'und:ci'), 'B']) AS x)
+=> [{"v":"B"},{"v":"B"}]
+
+SELECT ARRAY(SELECT MAX(x) OVER () FROM UNNEST(['a', COLLATE('A', 'und:ci')]) AS x)
+=> [{"v":"a"},{"v":"a"}]
+
+SELECT ARRAY(
+  SELECT MIN(x) OVER (ORDER BY o) FROM UNNEST([COLLATE('B', 'und:ci'), 'a']) AS x WITH OFFSET o
+  ORDER BY o
+)
+=> [{"v":"B"},{"v":"a"}]
+
+SELECT COUNT(DISTINCT x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b', NULL]) AS x
+=> "2"
+
+# Canonically equivalent strings are equal.
+SELECT COUNT(DISTINCT x) FROM UNNEST([COLLATE('å', 'und:ci'), 'Å', 'a']) AS x
+=> "2"
+
+SELECT COUNT(DISTINCT x) FROM UNNEST([COLLATE('', 'und:ci'), '']) AS x
+=> "1"
+
+SELECT COUNT(DISTINCT x) FROM UNNEST([COLLATE(NULL, 'und:ci'), NULL]) AS x
+=> "0"
+
+# Without DISTINCT, COUNT counts every value.
+SELECT COUNT(x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A']) AS x
+=> "2"
+
+# BigQuery's answer: unlike COUNT(DISTINCT), APPROX_COUNT_DISTINCT rejects a collation.
+SELECT APPROX_COUNT_DISTINCT(x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+=> error: Function 'approx_count_distinct' with collation 'und:ci' is not supported.
+
+SELECT ARRAY(
+  SELECT COUNT(DISTINCT x) OVER () FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+)
+=> [{"v":"2"},{"v":"2"},{"v":"2"}]
+
+SELECT GREATEST(COLLATE('a', 'und:ci'), 'B')
+=> "B"
+
+SELECT LEAST(COLLATE('a', 'und:ci'), 'B')
+=> "a"
+
+# BigQuery's answers: GREATEST and LEAST return the first of equal values.
+SELECT GREATEST(COLLATE('a', 'und:ci'), 'A')
+=> "a"
+
+SELECT GREATEST('A', COLLATE('b', 'und:ci'), 'B', 'a')
+=> "b"
+
+SELECT LEAST(COLLATE('b', 'und:ci'), 'B', 'a', 'A')
+=> "a"
+
+SELECT GREATEST(COLLATE('a', 'und:ci'), NULL)
+=> null
+
+SELECT LEAST('b', COLLATE(NULL, 'und:ci'))
+=> null
+
+SELECT LEAST(COLLATE('a', 'und:ci'), '')
+=> ""
+
+SELECT ARRAY(
+  SELECT GREATEST(x, 'B') FROM UNNEST([COLLATE('a', 'und:ci'), 'c']) AS x WITH OFFSET o ORDER BY o
+)
+=> [{"v":"B"},{"v":"c"}]
+
+# BigQuery's answer: HAVING MAX and MIN reject collated values.
+SELECT ARRAY_AGG(y HAVING MAX x ORDER BY y)
+FROM UNNEST([STRUCT(COLLATE('b', 'und:ci') AS x, 1 AS y), ('B', 2), ('a', 3)])
+=> error: Unsupported having modifier in the aggregate function array_agg.
