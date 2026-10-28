@@ -2044,13 +2044,7 @@ known_errors {
   label: "code:round_FLOAT64_3@1415925_INT64_-9223372036854775808"
   label: "code:round_FLOAT64_3@1415925_INT64_9223372036854775807"
   label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999"
-  label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999_INT64_-1"
-  label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999_INT64_0"
-  label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999_INT64_1"
   label: "code:safe_error_mode__safe_round_NUMERIC_99999999999999999999999999999.999999999"
-  label: "code:safe_error_mode__safe_round_NUMERIC_99999999999999999999999999999.999999999_INT64_-1"
-  label: "code:safe_error_mode__safe_round_NUMERIC_99999999999999999999999999999.999999999_INT64_0"
-  label: "code:safe_error_mode__safe_round_NUMERIC_99999999999999999999999999999.999999999_INT64_1"
 }
 
 known_errors {

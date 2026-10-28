@@ -55,6 +55,10 @@ Condition Mode(std::size_t argument, std::string_view rounding_mode) {
   return {.argument = argument, .rounding_mode = rounding_mode};
 }
 
+std::vector<Condition> NumericMode(std::string_view rounding_mode) {
+  return {Is(1, {TYPE_NUMERIC}), Mode(3, rounding_mode)};
+}
+
 Condition SubDay(std::size_t argument) {
   return Part(argument, {"hour", "minute", "second", "millisecond", "microsecond"});
 }
@@ -338,16 +342,6 @@ std::vector<Rule> RangeIntersect() {
 std::string RoundWithDigits(std::string_view function) {
   return "CASE WHEN $2 IS NULL THEN NULL ELSE " + std::string(function) +
          "($1, CAST(coalesce($2, 0) AS INTEGER)) END";
-}
-
-// ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
-// its rounding away from zero, and the two then differ by one unit of the last digit.
-std::string RoundHalfEven() {
-  const std::string away = "round($1, CAST(coalesce($2, 0) AS INTEGER))";
-  const std::string toward = "trunc($1, CAST(coalesce($2, 0) AS INTEGER))";
-  return "CASE WHEN $2 IS NULL THEN NULL WHEN " + away + " = " + toward + " OR " + away +
-         " - $1 <> $1 - " + toward + " THEN " + away + " WHEN " + toward + " % (2 * (" + away +
-         " - " + toward + ")) = 0 THEN " + toward + " ELSE " + away + " END";
 }
 
 // The values of a type the date arithmetic functions return, as DuckDB literals, and how a
@@ -1662,10 +1656,8 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           },
       },
 
-      // DuckDB takes the digits as an INTEGER.
-      // DuckDB rounds halfway values away from zero, and its round_even() goes through
-      // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
-      // value is even. Only NUMERIC and BIGNUMERIC take a rounding mode.
+      // DuckDB's DECIMAL rounding requires constant digits. GoogleSQL handles NUMERIC's
+      // dynamic digits and rounding modes without losing decimal precision.
       {
           "ROUND",
           {
@@ -1673,16 +1665,24 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   BigNumericRounding("bq_bignumeric_round", true),
                   {
                       {.arity = 1, .spelling = "round($1)"},
+                      {
+                          .arity = 2,
+                          .spelling = "bq_round_numeric($1, $2)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
                       {.arity = 2, .spelling = RoundWithDigits("round")},
                       {
                           .arity = 3,
-                          .spelling = RoundWithDigits("round"),
-                          .conditions = {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")},
+                          .spelling = "bq_round_numeric($1, $2)",
+                          .conditions = NumericMode("ROUND_HALF_AWAY_FROM_ZERO"),
+                          .implementation = Implementation::kGoogleSQL,
                       },
                       {
                           .arity = 3,
-                          .spelling = RoundHalfEven(),
-                          .conditions = {Mode(3, "ROUND_HALF_EVEN")},
+                          .spelling = "bq_round_numeric_half_even($1, $2)",
+                          .conditions = NumericMode("ROUND_HALF_EVEN"),
+                          .implementation = Implementation::kGoogleSQL,
                       },
                   },
               }),
@@ -1703,6 +1703,12 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                           .arity = 2,
                           .spelling = "bq_trunc_digits($1, $2)",
                           .conditions = {Is(1, {TYPE_DOUBLE})},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_trunc_numeric($1, $2)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
                           .implementation = Implementation::kGoogleSQL,
                       },
                       {.arity = 2, .spelling = RoundWithDigits("trunc")},
