@@ -1,10 +1,15 @@
 // Package emulatorprocess manages isolated emulator processes for tests and probes.
+//
+// Set EMULATOR_LOG_DIR to a directory to also write each process's stderr to a file of its
+// own there, such as for CI to keep the server side of a failing test.
 package emulatorprocess
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -14,6 +19,7 @@ import (
 
 const listening = "bigquery-emulator-duckdb listening on "
 const grpcListening = "BigQuery Storage gRPC listening on "
+const logDirEnv = "EMULATOR_LOG_DIR"
 
 // Process is an emulator whose startup URL has been read from stderr.
 // Stop must be called before removing its data directory.
@@ -63,6 +69,27 @@ func (l *startupLog) text() string {
 	return l.buffer.String()
 }
 
+// openLogFile creates a file for cmd's stderr in EMULATOR_LOG_DIR, headed by the command line
+// that identifies the process, or returns nil when the variable is unset.
+func openLogFile(cmd *exec.Cmd) (*os.File, error) {
+	dir := os.Getenv(logDirEnv)
+	if dir == "" {
+		return nil, nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	file, err := os.CreateTemp(dir, "emulator-*.log")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := fmt.Fprintf(file, "# %q\n", cmd.Args); err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return file, nil
+}
+
 // Start runs the serve command and waits for its startup announcement or ctx to expire. The
 // caller supplies all server arguments, including --host and --http-port; dir may be empty.
 // ctx bounds startup only. The caller owns the process after Start succeeds.
@@ -77,11 +104,25 @@ func Start(ctx context.Context, binary, dir string, args ...string) (*Process, e
 	}
 	p.cmd.Dir = dir
 	p.cmd.Stderr = p.log
+	logFile, err := openLogFile(p.cmd)
+	if err != nil {
+		return nil, err
+	}
+	if logFile != nil {
+		p.cmd.Stderr = io.MultiWriter(p.log, logFile)
+	}
 	if err := p.cmd.Start(); err != nil {
+		if logFile != nil {
+			_ = logFile.Close()
+		}
 		return nil, err
 	}
 	go func() {
+		// Wait returns after copying all of stderr, so the file is complete when closed.
 		p.err = p.cmd.Wait()
+		if logFile != nil {
+			_ = logFile.Close()
+		}
 		close(p.done)
 	}()
 	select {

@@ -78,6 +78,7 @@ jobs:
       - name: Unit tests
         env:
           GO_TEST_JSON: ${{ runner.temp }}/reports/go-test.json
+          EMULATOR_LOG_DIR: ${{ runner.temp }}/reports/emulator-logs/unit
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/unit-tests.bep.json --profile=$RUNNER_TEMP/reports/unit-tests.profile.json.gz" >> .bazelrc.local
           nix run .#test
@@ -86,12 +87,15 @@ jobs:
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/build.bep.json --profile=$RUNNER_TEMP/reports/build.profile.json.gz" >> .bazelrc.local
           nix run .#bazel -- build //:bigquery-emulator-duckdb //:function_probe //:compliance_test
       - name: Generated docs check
+        env:
+          EMULATOR_LOG_DIR: ${{ runner.temp }}/reports/emulator-logs/docs
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/docs-check.bep.json --profile=$RUNNER_TEMP/reports/docs-check.profile.json.gz" >> .bazelrc.local
           nix run .#docs-check
       - name: End-to-end tests
         env:
           E2E_GO_TEST_JSON_DIR: ${{ runner.temp }}/reports/go-test-e2e
+          EMULATOR_LOG_DIR: ${{ runner.temp }}/reports/emulator-logs/e2e
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/e2e.bep.json --profile=$RUNNER_TEMP/reports/e2e.profile.json.gz" >> .bazelrc.local
           nix run .#e2e -- --profile --profile-out "$RUNNER_TEMP/reports/e2e.runn.prof"

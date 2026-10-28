@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
@@ -33,6 +34,7 @@ func TestProcessHelper(t *testing.T) {
 		fmt.Fprint(os.Stderr, "diagnostic before startup\nbigquery-emulator-duckdb listening ")
 		fmt.Fprintln(os.Stderr, "on http://127.0.0.1:1234")
 		<-stopped
+		fmt.Fprintln(os.Stderr, "diagnostic after startup")
 		os.Exit(0)
 	case "failure":
 		fmt.Fprintln(os.Stderr, "invalid configuration")
@@ -58,6 +60,33 @@ func TestStartAndStop(t *testing.T) {
 	for range 2 {
 		if err := p.Stop(); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+func TestLogDirKeepsStderr(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "logs")
+	t.Setenv("EMULATOR_LOG_DIR", dir)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	p, err := Start(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	files, err := filepath.Glob(filepath.Join(dir, "emulator-*.log"))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("log files = %v, %v", files, err)
+	}
+	data, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"--" "ready"`, "diagnostic before startup", "diagnostic after startup"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("log does not contain %q:\n%s", want, data)
 		}
 	}
 }
