@@ -112,7 +112,7 @@ bigquery-docs-scan:
 
 # Validate snapshots and citations offline.
 bigquery-docs-check:
-    go run ./tools/bigquerydocs check
+    {{ _test_go }} run ./tools/bigquerydocs check
 
 # Explicitly refresh all saved and newly cited pages.
 bigquery-docs-refresh:
