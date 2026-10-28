@@ -255,24 +255,10 @@ func inspect(r io.Reader, source string, out io.Writer) error {
 }
 
 func main() {
-	modelK := flag.Int("model-k", 0, "explore a hypothetical count-only compactor with this k (no sampler)")
-	modelSteps := flag.Int("model-steps", 30, "unit-weight insertions to enumerate in model mode")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: go run ./tools/kll ARCHIVE.answers.txt ...\n       go run ./tools/kll -model-k K [-model-steps N]")
-		flag.PrintDefaults()
+		fmt.Fprintln(os.Stderr, "usage: go run ./tools/kll ARCHIVE.answers.txt ...")
 	}
 	flag.Parse()
-	if *modelK != 0 {
-		if flag.NArg() != 0 {
-			flag.Usage()
-			os.Exit(2)
-		}
-		if err := compactionModel(*modelK, *modelSteps, os.Stdout); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		return
-	}
 	if flag.NArg() == 0 {
 		flag.Usage()
 		os.Exit(2)
