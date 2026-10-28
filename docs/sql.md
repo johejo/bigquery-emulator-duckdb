@@ -24,7 +24,7 @@ rejected.
 | [Queries](#queries) | 34 | 2 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 23 | 8 | 1 |
-| [Collation](#collation) | 10 | 1 | 3 |
+| [Collation](#collation) | 12 | 0 | 2 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -138,9 +138,9 @@ rejected.
 | Collated `LIKE` | Unsupported |  |
 | Collated joins | Supported |  |
 | Collated `ORDER BY` | Supported |  |
-| Collated `GROUP BY` | Unsupported |  |
+| Collated `GROUP BY` | Supported |  |
 | Collated window functions | Supported |  |
-| Collated set operations | Partial | Unsupported: set operation DISTINCT with collation. |
+| Collated set operations | Supported |  |
 | Column collation | Supported |  |
 | Table default collation | Supported |  |
 | Dataset default collation | Supported |  |

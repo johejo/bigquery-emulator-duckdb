@@ -61,6 +61,14 @@ std::optional<std::string> Call(const Catalog& functions,
                                                 CollationKey(second, collation) +
                                                 " THEN NULL ELSE " + first + " END");
   }
+  if ((name == "GREATEST" || name == "LEAST") && !collation.empty()) {
+    // NULL when any argument is, and otherwise the first argument whose key is the extremum.
+    return "list_transform([[" + Join(args, ", ") +
+           "]], lambda _ext: CASE WHEN list_count(_ext) < len(_ext) THEN NULL ELSE "
+           "list_transform([list_transform(_ext, lambda _e: " +
+           CollationKey("_e", collation) + ")], lambda _keys: _ext[list_position(_keys, " +
+           (name == "GREATEST" ? "list_max" : "list_min") + "(_keys))])[1] END)[1]";
+  }
   ScalarCall call{.resolved = resolved, .name = name, .safe = safe, .project = project};
   for (size_t i = 0; i < args.size(); ++i) {
     const googlesql::ResolvedExpr& argument = *resolved.argument_list(static_cast<int>(i));
@@ -448,11 +456,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     if (!sql) {
       return std::nullopt;
     }
-    // CASE compares only its input and WHEN operands; its results retain their values.
-    // NULLIF needs both keys and the original input, so Call binds its values before keying.
+    // CASE compares only its input and WHEN operands; its results retain their values. NULLIF,
+    // GREATEST and LEAST return values they compare, so Call binds their values before keying.
     const bool collation_operand =
-        function != "NULLIF" && (function != "$CASE_WITH_VALUE" || i == 0 ||
-                                 (i % 2 == 1 && i + 1 < call.argument_list().size()));
+        function == "$CASE_WITH_VALUE"
+            ? i == 0 || (i % 2 == 1 && i + 1 < call.argument_list().size())
+            : !functions.HasTypeUse(function, TypeUse::kSelectsCollationValues);
     if (argument->type()->IsString() && collation_operand) {
       args.push_back(CollationKey(*sql, *collation));
     } else if (compares_intervals && argument->type()->IsInterval()) {

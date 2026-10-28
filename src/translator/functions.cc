@@ -299,6 +299,7 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
+                            TypeUse::kSelectsCollationValues,
                             TypeUse::kBigNumeric,
                         },
                     .type_rejections = kGreatestTypeRejections,
@@ -311,6 +312,7 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
+                            TypeUse::kSelectsCollationValues,
                             TypeUse::kBigNumeric,
                         },
                     .type_rejections = kLeastTypeRejections,

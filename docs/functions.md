@@ -40,7 +40,7 @@ functions.
 | Category | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
 | [AEAD encryption functions](#aead-encryption-functions) | 5 | 7 | 4 | 0 |
-| [Aggregate functions](#aggregate-functions) | 15 | 3 | 0 | 1 |
+| [Aggregate functions](#aggregate-functions) | 18 | 0 | 0 | 1 |
 | [Approximate aggregate functions](#approximate-aggregate-functions) | 4 | 0 | 0 | 0 |
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
@@ -59,7 +59,7 @@ functions.
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
 | [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
 | [KLL functions](#kll-functions) | 11 | 0 | 0 | 0 |
-| [Mathematical functions](#mathematical-functions) | 48 | 2 | 0 | 0 |
+| [Mathematical functions](#mathematical-functions) | 50 | 0 | 0 | 0 |
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
@@ -109,14 +109,14 @@ functions.
 | [`BIT_AND`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`BIT_OR`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`BIT_XOR`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
-| [`COUNT`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function COUNT with modifiers. |
+| [`COUNT`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`COUNTIF`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`GROUPING`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`LOGICAL_AND`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`LOGICAL_OR`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
-| [`MAX`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function MAX with modifiers. |
+| [`MAX`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`MAX_BY`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
-| [`MIN`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function MIN with modifiers. |
+| [`MIN`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`MIN_BY`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`STRING_AGG`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`SUM`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
@@ -423,11 +423,11 @@ functions.
 | [`EUCLIDEAN_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`EXP`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`FLOOR`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
-| [`GREATEST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Partial | DuckDB SQL, in code | Unsupported: function GREATEST with collation. |
+| [`GREATEST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL, in code |  |
 | [`IEEE_DIVIDE`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
 | [`IS_INF`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB function, renamed |  |
 | [`IS_NAN`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB function, renamed |  |
-| [`LEAST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Partial | DuckDB SQL, in code | Unsupported: function LEAST with collation. |
+| [`LEAST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL, in code |  |
 | [`LN`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`LOG`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`LOG10`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |

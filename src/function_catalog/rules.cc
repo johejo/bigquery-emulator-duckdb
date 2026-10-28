@@ -256,6 +256,7 @@ AggregateRule Own(const StaticAggregateRule& rule) {
       .limit = rule.limit,
       .skip_nulls = rule.skip_nulls,
       .carries = rule.carries,
+      .collated = rule.collated,
       .finish = rule.finish,
       .finish_after_scan = rule.finish_after_scan,
       .order_by_argument_error = rule.order_by_argument_error,

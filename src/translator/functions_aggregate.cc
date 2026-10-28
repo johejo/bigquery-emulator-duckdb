@@ -292,6 +292,8 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
   static constexpr std::string_view kStar[] = {"*"};
   static constexpr std::string_view kIntervalValueAndKey[] = {"$1", "bq_interval_key($1)"};
   static constexpr std::string_view kIntervalSecondKey[] = {"$1", "bq_interval_key($2)"};
+  static constexpr std::string_view kCollationKey[] = {"$2"};
+  static constexpr std::string_view kValueAndCollationKey[] = {"$1", "$2"};
   static constexpr std::string_view kQuantileArguments[] = {
       "$1",
       "list_transform(range($2 + 1), lambda i: i / $2)",
@@ -326,11 +328,12 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       {.types = kRangeTypes, .message = "Unsupported type RANGE for approx_top_sum_shard."},
   };
   static constexpr auto kAggregatesBacking = std::tuple{
-      // INTERVAL values compare by their keys; among equal values, MIN and MAX return the
-      // first, as BigQuery does.
+      // INTERVAL values and collated strings compare by their keys; among equal values, MIN and
+      // MAX return the first, as BigQuery does.
 
       Define("COUNT",
              {
+                 {.function = "count", .arguments = kCollationKey, .collated = true},
                  {
                      .function = "count",
                      .type = googlesql::TYPE_INTERVAL,
@@ -376,6 +379,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .type = googlesql::TYPE_INTERVAL,
                      .arguments = kIntervalValueAndKey,
                  },
+                 {
+                     .function = "arg_min",
+                     .arguments = kValueAndCollationKey,
+                     .collated = true,
+                 },
                  {.function = "min"},
              },
              {
@@ -388,6 +396,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .function = "arg_max",
                      .type = googlesql::TYPE_INTERVAL,
                      .arguments = kIntervalValueAndKey,
+                 },
+                 {
+                     .function = "arg_max",
+                     .arguments = kValueAndCollationKey,
+                     .collated = true,
                  },
                  {.function = "max"},
              },
@@ -489,7 +502,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
              },
              {
-                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsCollation, TypeUse::kRejectsOver},
                  .type_rejections = kApproxCountRejections,
              }),
       // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
