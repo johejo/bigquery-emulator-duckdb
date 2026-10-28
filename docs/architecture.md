@@ -363,9 +363,29 @@ index based on `n-1`. Exact full-range INT64 extraction also preserves all 64 bi
 The fixed compacted-state outputs are now independent reader expectations, and merging
 two fixed compacted sketches preserved their exact overall extrema `[1,16]`.
 
-All three collection rounds are complete; the 86 SQL observations, including errors,
-are archived in [tools/kll/](../tools/kll/README.md), with no pending KLL queries in
-`unverified/`. The current corpus is enough to begin a separately scoped reader:
+The earlier reader-focused collection rounds are complete. The full corpus now has
+113 SQL observations, including the completed update/transition/sampler/merge/weighted rounds and analysis errors; these
+are archived in [tools/kll/](../tools/kll/README.md). A separate
+[update investigation](../tools/kll/updates.md) now provides an offline state decoder,
+additional constraints from those bytes and completed update-round findings. The
+[transition investigation](../tools/kll/transitions.md) supports a sum-of-ceils
+geometric capacity budget and a height-dependent sampler cutoff, and distinguishes
+sampler promotion from pending residue on overflow. Its count-only hypothesis
+explorer is not an emulator backend. The
+[sampler follow-up](../tools/kll/sampler_updates.md) extends overflow observations
+to unit 16 and separates below-budget level migration from ordinary compaction.
+The completed [reverse-order controls](../tools/kll/merge_order.md) constrain
+directional migration and absent-sampler normalization. The
+[weighted-stream findings](../tools/kll/weighted_stream.md) support direct upper-bit
+placement and pending low remainders. The completed
+[nonempty-reservoir follow-up](../tools/kll/weighted_pending.md) supports inserting
+upper bits without consuming existing pending state. All prepared investigation
+queries are now answered; its checkpoint lists the remaining compatibility gaps.
+Field 1 is not a hard per-level limit; first compaction occurs at that size in the
+tested forms, and odd compaction can retain either sorted parity without a leftover.
+Weighted singleton remainders can round up or down. Sampler field 3 affects MERGE,
+but does not forbid retaining values at lower levels. Exact capacity and general
+update rules remain unresolved. The current corpus is enough to begin a separately scoped reader:
 protobuf decoding, typed extrema and levels, sampled value/weight, and EXTRACT/EXTRACT_POINT.
 Use the recorded fixed-byte answers as independent client-visible tests. Keep INT64
 values exact, use GoogleSQL's FLOAT64 ordering including NaN, and treat version/unknown-field
