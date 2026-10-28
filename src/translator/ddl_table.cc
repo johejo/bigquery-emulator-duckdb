@@ -26,6 +26,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
@@ -517,7 +518,9 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
 std::optional<std::optional<std::string>> SourceRows(const googlesql::ResolvedTableScan& scan,
                                                      const Scope& scope, std::string& time) {
   if (scan.for_system_time_expr() == nullptr) {
-    return dynamic_cast<const BigQueryTable*>(scan.table())->ReadQuery();
+    const auto& table = *dynamic_cast<const BigQueryTable*>(scan.table());
+    return StatementResources::ReadQuery(table.reference(), table.ReadQuery(),
+                                         scope.context.resources);
   }
   int64_t micros = 0;
   std::optional<std::string> rows = TimeTravelRows(scan, scope, micros);

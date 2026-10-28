@@ -26,6 +26,7 @@
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 #include "src/result_chunks.h"
+#include "src/statement_resources.h"
 #include "src/storage_read_codec.h"
 #include "src/vector_value.h"
 
@@ -434,6 +435,8 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
 
 class StorageSnapshot::Impl {
  public:
+  // Destroy options, chunks and the session before releasing staged source files.
+  std::shared_ptr<const StatementResources> resources;
   // Destroy options and chunks before the session, whose connection their properties name.
   std::shared_ptr<Backend> session;
   Handle<duckdb_arrow_options, duckdb_destroy_arrow_options> options;
@@ -446,12 +449,14 @@ class StorageSnapshot::Impl {
 };
 
 StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema> schema,
-                                 std::shared_ptr<Backend> session)
+                                 std::shared_ptr<Backend> session,
+                                 std::shared_ptr<const StatementResources> resources)
     : impl_(std::make_unique<Impl>()) {
   auto& state = *impl_;
   if (schema.size() != duckdb_column_count(&result)) {
     throw ApiError::Invalid("Table changed while creating the Storage Read snapshot");
   }
+  state.resources = std::move(resources);
   state.session = std::move(session);
   state.fields = std::move(schema);
   *state.options.out() = duckdb_result_get_arrow_options(&result);

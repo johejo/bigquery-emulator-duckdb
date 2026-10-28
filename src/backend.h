@@ -16,6 +16,7 @@
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/result_rows.h"
+#include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
 
 namespace bigquery_emulator_duckdb {
@@ -64,9 +65,11 @@ class Backend {
                       bool null_arrays = false);
 
   // Runs `sql` on a session of its own and keeps its result, whose columns are the fields of
-  // `schema`, as a Storage Read snapshot. The session lives as long as the snapshot.
-  std::shared_ptr<const StorageSnapshot> ExecuteStorageRead(const std::string& sql,
-                                                            std::vector<FieldSchema> schema);
+  // `schema`, as a Storage Read snapshot. The session and any prepared source resources live
+  // as long as the snapshot.
+  std::shared_ptr<const StorageSnapshot> ExecuteStorageRead(
+      const std::string& sql, std::vector<FieldSchema> schema,
+      std::shared_ptr<const StatementResources> resources = {});
 
   // Runs `statements` in order on one connection and materializes the result of the last one.
   // Statements before the last may open a transaction. Outside a session, a failure rolls it

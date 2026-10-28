@@ -275,6 +275,7 @@ cc_library(
         ":field_schema",
         ":references",
         ":routine",
+        ":statement_resources",
         ":table_metadata",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -306,6 +307,7 @@ cc_library(
     deps = [
         ":field_schema",
         ":references",
+        ":statement_resources",
         ":table_metadata",
         "@googlesql//googlesql/public:simple_catalog",
     ],
@@ -558,6 +560,7 @@ cc_library(
     name = "default_dataset",
     hdrs = ["src/default_dataset.h"],
     copts = ["-std=c++20"],
+    deps = [":statement_resources"],
 )
 
 cc_library(
@@ -568,6 +571,7 @@ cc_library(
         ":field_schema",
         ":references",
         ":routine",
+        ":statement_resources",
         ":table_metadata",
     ],
 )
@@ -825,7 +829,10 @@ cc_library(
         "//third_party/duckdb",
         "@googlesql//googlesql/public:numeric_value",
     ],
-    deps = ["@nlohmann_json//:json"],
+    deps = [
+        ":statement_resources",
+        "@nlohmann_json//:json",
+    ],
 )
 
 cc_library(
@@ -901,6 +908,7 @@ cc_library(
         ":field_schema",
         ":function_options",
         ":result_rows",
+        ":statement_resources",
         "//src/googlesql_functions_duckdb:objectref_options",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
@@ -1096,6 +1104,7 @@ cc_library(
         ":routine_catalog",
         ":schema_sql",
         ":script",
+        ":statement_resources",
         ":table_comments",
         ":table_history",
         ":table_path",
@@ -1159,6 +1168,7 @@ cc_library(
         ":result_value",
         ":routine",
         ":routine_catalog",
+        ":statement_resources",
         ":system_variables",
         ":table_path",
         ":table_source",
@@ -1197,6 +1207,17 @@ cc_library(
         ":backend",
         ":builtin_function_options",
         ":query_parameters",
+    ],
+)
+
+cc_library(
+    name = "statement_resources",
+    srcs = ["src/statement_resources.cc"],
+    hdrs = ["src/statement_resources.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":references",
+        ":temporary_files",
     ],
 )
 
@@ -1584,6 +1605,7 @@ cc_library(
         ":references",
         ":routine",
         ":spanner_query",
+        ":statement_resources",
         ":table_comments",
         ":table_history",
         ":table_metadata",
@@ -1679,6 +1701,33 @@ cc_test(
         "//src/googlesql_geography",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "statement_resources_test",
+    srcs = ["tests/statement_resources_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":analyzer",
+        ":backend",
+        ":backend_error",
+        ":catalog",
+        ":default_dataset",
+        ":duckdb_sql",
+        ":emulator_functions",
+        ":field_schema",
+        ":references",
+        ":result_rows",
+        ":statement_resources",
+        ":table_source",
+        ":temporary_files",
+        ":translated_statement",
+        ":translator",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@googlesql//googlesql/public/types",
     ],
 )
 

@@ -1,7 +1,10 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
+
+#include "src/statement_resources.h"
 
 namespace googlesql {
 class Type;
@@ -24,6 +27,10 @@ struct DefaultDataset {
   // The tables and datasets the statement is analyzed against, such as for the default rounding
   // mode of the dataset that CREATE TABLE AS SELECT creates a table in.
   TableSource* source = nullptr;
+  // One statement's source preparation, separate from catalog/schema resolution. Missing for
+  // stored definitions, which must not embed staged paths. Expressions borrow their caller's
+  // owner through execution; translated statements also retain it with their SQL.
+  std::shared_ptr<StatementResources> resources = {};
   // Whether SESSION_USER is available from the execution backend.
   bool has_session_user = false;
   // Whether a query's rows are written to a destination table, which stores them as

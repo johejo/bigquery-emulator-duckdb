@@ -9,6 +9,7 @@
 #include "googlesql/public/simple_catalog.h"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/statement_resources.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
@@ -43,7 +44,7 @@ class BigQueryTable : public googlesql::SimpleTable {
   [[nodiscard]] std::optional<TableDescription> Describe() const;
   // The columns of the table's primary key, which graph element tables without a KEY clause take.
   [[nodiscard]] std::optional<std::vector<int>> PrimaryKey() const override;
-  [[nodiscard]] std::optional<std::string> ReadQuery() const;
+  [[nodiscard]] std::optional<TableRead> ReadQuery() const;
   [[nodiscard]] TableWriteRestriction WriteRestriction() const;
   [[nodiscard]] TableReference reference() const {
     return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};

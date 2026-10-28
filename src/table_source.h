@@ -11,6 +11,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/statement_resources.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
@@ -30,9 +31,10 @@ class TableSource {
     return std::nullopt;
   }
 
-  // An alternative query of the table's rows, with its declared column names and query
-  // types, or nullopt to read its named relation. Does not determine write permissions.
-  virtual std::optional<std::string> ReadQuery(const TableReference& /*table*/) {
+  // An alternative read definition with the table's declared column names and query types,
+  // or nullopt to read its named relation. Resolution must not stage or access source files:
+  // resource-backed definitions defer that work to their preparation. Does not determine writes.
+  virtual std::optional<TableRead> ReadQuery(const TableReference& /*table*/) {
     return std::nullopt;
   }
 

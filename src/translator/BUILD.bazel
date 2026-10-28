@@ -10,6 +10,7 @@ cc_library(
         "//:default_dataset",
         "//:duckdb_sql",
         "//:query_parameters",
+        "//:statement_resources",
         "//:system_variables",
     ],
 )
@@ -47,6 +48,7 @@ cc_library(
         "//:python_function",
         "//:references",
         "//:schema_sql",
+        "//:statement_resources",
         "//:table_metadata",
         "//:table_path",
         "//:table_source",
@@ -191,6 +193,7 @@ cc_library(
         "//:field_schema",
         "//:python_function",
         "//:references",
+        "//:statement_resources",
         "//:table_metadata",
         "//:table_path",
         "//:table_source",

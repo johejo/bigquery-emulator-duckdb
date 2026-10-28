@@ -11,6 +11,7 @@
 #include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
 #include "src/query_parameters.h"
+#include "src/statement_resources.h"
 #include "src/system_variables.h"
 
 namespace googlesql {
@@ -46,6 +47,8 @@ struct Context {
   // DDL records what it creates, alters or drops in the statement itself, so that this header,
   // which every translator includes, does not need their definitions.
   TranslatedStatement& statement;
+  // Null while translating a stored definition, even when its caller has execution resources.
+  StatementResources* resources = nullptr;
   // The values of the system variables of the script that the statement belongs to, if any.
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
   // Whether the statement defines a view, whose DuckDB view queries never read: they read the

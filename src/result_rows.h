@@ -6,8 +6,10 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "nlohmann/json.hpp"
+#include "src/statement_resources.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -51,6 +53,12 @@ class ResultRows {
   // throw BackendError, so that the statement fails rather than a later read of its rows.
   ResultRows(std::shared_ptr<const ResultChunks> chunks, bool null_arrays);
 
+  // Keep staged reads alive with every copy of these rows, including after their translation
+  // and execution scope have gone away. Does not copy or prepare sources again.
+  void KeepResources(std::shared_ptr<const StatementResources> resources) {
+    resources_ = std::move(resources);
+  }
+
   [[nodiscard]] size_t size() const;
   [[nodiscard]] bool empty() const { return size() == 0; }
   // Read-only access for value adapters without a REST round-trip. The chunks are borrowed
@@ -71,6 +79,8 @@ class ResultRows {
   [[nodiscard]] Iterator end() const { return {this, size()}; }
 
  private:
+  // Destroy the result chunks before releasing files its execution used.
+  std::shared_ptr<const StatementResources> resources_;
   std::shared_ptr<const ResultChunks> chunks_;
   bool null_arrays_ = false;
 };

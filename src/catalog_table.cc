@@ -7,6 +7,7 @@
 
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
 
@@ -34,9 +35,7 @@ std::optional<std::vector<int>> BigQueryTable::PrimaryKey() const {
   return columns;
 }
 
-std::optional<std::string> BigQueryTable::ReadQuery() const {
-  return source_.ReadQuery(reference());
-}
+std::optional<TableRead> BigQueryTable::ReadQuery() const { return source_.ReadQuery(reference()); }
 
 TableWriteRestriction BigQueryTable::WriteRestriction() const {
   return source_.WriteRestriction(reference());

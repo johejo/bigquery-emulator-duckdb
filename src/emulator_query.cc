@@ -46,6 +46,7 @@
 #include "src/result_value.h"
 #include "src/routine_catalog.h"
 #include "src/script.h"
+#include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
 #include "src/table_source.h"
 #include "src/translated_statement.h"
@@ -407,7 +408,7 @@ std::shared_ptr<const StorageSnapshot> Emulator::ReadStorageTable(
   const TranslatedStatement translated = Translate(query, {}, table.project_id, table.dataset_id);
   std::shared_ptr<const StorageSnapshot> snapshot;
   try {
-    snapshot = backend_.ExecuteStorageRead(translated.sql, std::move(schema));
+    snapshot = backend_.ExecuteStorageRead(translated.sql, std::move(schema), translated.resources);
   } catch (const BackendError& error) {
     throw ApiError::InvalidQuery(error.what());
   }
@@ -423,7 +424,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                                         const std::string& default_project,
                                         const std::string& default_dataset, JobLocation* location,
                                         const googlesql::SystemVariableValuesMap* system_variables,
-                                        bool stores_result) {
+                                        bool stores_result, bool dry_run) {
   AnalyzerSettings settings{
       .default_project = default_project,
       .default_dataset = default_dataset,
@@ -441,21 +442,23 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                          nullptr, excluded_function_ids_, declarations_);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
-  std::optional<TranslatedStatement> translated =
-      TranslateStatement(EmulatorFunctionCatalog(), analyzed.statement(), parameters,
-                         DefaultDataset{
-                             .project = settings.default_project,
-                             .dataset = settings.default_dataset,
-                             .temporary = nullptr,
-                             .source = source.get(),
-                             .has_session_user = has_session_user_,
-                             .stores_result = stores_result,
-                             .evaluate =
-                                 [this](const std::string& sql, const googlesql::Type* type) {
-                                   return ResultValue(Execute(sql, {}, true), type);
-                                 },
-                         },
-                         &unsupported, system_variables);
+  std::optional<TranslatedStatement> translated = TranslateStatement(
+      EmulatorFunctionCatalog(), analyzed.statement(), parameters,
+      DefaultDataset{
+          .project = settings.default_project,
+          .dataset = settings.default_dataset,
+          .temporary = nullptr,
+          .source = source.get(),
+          .resources = std::make_shared<StatementResources>(
+              dry_run ? StatementResources::Mode::kDryRun : StatementResources::Mode::kExecute),
+          .has_session_user = has_session_user_,
+          .stores_result = stores_result,
+          .evaluate =
+              [this](const std::string& sql, const googlesql::Type* type) {
+                return ResultValue(Execute(sql, {}, true), type);
+              },
+      },
+      &unsupported, system_variables);
   if (!translated.has_value()) {
     throw ApiError::UnsupportedQuery(unsupported);
   }
@@ -649,7 +652,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     };
     const TranslatedStatement translation = Translate(
         request.query, request.parameters, settings.default_project, settings.default_dataset,
-        &location, &variables, request.destination_table.has_value());
+        &location, &variables, request.destination_table.has_value(), request.dry_run);
     auto& query = std::get<QueryJob>(job.configuration);
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;
@@ -672,6 +675,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
       result = WriteDestination(request.project_id, *request.destination_table,
                                 request.create_disposition, request.write_disposition,
                                 translation.sql, written, setup);
+      result.rows.KeepResources(translation.resources);
     } else if (!AlterationStatements(translation).has_value()) {
       // A dry run checks an alteration against the table or dataset without running it.
       std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
@@ -805,6 +809,9 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
   }
   if (schema.has_value()) {
     result.schema = ReconcileSchema(std::move(result.schema), *schema);
+  }
+  if (result.has_rows) {
+    result.rows.KeepResources(translation.resources);
   }
   return result;
 }
