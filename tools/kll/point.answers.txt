@@ -1,0 +1,20 @@
+# Completed maintainer-recorded BigQuery round for native point extraction.
+# Archived from tests/e2e/goclient/testdata/unverified/kll_point.txt.
+# No expected answers are inferred locally.
+# NULL-sketch behavior with a valid phi, and SAFE runtime (not literal validation).
+SELECT KLL_QUANTILES.EXTRACT_POINT_INT64(CAST(NULL AS BYTES), 0.5)
+?> null
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_FLOAT64(CAST(NULL AS BYTES), 0.5)
+?> null
+
+SELECT SAFE.KLL_QUANTILES.EXTRACT_POINT_INT64(b'bad', 0.5)
+?> error: SAFE with function kll_quantiles.extract_point_int64 is not supported.
+
+SELECT SAFE.KLL_QUANTILES.EXTRACT_POINT_FLOAT64(b'bad', 0.5)
+?> error: SAFE with function kll_quantiles.extract_point_float64 is not supported.
+
+# Rank rounding at the next FLOAT64 on either side of an exact retained-mass tie.
+# Recorded n=4/p=1 specimen: retained mass=5, boundary phi=.4.
+SELECT [KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.39999999999999997), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.4000000000000001)] FROM (SELECT FROM_HEX('0871100420048a071d080310011a01012201042a0212002a041202010232070a010410011801') AS s)
+?> [{"v":"1"},{"v":"3"}]

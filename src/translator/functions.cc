@@ -336,6 +336,22 @@ constexpr auto kHandlers =
                 },
             },
             {
+                "KLL_QUANTILES.EXTRACT_POINT_INT64",
+                {
+                    .handler = KllExtract,
+                    .implementation = Implementation::kCustom,
+                    .uses = {TypeUse::kRejectsSafe},
+                },
+            },
+            {
+                "KLL_QUANTILES.EXTRACT_POINT_FLOAT64",
+                {
+                    .handler = KllExtract,
+                    .implementation = Implementation::kCustom,
+                    .uses = {TypeUse::kRejectsSafe},
+                },
+            },
+            {
                 "TEXT_ANALYZE",
                 {
                     .handler = TextAnalyze,

@@ -422,8 +422,8 @@ std::optional<std::string> AddKeyFromRawBytes(const ScalarCall& call) {
          ")";
 }
 
-// KLL extraction requires a constant number of quantiles even though GoogleSQL's
-// builtin signature does not enforce that restriction.
+// KLL extraction requires a constant number of quantiles or phi even though
+// GoogleSQL's builtin signatures do not enforce that restriction.
 std::optional<std::string> KllExtract(const ScalarCall& call) {
   if (call.arguments.size() != 2) {
     return std::nullopt;
@@ -436,9 +436,12 @@ std::optional<std::string> KllExtract(const ScalarCall& call) {
     throw std::invalid_argument("Argument #2 must be constant; error in " + std::string(call.name) +
                                 " expression");
   }
-  const std::string function = call.name == "KLL_QUANTILES.EXTRACT_INT64"
-                                   ? "bq_kll_extract_int64"
-                                   : "bq_kll_extract_float64";
+  const bool point = call.name == "KLL_QUANTILES.EXTRACT_POINT_INT64" ||
+                     call.name == "KLL_QUANTILES.EXTRACT_POINT_FLOAT64";
+  const bool integer = call.name == "KLL_QUANTILES.EXTRACT_INT64" ||
+                       call.name == "KLL_QUANTILES.EXTRACT_POINT_INT64";
+  const std::string function = std::string(point ? "bq_kll_extract_point_" : "bq_kll_extract_") +
+                               (integer ? "int64" : "float64");
   return function + "(" + Join(Sqls(call), ", ") + ")";
 }
 

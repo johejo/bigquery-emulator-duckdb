@@ -1,9 +1,9 @@
 # KLL compatibility evidence
 
 The native reader in [src/kll_duckdb/](../../src/kll_duckdb/kll.cc) implements
-`KLL_QUANTILES.EXTRACT_INT64` and `KLL_QUANTILES.EXTRACT_FLOAT64`; INIT, MERGE and
-point extraction remain unsupported. This directory keeps the evidence for that
-reader and for testing a future writer. It is not a specification of BigQuery's
+`KLL_QUANTILES.EXTRACT_INT64`, `KLL_QUANTILES.EXTRACT_FLOAT64` and their
+`EXTRACT_POINT` counterparts; INIT and MERGE remain unsupported. This directory
+keeps the evidence for that reader and for testing a future writer. It is not a specification of BigQuery's
 internal compaction algorithm.
 
 ## Independent observations
@@ -21,11 +21,15 @@ These files contain maintainer-recorded BigQuery responses with their original S
   retained mass from input count, and isolated sampler field mutations.
 - [reader.answers.txt](reader.answers.txt): NULL-sketch argument validation,
   NaN/infinity extraction and the constant-number-of-quantiles restriction.
+- [point.answers.txt](point.answers.txt): NULL point extraction, SAFE rejection and
+  FLOAT64 phi boundaries immediately around a retained-mass tie.
 
 Do not regenerate these archives or use their INIT/MERGE bytes as golden writer
 outputs: KLL is non-deterministic. Fixed bytes **with independently recorded
 EXTRACT answers** are client-visible reader tests in
-[scalars/kll.txt](../../tests/e2e/goclient/testdata/scalars/kll.txt). Decoding a sketch locally
+[scalars/kll.txt](../../tests/e2e/goclient/testdata/scalars/kll.txt) and
+[scalars/kll_point.txt](../../tests/e2e/goclient/testdata/scalars/kll_point.txt).
+Decoding a sketch locally
 is not an independent expected query answer.
 
 ## Observed encoding
@@ -104,8 +108,8 @@ The archives also establish:
   extraction is reported as an empty array in query results.
   Precision must be a literal or query
   parameter and cannot be NULL; EXTRACT quantile arguments cannot be NULL either.
-- SAFE was rejected for INIT and EXTRACT_INT64. SAFE.EXTRACT_POINT with negative
-  literal phi failed argument validation, not a demonstrated runtime SAFE path.
+- SAFE was rejected for INIT, EXTRACT_INT64 and both EXTRACT_POINT types.
+  SAFE.EXTRACT_POINT with negative literal phi failed argument validation first.
 - NaN is retained and sorts before other values in the recorded extraction;
   NaN-only extraction returns NaN. Stored extrema remain exact after merging the
   tested fixed compacted sketches.

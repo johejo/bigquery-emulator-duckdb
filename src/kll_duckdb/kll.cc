@@ -253,6 +253,50 @@ absl::StatusOr<Sketch<T>> Decode(std::string_view bytes) {
 }
 
 template <typename T>
+absl::StatusOr<std::optional<T>> ExtractPoint(const Arguments& arguments) {
+  const std::string name = std::string("KLL_QUANTILES.EXTRACT_POINT_") +
+                           (std::is_same_v<T, int64_t> ? "INT64" : "FLOAT64");
+  if (arguments.IsNull(1)) {
+    return absl::InvalidArgumentError("Argument 2 to " + name + " must be non-NULL");
+  }
+  const double phi = arguments.Double(1);
+  if (std::isnan(phi) || phi < 0 || phi > 1) {
+    return absl::InvalidArgumentError("Argument 2 to " + name + " must be between 0 and 1");
+  }
+  if (arguments.IsNull(0)) {
+    return std::optional<T>{};
+  }
+  const auto error = [&name](std::string_view message) {
+    return absl::InvalidArgumentError(std::string(message) + "; error in " + name + " expression");
+  };
+  try {
+    const auto sketch = Decode<T>(arguments.StringView(0));
+    if (!sketch.ok()) {
+      return error(sketch.status().message());
+    }
+    if (phi == 0) {
+      return sketch->minimum;
+    }
+    if (phi == 1) {
+      return sketch->maximum;
+    }
+    // Use the retained mass, including the sampler, not the envelope's input count.
+    // Multiply in FLOAT64: e.g. phi=.4 with mass=5 must select rank 2, not 3.
+    const auto rank =
+        static_cast<unsigned __int128>(std::ceil(phi * static_cast<double>(sketch->mass)));
+    const auto item =
+        std::lower_bound(sketch->items.begin(), sketch->items.end(), rank,
+                         [](const auto& item, auto target) { return item.weight < target; });
+    if (item == sketch->items.end()) {
+      throw InvalidSketch();
+    }
+    return item->value;
+  } catch (const InvalidSketch& invalid) {
+    return error(invalid.what());
+  }
+}
+
+template <typename T>
 absl::StatusOr<std::optional<std::vector<T>>> Extract(const Arguments& arguments) {
   const auto error = [](const std::string& message) {
     return absl::InvalidArgumentError(message + "; error in KLL_QUANTILES.EXTRACT_" +
@@ -289,6 +333,10 @@ absl::StatusOr<std::optional<std::vector<T>>> Extract(const Arguments& arguments
 }  // namespace
 
 void RegisterKllFunctions(duckdb_connection connection) {
+  Register(connection, "bq_kll_extract_point_int64", {kBlob, kDouble}, kBigint,
+           EachRow<ExtractPoint<int64_t>, false>, /*nulls=*/false);
+  Register(connection, "bq_kll_extract_point_float64", {kBlob, kDouble}, kDouble,
+           EachRow<ExtractPoint<double>, false>, /*nulls=*/false);
   LogicalType const bigint(duckdb_create_logical_type(kBigint));
   LogicalType const real(duckdb_create_logical_type(kDouble));
   LogicalType const ints(duckdb_create_list_type(bigint.get()));
