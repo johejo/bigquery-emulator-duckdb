@@ -1,0 +1,62 @@
+# DISTINCT in collated ARRAY_AGG and STRING_AGG
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+
+# Which of equal values a descending order keeps.
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x DESC) FROM UNNEST(['b', COLLATE('a', 'und:ci'), 'B', 'A']) AS x
+?>
+
+# Whether LIMIT applies to the distinct values.
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x LIMIT 1) FROM UNNEST(['A', COLLATE('a', 'und:ci'), 'b']) AS x
+?>
+
+SELECT ARRAY_AGG(DISTINCT x ORDER BY x LIMIT 1) FROM UNNEST(['B', COLLATE('b', 'und:ci'), 'a']) AS x
+?>
+
+# Without ORDER BY, which values DISTINCT keeps.
+
+SELECT ARRAY_LENGTH(ARRAY_AGG(DISTINCT x)) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b', 'B']) AS x
+?>
+
+SELECT STRING_AGG(DISTINCT x) FROM UNNEST([COLLATE('A', 'und:ci'), 'a']) AS x
+?>
+
+# A delimiter, NULL values and IGNORE NULLS.
+
+SELECT STRING_AGG(DISTINCT x, '-' ORDER BY x) FROM UNNEST([COLLATE('a', 'und:ci'), 'b', 'A']) AS x
+?>
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'a', NULL, 'A']) AS x
+?>
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), NULL]) AS x
+?>
+
+SELECT ARRAY_AGG(DISTINCT x IGNORE NULLS ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'B', 'b']) AS x
+?>
+
+SELECT ARRAY_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'b']) AS x
+?>
+
+# Canonically equivalent strings and the empty string.
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE('Å', 'und:ci'), 'å', '', 'a']) AS x
+?>
+
+# An argument computed from a collated value, which keeps its collation.
+
+SELECT STRING_AGG(DISTINCT CONCAT(x, 'z') ORDER BY CONCAT(x, 'z')) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+?>
+
+# A collated column.
+
+CREATE TEMP TABLE t (x STRING COLLATE 'und:ci');
+INSERT t (x) VALUES ('B'), ('a'), ('b'), ('A');
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM t
+?>
+
+# Whether DISTINCT in a window ARRAY_AGG takes a collation.
+
+SELECT ARRAY(SELECT ARRAY_TO_STRING(ARRAY_AGG(DISTINCT x) OVER (), ',') FROM UNNEST([COLLATE('a', 'und:ci'), 'A']) AS x)
+?>

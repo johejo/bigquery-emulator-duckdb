@@ -410,6 +410,8 @@ query Collated `GROUP BY` | SELECT COLLATE(name, 'und:ci') AS n FROM t GROUP BY 
 query Collated `GROUP BY` | SELECT DISTINCT COLLATE(name, 'und:ci') FROM t
 query Collated `GROUP BY` | SELECT COLLATE(name, 'und:ci') AS n, COUNT(*) FROM t GROUP BY ROLLUP(n)
 query Collated `GROUP BY` | SELECT id, COLLATE(name, 'und:ci') AS n FROM t GROUP BY id, n HAVING n = 'A'
+query Collated `DISTINCT` aggregates | SELECT ARRAY_AGG(DISTINCT COLLATE(name, 'und:ci')) FROM t
+query Collated `DISTINCT` aggregates | SELECT STRING_AGG(DISTINCT COLLATE(name, 'und:ci') ORDER BY COLLATE(name, 'und:ci') DESC LIMIT 2) FROM t
 query Collated window functions | SELECT ROW_NUMBER() OVER (PARTITION BY COLLATE(name, 'und:ci')) FROM t
 query Collated window functions | SELECT COUNT(*) OVER (PARTITION BY id, COLLATE(name, 'und:ci')) FROM t
 query Collated window functions | SELECT ROW_NUMBER() OVER (ORDER BY COLLATE(name, 'und:ci')) FROM t

@@ -271,6 +271,31 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   }
   const std::string tail =
       (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
+  if (rule->collated && rule->distinct == AggregateRule::Distinct::kRequired) {
+    // DuckDB's ORDER BY need not keep equal values in input order, so the values are collected as
+    // they come, and the first ORDER BY item, over the argument, sorts the distinct ones.
+    int direction = 0;
+    bool nulls_first = false;
+    if (aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
+      const auto& item = *aggregate->order_by_item_list(0);
+      const auto* argument = call.argument_list(0)->GetAs<googlesql::ResolvedColumnRef>();
+      if (!call.argument_list(0)->Is<googlesql::ResolvedColumnRef>() ||
+          argument->column() != item.column_ref()->column()) {
+        return Unsupported(scope, name + "(DISTINCT ...) ordered by another expression");
+      }
+      direction = item.is_descending() ? -1 : 1;
+      nulls_first = item.null_order() == googlesql::ResolvedOrderByItem::NULLS_FIRST ||
+                    (item.null_order() == googlesql::ResolvedOrderByItem::ORDER_UNSPECIFIED &&
+                     !item.is_descending());
+    }
+    std::string sql = "bq_collation_distinct(" + std::string(rule->function) + "(" + args.at(0) +
+                      ")" + tail + ", " + QuoteLiteral(*collation) + ", " +
+                      std::to_string(direction) + ", " + (nulls_first ? "true" : "false") + ")";
+    if (!limit.empty()) {
+      sql = "list_slice(" + sql + ", 1, " + limit + ")";
+    }
+    return finish(sql, tail);
+  }
   const std::string sql = std::string(rule->function) + "(" + inner + order + ")" + tail;
   if (limit.empty()) {
     return finish(sql, tail);

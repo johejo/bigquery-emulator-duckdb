@@ -1,5 +1,5 @@
-# Collated MIN, MAX, COUNT(DISTINCT), GREATEST and LEAST compare strings as the collation does and
-# return the original values:
+# Collated MIN, MAX, COUNT(DISTINCT), ARRAY_AGG(DISTINCT), STRING_AGG(DISTINCT), GREATEST and
+# LEAST compare strings as the collation does and return the original values:
 # third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
 
 SELECT MAX(x) FROM UNNEST([COLLATE('a', 'und:ci'), 'B']) AS x
@@ -105,3 +105,11 @@ SELECT ARRAY(
 SELECT ARRAY_AGG(y HAVING MAX x ORDER BY y)
 FROM UNNEST([STRUCT(COLLATE('b', 'und:ci') AS x, 1 AS y), ('B', 2), ('a', 3)])
 => error: Unsupported having modifier in the aggregate function array_agg.
+
+# BigQuery's answers: DISTINCT in STRING_AGG and ARRAY_AGG compares collated strings as the
+# collation does and keeps the first of equal values.
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+=> "a,b"
+
+SELECT ARRAY_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+=> [{"v":"a"},{"v":"b"}]

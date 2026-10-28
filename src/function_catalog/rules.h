@@ -170,6 +170,9 @@ struct BasicAggregateRule : AggregateOptions {
   bool carries = false;
   // A call with an operation collation matches only the rules that set this, whose $n count on
   // past the call's arguments to their collation keys: with one argument, $2 is the key of $1.
+  // With Distinct::kRequired, the function collects the first argument, and
+  // bq_collation_distinct leaves out its equal values and sorts them by the call's ORDER BY,
+  // which DISTINCT allows only over that argument, before LIMIT and the finish.
   bool collated = false;
   // Turns the DuckDB call `sql` into the BigQuery result, given the BigQuery arguments and the
   // FILTER and OVER clauses of the call; null keeps it as it is.

@@ -177,6 +177,13 @@ constexpr char kIntervalAvg[] = "bq_interval_avg";
 constexpr char kIntervalSumDistinct[] = "bq_interval_sum_distinct";
 constexpr char kIntervalAvgDistinct[] = "bq_interval_avg_distinct";
 
+// STRING_AGG of the list of distinct values that bq_collation_distinct returns.
+std::string JoinStrings(const std::string& sql, const std::vector<std::string>& arguments,
+                        const std::string& /*tail*/) {
+  return "list_aggr(" + sql + ", 'string_agg', " +
+         (arguments.size() > 1 ? arguments.at(1) : "','") + ")";
+}
+
 std::string IntervalDistinct(const std::string& sql, const std::vector<std::string>& /*arguments*/,
                              const std::string& /*tail*/) {
   return "bq_interval_distinct(" + sql + ")";
@@ -434,6 +441,13 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .limit = kSlice,
                      .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
                  },
+                 {
+                     .function = "list",
+                     .nulls = kFilter,
+                     .distinct = AggregateRule::Distinct::kRequired,
+                     .limit = kSliceFinished,
+                     .collated = true,
+                 },
                  {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
              },
              {
@@ -582,6 +596,14 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
 
       Define("STRING_AGG",
              {
+                 {
+                     .function = "list",
+                     .distinct = AggregateRule::Distinct::kRequired,
+                     .limit = kSliceFinished,
+                     .skip_nulls = true,
+                     .collated = true,
+                     .finish = JoinStrings,
+                 },
                  {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
                  {
                      .function = "string_agg",
