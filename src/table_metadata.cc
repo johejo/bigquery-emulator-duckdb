@@ -284,6 +284,17 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch, b
     metadata.tag_order.clear();
   }
   ValidateResourceTags(metadata.resource_tags);
+  // BigQuery's recorded answers: tables keep their default for null or an omitted field,
+  // even on full updates. Datasets clear it to an explicit empty default for null or a full
+  // update that omits it.
+  if (const auto collation = body.find("defaultCollation"); collation != body.end()) {
+    if (!collation->is_null() || !table) {
+      metadata.default_collation = StringValue(*collation, "defaultCollation");
+      ValidateCollation(*metadata.default_collation);
+    }
+  } else if (!table && !patch && metadata.default_collation.has_value()) {
+    metadata.default_collation = "";
+  }
   set("defaultRoundingMode", [&](const json& value) {
     const std::string mode = StringValue(value, "defaultRoundingMode");
     std::optional<RoundingMode> parsed = ParseRoundingMode(mode);
@@ -451,6 +462,9 @@ json TableMetadata::ToJson() const {
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
+  if (default_collation.has_value()) {
+    fields["defaultCollation"] = *default_collation;
+  }
   if (expiration_time.has_value()) {
     fields["expirationTime"] = std::to_string(*expiration_time);
   }
@@ -513,6 +527,9 @@ json DatasetMetadata::ToJson() const {
   }
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
+  }
+  if (default_collation.has_value()) {
+    fields["defaultCollation"] = *default_collation;
   }
   if (!location.empty()) {
     fields["location"] = location;

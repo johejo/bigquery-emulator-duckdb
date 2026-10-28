@@ -485,8 +485,7 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
     throw std::invalid_argument("OPTIONS on temporary tables are not supported");
   }
   if (create.is_value_table() || !create.pseudo_column_list().empty() ||
-      create.collation_name() != nullptr || create.connection_list() != nullptr ||
-      !create.check_constraint_list().empty()) {
+      create.connection_list() != nullptr || !create.check_constraint_list().empty()) {
     return Unsupported(scope, "CREATE TABLE option");
   }
   const auto path = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP
@@ -609,7 +608,8 @@ std::optional<TableDescription> LikeDescription(const CreateTable& create, const
   }
   auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope,
                                   std::move(inherited));
-  if (!metadata || !PartitioningAndClustering(create, *metadata, scope)) {
+  if (!metadata || !DefaultCollation(create.collation_name(), scope, metadata->default_collation) ||
+      !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
   }
   description->metadata = *std::move(metadata);
@@ -686,7 +686,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope,
                                   std::move(description->metadata));
   const auto columns = ColumnsSql(description->schema, scope);
-  if (!head || !target || !metadata || !columns) {
+  if (!head || !target || !metadata || !columns ||
+      !DefaultCollation(create.collation_name(), scope, metadata->default_collation)) {
     return std::nullopt;
   }
   // The new table would replace the source before its rows are copied.
@@ -824,6 +825,13 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
           .drop = true,
           .if_exists = action->GetAs<googlesql::ResolvedDropPrimaryKeyAction>()->is_if_exists(),
       });
+    } else if (action->Is<googlesql::ResolvedSetCollateClause>()) {
+      OptionUpdates updates;
+      if (!DefaultCollation(action->GetAs<googlesql::ResolvedSetCollateClause>()->collation_name(),
+                            scope, updates.default_collation)) {
+        return std::nullopt;
+      }
+      alteration.actions.emplace_back(std::move(updates));
     } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
       OptionUpdates updates;
       if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
@@ -868,7 +876,9 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope);
-  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope) ||
+  if (!head || !target || !metadata ||
+      !DefaultCollation(create.collation_name(), scope, metadata->default_collation) ||
+      !PartitioningAndClustering(create, *metadata, scope) ||
       !PrimaryKey(create, *metadata, scope)) {
     return std::nullopt;
   }
@@ -996,7 +1006,8 @@ std::optional<std::string> CreateTableAsSelect(
     description = LikeDescription(create, scope);
   } else {
     auto metadata = OptionsMetadata(create.option_list(), DdlOptionContext::kCreateTable, scope);
-    if (metadata && PartitioningAndClustering(create, *metadata, scope) &&
+    if (metadata && DefaultCollation(create.collation_name(), scope, metadata->default_collation) &&
+        PartitioningAndClustering(create, *metadata, scope) &&
         PrimaryKey(create, *metadata, scope)) {
       description = TableDescription{.schema = {}, .metadata = *std::move(metadata)};
     }

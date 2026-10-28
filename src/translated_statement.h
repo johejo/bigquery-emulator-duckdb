@@ -81,6 +81,7 @@ struct OptionUpdates {
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
   std::optional<RoundingMode> default_rounding_mode = {};
+  std::optional<std::string> default_collation = {};
 };
 
 // The routine a CREATE FUNCTION defines, which the emulator records next to its DuckDB macro.

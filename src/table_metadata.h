@@ -67,6 +67,7 @@ struct TableMetadata {
   // TableConstraints.primaryKey.columns; empty when the table has no primary key.
   std::vector<std::string> primary_key;
   RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
+  std::optional<std::string> default_collation;
   std::optional<BaseTableDefinition> clone;
   // A table snapshot is read-only: only its metadata can change.
   std::optional<BaseTableDefinition> snapshot;
@@ -82,7 +83,7 @@ struct TableMetadata {
            clustering.empty() && primary_key.empty() &&
            default_rounding_mode == RoundingMode::kUnspecified && !clone.has_value() &&
            !snapshot.has_value() && !expiration_time.has_value() && !restored_from_snapshot &&
-           creation_time == 0;
+           creation_time == 0 && !default_collation.has_value();
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -132,6 +133,7 @@ struct DatasetMetadata {
   std::vector<std::string> tag_order;
   std::optional<int64_t> default_table_expiration_ms;
   RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
+  std::optional<std::string> default_collation;
   // Output only and recorded with the dataset.
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old datasets.
   // As CanonicalLocation spells it; empty for a dataset recorded before datasets had locations,
@@ -142,7 +144,7 @@ struct DatasetMetadata {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !default_table_expiration_ms.has_value() &&
            default_rounding_mode == RoundingMode::kUnspecified && creation_time == 0 &&
-           location.empty();
+           location.empty() && !default_collation.has_value();
   }
   [[nodiscard]] std::string Location() const {
     return location.empty() ? kDefaultLocation : location;

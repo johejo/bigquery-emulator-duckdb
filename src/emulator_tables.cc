@@ -164,6 +164,9 @@ TableInfo Emulator::UpdateTable(TableReference table,
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
   if (info.view_query.has_value()) {
+    if (metadata.has_value() && metadata->default_collation.has_value()) {
+      throw ApiError::Unsupported("defaultCollation on a view");
+    }
     if (schema.has_value()) {
       throw ApiError::Unsupported("changing the schema of a view; change its query instead");
     }
@@ -198,7 +201,8 @@ TableInfo Emulator::UpdateTable(TableReference table,
       ((schema.has_value() && SchemaToJson(*schema) != SchemaToJson(info.schema)) ||
        (metadata.has_value() &&
         (metadata->clustering != info.metadata.clustering ||
-         metadata->default_rounding_mode != info.metadata.default_rounding_mode)))) {
+         metadata->default_rounding_mode != info.metadata.default_rounding_mode ||
+         metadata->default_collation != info.metadata.default_collation)))) {
     throw ApiError::Invalid(
         "Only table expirationTime, description, friendlyName, labels and tags can be updated for "
         "a snapshot.");
@@ -208,6 +212,9 @@ TableInfo Emulator::UpdateTable(TableReference table,
   if (updated_schema.has_value()) {
     const RoundingMode mode = metadata.value_or(info.metadata).default_rounding_mode;
     ApplyDefaultRoundingMode(info.schema, *updated_schema, mode);
+    ApplyDefaultCollation(info.schema, *updated_schema,
+                          metadata.value_or(info.metadata).default_collation);
+    ValidatePartitioning(metadata.value_or(info.metadata), *updated_schema);
     statements = SchemaUpdateStatements(table, info.schema, *updated_schema);
     // The rows kept from before the table had these columns are not those it has now.
     if (const int64_t creation_time = HistoryCreationTime(table, info.metadata);

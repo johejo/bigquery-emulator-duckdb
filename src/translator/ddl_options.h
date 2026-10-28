@@ -12,6 +12,8 @@
 
 namespace googlesql {
 class ResolvedOption;
+// Keep the heavy resolved AST header out of callers that only decode DDL options.
+class ResolvedExpr;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
@@ -32,6 +34,9 @@ struct DecodedDdlOption {
 std::optional<DecodedDdlOption> DecodeDdlOption(const googlesql::ResolvedOption& option,
                                                 DdlOptionContext context, const Scope& scope);
 bool StringOption(const googlesql::Value& value, std::string& into);
+// Reads and validates a literal DEFAULT COLLATE specification; no expression leaves it unset.
+bool DefaultCollation(const googlesql::ResolvedExpr* expression, const Scope& scope,
+                      std::optional<std::string>& into);
 // Sets `into` to the rounding mode `value` names, or clears it for NULL. False for any other
 // value.
 bool RoundingModeOption(const googlesql::Value& value, RoundingMode& into);

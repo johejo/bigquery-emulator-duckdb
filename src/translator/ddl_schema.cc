@@ -16,9 +16,6 @@ namespace bigquery_emulator_duckdb::translator {
 
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
                                         const Scope& scope) {
-  if (create.collation_name() != nullptr) {
-    return Unsupported(scope, "dataset collation");
-  }
   const auto path = TargetDataset(create.name_path(), scope);
   const std::optional<DatasetReference>& dataset = scope.context.statement.ddl_target_dataset;
   if (!path || !dataset) {
@@ -27,7 +24,7 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
   // The metadata the OPTIONS of a CREATE SCHEMA set. A dataset without a location is created in
   // the job's, which the emulator gives it when the statement runs.
   std::optional<DatasetMetadata> metadata = SchemaOptionsMetadata(create.option_list(), scope);
-  if (!metadata) {
+  if (!metadata || !DefaultCollation(create.collation_name(), scope, metadata->default_collation)) {
     return std::nullopt;
   }
   scope.context.statement.dataset = DatasetDefinition{
@@ -57,6 +54,13 @@ std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt&
   }
   DatasetAlteration alteration{.dataset = *dataset, .if_exists = alter.is_if_exists()};
   for (const auto& action : alter.alter_action_list()) {
+    if (action->Is<googlesql::ResolvedSetCollateClause>()) {
+      if (!DefaultCollation(action->GetAs<googlesql::ResolvedSetCollateClause>()->collation_name(),
+                            scope, alteration.options.default_collation)) {
+        return std::nullopt;
+      }
+      continue;
+    }
     if (!action->Is<googlesql::ResolvedSetOptionsAction>()) {
       return Unsupported(scope, "ALTER SCHEMA action " + action->node_kind_string());
     }

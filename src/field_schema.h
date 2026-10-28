@@ -131,6 +131,17 @@ void CheckRoundingModes(const std::vector<FieldSchema>& schema);
 // third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
 void CheckCollations(const std::vector<FieldSchema>& schema);
 
+// Assigns a table's default only to STRING fields without an explicit collation, recursively.
+void ApplyDefaultCollation(std::vector<FieldSchema>& schema,
+                           const std::optional<std::string>& specification);
+void ApplyDefaultCollation(FieldSchema& field, const std::optional<std::string>& specification);
+// Applies the default only to newly added fields, leaving existing columns unchanged.
+void ApplyDefaultCollation(const std::vector<FieldSchema>& current,
+                           std::vector<FieldSchema>& updated,
+                           const std::optional<std::string>& specification);
+// The specifications BigQuery accepts, including the explicit empty (binary) specification.
+void ValidateCollation(const std::string& specification);
+
 // The path, below `path`, of the first field of `schema` whose name another field beside it has,
 // ignoring case as BigQuery does, at any depth; BigQuery rejects such a schema.
 // third_party/bigquery_docs/schemas.md

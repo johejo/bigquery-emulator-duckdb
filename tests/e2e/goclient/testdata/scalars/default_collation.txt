@@ -1,0 +1,39 @@
+# Default collation applies to future STRING fields, including nested ones, but an explicit
+# empty collation overrides it. ALTER changes only the default, never existing fields.
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+CREATE TEMP TABLE t (c STRING, b STRING COLLATE '') DEFAULT COLLATE 'und:ci';
+INSERT t VALUES ('a', 'a');
+SELECT c = 'A' AND NOT (b = 'A') FROM t
+=> "true"
+
+CREATE TEMP TABLE t (s STRUCT<f STRING, b STRING COLLATE ''>, a ARRAY<STRING>, n INT64) DEFAULT COLLATE 'und:ci';
+INSERT t VALUES (STRUCT('a', 'a'), ['a'], 1);
+SELECT s.f = 'A' AND NOT (s.b = 'A') AND a[OFFSET(0)] = 'A' AND n = 1 FROM t
+=> "true"
+
+CREATE TEMP TABLE t (c STRING) DEFAULT COLLATE 'und:ci';
+ALTER TABLE t SET DEFAULT COLLATE '';
+ALTER TABLE t ADD COLUMN b STRING;
+INSERT t VALUES ('a', 'a');
+SELECT c = 'A' AND NOT (b = 'A') FROM t
+=> "true"
+
+CREATE TEMP TABLE t (b STRING);
+ALTER TABLE t SET DEFAULT COLLATE 'und:ci';
+ALTER TABLE t ADD COLUMN c STRING;
+INSERT t VALUES ('a', 'a');
+SELECT NOT (b = 'A') AND c = 'A' FROM t
+=> "true"
+
+CREATE TEMP TABLE t (c STRING) DEFAULT COLLATE 'und:ci';
+ALTER TABLE t ADD COLUMN b STRING COLLATE '';
+INSERT t VALUES ('a', 'a');
+SELECT c = 'A' AND NOT (b = 'A') FROM t
+=> "true"
+
+CREATE TEMP TABLE t (c STRING) DEFAULT COLLATE 'und:ci';
+ALTER TABLE t ADD COLUMN s STRUCT<f STRING, b STRING COLLATE ''>;
+INSERT t VALUES ('a', STRUCT('a', 'a'));
+SELECT c = 'A' AND s.f = 'A' AND NOT (s.b = 'A') FROM t
+=> "true"

@@ -328,6 +328,21 @@ std::optional<DecodedDdlOption> DecodeDdlOption(const googlesql::ResolvedOption&
 }
 
 // A STRING option into `into`; NULL leaves it unset.
+bool DefaultCollation(const googlesql::ResolvedExpr* expression, const Scope& scope,
+                      std::optional<std::string>& into) {
+  if (expression == nullptr) {
+    return true;
+  }
+  if (!expression->Is<googlesql::ResolvedLiteral>() ||
+      expression->GetAs<googlesql::ResolvedLiteral>()->value().is_null()) {
+    Unsupported(scope, "default collation that is not a non-NULL literal");
+    return false;
+  }
+  into = expression->GetAs<googlesql::ResolvedLiteral>()->value().string_value();
+  ValidateCollation(*into);
+  return true;
+}
+
 bool StringOption(const googlesql::Value& value, std::string& into) {
   if (value.is_null()) {
     into.clear();
