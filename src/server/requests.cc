@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/absl_log.h"
 #include "absl/time/time.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -248,7 +249,13 @@ QueryRequest ParseQueryConfiguration(const std::string& project_id, const json& 
   request.project_id = project_id;
   request.query = config["query"].get<std::string>();
   request.default_dataset = ParseDefaultDataset(config);
-  request.parameters = QueryParameters::Parse(config.value("queryParameters", json::array()));
+  const json parameters = config.value("queryParameters", json::array());
+  // Logged as the request spells them, before parsing, so that parameters that fail to parse are
+  // logged too.
+  if (!parameters.empty()) {
+    ABSL_VLOG(1) << "Query parameters: " << parameters.dump();
+  }
+  request.parameters = QueryParameters::Parse(parameters);
   return request;
 }
 
