@@ -14,6 +14,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_catalog/comparison.h"
 #include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
 #include "src/javascript_function.h"
@@ -46,10 +47,19 @@ namespace {
 std::optional<std::string> Call(const Catalog& functions,
                                 const googlesql::ResolvedFunctionCall& resolved,
                                 std::string_view name, const std::vector<std::string>& args,
-                                bool safe, std::string_view project) {
+                                bool safe, std::string_view project, const std::string& collation) {
   const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr) {
     return std::nullopt;
+  }
+  if (name == "NULLIF" && !collation.empty()) {
+    // Compare keys, but return the original first argument, evaluated only once.
+    const std::string first = function_catalog::BoundComparison(0);
+    const std::string second = function_catalog::BoundComparison(1);
+    return function_catalog::BindComparison(args, {0, 1},
+                                            "CASE WHEN " + CollationKey(first, collation) + " = " +
+                                                CollationKey(second, collation) +
+                                                " THEN NULL ELSE " + first + " END");
   }
   ScalarCall call{.resolved = resolved, .name = name, .safe = safe, .project = project};
   for (size_t i = 0; i < args.size(); ++i) {
@@ -277,7 +287,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     throw std::invalid_argument("Function '" + call.function()->Name() + "' with collation '" +
                                 *collation + "' is not supported.");
   }
-  if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys)) {
+  if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys) &&
+      !functions.HasTypeUse(name, TypeUse::kSelectsCollationValues)) {
     return Unsupported(scope, "function " + name + " with collation");
   }
   if (const auto* python = dynamic_cast<const PythonFunction*>(call.function())) {
@@ -437,7 +448,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     if (!sql) {
       return std::nullopt;
     }
-    if (argument->type()->IsString()) {
+    // CASE compares only its input and WHEN operands; its results retain their values.
+    // NULLIF needs both keys and the original input, so Call binds its values before keying.
+    const bool collation_operand =
+        function != "NULLIF" && (function != "$CASE_WITH_VALUE" || i == 0 ||
+                                 (i % 2 == 1 && i + 1 < call.argument_list().size()));
+    if (argument->type()->IsString() && collation_operand) {
       args.push_back(CollationKey(*sql, *collation));
     } else if (compares_intervals && argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
@@ -448,7 +464,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
   }
   if (!safe) {
-    auto sql = Call(functions, call, function, args, false, scope.context.defaults.project);
+    auto sql =
+        Call(functions, call, function, args, false, scope.context.defaults.project, *collation);
     if (!sql) {
       return Unsupported(scope, "function " + name);
     }
@@ -475,8 +492,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }
-  const auto sql =
-      Call(functions, call, function, placeholders, true, scope.context.defaults.project);
+  const auto sql = Call(functions, call, function, placeholders, true,
+                        scope.context.defaults.project, *collation);
   if (!sql) {
     return Unsupported(scope, "SAFE." + name);
   }

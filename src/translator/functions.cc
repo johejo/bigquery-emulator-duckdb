@@ -144,6 +144,7 @@ constexpr auto kHandlers =
                         {
                             TypeUse::kCompares,
                             TypeUse::kCarriesResults,
+                            TypeUse::kSelectsCollationValues,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },

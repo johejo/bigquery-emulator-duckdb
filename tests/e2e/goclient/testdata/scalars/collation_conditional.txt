@@ -1,0 +1,66 @@
+# Comparison semantics, original result values, propagation and short-circuiting:
+# third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+
+SELECT CASE COLLATE('Foo', 'und:ci') WHEN 'foo' THEN 'Matched' ELSE 'Different' END
+=> "Matched"
+
+SELECT CASE 'Foo' WHEN COLLATE('foo', 'und:ci') THEN 'Matched' ELSE 'Different' END
+=> "Matched"
+
+SELECT CASE COLLATE('Foo', 'und:ci') WHEN 'bar' THEN 'Matched' ELSE 'Original' END
+=> "Original"
+
+SELECT CASE COLLATE('Foo', 'und:ci') WHEN 'foo' THEN 'First' WHEN 'FOO' THEN ERROR('unselected') ELSE ERROR('unselected') END
+=> "First"
+
+SELECT CASE COLLATE(NULL, 'und:ci') WHEN NULL THEN 'Matched' ELSE 'Null is not equal' END
+=> "Null is not equal"
+
+SELECT CASE COLLATE('Foo', 'und:ci') WHEN 'foo' THEN 42 ELSE 0 END
+=> "42"
+
+# Result annotations are independent of the collation used to compare the input.
+SELECT (CASE COLLATE('Foo', 'und:ci') WHEN 'foo' THEN 'Result' ELSE 'Other' END) = 'result'
+=> "false"
+
+SELECT (CASE COLLATE('Foo', 'und:ci') WHEN 'foo' THEN COLLATE('Result', 'und:ci') ELSE 'Other' END) = 'result'
+=> "true"
+
+SELECT CASE 'Foo' WHEN 'foo' THEN COLLATE('Matched', 'und:ci') ELSE 'Different' END
+=> "Different"
+
+SELECT NULLIF(COLLATE('Foo', 'und:ci'), 'foo')
+=> null
+
+SELECT NULLIF('Foo', COLLATE('foo', 'und:ci'))
+=> null
+
+SELECT NULLIF(COLLATE('Foo', 'und:ci'), 'bar')
+=> "Foo"
+
+SELECT NULLIF(COLLATE('Foo', 'und:ci'), NULL)
+=> "Foo"
+
+SELECT NULLIF(COLLATE(NULL, 'und:ci'), 'foo')
+=> null
+
+SELECT NULLIF(COLLATE('', 'und:ci'), '')
+=> null
+
+SELECT NULLIF(COLLATE('Foo', 'und:ci'), 'bar') = 'foo'
+=> "true"
+
+SELECT NULLIF('Foo', 'foo')
+=> "Foo"
+
+# Canonically equivalent Unicode strings compare equal, not just ASCII case variants.
+SELECT NULLIF(COLLATE('å', 'und:ci'), 'Å')
+=> null
+
+SELECT CASE COLLATE('å', 'und:ci') WHEN 'Å' THEN 'Equivalent' ELSE 'Different' END
+=> "Equivalent"
+
+# Compare row-dependent inputs and retain their original spelling.
+SELECT STRING_AGG(NULLIF(w, 'FOO'), ',' ORDER BY w) FROM UNNEST([COLLATE('Foo', 'und:ci'), 'Bar', 'Zed']) AS w
+=> "Bar,Zed"
