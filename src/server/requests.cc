@@ -14,6 +14,7 @@
 
 #include "absl/log/absl_log.h"
 #include "absl/status/status.h"
+#include "google/cloud/bigquery/v2/job.pb.h"
 #include "google/cloud/bigquery/v2/job_config.pb.h"
 #include "google/cloud/bigquery/v2/table_reference.pb.h"
 #include "google/protobuf/timestamp.pb.h"
@@ -242,37 +243,31 @@ TableReference ParseTableReference(const v2::TableReference& table, std::string_
   };
 }
 
-TableReference ParseTableReference(const json& table, std::string_view what) {
-  return ParseTableReference(ToProto<v2::TableReference>(table), what);
-}
-
-std::optional<DatasetReference> ParseDefaultDataset(const json& config) {
-  if (!config.contains("defaultDataset")) {
-    return std::nullopt;
-  }
-  return DatasetReference{
-      .project_id = config["defaultDataset"].value("projectId", ""),
-      .dataset_id = config["defaultDataset"].value("datasetId", ""),
-  };
-}
-
-// jobs.query takes the query configuration as the request body and jobs.insert takes it as
-// configuration.query, but the fields this emulator reads are spelled the same in both.
-QueryRequest ParseQueryConfiguration(const std::string& project_id, const json& config) {
+// jobs.query takes the query configuration as a QueryRequest and jobs.insert takes it as a
+// JobConfigurationQuery, but the fields this emulator reads are spelled the same in both.
+// `config` is the configuration's JSON, for the query parameters.
+template <typename Message>
+QueryRequest ParseQueryConfiguration(const std::string& project_id, const Message& message,
+                                     const json& config) {
   if (!config.contains("query")) {
     throw ApiError::Invalid("Required parameter is missing: query");
   }
   // Only GoogleSQL is emulated. An omitted useLegacySql runs as GoogleSQL, although BigQuery
   // defaults it to true.
-  if (config.value("useLegacySql", false)) {
+  if (message.use_legacy_sql().value()) {
     throw ApiError::Unsupported("legacy SQL; set useLegacySql to false");
   }
   RejectEncryptionConfiguration(config, "destinationEncryptionConfiguration",
                                 "destinationEncryptionConfiguration");
   QueryRequest request;
   request.project_id = project_id;
-  request.query = config["query"].get<std::string>();
-  request.default_dataset = ParseDefaultDataset(config);
+  request.query = message.query();
+  if (message.has_default_dataset()) {
+    request.default_dataset = DatasetReference{
+        .project_id = message.default_dataset().project_id(),
+        .dataset_id = message.default_dataset().dataset_id(),
+    };
+  }
   const json parameters = config.value("queryParameters", json::array());
   // Logged as the request spells them, before parsing, so that parameters that fail to parse are
   // logged too.
@@ -303,65 +298,52 @@ void ParseDispositions(const std::string& create, const std::string& write, T& j
   }
 }
 
-template <typename T>
-void ParseDispositions(const json& config, T& job) {
-  ParseDispositions(config.value("createDisposition", ""), config.value("writeDisposition", ""),
-                    job);
-}
-
-std::string JobId(const json& job) {
-  return job.value(json::json_pointer("/jobReference/jobId"), "");
-}
-
-// The location `object`, such as a job reference, names, or nothing when it names none.
-std::optional<std::string> LocationField(const json& object) {
-  std::string location = object.value("location", "");
+// A location, or nothing when it is empty.
+std::optional<std::string> Location(const std::string& location) {
   if (location.empty()) {
     return std::nullopt;
   }
   return location;
 }
 
-// The location the job reference of a job resource names.
-std::optional<std::string> JobLocationField(const json& job) {
-  return LocationField(job.value("jobReference", json::object()));
-}
-
-QueryRequest ParseQueryJob(const std::string& project_id, const json& job) {
-  const json& config = job["configuration"];
-  const json& query = config["query"];
-  QueryRequest request = ParseQueryConfiguration(project_id, query);
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
-  request.dry_run = config.value("dryRun", false);
-  if (query.contains("destinationTable")) {
-    request.destination_table = ParseTableReference(query["destinationTable"], "destination table");
+// Each job type's parser takes the checked job resource as its message and the JSON of its
+// configuration, which its request keeps.
+QueryRequest ParseQueryJob(const std::string& project_id, const v2::Job& job,
+                           const json& configuration) {
+  const v2::JobConfigurationQuery& query = job.configuration().query();
+  QueryRequest request = ParseQueryConfiguration(project_id, query, configuration);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
+  request.dry_run = job.configuration().dry_run().value();
+  if (query.has_destination_table()) {
+    request.destination_table = ParseTableReference(query.destination_table(), "destination table");
   }
-  ParseDispositions(query, request);
+  ParseDispositions(query.create_disposition(), query.write_disposition(), request);
   return request;
 }
 
-LoadRequest ParseLoadJob(const std::string& project_id, const json& job) {
-  const json& load = job["configuration"]["load"];
-  if (!load.contains("destinationTable")) {
+LoadRequest ParseLoadJob(const std::string& project_id, const v2::Job& job,
+                         const json& configuration) {
+  const v2::JobConfigurationLoad& load = job.configuration().load();
+  if (!load.has_destination_table()) {
     throw ApiError::Invalid("Invalid destination table");
   }
   LoadRequest request;
   request.project_id = project_id;
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
   request.load.destination_table =
-      ParseTableReference(load["destinationTable"], "destination table");
-  ParseDispositions(load, request.load);
-  RejectEncryptionConfiguration(load, "destinationEncryptionConfiguration",
+      ParseTableReference(load.destination_table(), "destination table");
+  ParseDispositions(load.create_disposition(), load.write_disposition(), request.load);
+  RejectEncryptionConfiguration(configuration, "destinationEncryptionConfiguration",
                                 "destinationEncryptionConfiguration");
-  request.load.configuration = load;
+  request.load.configuration = configuration;
   return request;
 }
 
-CopyRequest ParseCopyJob(const std::string& project_id, const json& job) {
-  const json& configuration = job["configuration"]["copy"];
-  const auto copy = ToProto<v2::JobConfigurationTableCopy>(configuration);
+CopyRequest ParseCopyJob(const std::string& project_id, const v2::Job& job,
+                         const json& configuration) {
+  const v2::JobConfigurationTableCopy& copy = job.configuration().copy();
   if (!copy.has_destination_table()) {
     throw ApiError::Invalid("Invalid destination table");
   }
@@ -380,8 +362,8 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& job) {
       break;
   }
   request.project_id = project_id;
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
   request.copy.destination_table =
       ParseTableReference(copy.destination_table(), "destination table");
   if (copy.has_source_table() == !copy.source_tables().empty()) {
@@ -406,16 +388,16 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& job) {
   return request;
 }
 
-ExtractRequest ParseExtractJob(const std::string& project_id, const json& job) {
-  const json& configuration = job["configuration"]["extract"];
-  const auto extract = ToProto<v2::JobConfigurationExtract>(configuration);
+ExtractRequest ParseExtractJob(const std::string& project_id, const v2::Job& job,
+                               const json& configuration) {
+  const v2::JobConfigurationExtract& extract = job.configuration().extract();
   if (!extract.has_source_table()) {
     throw ApiError::Invalid("Source table is required");
   }
   ExtractRequest request;
   request.project_id = project_id;
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
   request.extract.source_table = ParseTableReference(extract.source_table(), "source table");
   request.extract.destination_uris.assign(extract.destination_uris().begin(),
                                           extract.destination_uris().end());
@@ -542,17 +524,18 @@ MediaUpload ParseMultipartUpload(const httplib::Request& request) {
 JobsQuery ParseQuery(const std::string& project_id, const json& body) {
   const json checked =
       CheckResource(body, "QueryRequest", QueryRequestFields(), UnknownFields::kIgnore);
+  const auto message = ToProto<v2::QueryRequest>(checked);
   JobsQuery result{
-      .query = ParseQueryConfiguration(project_id, checked),
+      .query = ParseQueryConfiguration(project_id, message, checked),
       .page =
           {
-              .max_results = checked.value("maxResults", kDefaultMaxResults),
-              .int64_timestamps =
-                  checked.value(json::json_pointer("/formatOptions/useInt64Timestamp"), false),
+              .max_results =
+                  message.has_max_results() ? message.max_results().value() : kDefaultMaxResults,
+              .int64_timestamps = message.format_options().use_int64_timestamp(),
           },
   };
-  result.query.location = LocationField(checked);
-  result.query.dry_run = checked.value("dryRun", false);
+  result.query.location = Location(message.location());
+  result.query.dry_run = message.dry_run();
   return result;
 }
 
@@ -567,28 +550,30 @@ ResultPage ParseResultPage(const httplib::Request& request) {
 
 JobRequest ParseJobInsert(const std::string& project_id, const json& body) {
   const json job = CheckResource(body, "Job", JobFields(), UnknownFields::kIgnore);
-  const json config = job.value("configuration", json::object());
-  if (config.contains("load")) {
-    return ParseLoadJob(project_id, job);
+  const auto message = ToProto<v2::Job>(job);
+  const v2::JobConfiguration& config = message.configuration();
+  if (config.has_load()) {
+    return ParseLoadJob(project_id, message, job["configuration"]["load"]);
   }
-  if (config.contains("copy")) {
-    return ParseCopyJob(project_id, job);
+  if (config.has_copy()) {
+    return ParseCopyJob(project_id, message, job["configuration"]["copy"]);
   }
-  if (config.contains("extract")) {
-    return ParseExtractJob(project_id, job);
+  if (config.has_extract()) {
+    return ParseExtractJob(project_id, message, job["configuration"]["extract"]);
   }
-  if (!config.contains("query")) {
+  if (!config.has_query()) {
     throw ApiError::Invalid("Only query, load, copy, and extract jobs are supported");
   }
-  return ParseQueryJob(project_id, job);
+  return ParseQueryJob(project_id, message, job["configuration"]["query"]);
 }
 
 LoadRequest ParseLoadInsert(const std::string& project_id, const json& body) {
   const json job = CheckResource(body, "Job", JobFields(), UnknownFields::kIgnore);
-  if (!job.contains("configuration") || !job["configuration"].contains("load")) {
+  const auto message = ToProto<v2::Job>(job);
+  if (!message.configuration().has_load()) {
     throw ApiError::Invalid("Media upload requires a load job");
   }
-  return ParseLoadJob(project_id, job);
+  return ParseLoadJob(project_id, message, job["configuration"]["load"]);
 }
 
 JobListRequest ParseJobList(const httplib::Request& request) {
