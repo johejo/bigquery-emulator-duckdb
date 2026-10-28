@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -30,6 +31,8 @@
 #include "googlesql/public/sql_view.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/templated_sql_function.h"
+#include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/scripting/error_helpers.h"
@@ -122,6 +125,47 @@ std::vector<std::pair<std::string, const googlesql::Type*>> ResultColumns(
   return columns;
 }
 
+// The annotations of the columns ResultColumns returns, in its order.
+std::vector<const googlesql::AnnotationMap*> ResultAnnotations(
+    const googlesql::ResolvedQueryStmt& query) {
+  std::vector<const googlesql::AnnotationMap*> annotations;
+  if (ReturnsStructFields(query)) {
+    const googlesql::AnnotationMap* row =
+        query.output_column_list(0)->column().type_annotation_map();
+    const googlesql::StructAnnotationMap* fields = row == nullptr ? nullptr : row->AsStructMap();
+    for (int i = 0; i < query.output_column_list(0)->column().type()->AsStruct()->num_fields();
+         ++i) {
+      annotations.push_back(fields == nullptr ? nullptr : fields->field(i));
+    }
+    return annotations;
+  }
+  std::ranges::transform(query.output_column_list(), std::back_inserter(annotations),
+                         [](const auto& output) { return output->column().type_annotation_map(); });
+  return annotations;
+}
+
+// Gives `field` and its fields the collations `annotations` hold, as BigQuery reports them; a
+// REPEATED field reports its elements' collation.
+void SetCollations(FieldSchema& field, const googlesql::AnnotationMap* annotations) {
+  if (annotations != nullptr && field.mode == FieldMode::kRepeated) {
+    const googlesql::StructAnnotationMap* element = annotations->AsStructMap();
+    annotations = element == nullptr || element->num_fields() != 1 ? nullptr : element->field(0);
+  }
+  if (annotations == nullptr) {
+    return;
+  }
+  if (const googlesql::SimpleValue* collation =
+          annotations->GetAnnotation(static_cast<int>(googlesql::AnnotationKind::kCollation));
+      collation != nullptr && collation->has_string_value()) {
+    field.collation = collation->string_value();
+  }
+  if (const googlesql::StructAnnotationMap* fields = annotations->AsStructMap()) {
+    for (int i = 0; i < fields->num_fields() && std::cmp_less(i, field.fields.size()); ++i) {
+      SetCollations(field.fields.at(i), fields->field(i));
+    }
+  }
+}
+
 }  // namespace
 
 std::optional<std::vector<FieldSchema>> ResultSchema(
@@ -129,12 +173,15 @@ std::optional<std::vector<FieldSchema>> ResultSchema(
   if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return std::nullopt;
   }
+  const auto& query = *statement.GetAs<googlesql::ResolvedQueryStmt>();
+  const std::vector<const googlesql::AnnotationMap*> annotations = ResultAnnotations(query);
   std::vector<FieldSchema> schema;
-  for (const auto& [name, type] : ResultColumns(*statement.GetAs<googlesql::ResolvedQueryStmt>())) {
+  for (const auto& [name, type] : ResultColumns(query)) {
     absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(name, type);
     if (!field.ok()) {
       return std::nullopt;
     }
+    SetCollations(*field, annotations.at(schema.size()));
     schema.push_back(*std::move(field));
   }
   return schema;

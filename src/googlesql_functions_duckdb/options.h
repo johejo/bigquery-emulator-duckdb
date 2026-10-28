@@ -23,6 +23,8 @@ struct Options {
   // of a negative zero.
   bool json_strict_numbers = false;
   bool json_preserve_negative_zero = false;
+  // Collation specifications are und:ci or empty.
+  bool bigquery_collations = false;
 };
 
 }  // namespace bigquery_emulator_duckdb::functions_duckdb

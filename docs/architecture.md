@@ -127,6 +127,20 @@ and later MATCH stages. Fixed paths contain separate
 node and edge lists, with property types widened to the resolved path's element types. Graph
 functions use this representation; it is never returned as an ordinary STRUCT to clients.
 
+GoogleSQL's resolver propagates [collations](../third_party/bigquery_docs/reference/standard-sql/collation-concepts.md)
+as type annotations and records the collation each operation uses in the resolved AST.
+[collation.h](../src/translator/collation.h) is the translator's only reader of both. An operation
+applies `und:ci` by comparing, ordering or grouping `bq_collation_key` BLOBs, the ICU sort keys of
+GoogleSQL's collator, in place of the strings: functions marked `kComparesCollationKeys` key their
+STRING arguments, and `ORDER BY` keys its items. Operations that do more than compare, such as
+`STARTS_WITH` or `LIKE`, need GoogleSQL's collated implementations instead. Every other operation
+rejects a non-empty collation, as do set operations, whose collation the resolved AST does not
+record, and views and query destination tables, whose schemas would drop it. A query result's
+schema reports the collations of its columns' annotations.
+[googlesql_collation](../src/googlesql_collation/) owns the collators and, behind the
+`bigquery_collations` option, the specifications BigQuery takes; its DuckDB adapter registers the
+key function and COLLATE's check of its specification.
+
 ## Backend
 
 DuckDB executes translated SQL through its C++ API. Each project is a catalog and each dataset a
@@ -252,6 +266,17 @@ shared coverage notes. `just docs-function-types` regenerates this report set al
 freshness offline. `restprobe -check function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR` checks
 without modifying files, including detecting obsolete domain pages; regeneration removes them.
 These probes do not verify result values or establish semantic compatibility.
+
+## Collation probes
+
+`tools/collationcoverage` lists the sections of the saved function, expression and operator
+references that say they support collation; `just collation-operations-update` writes them to
+`tools/collation_operations.json`. `//:function_probe` calls each listed function with a collated
+argument in every signature GoogleSQL marks as using the operation collation, and fails for a
+listed function no call collates, so that the documentation and GoogleSQL's signatures cannot
+drift apart unnoticed. A function whose collated call the emulator rejects is Partial in
+[functions.md](functions.md). The other listed operations, and where a collation can be
+assigned, are the Collation section of `tools/sql_features.txt`.
 
 ## DDL option probes
 

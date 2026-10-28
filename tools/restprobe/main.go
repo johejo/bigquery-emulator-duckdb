@@ -100,7 +100,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: restprobe -emulator BINARY sql FEATURES_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY options CATALOG")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE")
-		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE")
+		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE COLLATION_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY [-check] function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR")
 	}
 	flag.Parse()
@@ -117,7 +117,7 @@ func main() {
 		err = probeAPI(os.Stdout, *binary, args[1], args[2])
 	case *binary != "" && len(args) == 4 && args[0] == "function-types":
 		err = probeFunctionTypes(*binary, args[1], args[2], args[3], *check)
-	case *binary != "" && len(args) == 4 && args[0] == "functions":
+	case *binary != "" && len(args) == 5 && args[0] == "functions":
 		err = probeFunctions(os.Stdout, *binary, args[1], args[2:])
 	default:
 		flag.Usage()

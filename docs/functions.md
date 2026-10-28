@@ -40,12 +40,12 @@ functions.
 | Category | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
 | [AEAD encryption functions](#aead-encryption-functions) | 5 | 7 | 4 | 0 |
-| [Aggregate functions](#aggregate-functions) | 18 | 0 | 0 | 1 |
+| [Aggregate functions](#aggregate-functions) | 15 | 3 | 0 | 1 |
 | [Approximate aggregate functions](#approximate-aggregate-functions) | 4 | 0 | 0 | 0 |
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
 | [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
-| [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 | 0 |
+| [Conditional expressions](#conditional-expressions) | 3 | 2 | 0 | 0 |
 | [Conversion functions](#conversion-functions) | 4 | 0 | 0 | 0 |
 | [Date functions](#date-functions) | 12 | 0 | 0 | 0 |
 | [Datetime functions](#datetime-functions) | 8 | 0 | 0 | 0 |
@@ -59,7 +59,7 @@ functions.
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
 | [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
 | [KLL functions](#kll-functions) | 0 | 0 | 11 | 0 |
-| [Mathematical functions](#mathematical-functions) | 50 | 0 | 0 | 0 |
+| [Mathematical functions](#mathematical-functions) | 48 | 2 | 0 | 0 |
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
@@ -68,7 +68,7 @@ functions.
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
-| [String functions](#string-functions) | 52 | 0 | 1 | 0 |
+| [String functions](#string-functions) | 47 | 6 | 0 | 0 |
 | [Text analysis functions](#text-analysis-functions) | 3 | 0 | 0 | 0 |
 | [Time functions](#time-functions) | 8 | 0 | 0 | 0 |
 | [Time series functions](#time-series-functions) | 3 | 0 | 3 | 0 |
@@ -109,14 +109,14 @@ functions.
 | [`BIT_AND`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`BIT_OR`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`BIT_XOR`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
-| [`COUNT`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
+| [`COUNT`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function COUNT with modifiers. |
 | [`COUNTIF`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`GROUPING`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`LOGICAL_AND`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`LOGICAL_OR`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
-| [`MAX`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
+| [`MAX`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function MAX with modifiers. |
 | [`MAX_BY`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
-| [`MIN`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
+| [`MIN`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function MIN with modifiers. |
 | [`MIN_BY`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`STRING_AGG`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`SUM`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
@@ -162,11 +162,11 @@ functions.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`CASE`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB SQL, in code |  |
+| [`CASE`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Partial | DuckDB SQL, in code | Unsupported: function $CASE_WITH_VALUE with collation. |
 | [`COALESCE`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB function |  |
 | [`IF`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB SQL |  |
 | [`IFNULL`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB function |  |
-| [`NULLIF`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB SQL |  |
+| [`NULLIF`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Partial | DuckDB SQL | Unsupported: function NULLIF with collation. |
 
 ## Conversion functions
 
@@ -423,11 +423,11 @@ functions.
 | [`EUCLIDEAN_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`EXP`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`FLOOR`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
-| [`GREATEST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL, in code |  |
+| [`GREATEST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Partial | DuckDB SQL, in code | Unsupported: function GREATEST with collation. |
 | [`IEEE_DIVIDE`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
 | [`IS_INF`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB function, renamed |  |
 | [`IS_NAN`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB function, renamed |  |
-| [`LEAST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL, in code |  |
+| [`LEAST`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Partial | DuckDB SQL, in code | Unsupported: function LEAST with collation. |
 | [`LN`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`LOG`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`LOG10`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
@@ -551,17 +551,17 @@ functions.
 | [`CHR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`CODE_POINTS_TO_BYTES`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`CODE_POINTS_TO_STRING`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`COLLATE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Unsupported |  |  |
+| [`COLLATE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`CONCAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL, in code |  |
 | [`CONTAINS_SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`EDIT_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`ENDS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
+| [`ENDS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function ENDS_WITH with collation. |
 | [`FORMAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`FROM_BASE32`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`INITCAP`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`INSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
+| [`INSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function INSTR with collation. |
 | [`LEFT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`LENGTH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`LOWER`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
@@ -577,16 +577,16 @@ functions.
 | [`REGEXP_REPLACE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`REGEXP_SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`REPEAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`REPLACE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
+| [`REPLACE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function REPLACE with collation. |
 | [`REVERSE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`RIGHT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`RPAD`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`RTRIM`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SAFE_CONVERT_BYTES_TO_STRING`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SOUNDEX`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`SPLIT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`STARTS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`STRPOS`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
+| [`SPLIT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function SPLIT with collation. |
+| [`STARTS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function STARTS_WITH with collation. |
+| [`STRPOS`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function STRPOS with collation. |
 | [`SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SUBSTRING`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`TO_BASE32`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |

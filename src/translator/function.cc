@@ -20,6 +20,7 @@
 #include "src/language_options.h"
 #include "src/python_function.h"
 #include "src/schema_sql.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -265,9 +266,19 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                                     const Columns& columns) {
   const Catalog& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
-  if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
-      !call.collation_list().empty()) {
-    return Unsupported(scope, "function " + name + " with generic arguments, hints or collation");
+  if (!call.generic_argument_list().empty() || !call.hint_list().empty()) {
+    return Unsupported(scope, "function " + name + " with generic arguments or hints");
+  }
+  const auto collation = OperationCollation(call.collation_list(), scope);
+  if (!collation) {
+    return std::nullopt;
+  }
+  if (!collation->empty() && functions.HasTypeUse(name, TypeUse::kRejectsCollation)) {
+    throw std::invalid_argument("Function '" + call.function()->Name() + "' with collation '" +
+                                *collation + "' is not supported.");
+  }
+  if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys)) {
+    return Unsupported(scope, "function " + name + " with collation");
   }
   if (const auto* python = dynamic_cast<const PythonFunction*>(call.function())) {
     return ExternalCall(call, python->definition(), scope, columns, true);
@@ -425,7 +436,9 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     if (!sql) {
       return std::nullopt;
     }
-    if (compares_intervals && argument->type()->IsInterval()) {
+    if (argument->type()->IsString()) {
+      args.push_back(CollationKey(*sql, *collation));
+    } else if (compares_intervals && argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
     } else if (compares_intervals && keyed(argument->type(), i)) {
       args.push_back("list_transform(" + *sql + ", lambda _ik: " + IntervalKey("_ik") + ")");

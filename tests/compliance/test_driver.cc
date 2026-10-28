@@ -33,6 +33,7 @@
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/parse_helpers.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
@@ -261,9 +262,15 @@ class EmulatorTestDriver : public googlesql::TestDriver {
       // lacks; the tests that read them fail to resolve, or are skipped for using a type the
       // engine does not support.
       // The public API cannot describe pseudo-columns. Loading them as ordinary columns
-      // would silently change SELECT *; leave such tables unsupported, like value tables.
+      // would silently change SELECT *; leave such tables unsupported, like value tables. So are
+      // tables with annotated columns, such as collations, which schemas do not record yet and
+      // would otherwise compare without.
       if (table.options.is_value_table() ||
-          std::ranges::any_of(table.options.pseudo_columns(), [](bool pseudo) { return pseudo; })) {
+          std::ranges::any_of(table.options.pseudo_columns(), [](bool pseudo) { return pseudo; }) ||
+          std::ranges::any_of(table.options.column_annotations(),
+                              [](const googlesql::AnnotationMap* annotations) {
+                                return !googlesql::AnnotationMap::IsNullOrEmpty(annotations);
+                              })) {
         continue;
       }
       const googlesql::StructType& row_type =

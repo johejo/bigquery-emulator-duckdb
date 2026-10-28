@@ -1,0 +1,42 @@
+# Collation errors:
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+# BigQuery takes und:ci and the empty specification, in lowercase.
+SELECT COLLATE('a', 'und:cs')
+=> error contains: Collation 'und:cs' in collate function is not supported.
+
+SELECT COLLATE('a', 'binary')
+=> error contains: Collation 'binary' in collate function is not supported.
+
+SELECT COLLATE('a', 'UND:CI') = 'A'
+=> error contains: Collation 'UND:CI' in collate function is not supported.
+
+SELECT COLLATE('a', 'fr')
+=> error:
+
+# The documentation spells the message "Collation isn't allowed on argument x ('und:ci'). Use
+# COLLATE(arg, '') to remove collation"; BigQuery answered with this one.
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+CREATE TEMP FUNCTION f(x STRING) AS (x);
+SELECT f(COLLATE('a', 'und:ci'))
+=> error contains: Annotations on arguments of SQL functions are not supported, but found annotations on argument x
+
+CREATE TEMP FUNCTION f(x STRING) AS (COLLATE(x, 'und:ci'));
+SELECT f('a')
+=> error contains: in return type of user-defined function body is not allowed
+
+# [NOT] IN UNNEST does not support collation.
+SELECT COLLATE('a', 'und:ci') IN UNNEST(['A'])
+=> error:
+
+# BigQuery's answers: IS [NOT] DISTINCT FROM rejects a collation, and there is no ORDER BY ...
+# COLLATE clause.
+SELECT COLLATE('a', 'und:ci') IS NOT DISTINCT FROM 'A'
+=> error contains: Function '$is_not_distinct_from' with collation 'und:ci' is not supported.
+
+SELECT COLLATE('a', 'und:ci') IS DISTINCT FROM 'A'
+=> error contains: Function '$is_distinct_from' with collation 'und:ci' is not supported.
+
+SELECT ARRAY(SELECT x FROM UNNEST(['b', 'A']) AS x ORDER BY x COLLATE 'und:ci')
+=> error contains: COLLATE is not supported

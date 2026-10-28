@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "cases": {
+    "query_result": {
+      "project": "johejo-sandbox",
+      "run": "l363n2yqs7fv7idu23nyuidffo",
+      "steps": {
+        "query": {
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "c",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "f",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

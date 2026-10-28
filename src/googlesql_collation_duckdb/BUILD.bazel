@@ -1,0 +1,23 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+cc_library(
+    name = "googlesql_collation_duckdb",
+    srcs = ["collation.cc"],
+    hdrs = ["collation.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//src/duckdb_functions:apply",
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
+        "//src/googlesql_collation",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/base:status",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [
+        "//third_party/duckdb",
+    ],
+)

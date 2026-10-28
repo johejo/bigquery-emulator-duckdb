@@ -665,6 +665,14 @@
       "updateTime": "2026-10-02T03:48:05Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/collation-concepts",
+      "file": "third_party/bigquery_docs/reference/standard-sql/collation-concepts.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/collation-concepts",
+      "title": "Collation",
+      "sha256": "617796d729f47698d6912b655c4f8fb2f1d33af825b887bbafead30b810ab2d3",
+      "updateTime": "2026-10-02T03:48:05Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions",
       "file": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions",

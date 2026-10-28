@@ -22,6 +22,7 @@
 #include "src/schema_sql.h"
 #include "src/system_variables.h"
 #include "src/translated_statement.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -53,6 +54,7 @@ std::optional<TranslatedStatement> TranslateStatement(
   translated.sql = *std::move(sql);
   translated.statement_type = translator::StatementType(statement);
   translated.result_schema = ResultSchema(statement);
+  translated.result_has_collation = translator::ResultHasCollation(statement);
   return translated;
 }
 

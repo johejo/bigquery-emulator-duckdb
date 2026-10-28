@@ -22,7 +22,7 @@
 # NAME must be in tools/bigquery_functions.txt. TYPE and PATTERN refer to signatures as
 # `--signatures` prints them, such as `RANGE_BUCKET(<T1>, <array<T1>>) -> INT64`, which shows each
 # signature with its call:
-# `bazel run //:function_probe -- --signatures $PWD/tools/bigquery_functions.txt $PWD/tools/function_probe_hints.txt`
+# `bazel run //:function_probe -- --signatures $PWD/tools/bigquery_functions.txt $PWD/tools/function_probe_hints.txt $PWD/tools/collation_operations.json`
 # TYPE is an argument's type without its cardinality and name, and PATTERN is an ECMAScript
 # regular expression that has to match some signature. Where several `elements` or `argument`
 # hints match, the last one applies.
@@ -284,6 +284,12 @@ query RANGE_SESSIONIZE WITH input AS (SELECT INTERVAL 1 DAY AS k, RANGE<DATE> '[
 query ARRAY SELECT ARRAY(SELECT x FROM UNNEST([1, 2]) AS x)
 query CASE SELECT CASE 2 WHEN 1 THEN 'a' ELSE 'b' END
 query CASE SELECT CASE WHEN TRUE THEN 'a' ELSE 'b' END
+# CASE with a value compares it under its collation; the comparisons of CASE without one are
+# operators of their own.
+query CASE SELECT CASE COLLATE('abc', 'und:ci') WHEN 'ABC' THEN 'a' ELSE 'b' END
+# A collation specification must be one BigQuery takes: und:ci, or empty for binary collation.
+query COLLATE SELECT COLLATE('abc', 'und:ci')
+query COLLATE SELECT COLLATE('abc', '')
 query CAST SELECT CAST('2' AS INT64)
 query CAST SELECT CAST('2024-01-15' AS DATE FORMAT 'YYYY-MM-DD')
 query CAST SELECT CAST(TIMESTAMP '2024-01-15 10:20:30+00' AS STRING FORMAT 'YYYY-MM-DD HH24:MI TZH' AT TIME ZONE 'Asia/Tokyo')

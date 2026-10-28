@@ -634,6 +634,7 @@ cc_library(
         ":duckdb_handle",
         ":spanner_query",
         "//src/googlesql_aead_duckdb",
+        "//src/googlesql_collation_duckdb",
         "//src/googlesql_functions_duckdb:bignumeric",
         "//src/googlesql_functions_duckdb:cast",
         "//src/googlesql_functions_duckdb:contains_substr",

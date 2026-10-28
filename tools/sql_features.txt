@@ -247,7 +247,6 @@ query Primary and foreign keys | ALTER TABLE u DROP PRIMARY KEY IF EXISTS
 query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE t ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES u (id) NOT ENFORCED
 query Primary and foreign keys | ALTER TABLE t DROP CONSTRAINT IF EXISTS fk
 note Primary and foreign keys | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
-query Collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64); INSERT n (a) VALUES (1); SELECT a FROM n
 query `CREATE TEMP TABLE` | CREATE TEMPORARY TABLE _SESSION.n AS SELECT id FROM t; SELECT id FROM _SESSION.n
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE t AS SELECT 1 AS id; DROP TABLE t; SELECT id FROM t
@@ -374,6 +373,46 @@ query `DROP PROCEDURE` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN
 query `DROP PROCEDURE` | DROP PROCEDURE IF EXISTS d.missing
 query `DROP PROCEDURE` | SET @@dataset_id = 'd'; DROP PROCEDURE IF EXISTS missing
 note `DROP PROCEDURE` | See [Stored procedures](compatibility.md#stored-procedures).
+
+# The operations third_party/bigquery_docs/reference/standard-sql/collation-concepts.md says
+# collation affects, and where it can be assigned. //:function_probe collates the functions that
+# tools/collation_operations.json lists.
+section Collation
+
+query Collated comparisons | SELECT COLLATE(name, 'und:ci') = 'A' FROM t
+query Collated comparisons | SELECT COLLATE(name, 'und:ci') != 'A' FROM t
+query Collated comparisons | SELECT COLLATE(name, 'und:ci') < 'B' FROM t
+query Collated comparisons | SELECT COLLATE(name, 'und:ci') BETWEEN 'A' AND 'B' FROM t
+query Collated `IN` | SELECT COLLATE(name, 'und:ci') IN ('A', 'B') FROM t
+query Collated `IN` | SELECT COLLATE(name, 'und:ci') NOT IN ('A', 'B') FROM t
+query Collated `IN` | SELECT COLLATE(name, 'und:ci') IN (SELECT 'A') FROM t
+query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') LIKE 'A%' FROM t
+query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') NOT LIKE 'A%' FROM t
+query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') LIKE ANY ('A%', 'B') FROM t
+query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') LIKE ALL ('A%', '%') FROM t
+query Collated joins | SELECT a.id FROM t AS a JOIN t AS b ON COLLATE(a.name, 'und:ci') = b.name
+query Collated joins | SELECT name FROM (SELECT COLLATE(name, 'und:ci') AS name FROM t) JOIN t USING (name)
+query Collated `ORDER BY` | SELECT name FROM t ORDER BY COLLATE(name, 'und:ci')
+query Collated `ORDER BY` | SELECT ARRAY_AGG(id ORDER BY COLLATE(name, 'und:ci')) FROM t
+query Collated `GROUP BY` | SELECT COLLATE(name, 'und:ci') AS n FROM t GROUP BY n
+query Collated `GROUP BY` | SELECT DISTINCT COLLATE(name, 'und:ci') FROM t
+query Collated window functions | SELECT ROW_NUMBER() OVER (PARTITION BY COLLATE(name, 'und:ci')) FROM t
+query Collated window functions | SELECT ROW_NUMBER() OVER (ORDER BY COLLATE(name, 'und:ci')) FROM t
+query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t UNION ALL SELECT name FROM t
+query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t UNION DISTINCT SELECT name FROM t
+query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t INTERSECT DISTINCT SELECT name FROM t
+query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t EXCEPT DISTINCT SELECT name FROM t
+query Column collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
+query Column collation | CREATE TABLE n (a STRUCT<b STRING COLLATE 'und:ci'>, c ARRAY<STRING COLLATE 'und:ci'>)
+query Column collation | ALTER TABLE t ADD COLUMN c STRING COLLATE 'und:ci'
+query Table default collation | CREATE TABLE n (a STRING) DEFAULT COLLATE 'und:ci'
+query Table default collation | ALTER TABLE t SET DEFAULT COLLATE 'und:ci'
+query Dataset default collation | CREATE SCHEMA n DEFAULT COLLATE 'und:ci'
+query Dataset default collation | ALTER SCHEMA d SET DEFAULT COLLATE 'und:ci'
+query Collated views | CREATE VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
+query Collated materialized views | CREATE MATERIALIZED VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
+query Collated table functions | CREATE TABLE FUNCTION d.f() AS (SELECT COLLATE(name, 'und:ci') AS c FROM d.t); SELECT c FROM d.f()
+note Collated comparisons | See [Collation](compatibility.md#collation).
 
 section Multi-statement queries
 

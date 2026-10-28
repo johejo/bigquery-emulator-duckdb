@@ -207,6 +207,9 @@ enum class TypeUse : std::uint8_t {
   kBuildsOrReadsInterval,
   // Only compare their INTERVAL arguments or ARRAY elements, so they compare the values' keys.
   kComparesIntervalKeys,
+  // Only compare their STRING arguments, so that under an operation collation they compare the
+  // arguments' collation keys.
+  kComparesCollationKeys,
   // STRUCT handlers that also compare INTERVAL fields, by their keys. BigQuery
   // compares no ARRAYs, also in STRUCT fields.
   kComparesStructsWithInterval,
@@ -224,6 +227,8 @@ enum class TypeUse : std::uint8_t {
   kReadsEmptyStruct,
   // BigQuery rejects the SAFE. prefix on these although GoogleSQL accepts it.
   kRejectsSafe,
+  // BigQuery rejects an operation collation on these although GoogleSQL applies it.
+  kRejectsCollation,
   // BigQuery rejects OVER on these aggregate functions although GoogleSQL accepts it.
   kRejectsOver,
 };

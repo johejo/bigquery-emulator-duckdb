@@ -123,14 +123,14 @@ bigquery-docs-refresh:
 _restprobe := _test_go + " run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 _sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
 _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
-_function_probe := _restprobe + " functions " + justfile_directory() + "/bazel-bin/function_probe " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/tools/function_probe_hints.txt"
+_function_probe := _restprobe + " functions " + justfile_directory() + "/bazel-bin/function_probe " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/tools/function_probe_hints.txt " + justfile_directory() + "/tools/collation_operations.json"
 _function_types_args := "function-types " + justfile_directory() + "/tools/function_types.json " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/docs"
 _function_types_probe := _restprobe + " " + _function_types_args
 _option_probe := _restprobe + " options " + justfile_directory() + "/tools/ddl_options.json"
 _storage_probe := _test_go + " run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 
 # Regenerates the compatibility tables for functions, SQL, DDL options, REST and Storage RPCs.
-docs: function-types-update
+docs: function-types-update collation-operations-update
     bazelisk build //:function_probe //:bigquery-emulator-duckdb
     {{ _function_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/functions.md > docs/functions.md.tmp && mv docs/functions.md.tmp docs/functions.md
     {{ _function_types_probe }}
@@ -142,6 +142,7 @@ docs: function-types-update
 # Fails when function, SQL, DDL option, REST or Storage docs are stale.
 docs-check:
     {{ _test_go }} run ./tools/functioncoverage third_party/bigquery_docs | diff -u tools/function_types.json - || { echo "function type catalog is stale; run just function-types-update" >&2; exit 1; }
+    {{ _test_go }} run ./tools/collationcoverage third_party/bigquery_docs | diff -u tools/collation_operations.json - || { echo "collation catalog is stale; run just collation-operations-update" >&2; exit 1; }
     bazelisk build //:function_probe //:bigquery-emulator-duckdb
     {{ _function_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/functions.md | diff -u docs/functions.md - || { echo "docs/functions.md is stale; run just docs" >&2; exit 1; }
     {{ _restprobe }} -check {{ _function_types_args }}
@@ -153,6 +154,11 @@ docs-check:
 # Extract reviewed input/output type tables from the saved official function documentation.
 function-types-update:
     {{ _test_go }} run ./tools/functioncoverage third_party/bigquery_docs > tools/function_types.json.tmp && mv tools/function_types.json.tmp tools/function_types.json
+
+# Lists the operations BigQuery's documentation says support collation, whose functions
+# //:function_probe also calls with a collated argument.
+collation-operations-update:
+    {{ _test_go }} run ./tools/collationcoverage third_party/bigquery_docs > tools/collation_operations.json.tmp && mv tools/collation_operations.json.tmp tools/collation_operations.json
 
 # Regenerates the type-level report without the unrelated API and SQL probes.
 docs-function-types: function-types-update

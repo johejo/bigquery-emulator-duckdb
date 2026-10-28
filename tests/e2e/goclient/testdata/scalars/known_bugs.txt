@@ -96,3 +96,31 @@ SELECT COUNT(*) FROM committed
 # BigQuery adds the planar edge's midpoints until it is close enough to the geodesic one.
 SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040'), planar => TRUE)
 => "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
+
+# BigQuery has no ARRAY_INCLUDES, which GoogleSQL has.
+SELECT ARRAY_INCLUDES([COLLATE('a', 'und:ci')], 'A')
+!> error: Function ARRAY_INCLUDES is not yet implemented.
+
+# Collated groupings, DISTINCT and MAX return the first of equal values in input order, and
+# GREATEST its first; the emulator rejects them.
+SELECT ARRAY(
+  SELECT x FROM UNNEST(['b', COLLATE('A', 'und:ci'), 'a', 'B']) AS x GROUP BY x ORDER BY x
+)
+!> [{"v":"A"},{"v":"b"}]
+
+SELECT ARRAY(SELECT DISTINCT x FROM UNNEST(['b', COLLATE('A', 'und:ci'), 'a', 'B']) AS x)
+!> [{"v":"b"},{"v":"A"}]
+
+SELECT ARRAY(
+  SELECT x FROM UNNEST([COLLATE('a', 'und:ci')]) AS x
+  UNION DISTINCT
+  SELECT x FROM UNNEST(['A', 'b']) AS x
+  ORDER BY x
+)
+!> [{"v":"a"},{"v":"b"}]
+
+SELECT MAX(x) FROM UNNEST(['A', COLLATE('a', 'und:ci')]) AS x
+!> "A"
+
+SELECT GREATEST(COLLATE('a', 'und:ci'), 'A')
+!> "a"

@@ -231,6 +231,9 @@ json FieldSchema::ToJson() const {
   if (!policy_tags.empty()) {
     field["policyTags"] = {{"names", policy_tags}};
   }
+  if (!collation.empty()) {
+    field["collation"] = collation;
+  }
   return field;
 }
 

@@ -20,6 +20,7 @@ cc_library(
     name = "query",
     srcs = [
         "aggregate.cc",
+        "collation.cc",
         "expression.cc",
         "function.cc",
         "graph.cc",
@@ -27,6 +28,7 @@ cc_library(
     ],
     hdrs = [
         "aggregate.h",
+        "collation.h",
         "expression.h",
         "function.h",
         "graph.h",
@@ -63,6 +65,7 @@ cc_library(
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
         "@googlesql//googlesql/resolved_ast",
     ],
     linkstatic = True,
