@@ -1228,6 +1228,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      {
                          TypeUse::kBuildsOrReadsInterval,
                          TypeUse::kBuildsOrReadsRange,
+                         TypeUse::kBuildsOrReadsGeography,
                          TypeUse::kRejectsSafe,
                          TypeUse::kBigNumeric,
                      },

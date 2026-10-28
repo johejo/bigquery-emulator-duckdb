@@ -1,0 +1,28 @@
+## First and last GEOGRAPHY array elements
+# Sources: ARRAY_FIRST and ARRAY_LAST in
+# third_party/bigquery_docs/reference/standard-sql/array_functions.md.
+# ST_EQUALS checks the selected point without depending on its WKT formatting.
+
+SELECT ST_EQUALS(ARRAY_FIRST([ST_GEOGPOINT(10, 20), ST_GEOGPOINT(30, 40)]), ST_GEOGPOINT(10, 20))
+=> "true"
+
+SELECT ST_EQUALS(ARRAY_LAST([ST_GEOGPOINT(10, 20), ST_GEOGPOINT(30, 40)]), ST_GEOGPOINT(30, 40))
+=> "true"
+
+SELECT ARRAY_FIRST(CAST(NULL AS ARRAY<GEOGRAPHY>))
+=> null
+
+SELECT ARRAY_LAST(CAST(NULL AS ARRAY<GEOGRAPHY>))
+=> null
+
+SELECT ARRAY_FIRST([CAST(NULL AS GEOGRAPHY), ST_GEOGPOINT(10, 20)])
+=> null
+
+SELECT ARRAY_LAST([ST_GEOGPOINT(10, 20), CAST(NULL AS GEOGRAPHY)])
+=> null
+
+SELECT ARRAY_FIRST(ARRAY<GEOGRAPHY>[])
+=> error:
+
+SELECT ARRAY_LAST(ARRAY<GEOGRAPHY>[])
+=> error:
