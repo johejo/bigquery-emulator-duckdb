@@ -536,18 +536,21 @@ Scope WithCorrelatedColumns(const googlesql::ResolvedAggregateScan& aggregate, c
   return local;
 }
 
-// What a GROUP BY key groups by: INTERVAL values by their lengths and graph elements by
-// identity.
-std::string GroupKey(const googlesql::Type* type, const std::string& sql) {
-  return type->IsGraphElement() ? "struct_extract(" + sql + ", '$id')" : IntervalKey(type, sql);
+// What a GROUP BY key groups by: INTERVAL values by their lengths, graph elements by identity
+// and strings by their keys under the key's `collation`.
+std::string GroupKey(const googlesql::Type* type, const std::string& sql,
+                     const std::string& collation) {
+  return type->IsGraphElement() ? "struct_extract(" + sql + ", '$id')"
+                                : CollationKey(IntervalKey(type, sql), collation);
 }
 
 }  // namespace
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
-  // Keys with INTERVAL values group by their lengths, and return the first of equal values in input
-  // order, as BigQuery does. Graph elements group by identity, as SAME compares them.
+  // Keys with INTERVAL values group by their lengths, and collated strings by their collation keys,
+  // and return the first of equal values in input order, as BigQuery does. Graph elements group by
+  // identity, as SAME compares them.
   const bool grouping_sets =
       !aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty();
   if (std::ranges::any_of(aggregate.group_by_list(), [&](const auto& key) {
@@ -556,8 +559,16 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       })) {
     return Unsupported(scope, "GROUP BY with graph values");
   }
-  if (!aggregate.collation_list().empty()) {
-    return Unsupported(scope, "GROUP BY with collation");
+  // The collation of each key, which SELECT DISTINCT records as GROUP BY does.
+  std::vector<std::string> collations;
+  for (int i = 0; i < aggregate.group_by_list_size(); ++i) {
+    const auto collation = aggregate.collation_list().empty()
+                               ? std::optional<std::string>("")
+                               : OperationCollation(aggregate.collation_list(i), scope);
+    if (!collation) {
+      return std::nullopt;
+    }
+    collations.push_back(*collation);
   }
   auto input = Scan(*aggregate.input_scan(), scope);
   if (!input) {
@@ -575,6 +586,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   std::vector<std::pair<int, std::string>> key_projections;
   std::vector<std::pair<int, int>> grouping_projections;
   Columns key_columns;
+  // The aggregate that returns each collated key's value in a group of its key's grouping.
+  std::map<int, std::string> key_values;
   // GROUPING() without grouping sets still needs them: it is 0 over the one plain grouping.
   if (grouping_sets) {
     // Grouping sets name their keys, so compute the keys once below the aggregation and group
@@ -585,29 +598,48 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       inner.push_back(sql + " AS " + ColumnName(id));
       columns.emplace(id, "q." + ColumnName(id));
     }
-    // BigQuery returns the first of equal values in the whole input, also in the groups of later
-    // rows, so a key with INTERVAL values becomes that value before the grouping. Values with
-    // different lengths differ in DuckDB too, so DuckDB groups them as BigQuery does.
+    // BigQuery returns the first of equal INTERVAL values in the whole input, also in the groups
+    // of later rows, so a key with INTERVAL values becomes that value before the grouping. Values
+    // with different lengths differ in DuckDB too, so DuckDB groups them as BigQuery does. A
+    // collated key returns the first of its equal values in each group instead, so it groups by
+    // its collation key and returns the value as an aggregate.
     std::vector<std::string> firsts;
-    for (const auto& key : aggregate.group_by_list()) {
+    std::vector<std::string> collation_keys;
+    for (int i = 0; i < aggregate.group_by_list_size(); ++i) {
+      const auto& key = aggregate.group_by_list(i);
       const auto sql = Expression(*key->expr(), scope, input->columns);
       if (!sql) {
         return std::nullopt;
       }
       const int id = key->column().column_id();
       inner.push_back(*sql + " AS " + ColumnName(id));
-      if (const googlesql::Type* type = key->expr()->type(); HasInterval(type)) {
-        const std::string column = "q." + ColumnName(id);
+      const std::string column = "q." + ColumnName(id);
+      if (HasInterval(key->expr()->type())) {
         firsts.push_back("first_value(" + column + ") OVER (PARTITION BY " +
-                         IntervalKey(type, column) + " ORDER BY q._rn) AS " + ColumnName(id));
+                         IntervalKey(key->expr()->type(), column) + " ORDER BY q._rn) AS " +
+                         ColumnName(id));
       }
-      key_columns.emplace(id, "q." + ColumnName(id));
       const auto type = DuckDbType(key->expr()->type());
       if (!type) {
         return std::nullopt;
       }
       key_projections.emplace_back(id, *type);
-      projections.push_back("q." + ColumnName(id) + " AS " + ColumnName(id));
+      if (collations.at(i).empty()) {
+        key_columns.emplace(id, column);
+        projections.push_back(column + " AS " + ColumnName(id));
+      } else {
+        const std::string name = QuoteIdentifier("_k" + std::to_string(id));
+        collation_keys.push_back(CollationKey(column, collations.at(i)) + " AS " + name);
+        key_columns.emplace(id, "q." + name);
+        const std::string value = "first(" + column + ")";
+        key_values.emplace(id, value);
+        projections.push_back(std::string("CASE WHEN GROUPING(q.")
+                                  .append(name)
+                                  .append(") = 0 THEN ")
+                                  .append(value)
+                                  .append(" END AS ")
+                                  .append(ColumnName(id)));
+      }
       result.columns.emplace(id, "q." + ColumnName(id));
     }
     std::vector<std::string> all_keys;
@@ -646,6 +678,9 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     } else {
       sql += input->From();
     }
+    if (!collation_keys.empty()) {
+      sql = "SELECT q.*, " + Join(collation_keys, ", ") + " FROM (" + sql + ") AS q";
+    }
     input = Relation{.sql = sql, .columns = columns};
   } else {
     // HAVING MAX/MIN keeps the rows whose expression reaches the group's maximum or minimum,
@@ -653,13 +688,15 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     // their keys.
     std::vector<std::string> partition;
     std::vector<std::string> partition_values;
-    for (const auto& key : aggregate.group_by_list()) {
+    for (int i = 0; i < aggregate.group_by_list_size(); ++i) {
+      const auto& key = aggregate.group_by_list(i);
       const auto sql = Expression(*key->expr(), scope, input->columns);
       if (!sql) {
         return std::nullopt;
       }
       const std::string name = "_partition" + std::to_string(partition.size());
-      partition_values.push_back(GroupKey(key->expr()->type(), *sql) + " AS " + name);
+      partition_values.push_back(GroupKey(key->expr()->type(), *sql, collations.at(i)) + " AS " +
+                                 name);
       partition.push_back("q." + name);
     }
     std::vector<std::string> inner;
@@ -697,16 +734,17 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       }
       input = Relation{.sql = "SELECT " + Join(inner, ", ") + input->From(), .columns = columns};
     }
-    for (const auto& key : aggregate.group_by_list()) {
+    for (int i = 0; i < aggregate.group_by_list_size(); ++i) {
+      const auto& key = aggregate.group_by_list(i);
       const auto sql = Expression(*key->expr(), scope, input->columns);
       if (!sql) {
         return std::nullopt;
       }
       const int id = key->column().column_id();
       if (const googlesql::Type* type = key->expr()->type();
-          HasInterval(type) || type->IsGraphElement()) {
+          HasInterval(type) || type->IsGraphElement() || !collations.at(i).empty()) {
         projections.push_back("first(" + *sql + ") AS " + ColumnName(id));
-        keys.push_back(GroupKey(type, *sql));
+        keys.push_back(GroupKey(type, *sql, collations.at(i)));
       } else {
         projections.push_back(*sql + " AS " + ColumnName(id));
         keys.push_back(std::to_string(projections.size()));
@@ -798,7 +836,9 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       for (const auto& [id, type] : key_projections) {
         if (grouping.contains(id)) {
           partition.push_back(key_columns.at(id));
-          branch.push_back(key_columns.at(id) + " AS " + ColumnName(id));
+          const auto value = key_values.find(id);
+          branch.push_back((value == key_values.end() ? key_columns.at(id) : value->second) +
+                           " AS " + ColumnName(id));
         } else {
           branch.push_back("CAST(NULL AS " + type + ") AS " + ColumnName(id));
         }

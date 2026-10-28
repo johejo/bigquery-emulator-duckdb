@@ -1,0 +1,83 @@
+# Collated GROUP BY and SELECT DISTINCT group strings as the collation compares them:
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+
+# BigQuery's answers: a group returns the first of its equal values in input order.
+SELECT ARRAY(
+  SELECT x FROM UNNEST(['b', COLLATE('A', 'und:ci'), 'a', 'B']) AS x GROUP BY x ORDER BY x
+)
+=> [{"v":"A"},{"v":"b"}]
+
+# BigQuery answered [{"v":"b"},{"v":"A"}] without ORDER BY, whose order it does not define.
+SELECT ARRAY(SELECT DISTINCT x FROM UNNEST(['b', COLLATE('A', 'und:ci'), 'a', 'B']) AS x ORDER BY x)
+=> [{"v":"A"},{"v":"b"}]
+
+SELECT ARRAY(
+  SELECT COUNT(*) FROM UNNEST(['b', COLLATE('A', 'und:ci'), 'a', 'B', 'c']) AS x
+  GROUP BY x ORDER BY 1
+)
+=> [{"v":"1"},{"v":"2"},{"v":"2"}]
+
+# NULLs form one group, and canonically equivalent strings another.
+SELECT ARRAY(
+  SELECT COUNT(*) FROM UNNEST([COLLATE('å', 'und:ci'), 'Å', NULL, NULL, 'a']) AS x
+  GROUP BY x ORDER BY 1
+)
+=> [{"v":"1"},{"v":"2"},{"v":"2"}]
+
+# The grouping uses the key's collation, which an expression of a collated column carries.
+SELECT ARRAY(
+  SELECT COUNT(*) FROM UNNEST([COLLATE('Foo', 'und:ci'), 'FOO', 'bar']) AS x
+  GROUP BY CONCAT(x, '!') ORDER BY 1
+)
+=> [{"v":"1"},{"v":"2"}]
+
+# Each key has its own collation: only the first of two string keys is collated.
+SELECT ARRAY(
+  SELECT COUNT(*) FROM UNNEST([
+    STRUCT(COLLATE('a', 'und:ci') AS w, 'x' AS k), ('A', 'x'), ('a', 'X')
+  ])
+  GROUP BY w, k ORDER BY 1
+)
+=> [{"v":"1"},{"v":"2"}]
+
+SELECT (SELECT COUNT(*) FROM (SELECT DISTINCT x FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x))
+=> "2"
+
+SELECT ARRAY(
+  SELECT COUNT(*) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+  GROUP BY x HAVING x = 'A'
+)
+=> [{"v":"2"}]
+
+# Grouping sets group by the collation, and the grand total counts every row.
+SELECT ARRAY(
+  SELECT COUNT(*) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+  GROUP BY ROLLUP(x) ORDER BY 1
+)
+=> [{"v":"1"},{"v":"2"},{"v":"3"}]
+
+# BigQuery's answers: with several keys and in grouping sets, each group returns the first of
+# its own equal values.
+SELECT ARRAY(
+  SELECT AS STRUCT g, x FROM UNNEST([STRUCT(1 AS g, COLLATE('a', 'und:ci') AS x), (2, 'A')])
+  GROUP BY g, x ORDER BY g
+)
+=> [{"v":{"f":[{"v":"1"},{"v":"a"}]}},{"v":{"f":[{"v":"2"},{"v":"A"}]}}]
+
+SELECT ARRAY(
+  SELECT AS STRUCT g, x FROM UNNEST([STRUCT(1 AS g, COLLATE('a', 'und:ci') AS x), (2, 'A')])
+  GROUP BY ROLLUP(g, x) ORDER BY g, x
+)
+=> [{"v":{"f":[{"v":null},{"v":null}]}},{"v":{"f":[{"v":"1"},{"v":null}]}},{"v":{"f":[{"v":"1"},{"v":"a"}]}},{"v":{"f":[{"v":"2"},{"v":null}]}},{"v":{"f":[{"v":"2"},{"v":"A"}]}}]
+
+SELECT ARRAY(
+  SELECT AS STRUCT x, COUNT(*) AS n FROM UNNEST(['b', COLLATE('A', 'und:ci'), 'a', 'B', NULL]) AS x
+  GROUP BY GROUPING SETS ((x), ()) ORDER BY x, n
+)
+=> [{"v":{"f":[{"v":null},{"v":"1"}]}},{"v":{"f":[{"v":null},{"v":"5"}]}},{"v":{"f":[{"v":"A"},{"v":"2"}]}},{"v":{"f":[{"v":"b"},{"v":"2"}]}}]
+
+# A collated column groups by its collation.
+CREATE TEMP TABLE t (x STRING COLLATE 'und:ci');
+INSERT t (x) VALUES ('b'), ('A'), ('a'), ('B');
+SELECT ARRAY(SELECT AS STRUCT x, COUNT(*) AS n FROM t GROUP BY x ORDER BY x)
+=> [{"v":{"f":[{"v":"A"},{"v":"2"}]}},{"v":{"f":[{"v":"b"},{"v":"2"}]}}]
