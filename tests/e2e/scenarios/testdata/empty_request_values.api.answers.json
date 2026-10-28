@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "cases": {
+    "dataset_empty_id": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Required parameter is missing: dataset_id",
+                    "reason": "required"
+                  }
+                ],
+                "message": "Required parameter is missing: dataset_id",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "function_argument_kind_unspecified": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "get": {
+          "arguments": [
+            {
+              "dataType": {
+                "typeKind": "INT64"
+              },
+              "name": "x"
+            }
+          ],
+          "language": "SQL"
+        },
+        "insert": {
+          "arguments": [
+            {
+              "dataType": {
+                "typeKind": "INT64"
+              },
+              "name": "x"
+            }
+          ],
+          "language": "SQL",
+          "status": 200
+        }
+      }
+    },
+    "function_argument_mode_unspecified": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "get": {
+          "arguments": [
+            {
+              "dataType": {
+                "typeKind": "INT64"
+              },
+              "name": "x"
+            }
+          ],
+          "language": "SQL"
+        },
+        "insert": {
+          "arguments": [
+            {
+              "dataType": {
+                "typeKind": "INT64"
+              },
+              "name": "x"
+            }
+          ],
+          "language": "SQL",
+          "status": 200
+        }
+      }
+    },
+    "query_job_empty_dispositions": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "first_done": {},
+        "rows": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "second_done": {
+          "errorResult": {
+            "message": "Already Exists: Table johejo-sandbox:bqa_eorttcsidcpquia6yq64cswijt_query_job_empty_dispositions.t",
+            "reason": "duplicate"
+          }
+        }
+      }
+    },
+    "routine_empty_id": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Project ID, dataset ID and routine ID cannot be missing or empty in call to routines.insert",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Project ID, dataset ID and routine ID cannot be missing or empty in call to routines.insert",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "routine_language_unspecified": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "get": {
+          "arguments": [
+            {
+              "dataType": {
+                "typeKind": "INT64"
+              },
+              "name": "x"
+            }
+          ],
+          "language": "SQL"
+        },
+        "insert": {
+          "arguments": [
+            {
+              "dataType": {
+                "typeKind": "INT64"
+              },
+              "name": "x"
+            }
+          ],
+          "language": "SQL",
+          "status": 200
+        }
+      }
+    },
+    "routine_update_empty_id": {
+      "project": "johejo-sandbox",
+      "run": "yfs5kf2veu7er2pu77hliq7uvo",
+      "steps": {
+        "update": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Project ID, dataset ID and routine ID cannot be missing or empty in call to routines.update",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Project ID, dataset ID and routine ID cannot be missing or empty in call to routines.update",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "table_empty_id": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Required parameter is missing: table_id",
+                    "reason": "required"
+                  }
+                ],
+                "message": "Required parameter is missing: table_id",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

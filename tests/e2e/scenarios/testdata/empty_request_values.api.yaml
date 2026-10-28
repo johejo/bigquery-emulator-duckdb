@@ -1,0 +1,299 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, runs eorttcsidcpquia6yq64cswijt and
+# yfs5kf2veu7er2pu77hliq7uvo (routine_update_empty_id); the answers sidecar keeps the
+# observations. Rejections observe their status, reason and message.
+#
+# BigQuery reads an empty string or an UNSPECIFIED enum as a field left out: it reports an empty
+# ID missing, runs a routine of language LANGUAGE_UNSPECIFIED as SQL, returns no argument mode or
+# kind that is UNSPECIFIED, and takes empty dispositions as their defaults.
+description: >-
+  Empty IDs, explicit UNSPECIFIED enum values and empty dispositions in datasets.insert,
+  tables.insert, routines.insert, routines.update and jobs.insert.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  routine:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+          body: ${routine}
+        observe:
+          status: /status
+          language: /body/language
+          arguments: /body/arguments
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines/f
+        observe:
+          language: /body/language
+          arguments: /body/arguments
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: dataset_empty_id
+    steps:
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {projectId: '${project}', datasetId: ''}
+            location: US
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    expect:
+      insert:
+        status: 400
+        reason: required
+        message: 'Required parameter is missing: dataset_id'
+  - name: table_empty_id
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: ''}
+            schema:
+              fields: [{name: x, type: INT64}]
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      insert:
+        status: 400
+        reason: required
+        message: 'Required parameter is missing: table_id'
+  - name: routine_empty_id
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+          body:
+            routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: ''}
+            routineType: SCALAR_FUNCTION
+            definitionBody: '1'
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Project ID, dataset ID and routine ID cannot be missing or empty in call to
+          routines.insert
+  - name: routine_update_empty_id
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+          body:
+            routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+            routineType: SCALAR_FUNCTION
+            definitionBody: '1'
+      - name: update
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines/f
+          body:
+            routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: ''}
+            routineType: SCALAR_FUNCTION
+            definitionBody: '2'
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      update:
+        status: 400
+        reason: invalid
+        message: >-
+          Project ID, dataset ID and routine ID cannot be missing or empty in call to
+          routines.update
+  - name: routine_language_unspecified
+    template: routine
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        language: LANGUAGE_UNSPECIFIED
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+        definitionBody: x * 2
+    expect:
+      insert:
+        status: 200
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+      get:
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+  - name: function_argument_mode_unspecified
+    template: routine
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}, mode: MODE_UNSPECIFIED}]
+        definitionBody: x * 2
+    expect:
+      insert:
+        status: 200
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+      get:
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+  - name: function_argument_kind_unspecified
+    template: routine
+    vars:
+      routine:
+        routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+        routineType: SCALAR_FUNCTION
+        language: SQL
+        arguments:
+          - {name: x, argumentKind: ARGUMENT_KIND_UNSPECIFIED, dataType: {typeKind: INT64}}
+        definitionBody: x * 2
+    expect:
+      insert:
+        status: 200
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+      get:
+        language: SQL
+        arguments: [{name: x, dataType: {typeKind: INT64}}]
+  # A query job's writeDisposition defaults to WRITE_EMPTY, so the second job fails.
+  - name: query_job_empty_dispositions
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: first
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: SELECT 1 AS x
+                useLegacySql: false
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                createDisposition: ''
+                writeDisposition: ''
+        bind:
+          first_job: /body/jobReference/jobId
+      - name: first_done
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${first_job}?location=US
+        until: {/body/status/state: DONE}
+        observe:
+          errorResult: /body/status/errorResult
+      - name: second
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: SELECT 2 AS x
+                useLegacySql: false
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                createDisposition: ''
+                writeDisposition: ''
+        bind:
+          second_job: /body/jobReference/jobId
+      - name: second_done
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${second_job}?location=US
+        until: {/body/status/state: DONE}
+        # The emulator also gives this error a location, which BigQuery leaves out
+        # (known_bugs/job_error_result.api.yaml).
+        observe:
+          reason: /body/status/errorResult/reason
+          message: /body/status/errorResult/message
+      - name: rows
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t/data
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      first_done: {}
+      second_done:
+        reason: duplicate
+        message: 'Already Exists: Table ${project}:${dataset}.t'
+      rows:
+        rows: [{f: [{v: '1'}]}]

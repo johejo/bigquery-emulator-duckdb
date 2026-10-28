@@ -1,7 +1,6 @@
 #include "src/server/requests.h"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -13,7 +12,16 @@
 #include <vector>
 
 #include "absl/log/absl_log.h"
-#include "absl/time/time.h"
+#include "absl/status/status.h"
+#include "google/cloud/bigquery/v2/dataset.pb.h"
+#include "google/cloud/bigquery/v2/job.pb.h"
+#include "google/cloud/bigquery/v2/job_config.pb.h"
+#include "google/cloud/bigquery/v2/routine.pb.h"
+#include "google/cloud/bigquery/v2/routine_reference.pb.h"
+#include "google/cloud/bigquery/v2/table.pb.h"
+#include "google/cloud/bigquery/v2/table_reference.pb.h"
+#include "google/protobuf/timestamp.pb.h"
+#include "google/protobuf/util/json_util.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
@@ -175,13 +183,24 @@ const ResourceMask& QueryRequestFields() {
   return *kFields;
 }
 
-constexpr auto kProcedureArgumentModes = std::to_array<std::string_view>({
-    "IN",
-    "OUT",
-    "INOUT",
-});
-
 using nlohmann::json;
+namespace v2 = google::cloud::bigquery::v2;
+
+// A resource CheckResource has checked, as the protocol buffer message of its schema. Values that
+// it leaves unchecked, such as malformed timestamps, are rejected. Fields the message lacks, such
+// as JobConfigurationExtract's deprecated destinationUri, are left out; read them from the JSON.
+template <typename Message>
+Message ToProto(const json& resource) {
+  Message message;
+  google::protobuf::util::JsonParseOptions options;
+  options.ignore_unknown_fields = true;
+  if (const absl::Status status =
+          google::protobuf::util::JsonStringToMessage(resource.dump(), &message, options);
+      !status.ok()) {
+    throw ApiError::Invalid("Invalid value: " + std::string(status.message()));
+  }
+  return message;
+}
 
 int64_t QueryParamInt(const httplib::Request& request, const char* name, int64_t fallback) {
   if (!request.has_param(name)) {
@@ -198,57 +217,43 @@ int64_t QueryParamInt(const httplib::Request& request, const char* name, int64_t
   }
 }
 
-// The string `object[key]`, or "" when it is missing.
-std::string StringField(const json& object, const char* key, std::string_view what) {
-  if (!object.contains(key)) {
-    return "";
-  }
-  if (!object[key].is_string()) {
-    throw ApiError::Invalid("Invalid " + std::string(what));
-  }
-  return object[key].get<std::string>();
-}
-
 // Reads a TableReference, whose project defaults to the job's. `what` names it in errors.
-TableReference ParseTableReference(const json& table, std::string_view what) {
-  TableReference result{
-      .project_id = table.value("projectId", ""),
-      .dataset_id = table.value("datasetId", ""),
-      .table_id = table.value("tableId", ""),
-  };
-  if (result.dataset_id.empty() || result.table_id.empty()) {
+TableReference ParseTableReference(const v2::TableReference& table, std::string_view what) {
+  if (table.dataset_id().empty() || table.table_id().empty()) {
     throw ApiError::Invalid("Invalid " + std::string(what));
   }
-  return result;
-}
-
-std::optional<DatasetReference> ParseDefaultDataset(const json& config) {
-  if (!config.contains("defaultDataset")) {
-    return std::nullopt;
-  }
-  return DatasetReference{
-      .project_id = config["defaultDataset"].value("projectId", ""),
-      .dataset_id = config["defaultDataset"].value("datasetId", ""),
+  return {
+      .project_id = table.project_id(),
+      .dataset_id = table.dataset_id(),
+      .table_id = table.table_id(),
   };
 }
 
-// jobs.query takes the query configuration as the request body and jobs.insert takes it as
-// configuration.query, but the fields this emulator reads are spelled the same in both.
-QueryRequest ParseQueryConfiguration(const std::string& project_id, const json& config) {
+// jobs.query takes the query configuration as a QueryRequest and jobs.insert takes it as a
+// JobConfigurationQuery, but the fields this emulator reads are spelled the same in both.
+// `config` is the configuration's JSON, for the query parameters.
+template <typename Message>
+QueryRequest ParseQueryConfiguration(const std::string& project_id, const Message& message,
+                                     const json& config) {
   if (!config.contains("query")) {
     throw ApiError::Invalid("Required parameter is missing: query");
   }
   // Only GoogleSQL is emulated. An omitted useLegacySql runs as GoogleSQL, although BigQuery
   // defaults it to true.
-  if (config.value("useLegacySql", false)) {
+  if (message.use_legacy_sql().value()) {
     throw ApiError::Unsupported("legacy SQL; set useLegacySql to false");
   }
   RejectEncryptionConfiguration(config, "destinationEncryptionConfiguration",
                                 "destinationEncryptionConfiguration");
   QueryRequest request;
   request.project_id = project_id;
-  request.query = config["query"].get<std::string>();
-  request.default_dataset = ParseDefaultDataset(config);
+  request.query = message.query();
+  if (message.has_default_dataset()) {
+    request.default_dataset = DatasetReference{
+        .project_id = message.default_dataset().project_id(),
+        .dataset_id = message.default_dataset().dataset_id(),
+    };
+  }
   const json parameters = config.value("queryParameters", json::array());
   // Logged as the request spells them, before parsing, so that parameters that fail to parse are
   // logged too.
@@ -259,151 +264,139 @@ QueryRequest ParseQueryConfiguration(const std::string& project_id, const json& 
   return request;
 }
 
-// Reads the dispositions in a job configuration into `job`, which keeps its job type's default
-// for any the configuration omits.
+// Reads the dispositions of a job configuration into `job`, which keeps its job type's default
+// for any the configuration leaves empty, as BigQuery cannot tell an empty one from one left out.
 template <typename T>
-void ParseDispositions(const json& config, T& job) {
-  if (config.contains("createDisposition")) {
-    const std::string name = config["createDisposition"].get<std::string>();
-    const std::optional<CreateDisposition> disposition = ParseCreateDisposition(name);
+void ParseDispositions(const std::string& create, const std::string& write, T& job) {
+  if (!create.empty()) {
+    const std::optional<CreateDisposition> disposition = ParseCreateDisposition(create);
     if (!disposition.has_value()) {
-      throw ApiError::Invalid("Invalid create disposition: " + name);
+      throw ApiError::Invalid("Invalid create disposition: " + create);
     }
     job.create_disposition = *disposition;
   }
-  if (config.contains("writeDisposition")) {
-    const std::string name = config["writeDisposition"].get<std::string>();
-    const std::optional<WriteDisposition> disposition = ParseWriteDisposition(name);
+  if (!write.empty()) {
+    const std::optional<WriteDisposition> disposition = ParseWriteDisposition(write);
     if (!disposition.has_value()) {
-      throw ApiError::Invalid("Invalid write disposition: " + name);
+      throw ApiError::Invalid("Invalid write disposition: " + write);
     }
     job.write_disposition = *disposition;
   }
 }
 
-std::string JobId(const json& job) {
-  return job.value(json::json_pointer("/jobReference/jobId"), "");
-}
-
-// The location `object`, such as a job reference, names, or nothing when it names none.
-std::optional<std::string> LocationField(const json& object) {
-  std::string location = object.value("location", "");
+// A location, or nothing when it is empty.
+std::optional<std::string> Location(const std::string& location) {
   if (location.empty()) {
     return std::nullopt;
   }
   return location;
 }
 
-// The location the job reference of a job resource names.
-std::optional<std::string> JobLocationField(const json& job) {
-  return LocationField(job.value("jobReference", json::object()));
-}
-
-QueryRequest ParseQueryJob(const std::string& project_id, const json& job) {
-  const json& config = job["configuration"];
-  const json& query = config["query"];
-  QueryRequest request = ParseQueryConfiguration(project_id, query);
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
-  request.dry_run = config.value("dryRun", false);
-  if (query.contains("destinationTable")) {
-    request.destination_table = ParseTableReference(query["destinationTable"], "destination table");
+// Each job type's parser takes the checked job resource as its message and the JSON of its
+// configuration, which its request keeps.
+QueryRequest ParseQueryJob(const std::string& project_id, const v2::Job& job,
+                           const json& configuration) {
+  const v2::JobConfigurationQuery& query = job.configuration().query();
+  QueryRequest request = ParseQueryConfiguration(project_id, query, configuration);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
+  request.dry_run = job.configuration().dry_run().value();
+  if (query.has_destination_table()) {
+    request.destination_table = ParseTableReference(query.destination_table(), "destination table");
   }
-  ParseDispositions(query, request);
+  ParseDispositions(query.create_disposition(), query.write_disposition(), request);
   return request;
 }
 
-LoadRequest ParseLoadJob(const std::string& project_id, const json& job) {
-  const json& load = job["configuration"]["load"];
-  if (!load.contains("destinationTable")) {
+LoadRequest ParseLoadJob(const std::string& project_id, const v2::Job& job,
+                         const json& configuration) {
+  const v2::JobConfigurationLoad& load = job.configuration().load();
+  if (!load.has_destination_table()) {
     throw ApiError::Invalid("Invalid destination table");
   }
   LoadRequest request;
   request.project_id = project_id;
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
   request.load.destination_table =
-      ParseTableReference(load["destinationTable"], "destination table");
-  ParseDispositions(load, request.load);
-  RejectEncryptionConfiguration(load, "destinationEncryptionConfiguration",
+      ParseTableReference(load.destination_table(), "destination table");
+  ParseDispositions(load.create_disposition(), load.write_disposition(), request.load);
+  RejectEncryptionConfiguration(configuration, "destinationEncryptionConfiguration",
                                 "destinationEncryptionConfiguration");
-  request.load.configuration = load;
+  request.load.configuration = configuration;
   return request;
 }
 
-CopyRequest ParseCopyJob(const std::string& project_id, const json& job) {
-  const json& copy = job["configuration"]["copy"];
-  if (!copy.contains("destinationTable")) {
+CopyRequest ParseCopyJob(const std::string& project_id, const v2::Job& job,
+                         const json& configuration) {
+  const v2::JobConfigurationTableCopy& copy = job.configuration().copy();
+  if (!copy.has_destination_table()) {
     throw ApiError::Invalid("Invalid destination table");
   }
   CopyRequest request;
-  if (const std::string operation = copy.value("operationType", ""); operation == "SNAPSHOT") {
-    request.copy.operation = CopyOperation::kSnapshot;
-  } else if (operation == "RESTORE") {
-    request.copy.operation = CopyOperation::kRestore;
-  } else if (operation == "CLONE") {
-    request.copy.operation = CopyOperation::kClone;
+  switch (copy.operation_type()) {
+    case v2::JobConfigurationTableCopy::SNAPSHOT:
+      request.copy.operation = CopyOperation::kSnapshot;
+      break;
+    case v2::JobConfigurationTableCopy::RESTORE:
+      request.copy.operation = CopyOperation::kRestore;
+      break;
+    case v2::JobConfigurationTableCopy::CLONE:
+      request.copy.operation = CopyOperation::kClone;
+      break;
+    default:
+      break;
   }
   request.project_id = project_id;
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
   request.copy.destination_table =
-      ParseTableReference(copy["destinationTable"], "destination table");
-  if (copy.contains("sourceTable") == copy.contains("sourceTables")) {
+      ParseTableReference(copy.destination_table(), "destination table");
+  if (copy.has_source_table() == !copy.source_tables().empty()) {
     throw ApiError::Invalid("Specify sourceTable or sourceTables");
   }
-  if (copy.contains("sourceTable")) {
-    request.copy.source_tables.push_back(ParseTableReference(copy["sourceTable"], "source table"));
-  } else {
-    if (copy["sourceTables"].empty()) {
-      throw ApiError::Invalid("sourceTables is required");
-    }
-    for (const json& table : copy["sourceTables"]) {
-      request.copy.source_tables.push_back(ParseTableReference(table, "source table"));
-    }
+  if (copy.has_source_table()) {
+    request.copy.source_tables.push_back(ParseTableReference(copy.source_table(), "source table"));
   }
-  ParseDispositions(copy, request.copy);
-  RejectEncryptionConfiguration(copy, "destinationEncryptionConfiguration",
+  for (const v2::TableReference& table : copy.source_tables()) {
+    request.copy.source_tables.push_back(ParseTableReference(table, "source table"));
+  }
+  ParseDispositions(copy.create_disposition(), copy.write_disposition(), request.copy);
+  RejectEncryptionConfiguration(configuration, "destinationEncryptionConfiguration",
                                 "destinationEncryptionConfiguration");
-  // An RFC 3339 timestamp, as Timestamp is in JSON.
-  if (copy.contains("destinationExpirationTime")) {
-    const std::string expiration = copy["destinationExpirationTime"].get<std::string>();
-    absl::Time time;
-    std::string error;
-    if (!absl::ParseTime(absl::RFC3339_full, expiration, &time, &error)) {
-      throw ApiError::Invalid("Invalid destinationExpirationTime: " +
-                              copy["destinationExpirationTime"].dump());
-    }
-    request.copy.destination_expiration_time = absl::ToUnixMillis(time);
+  if (copy.has_destination_expiration_time()) {
+    // Timestamps keep their nanoseconds nonnegative, so this rounds down as milliseconds do.
+    const google::protobuf::Timestamp& expiration = copy.destination_expiration_time();
+    request.copy.destination_expiration_time =
+        (expiration.seconds() * 1000) + (expiration.nanos() / 1000000);
   }
-  request.copy.configuration = copy;
+  request.copy.configuration = configuration;
   return request;
 }
 
-ExtractRequest ParseExtractJob(const std::string& project_id, const json& job) {
-  const json& extract = job["configuration"]["extract"];
-  if (!extract.contains("sourceTable")) {
+ExtractRequest ParseExtractJob(const std::string& project_id, const v2::Job& job,
+                               const json& configuration) {
+  const v2::JobConfigurationExtract& extract = job.configuration().extract();
+  if (!extract.has_source_table()) {
     throw ApiError::Invalid("Source table is required");
   }
   ExtractRequest request;
   request.project_id = project_id;
-  request.job_id = JobId(job);
-  request.location = JobLocationField(job);
-  request.extract.source_table = ParseTableReference(extract["sourceTable"], "source table");
-  // destinationUri is the deprecated spelling of a single destination.
-  const json uris = extract.contains("destinationUris")
-                        ? extract["destinationUris"]
-                        : json::array({extract.value("destinationUri", "")});
-  if (uris.empty()) {
-    throw ApiError::Invalid("destinationUris is required");
+  request.job_id = job.job_reference().job_id();
+  request.location = Location(job.job_reference().location().value());
+  request.extract.source_table = ParseTableReference(extract.source_table(), "source table");
+  request.extract.destination_uris.assign(extract.destination_uris().begin(),
+                                          extract.destination_uris().end());
+  // destinationUri, the deprecated spelling of a single destination, is missing from the
+  // protocol buffer.
+  if (request.extract.destination_uris.empty()) {
+    request.extract.destination_uris.push_back(configuration.value("destinationUri", ""));
   }
-  for (const json& uri : uris) {
-    if (uri.get<std::string>().empty()) {
-      throw ApiError::Invalid("Invalid destination URI");
-    }
-    request.extract.destination_uris.push_back(uri.get<std::string>());
+  if (std::ranges::find(request.extract.destination_uris, "") !=
+      request.extract.destination_uris.end()) {
+    throw ApiError::Invalid("Invalid destination URI");
   }
-  request.extract.configuration = extract;
+  request.extract.configuration = configuration;
   return request;
 }
 
@@ -517,17 +510,18 @@ MediaUpload ParseMultipartUpload(const httplib::Request& request) {
 JobsQuery ParseQuery(const std::string& project_id, const json& body) {
   const json checked =
       CheckResource(body, "QueryRequest", QueryRequestFields(), UnknownFields::kIgnore);
+  const auto message = ToProto<v2::QueryRequest>(checked);
   JobsQuery result{
-      .query = ParseQueryConfiguration(project_id, checked),
+      .query = ParseQueryConfiguration(project_id, message, checked),
       .page =
           {
-              .max_results = checked.value("maxResults", kDefaultMaxResults),
-              .int64_timestamps =
-                  checked.value(json::json_pointer("/formatOptions/useInt64Timestamp"), false),
+              .max_results =
+                  message.has_max_results() ? message.max_results().value() : kDefaultMaxResults,
+              .int64_timestamps = message.format_options().use_int64_timestamp(),
           },
   };
-  result.query.location = LocationField(checked);
-  result.query.dry_run = checked.value("dryRun", false);
+  result.query.location = Location(message.location());
+  result.query.dry_run = message.dry_run();
   return result;
 }
 
@@ -542,28 +536,30 @@ ResultPage ParseResultPage(const httplib::Request& request) {
 
 JobRequest ParseJobInsert(const std::string& project_id, const json& body) {
   const json job = CheckResource(body, "Job", JobFields(), UnknownFields::kIgnore);
-  const json config = job.value("configuration", json::object());
-  if (config.contains("load")) {
-    return ParseLoadJob(project_id, job);
+  const auto message = ToProto<v2::Job>(job);
+  const v2::JobConfiguration& config = message.configuration();
+  if (config.has_load()) {
+    return ParseLoadJob(project_id, message, job["configuration"]["load"]);
   }
-  if (config.contains("copy")) {
-    return ParseCopyJob(project_id, job);
+  if (config.has_copy()) {
+    return ParseCopyJob(project_id, message, job["configuration"]["copy"]);
   }
-  if (config.contains("extract")) {
-    return ParseExtractJob(project_id, job);
+  if (config.has_extract()) {
+    return ParseExtractJob(project_id, message, job["configuration"]["extract"]);
   }
-  if (!config.contains("query")) {
+  if (!config.has_query()) {
     throw ApiError::Invalid("Only query, load, copy, and extract jobs are supported");
   }
-  return ParseQueryJob(project_id, job);
+  return ParseQueryJob(project_id, message, job["configuration"]["query"]);
 }
 
 LoadRequest ParseLoadInsert(const std::string& project_id, const json& body) {
   const json job = CheckResource(body, "Job", JobFields(), UnknownFields::kIgnore);
-  if (!job.contains("configuration") || !job["configuration"].contains("load")) {
+  const auto message = ToProto<v2::Job>(job);
+  if (!message.configuration().has_load()) {
     throw ApiError::Invalid("Media upload requires a load job");
   }
-  return ParseLoadJob(project_id, job);
+  return ParseLoadJob(project_id, message, job["configuration"]["load"]);
 }
 
 JobListRequest ParseJobList(const httplib::Request& request) {
@@ -692,15 +688,15 @@ TableGetRequest ParseTableGet(const httplib::Request& request) {
 // BigQuery ignores the fields a Dataset or Table resource lacks, at any depth, as it does a job's.
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& resource) {
   const json body = CheckResource(resource, "Dataset", DatasetFields(), UnknownFields::kIgnore);
-  const json reference = body.value("datasetReference", json::object());
-  if (!reference.is_object() || !reference.contains("datasetId")) {
-    throw ApiError::Invalid("Required parameter is missing: datasetId");
+  const auto dataset = ToProto<v2::Dataset>(body);
+  if (dataset.dataset_reference().dataset_id().empty()) {
+    throw ApiError::Required("dataset_id");
   }
   return {
       .dataset =
           DatasetReference{
               .project_id = project_id,
-              .dataset_id = StringField(reference, "datasetId", "dataset ID"),
+              .dataset_id = dataset.dataset_reference().dataset_id(),
           },
       .metadata = DatasetMetadataFromJson(body),
   };
@@ -708,24 +704,24 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const jso
 
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json& resource) {
   const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore);
-  const json reference = body.value("tableReference", json::object());
-  if (!reference.is_object() || !reference.contains("tableId")) {
-    throw ApiError::Invalid("Required parameter is missing: tableId");
+  const auto table = ToProto<v2::Table>(body);
+  if (table.table_reference().table_id().empty()) {
+    throw ApiError::Required("table_id");
   }
   TableInsertRequest request;
   request.table = TableReference{
       .project_id = dataset.project_id,
       .dataset_id = dataset.dataset_id,
-      .table_id = StringField(reference, "tableId", "table ID"),
+      .table_id = table.table_reference().table_id(),
   };
-  if (body.contains("materializedView")) {
-    if (body.contains("view")) {
+  if (table.has_materialized_view()) {
+    if (table.has_view()) {
       throw ApiError::Invalid("Cannot specify both view and materializedView");
     }
     request.materialized = true;
     request.view = body["materializedView"];
-  } else if (body.contains("view")) {
-    if (!body.value("tableConstraints", json()).is_null()) {
+  } else if (table.has_view()) {
+    if (table.has_table_constraints()) {
       throw ApiError::Invalid("Cannot specify the table constraints when creating view.");
     }
     request.view = body["view"];
@@ -736,78 +732,85 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   return request;
 }
 
-Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
+Routine ParseRoutine(const DatasetReference& dataset, const json& body, std::string_view method) {
   json resource = CheckResource(body, "Routine", RoutineFields());
-  const json reference = resource.value("routineReference", json::object());
+  const auto routine = ToProto<v2::Routine>(resource);
   resource.erase("routineReference");
-  const std::string id = reference.value("routineId", "");
-  if (id.empty()) {
-    throw ApiError::Invalid("Required parameter is missing: routineId");
+  const v2::RoutineReference& reference = routine.routine_reference();
+  if (reference.project_id().empty() || reference.dataset_id().empty() ||
+      reference.routine_id().empty()) {
+    throw ApiError::Invalid(
+        "Project ID, dataset ID and routine ID cannot be missing or empty in call to " +
+        std::string(method));
   }
-  if (reference.value("projectId", "") != dataset.project_id ||
-      reference.value("datasetId", "") != dataset.dataset_id) {
+  if (reference.project_id() != dataset.project_id ||
+      reference.dataset_id() != dataset.dataset_id) {
     throw ApiError::Invalid("Routine reference does not match the request path");
   }
-  const std::string type = resource.value("routineType", "");
-  const bool procedure = type == "PROCEDURE";
-  const bool tvf = type == "TABLE_VALUED_FUNCTION";
-  if (!procedure && !tvf && type != "SCALAR_FUNCTION") {
+  const bool procedure = routine.routine_type() == v2::Routine::PROCEDURE;
+  const bool tvf = routine.routine_type() == v2::Routine::TABLE_VALUED_FUNCTION;
+  if (!procedure && !tvf && routine.routine_type() != v2::Routine::SCALAR_FUNCTION) {
     throw ApiError::Unsupported(
         "routines other than SQL scalar functions, table functions and procedures");
   }
-  if (!procedure && resource.contains("strictMode")) {
+  if (!procedure && routine.has_strict_mode()) {
     throw ApiError::Unsupported("strictMode on functions");
   }
-  if (resource.contains("returnType") && (procedure || tvf)) {
+  if (routine.has_return_type() && (procedure || tvf)) {
     throw ApiError::Invalid("Only scalar functions can have returnType");
   }
-  if (resource.contains("returnTableType") && !tvf) {
+  if (routine.has_return_table_type() && !tvf) {
     throw ApiError::Invalid("Only table functions can have returnTableType");
   }
-  const std::string language = resource.value("language", "SQL");
-  if (language != "SQL" && language != "PYTHON") {
+  const bool python = routine.language() == v2::Routine::PYTHON;
+  if (!python && routine.language() != v2::Routine::SQL &&
+      routine.language() != v2::Routine::LANGUAGE_UNSPECIFIED) {
     throw ApiError::Unsupported("non-SQL routines other than Python scalar functions");
   }
-  resource["language"] = language;
-  if (language == "PYTHON") {
-    if (procedure || tvf || !resource.contains("returnType") ||
-        resource.value(json::json_pointer("/externalRuntimeOptions/runtimeVersion"), "") !=
-            "python-3.11") {
+  resource["language"] = python ? "PYTHON" : "SQL";
+  if (python) {
+    if (procedure || tvf || !routine.has_return_type() ||
+        routine.external_runtime_options().runtime_version() != "python-3.11") {
       throw ApiError::Unsupported("Python routines without a fixed result and python-3.11 runtime");
     }
-    if (resource.value(json::json_pointer("/pythonOptions/entryPoint"), "").empty()) {
+    if (routine.python_options().entry_point().empty()) {
       throw ApiError::Unsupported("Python routines without an entryPoint");
     }
-  } else if (resource.contains("externalRuntimeOptions") || resource.contains("pythonOptions")) {
+  } else if (routine.has_external_runtime_options() || routine.has_python_options()) {
     throw ApiError::Unsupported("Python options on SQL routines");
   }
-  if (resource.value("definitionBody", "").empty()) {
+  if (routine.definition_body().empty()) {
     throw ApiError::Invalid("Required parameter is missing: definitionBody");
   }
   if (!resource.contains("arguments")) {
     resource["arguments"] = json::array();
   }
-  for (const json& argument : resource["arguments"]) {
-    if (argument.value("name", "").empty()) {
+  for (int i = 0; i < routine.arguments_size(); ++i) {
+    const v2::Routine::Argument& argument = routine.arguments(i);
+    // BigQuery reads an UNSPECIFIED enum as one left out, and returns none.
+    if (argument.mode() == v2::Routine::Argument::MODE_UNSPECIFIED) {
+      resource["arguments"][i].erase("mode");
+    }
+    if (argument.argument_kind() == v2::Routine::Argument::ARGUMENT_KIND_UNSPECIFIED) {
+      resource["arguments"][i].erase("argumentKind");
+    }
+    if (argument.name().empty()) {
       throw ApiError::Invalid("Invalid routine argument");
     }
-    if (argument.contains("mode")) {
-      const std::string mode = argument["mode"].get<std::string>();
-      if (!procedure) {
-        throw ApiError::Unsupported("routine argument field mode");
-      }
-      if (std::ranges::find(kProcedureArgumentModes, mode) == kProcedureArgumentModes.end()) {
-        throw ApiError::Unsupported("procedure argument mode " + mode);
-      }
+    // Procedures take every mode.
+    if (argument.mode() != v2::Routine::Argument::MODE_UNSPECIFIED && !procedure) {
+      throw ApiError::Unsupported("routine argument field mode");
     }
-    const std::string kind = argument.value("argumentKind", "");
-    if ((procedure || tvf) && kind == "ANY_TYPE") {
+    const v2::Routine::Argument::ArgumentKind kind = argument.argument_kind();
+    if ((procedure || tvf) && kind == v2::Routine::Argument::ANY_TYPE) {
       throw ApiError::Unsupported("procedure or TVF arguments of ANY TYPE");
     }
-    if (!kind.empty() && kind != "FIXED_TYPE" && kind != "ANY_TYPE") {
-      throw ApiError::Unsupported("routine argument kind " + kind);
+    if (kind != v2::Routine::Argument::ARGUMENT_KIND_UNSPECIFIED &&
+        kind != v2::Routine::Argument::FIXED_TYPE && kind != v2::Routine::Argument::ANY_TYPE) {
+      throw ApiError::Unsupported("routine argument kind " +
+                                  v2::Routine::Argument::ArgumentKind_Name(kind));
     }
-    if (kind == "ANY_TYPE" && argument.contains("dataType")) {
+    if (kind == v2::Routine::Argument::ANY_TYPE && argument.has_data_type()) {
       throw ApiError::Invalid("ANY_TYPE arguments cannot have dataType");
     }
   }
@@ -816,7 +819,7 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
           {
               .project_id = dataset.project_id,
               .dataset_id = dataset.dataset_id,
-              .routine_id = id,
+              .routine_id = reference.routine_id(),
           },
       .resource = std::move(resource),
   };
@@ -830,16 +833,17 @@ json ParseDatasetUpdate(const json& body, bool patch) {
 TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
   const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore,
                                   patch ? Change::kPatch : Change::kUpdate);
-  if (!body.value("materializedView", json()).is_null()) {
+  const auto table = ToProto<v2::Table>(body);
+  if (table.has_materialized_view()) {
     throw ApiError::Unsupported("updating materializedView");
   }
   TableUpdateRequest request{.resource = body, .schema = std::nullopt, .view = std::nullopt};
   // As BigQuery answers, a patch that sets the schema to null keeps it; the emulator keeps a view
   // set to null too.
-  if (!body.value("schema", json()).is_null()) {
+  if (table.has_schema()) {
     request.schema = SchemaFromJson(body["schema"]);
   }
-  if (!body.value("view", json()).is_null()) {
+  if (table.has_view()) {
     request.view = body["view"];
   }
   return request;

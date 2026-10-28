@@ -391,7 +391,8 @@ class RestServer::Impl {
     Route("bigquery.routines.insert", {},
           Json([this](const httplib::Request& request, httplib::Response&) {
             return RoutineResource(emulator_.WriteRoutine(
-                ParseRoutine(DatasetFromPath(request), ParseBody(request)), /*update=*/false));
+                ParseRoutine(DatasetFromPath(request), ParseBody(request), "routines.insert"),
+                /*update=*/false));
           }));
     Route("bigquery.routines.update", {},
           Json([this](const httplib::Request& request, httplib::Response&) {
@@ -401,7 +402,7 @@ class RestServer::Impl {
             const RoutineReference reference = RoutineFromPath(request);
             Routine routine = ParseRoutine(
                 {.project_id = reference.project_id, .dataset_id = reference.dataset_id},
-                ParseBody(request));
+                ParseBody(request), "routines.update");
             if (routine.reference.routine_id != reference.routine_id) {
               throw ApiError::Invalid("Routine reference does not match the request path");
             }

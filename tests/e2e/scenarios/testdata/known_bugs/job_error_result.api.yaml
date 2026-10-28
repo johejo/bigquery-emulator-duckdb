@@ -1,0 +1,84 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run eorttcsidcpquia6yq64cswijt, as the
+# query_job_empty_dispositions case of ../empty_request_values.api.yaml; the answers sidecar keeps
+# the observations. BigQuery's errorResult for a query job whose WRITE_EMPTY destination already
+# has rows carries only a reason and a message, but the emulator gives every job error the
+# location "query".
+description: >-
+  The errorResult of a query job rejected for writing to a nonempty WRITE_EMPTY destination,
+  which the emulator gives a location BigQuery leaves out.
+vars:
+  dataset: e2e_${run}_${case}
+cases:
+  - name: write_empty_error_result
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: first
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: SELECT 1 AS x
+                useLegacySql: false
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                createDisposition: ''
+                writeDisposition: ''
+        bind:
+          first_job: /body/jobReference/jobId
+      - name: first_done
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${first_job}?location=US
+        until: {/body/status/state: DONE}
+        observe:
+          errorResult: /body/status/errorResult
+      - name: second
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: SELECT 2 AS x
+                useLegacySql: false
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                createDisposition: ''
+                writeDisposition: ''
+        bind:
+          second_job: /body/jobReference/jobId
+      - name: second_done
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${second_job}?location=US
+        until: {/body/status/state: DONE}
+        observe:
+          errorResult: /body/status/errorResult
+      - name: rows
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t/data
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      first_done: {}
+      second_done:
+        errorResult:
+          reason: duplicate
+          message: 'Already Exists: Table ${project}:${dataset}.t'
+      rows:
+        rows: [{f: [{v: '1'}]}]
