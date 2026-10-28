@@ -204,9 +204,9 @@ which are unsupported with a collation. `und:ci` compares with GoogleSQL's colla
 locale at secondary strength, whose Unicode data can order some strings differently from
 BigQuery's.
 
-Schemas do not record collations yet: column and default collations are unsupported, as are
-views and query destination tables with collated columns. Query results report their schemas
-without collations.
+Query results report their fields' collations, but tables and views do not record them yet:
+column and default collations are unsupported, as are views and query destination tables with
+collated columns.
 
 ### RANGE values
 

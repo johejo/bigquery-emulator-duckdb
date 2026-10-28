@@ -163,7 +163,7 @@ struct TranslatedStatement {
   std::string statement_type;
   // The schema of the rows a query returns, as ResultSchema reports it; empty for other statements.
   std::optional<std::vector<FieldSchema>> result_schema;
-  // Whether a column of result_schema holds a collation, which the schema does not record.
+  // Whether a column of result_schema holds a collation, which a destination table would keep.
   bool result_has_collation = false;
   // The table or view, the dataset, or the routine that a DDL statement creates, alters or drops.
   std::optional<TableReference> ddl_target_table;

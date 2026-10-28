@@ -53,7 +53,7 @@ absl::Status CheckSpecification(std::string_view specification, bool bigquery) {
   }
   if (bigquery && specification != "und:ci") {
     return absl::InvalidArgumentError("Collation '" + std::string(specification) +
-                                      "' is not supported; use 'und:ci' or ''");
+                                      "' in collate function is not supported.");
   }
   return FindCollator(specification).status();
 }

@@ -12,7 +12,8 @@ namespace googlesql_collation {
 
 // Fails for a collation specification GoogleSQL's collator does not take, or with `bigquery`, for
 // one BigQuery does not take: BigQuery takes only `und:ci` and the empty specification, binary
-// collation, where GoogleSQL also takes other locales, `und:cs` and `binary`.
+// collation, where GoogleSQL also takes other locales, `und:cs` and `binary`. The message is
+// BigQuery's for COLLATE, which every specification passes.
 absl::Status CheckSpecification(std::string_view specification, bool bigquery);
 
 // The sort key of `value` under `specification`: keys compare bytewise as the collation compares

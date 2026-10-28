@@ -1,0 +1,32 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run l363n2yqs7fv7idu23nyuidffo; the answers
+# sidecar keeps the observation.
+#
+# A query result reports the collation of each collated field, also inside a RECORD.
+description: >-
+  The collations a query result's schema reports.
+cases:
+  - name: query_result
+    steps:
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT COLLATE('a', 'und:ci') AS c, STRUCT(COLLATE('b', 'und:ci') AS f) AS s
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          errors: /body/errors
+          schema: /body/schema
+    expect:
+      query:
+        schema:
+          fields:
+            - {collation: und:ci, mode: NULLABLE, name: c, type: STRING}
+            - fields:
+                - {collation: und:ci, mode: NULLABLE, name: f, type: STRING}
+              mode: NULLABLE
+              name: s
+              type: RECORD

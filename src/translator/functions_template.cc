@@ -790,7 +790,13 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  {.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"},
              },
              {
-                 .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+                 .uses =
+                     {
+                         TypeUse::kCompares,
+                         TypeUse::kComparesIntervalKeys,
+                         TypeUse::kRejectsCollation,
+                         TypeUse::kBigNumeric,
+                     },
                  .type_rejections = kDistinctRejections,
              }),
 
@@ -799,7 +805,13 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  {.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"},
              },
              {
-                 .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+                 .uses =
+                     {
+                         TypeUse::kCompares,
+                         TypeUse::kComparesIntervalKeys,
+                         TypeUse::kRejectsCollation,
+                         TypeUse::kBigNumeric,
+                     },
                  .type_rejections = kNotDistinctRejections,
              }),
 

@@ -66,6 +66,8 @@ struct FieldSchema {
   // roundingMode; kUnspecified means the field has no recorded rounding mode.
   RoundingMode rounding_mode = RoundingMode::kUnspecified;
   std::vector<std::string> policy_tags = {};  // policyTags.names.
+  // collation, which query results report; tables and views do not record one yet.
+  std::string collation = {};
 
   [[nodiscard]] nlohmann::json ToJson() const;
 };

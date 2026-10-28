@@ -134,3 +134,47 @@ SELECT COALESCE(COLLATE('a', 'und:ci'), 'b') = 'A'
 
 SELECT CASE WHEN COLLATE('a', 'und:ci') = 'A' THEN 'equal' ELSE 'different' END
 => "equal"
+
+# BigQuery's answers. und:ci tells accents and ß from ss apart, as ICU's secondary strength does.
+SELECT COLLATE('a', 'und:ci') = 'á'
+=> "false"
+
+SELECT COLLATE('ä', 'und:ci') = 'Ä'
+=> "true"
+
+SELECT COLLATE('ß', 'und:ci') = 'ss'
+=> "false"
+
+# Functions that do not compare carry a collated argument.
+SELECT LENGTH(COLLATE('abc', 'und:ci'))
+=> "3"
+
+SELECT TO_JSON_STRING(COLLATE('abc', 'und:ci'))
+=> "\"abc\""
+
+# A cast and a script variable drop the collation; a scalar subquery and WITH RECURSIVE keep it.
+SELECT CAST(COLLATE('a', 'und:ci') AS STRING) = 'A'
+=> "false"
+
+SELECT SAFE_CAST(COLLATE('a', 'und:ci') AS STRING) = 'A'
+=> "false"
+
+DECLARE v STRING DEFAULT COLLATE('a', 'und:ci');
+SELECT v = 'A'
+=> "false"
+
+DECLARE v STRING;
+SET v = COLLATE('a', 'und:ci');
+SELECT v = 'A'
+=> "false"
+
+SELECT (SELECT w FROM UNNEST([COLLATE('a', 'und:ci')]) AS w) = 'A'
+=> "true"
+
+WITH RECURSIVE r AS (
+  SELECT COLLATE('a', 'und:ci') AS x
+  UNION ALL
+  SELECT x FROM r WHERE FALSE
+)
+SELECT x = 'A' FROM r
+=> "true"

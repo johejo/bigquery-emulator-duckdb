@@ -328,7 +328,7 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
 
 std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item, const Scope& scope,
                                      const Columns& columns) {
-  // BigQuery has no ORDER BY ... COLLATE clause; the collation comes from the ordered value.
+  // BigQuery has no ORDER BY ... COLLATE clause, which the analyzer's options leave off.
   if (item.collation_name() != nullptr) {
     return Unsupported(scope, "ORDER BY with COLLATE");
   }

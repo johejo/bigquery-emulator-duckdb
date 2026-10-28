@@ -135,7 +135,8 @@ GoogleSQL's collator, in place of the strings: functions marked `kComparesCollat
 STRING arguments, and `ORDER BY` keys its items. Operations that do more than compare, such as
 `STARTS_WITH` or `LIKE`, need GoogleSQL's collated implementations instead. Every other operation
 rejects a non-empty collation, as do set operations, whose collation the resolved AST does not
-record, and views and query destination tables, whose schemas would drop it.
+record, and views and query destination tables, whose schemas would drop it. A query result's
+schema reports the collations of its columns' annotations.
 [googlesql_collation](../src/googlesql_collation/) owns the collators and, behind the
 `bigquery_collations` option, the specifications BigQuery takes; its DuckDB adapter registers the
 key function and COLLATE's check of its specification.

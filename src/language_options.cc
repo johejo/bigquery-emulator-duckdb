@@ -47,6 +47,9 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // under them. The translator rejects the operations whose collation it does not apply.
     options->EnableLanguageFeature(googlesql::FEATURE_COLLATION_SUPPORT);
     options->EnableLanguageFeature(googlesql::FEATURE_USE_OPERATION_COLLATION_FOR_NULLIF);
+    options->EnableLanguageFeature(googlesql::FEATURE_COLLATION_IN_WITH_RECURSIVE);
+    // BigQuery has no ORDER BY ... COLLATE clause; an ordered value carries its collation.
+    options->DisableLanguageFeature(googlesql::FEATURE_ORDER_BY_COLLATE);
     // BigQuery rejects collations on arguments of user-defined functions and table functions and
     // in their SQL bodies' results.
     options->DisableLanguageFeature(googlesql::FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS);

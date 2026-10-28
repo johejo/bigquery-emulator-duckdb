@@ -273,6 +273,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!collation) {
     return std::nullopt;
   }
+  if (!collation->empty() && functions.HasTypeUse(name, TypeUse::kRejectsCollation)) {
+    throw std::invalid_argument("Function '" + call.function()->Name() + "' with collation '" +
+                                *collation + "' is not supported.");
+  }
   if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys)) {
     return Unsupported(scope, "function " + name + " with collation");
   }

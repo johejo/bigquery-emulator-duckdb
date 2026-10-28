@@ -140,9 +140,11 @@ AST does not record, such as set operations. Apply one by what the operation doe
   through a backend function that takes the specification.
 
 Any other operation rejects a non-empty collation as unsupported; a value carries one freely where
-no operation uses it. Until `FieldSchema` records collations, also reject schemas that would keep
-one, such as tables, views and query destinations. Recording them means giving catalog columns
-their collation annotations, with DDL, the REST API and INFORMATION_SCHEMA agreeing.
+no operation uses it. `FieldSchema::collation` reports collations in query results; until tables
+and views record it, also reject schemas that would keep one, such as tables, views and query
+destinations. Recording them means giving catalog columns their collation annotations, with DDL,
+the REST API and INFORMATION_SCHEMA agreeing. Where BigQuery rejects a collation GoogleSQL
+applies, as on IS DISTINCT FROM, mark the function `kRejectsCollation`.
 `tools/collation_operations.json`, generated from the documentation, and the Collation section of
 `tools/sql_features.txt` list the operations to cover; `docs/functions.md` and `docs/sql.md` show
 what remains.

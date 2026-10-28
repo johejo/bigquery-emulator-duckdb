@@ -131,6 +131,7 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
     FieldSchema& field = duckdb_schema.at(i);
     const FieldSchema& resolved = resolved_schema.at(i);
     field.name = resolved.name;
+    field.collation = resolved.collation;
     if (field.mode != resolved.mode) {
       continue;
     }

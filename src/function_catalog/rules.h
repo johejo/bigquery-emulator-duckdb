@@ -227,6 +227,8 @@ enum class TypeUse : std::uint8_t {
   kReadsEmptyStruct,
   // BigQuery rejects the SAFE. prefix on these although GoogleSQL accepts it.
   kRejectsSafe,
+  // BigQuery rejects an operation collation on these although GoogleSQL applies it.
+  kRejectsCollation,
   // BigQuery rejects OVER on these aggregate functions although GoogleSQL accepts it.
   kRejectsOver,
 };
