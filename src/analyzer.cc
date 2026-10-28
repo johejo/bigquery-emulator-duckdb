@@ -144,28 +144,6 @@ std::vector<const googlesql::AnnotationMap*> ResultAnnotations(
   return annotations;
 }
 
-// Gives `field` and its fields the collations `annotations` hold, as BigQuery reports them; a
-// REPEATED field reports its elements' collation.
-void SetCollations(FieldSchema& field, const googlesql::AnnotationMap* annotations) {
-  if (annotations != nullptr && field.mode == FieldMode::kRepeated) {
-    const googlesql::StructAnnotationMap* element = annotations->AsStructMap();
-    annotations = element == nullptr || element->num_fields() != 1 ? nullptr : element->field(0);
-  }
-  if (annotations == nullptr) {
-    return;
-  }
-  if (const googlesql::SimpleValue* collation =
-          annotations->GetAnnotation(static_cast<int>(googlesql::AnnotationKind::kCollation));
-      collation != nullptr && collation->has_string_value()) {
-    field.collation = collation->string_value();
-  }
-  if (const googlesql::StructAnnotationMap* fields = annotations->AsStructMap()) {
-    for (int i = 0; i < fields->num_fields() && std::cmp_less(i, field.fields.size()); ++i) {
-      SetCollations(field.fields.at(i), fields->field(i));
-    }
-  }
-}
-
 }  // namespace
 
 std::optional<std::vector<FieldSchema>> ResultSchema(

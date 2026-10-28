@@ -100,7 +100,9 @@ absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
                            String(path),
                            String(*type),
                            OptionalString(field.description),
-                           kNull,
+                           // BigQuery spells a field without collation "NULL".
+                           // BigQuery spells a column without collation "NULL".
+                           String(field.collation.value_or("NULL")),
                            OptionalString(std::string(RoundingModeName(field.rounding_mode))),
                            kEmptyArray,
                        }));
@@ -347,7 +349,7 @@ absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
                        String("NO"),
                        String("NO"),
                        kNull,
-                       kNull,
+                       String(field.collation.value_or("NULL")),
                        OptionalString(field.default_value_expression),
                        OptionalString(std::string(RoundingModeName(field.rounding_mode))),
                        kEmptyArray,

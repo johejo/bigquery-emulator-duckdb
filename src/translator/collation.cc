@@ -1,6 +1,5 @@
 #include "src/translator/collation.h"
 
-#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -8,7 +7,6 @@
 
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/simple_value.h"
-#include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/resolved_collation.h"
 #include "src/duckdb_sql.h"
 #include "src/translator/context.h"
@@ -82,15 +80,6 @@ bool HasCollation(const googlesql::AnnotationMap* annotations) {
     });
   }
   return found;
-}
-
-bool ResultHasCollation(const googlesql::ResolvedStatement& statement) {
-  if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
-    return false;
-  }
-  return std::ranges::any_of(
-      statement.GetAs<googlesql::ResolvedQueryStmt>()->output_column_list(),
-      [](const auto& output) { return HasCollation(output->column().type_annotation_map()); });
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

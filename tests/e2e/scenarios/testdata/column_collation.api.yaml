@@ -1,0 +1,306 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run x2ropk2xkgochasmj7x2jsvbgi; the answers
+# sidecar keeps the observations, of which these select the status, reason and message of errors.
+#
+# tables.get reports an assigned empty collation, which INFORMATION_SCHEMA spells "" and a column
+# without one "NULL". BigQuery's message for a collated clustering column differs from the one
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md documents, "CLUSTER BY
+# STRING column word with collation und:ci isn't supported".
+description: >-
+  Column collations: how tables.get and INFORMATION_SCHEMA report the collations DDL assigns,
+  including an empty one, and how BigQuery answers collations it does not take or a change to an
+  existing column's collation, through DDL and tables.insert or tables.patch.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  statement:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: ${statement}
+            useLegacySql: false
+            timeoutMs: 200000
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  insert:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: c, type: '${type}', collation: '${collation}'}
+        observe:
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected_insert:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: c, type: '${type}', collation: '${collation}'}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: ddl_columns
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CREATE TABLE `${project}.${dataset}.t` (c STRING COLLATE 'und:ci',
+              s STRUCT<f STRING COLLATE 'und:ci', g STRING>, a ARRAY<STRING COLLATE 'und:ci'>,
+              e STRING COLLATE '', n STRING)
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          errors: /body/errors
+      - name: add_column
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              ALTER TABLE `${project}.${dataset}.t` ADD COLUMN w STRING COLLATE 'und:ci'
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          errors: /body/errors
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          schema: /body/schema
+          defaultCollation: /body/defaultCollation
+      - name: columns
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT column_name, data_type, collation_name
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.COLUMNS` ORDER BY ordinal_position
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          rows: /body/rows
+      - name: field_paths
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT field_path, data_type, collation_name
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS` ORDER BY field_path
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create: {}
+      add_column: {}
+      table:
+        schema:
+          fields:
+            - {collation: und:ci, name: c, type: STRING}
+            - fields:
+                - {collation: und:ci, name: f, type: STRING}
+                - {name: g, type: STRING}
+              name: s
+              type: RECORD
+            - {collation: und:ci, mode: REPEATED, name: a, type: STRING}
+            - {collation: '', name: e, type: STRING}
+            - {name: n, type: STRING}
+            - {collation: und:ci, name: w, type: STRING}
+      columns:
+        rows:
+          - f: [{v: c}, {v: STRING}, {v: und:ci}]
+          - f: [{v: s}, {v: 'STRUCT<f STRING, g STRING>'}, {v: 'NULL'}]
+          - f: [{v: a}, {v: 'ARRAY<STRING>'}, {v: und:ci}]
+          - f: [{v: e}, {v: STRING}, {v: ''}]
+          - f: [{v: n}, {v: STRING}, {v: 'NULL'}]
+          - f: [{v: w}, {v: STRING}, {v: und:ci}]
+      field_paths:
+        rows:
+          - f: [{v: a}, {v: 'ARRAY<STRING>'}, {v: und:ci}]
+          - f: [{v: c}, {v: STRING}, {v: und:ci}]
+          - f: [{v: e}, {v: STRING}, {v: ''}]
+          - f: [{v: n}, {v: STRING}, {v: 'NULL'}]
+          - f: [{v: s}, {v: 'STRUCT<f STRING, g STRING>'}, {v: 'NULL'}]
+          - f: [{v: s.f}, {v: STRING}, {v: und:ci}]
+          - f: [{v: s.g}, {v: STRING}, {v: 'NULL'}]
+          - f: [{v: w}, {v: STRING}, {v: und:ci}]
+  - name: ddl_unsupported_specification
+    template: statement
+    vars:
+      statement: CREATE TABLE `${project}.${dataset}.t` (c STRING COLLATE 'und:cs')
+    expect:
+      statement: {status: 400, reason: invalidQuery, message: "Collation 'und:cs' is unsupported."}
+  - name: ddl_binary_specification
+    template: statement
+    vars:
+      statement: CREATE TABLE `${project}.${dataset}.t` (c STRING COLLATE 'binary')
+    expect:
+      statement: {status: 400, reason: invalidQuery, message: "Collation 'binary' is unsupported."}
+  - name: ddl_clustering
+    template: statement
+    vars:
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` (word STRING COLLATE 'und:ci', number INT64)
+        CLUSTER BY word
+    expect:
+      statement:
+        status: 400
+        reason: invalid
+        message: 'Fields specified for clustering cannot have collation. Invalid field: word.'
+  - name: insert_string
+    template: insert
+    vars: {type: STRING, collation: 'und:ci'}
+    expect:
+      insert:
+        schema:
+          fields:
+            - {collation: und:ci, name: c, type: STRING}
+  - name: insert_integer
+    template: rejected_insert
+    vars: {type: INTEGER, collation: 'und:ci'}
+    expect:
+      insert:
+        status: 400
+        reason: invalid
+        message: >-
+          Field c with type INTEGER and has collation, but collation is only allowed for STRING
+          type columns or STRING type fields in ARRAY or STRUCT
+  - name: insert_unsupported_specification
+    template: rejected_insert
+    vars: {type: STRING, collation: 'und:cs'}
+    expect:
+      insert: {status: 400, reason: invalid, message: 'Unsupported collation: und:cs'}
+  - name: insert_empty
+    template: insert
+    vars: {type: STRING, collation: ''}
+    expect:
+      insert:
+        schema:
+          fields:
+            - {collation: '', name: c, type: STRING}
+  - name: patch_collation
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: c, type: STRING, collation: 'und:ci'}
+                - {name: d, type: STRING}
+        observe:
+          error: /body/error
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            schema:
+              fields:
+                - {name: c, type: STRING}
+                - {name: d, type: STRING, collation: 'und:ci'}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      insert: {}
+      patch:
+        status: 400
+        reason: invalid
+        message: >-
+          Provided Schema does not match Table ${project}:${dataset}.t. Invalid schema update.
+          Updating field collation is not supported. Field c has changed collation from
+          "und:ci" to ""

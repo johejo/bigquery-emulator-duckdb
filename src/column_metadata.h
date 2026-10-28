@@ -15,7 +15,8 @@ namespace bigquery_emulator_duckdb {
 // column, so dropping or replacing a table or adding a column never leaves it stale.
 
 // The statements that record `schema` on the columns of `table`, which must already exist.
-// Throws ApiError for rounding modes the emulator cannot keep; see CheckRoundingModes.
+// Throws ApiError for rounding modes the emulator cannot keep and collations BigQuery does not
+// take; see CheckRoundingModes and CheckCollations.
 std::vector<std::string> ColumnCommentStatements(const TableReference& table,
                                                  const std::vector<FieldSchema>& schema);
 

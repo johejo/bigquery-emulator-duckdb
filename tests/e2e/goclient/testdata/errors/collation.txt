@@ -40,3 +40,19 @@ SELECT COLLATE('a', 'und:ci') IS DISTINCT FROM 'A'
 
 SELECT ARRAY(SELECT x FROM UNNEST(['b', 'A']) AS x ORDER BY x COLLATE 'und:ci')
 => error contains: COLLATE is not supported
+
+# Columns take und:ci or the empty specification on STRING alone, and a clustering column no
+# collation. BigQuery's answers, in ../../../scenarios/testdata/column_collation.api.yaml, give
+# the messages; the documented clustering message differs.
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+CREATE TEMP TABLE t (c STRING COLLATE 'und:cs');
+SELECT 1
+=> error contains: Collation 'und:cs' is unsupported.
+
+CREATE TEMP TABLE t (c INT64 COLLATE 'und:ci');
+SELECT 1
+=> error:
+
+CREATE TEMP TABLE t (word STRING COLLATE 'und:ci', number INT64) CLUSTER BY word;
+SELECT 1
+=> error contains: Fields specified for clustering cannot have collation. Invalid field: word.

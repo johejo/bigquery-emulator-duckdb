@@ -24,7 +24,7 @@ rejected.
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 23 | 8 | 1 |
-| [Collation](#collation) | 4 | 3 | 7 |
+| [Collation](#collation) | 6 | 3 | 5 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -140,10 +140,10 @@ rejected.
 | Collated `GROUP BY` | Unsupported |  |
 | Collated window functions | Partial | Unsupported: PARTITION BY with collation. |
 | Collated set operations | Partial | Unsupported: set operation DISTINCT with collation. |
-| Column collation | Unsupported |  |
+| Column collation | Supported |  |
 | Table default collation | Unsupported |  |
 | Dataset default collation | Unsupported |  |
-| Collated views | Unsupported |  |
+| Collated views | Supported |  |
 | Collated materialized views | Unsupported |  |
 | Collated table functions | Supported |  |
 

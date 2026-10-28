@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -17,6 +18,9 @@
 #include "duckdb.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/type_parameters.pb.h"
+#include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/simple_value.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_parameters.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
@@ -367,7 +371,65 @@ std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_log
   }
 }
 
+// Sets the collations of `field` and its fields on `annotations`, which annotate its type; a
+// REPEATED field's collation annotates its elements.
+void AnnotateCollations(const FieldSchema& field, googlesql::AnnotationMap& annotations) {
+  googlesql::AnnotationMap* value = &annotations;
+  if (field.mode == FieldMode::kRepeated) {
+    value = annotations.AsStructMap()->mutable_field(0);
+  }
+  // An empty collation compares as none does.
+  if (field.collation.has_value() && !field.collation->empty()) {
+    value->SetAnnotation(static_cast<int>(googlesql::AnnotationKind::kCollation),
+                         googlesql::SimpleValue::String(*field.collation));
+  }
+  if (googlesql::StructAnnotationMap* fields = value->AsStructMap()) {
+    for (int i = 0; i < fields->num_fields() && std::cmp_less(i, field.fields.size()); ++i) {
+      AnnotateCollations(field.fields.at(i), *fields->mutable_field(i));
+    }
+  }
+}
+
 }  // namespace
+
+absl::StatusOr<googlesql::AnnotatedType> GoogleSqlAnnotatedType(
+    const FieldSchema& field, googlesql::TypeFactory* type_factory) {
+  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, type_factory);
+  if (!type.ok()) {
+    return type.status();
+  }
+  std::unique_ptr<googlesql::AnnotationMap> annotations = googlesql::AnnotationMap::Create(*type);
+  AnnotateCollations(field, *annotations);
+  if (annotations->Empty()) {
+    return googlesql::AnnotatedType(*type, nullptr);
+  }
+  absl::StatusOr<const googlesql::AnnotationMap*> owned =
+      type_factory->TakeOwnership(std::move(annotations));
+  if (!owned.ok()) {
+    return owned.status();
+  }
+  return googlesql::AnnotatedType(*type, *owned);
+}
+
+void SetCollations(FieldSchema& field, const googlesql::AnnotationMap* annotations) {
+  if (annotations != nullptr && field.mode == FieldMode::kRepeated) {
+    const googlesql::StructAnnotationMap* element = annotations->AsStructMap();
+    annotations = element == nullptr || element->num_fields() != 1 ? nullptr : element->field(0);
+  }
+  if (annotations == nullptr) {
+    return;
+  }
+  if (const googlesql::SimpleValue* collation =
+          annotations->GetAnnotation(static_cast<int>(googlesql::AnnotationKind::kCollation));
+      collation != nullptr && collation->has_string_value() && !collation->string_value().empty()) {
+    field.collation = collation->string_value();
+  }
+  if (const googlesql::StructAnnotationMap* fields = annotations->AsStructMap()) {
+    for (int i = 0; i < fields->num_fields() && std::cmp_less(i, field.fields.size()); ++i) {
+      SetCollations(field.fields.at(i), fields->field(i));
+    }
+  }
+}
 
 absl::StatusOr<std::string> GoogleSqlTypeName(const FieldSchema& field,
                                               googlesql::TypeFactory* type_factory) {

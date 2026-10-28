@@ -66,8 +66,10 @@ struct FieldSchema {
   // roundingMode; kUnspecified means the field has no recorded rounding mode.
   RoundingMode rounding_mode = RoundingMode::kUnspecified;
   std::vector<std::string> policy_tags = {};  // policyTags.names.
-  // collation, which query results report; tables and views do not record one yet.
-  std::string collation = {};
+  // collation of a STRING field, or of the elements of a REPEATED one: nullopt when none is
+  // assigned, or "" for an assigned binary collation, which tables.get and INFORMATION_SCHEMA
+  // report apart.
+  std::optional<std::string> collation = {};
 
   [[nodiscard]] nlohmann::json ToJson() const;
 };
@@ -122,6 +124,12 @@ void ApplyDefaultRoundingMode(const std::vector<FieldSchema>& current,
 // is not NUMERIC or BIGNUMERIC, or ROUND_HALF_EVEN on a parameterized field of a column with a
 // default, whose value DuckDB would round away from zero.
 void CheckRoundingModes(const std::vector<FieldSchema>& schema);
+
+// Throws ApiError::Invalid, with tables.insert's message, for a collation BigQuery does not take
+// on a field of `schema`, at any depth: one on a field that is not a STRING, or a specification
+// other than und:ci and "".
+// third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+void CheckCollations(const std::vector<FieldSchema>& schema);
 
 // The path, below `path`, of the first field of `schema` whose name another field beside it has,
 // ignoring case as BigQuery does, at any depth; BigQuery rejects such a schema.

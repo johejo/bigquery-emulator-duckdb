@@ -174,7 +174,6 @@ cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:type_parameters_cc_proto",
-        "@googlesql//googlesql/public/types",
     ],
     deps = [
         ":bignumeric",
@@ -184,6 +183,7 @@ cc_library(
         "//third_party/duckdb",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public/types",
     ],
 )
 
@@ -387,6 +387,7 @@ cc_library(
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:simple_catalog_util",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public/types",
     ],
     deps = [
         ":builtin_function_options",
@@ -433,6 +434,7 @@ cc_library(
         "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:sql_function",
         "@googlesql//googlesql/public:sql_tvf",
+        "@googlesql//googlesql/public:sql_view",
         "@googlesql//googlesql/public:templated_sql_function",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",

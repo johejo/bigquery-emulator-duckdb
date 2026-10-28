@@ -1,5 +1,7 @@
 #include "src/routine_catalog.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <exception>
 #include <map>
 #include <memory>
@@ -12,6 +14,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/span.h"
@@ -23,7 +26,9 @@
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/sql_tvf.h"
+#include "googlesql/public/sql_view.h"
 #include "googlesql/public/templated_sql_function.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
@@ -43,6 +48,39 @@ namespace {
 
 // How a status the analyzer throws begins.
 constexpr std::string_view kInvalidArgument = "INVALID_ARGUMENT: ";
+
+// A view whose columns have the collations its query gives them, which a SimpleSQLView, whose
+// columns have types alone, would drop.
+class AnnotatedSqlView : public googlesql::SQLView {
+ public:
+  AnnotatedSqlView(std::string name, bool is_value_table, const googlesql::ResolvedScan* query)
+      : name_(std::move(name)), is_value_table_(is_value_table), query_(query) {}
+
+  void AddColumn(const std::string& name, googlesql::AnnotatedType type) {
+    columns_.push_back(std::make_unique<googlesql::SimpleColumn>(name_, name, type));
+  }
+
+  [[nodiscard]] SqlSecurity sql_security() const override { return kSecurityInvoker; }
+  [[nodiscard]] const googlesql::ResolvedScan* view_query() const override { return query_; }
+  [[nodiscard]] std::string Name() const override { return name_; }
+  [[nodiscard]] std::string FullName() const override { return name_; }
+  [[nodiscard]] int NumColumns() const override { return static_cast<int>(columns_.size()); }
+  [[nodiscard]] const googlesql::Column* GetColumn(int i) const override {
+    return columns_.at(static_cast<size_t>(i)).get();
+  }
+  [[nodiscard]] const googlesql::Column* FindColumnByName(const std::string& name) const override {
+    const auto column = std::ranges::find_if(
+        columns_, [&](const auto& column) { return absl::EqualsIgnoreCase(column->Name(), name); });
+    return column == columns_.end() ? nullptr : column->get();
+  }
+  [[nodiscard]] bool IsValueTable() const override { return is_value_table_; }
+
+ private:
+  std::string name_;
+  bool is_value_table_;
+  const googlesql::ResolvedScan* query_;
+  std::vector<std::unique_ptr<googlesql::SimpleColumn>> columns_;
+};
 
 }  // namespace
 
@@ -294,18 +332,13 @@ absl::Status RoutineCatalog::FindTable(const absl::Span<const std::string>& path
                                       reference.table_id + "'");
   }
   const auto& query = *analyzed->statement().GetAs<googlesql::ResolvedQueryStmt>();
-  std::vector<googlesql::SimpleSQLView::NameAndType> columns;
+  auto resolved =
+      std::make_unique<AnnotatedSqlView>(stored->FullName(), query.is_value_table(), query.query());
   for (int i = 0; i < query.output_column_list_size(); ++i) {
     const auto* output = query.output_column_list(i);
-    columns.push_back({
-        .name = i < stored->NumColumns() ? stored->GetColumn(i)->Name() : output->name(),
-        .type = output->column().type(),
-    });
+    resolved->AddColumn(i < stored->NumColumns() ? stored->GetColumn(i)->Name() : output->name(),
+                        output->column().annotated_type());
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(
-      auto resolved, googlesql::SimpleSQLView::Create(stored->FullName(), std::move(columns),
-                                                      googlesql::SQLView::kSecurityInvoker,
-                                                      query.is_value_table(), query.query()));
   *table = resolved.get();
   state_->views.emplace(key, std::move(resolved));
   state_->analyses.push_back(*std::move(analyzed));

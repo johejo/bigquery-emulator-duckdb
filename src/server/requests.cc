@@ -93,6 +93,7 @@ const ResourceMask& TableFields() {
                                            "schema.fields.rangeElementType",
                                            "schema.fields.defaultValueExpression",
                                            "schema.fields.policyTags",
+                                           "schema.fields.collation",
                                            "view.query",
                                            "view.useLegacySql",
                                            "materializedView.query",

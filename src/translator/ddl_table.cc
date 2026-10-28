@@ -55,17 +55,6 @@ constexpr auto kDefaultExpressionFunctions = std::to_array<std::string_view>({
     "st_geogpoint",
 });
 
-bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
-  if (annotations == nullptr) {
-    return false;
-  }
-  if (annotations->collation_name() != nullptr) {
-    return true;
-  }
-  return std::ranges::any_of(annotations->child_list(),
-                             [](const auto& child) { return HasCollation(child.get()); });
-}
-
 // The type parameters of `column`, its nested fields' included, which its annotations keep
 // apart.
 std::optional<googlesql::TypeParameters> ColumnTypeParameters(
@@ -104,13 +93,26 @@ bool ApplyColumnOption(DdlOptionId name, const googlesql::Value& value,
   }
 }
 
-// Records NOT NULL as REQUIRED and the description and rounding mode in OPTIONS on `field`, and
-// the same for the fields of a struct. Other column options are unsupported.
+// Records NOT NULL as REQUIRED, the collation and the description and rounding mode in OPTIONS on
+// `field`, and the same for the fields of a struct. Other column options are unsupported.
 bool ApplyAnnotations(const googlesql::Type* type,
                       const googlesql::ResolvedColumnAnnotations& annotations, FieldSchema& field,
                       const Scope& scope) {
   if (annotations.not_null() && field.mode == FieldMode::kNullable) {
     field.mode = FieldMode::kRequired;
+  }
+  if (const googlesql::ResolvedExpr* collation = annotations.collation_name()) {
+    if (!collation->Is<googlesql::ResolvedLiteral>() ||
+        collation->GetAs<googlesql::ResolvedLiteral>()->value().is_null()) {
+      Unsupported(scope, "column collation that is not a literal");
+      return false;
+    }
+    std::string specification =
+        collation->GetAs<googlesql::ResolvedLiteral>()->value().string_value();
+    if (!specification.empty() && specification != "und:ci") {
+      throw std::invalid_argument("Collation '" + specification + "' is unsupported.");
+    }
+    field.collation = std::move(specification);
   }
   for (const auto& option : annotations.option_list()) {
     const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kColumn, scope);
@@ -168,9 +170,6 @@ void ApplyTypeParameters(const googlesql::Type* type, const googlesql::TypeParam
 
 std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnDefinition& column,
                                                 const Scope& scope) {
-  if (HasCollation(column.annotations())) {
-    return Unsupported(scope, "column collation");
-  }
   const auto parameters = ColumnTypeParameters(column, scope);
   if (!parameters) {
     return std::nullopt;

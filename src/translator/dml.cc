@@ -18,6 +18,7 @@
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -91,7 +92,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   };
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
-    if (!DuckDbType(column.type()) || column.type_annotation_map() != nullptr) {
+    if (!DuckDbType(column.type()) || !OnlyCollations(column.type_annotation_map())) {
       return Unsupported(scope, "column type " + column.type()->DebugString());
     }
     const std::string name =
@@ -285,7 +286,7 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   for (const auto& column : insert.insert_column_list()) {
     const auto name = table_columns.find(column.column_id());
     if (name == table_columns.end() || !DuckDbType(column.type()) ||
-        column.type_annotation_map() != nullptr) {
+        !OnlyCollations(column.type_annotation_map())) {
       return std::nullopt;
     }
     names.push_back(name->second);

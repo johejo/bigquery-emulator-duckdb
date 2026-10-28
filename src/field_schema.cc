@@ -231,8 +231,8 @@ json FieldSchema::ToJson() const {
   if (!policy_tags.empty()) {
     field["policyTags"] = {{"names", policy_tags}};
   }
-  if (!collation.empty()) {
-    field["collation"] = collation;
+  if (collation.has_value()) {
+    field["collation"] = *collation;
   }
   return field;
 }
@@ -325,6 +325,9 @@ FieldSchema FieldSchemaFromJson(const json& value) {
       field.policy_tags.push_back(name.get<std::string>());
     }
   }
+  if (const auto it = value.find("collation"); it != value.end() && !it->is_null()) {
+    field.collation = StringMember(value, "collation");
+  }
   return field;
 }
 
@@ -407,6 +410,21 @@ void CheckRoundingModes(const std::vector<FieldSchema>& schema) {
                                   " fields");
     }
     CheckRoundingModes(field.fields);
+  }
+}
+
+void CheckCollations(const std::vector<FieldSchema>& schema) {
+  for (const FieldSchema& field : schema) {
+    if (field.collation.has_value() && field.type != FieldType::kString) {
+      throw ApiError::Invalid("Field " + field.name + " with type " +
+                              std::string(FieldTypeName(field.type)) +
+                              " and has collation, but collation is only allowed for STRING type "
+                              "columns or STRING type fields in ARRAY or STRUCT");
+    }
+    if (field.collation.has_value() && !field.collation->empty() && *field.collation != "und:ci") {
+      throw ApiError::Invalid("Unsupported collation: " + *field.collation);
+    }
+    CheckCollations(field.fields);
   }
 }
 
