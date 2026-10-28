@@ -24,13 +24,45 @@ namespace bigquery_emulator_duckdb::information_schema {
 
 namespace {
 
+// DDL omits redundant collations: the table's default, and binary when there is no nonempty
+// default. Nested STRING fields and array elements carry their own COLLATE clauses.
+absl::StatusOr<std::string> ColumnTypeDdl(FieldSchema field,
+                                          const std::optional<std::string>& default_collation,
+                                          googlesql::TypeFactory* type_factory) {
+  const bool repeated = field.mode == FieldMode::kRepeated;
+  field.mode = FieldMode::kNullable;
+  std::string text;
+  if (field.type == FieldType::kRecord) {
+    std::vector<std::string> children;
+    for (const FieldSchema& child : field.fields) {
+      auto type = ColumnTypeDdl(child, default_collation, type_factory);
+      if (!type.ok()) {
+        return type.status();
+      }
+      children.push_back(child.name + " " + *type);
+    }
+    text = "STRUCT<" + absl::StrJoin(children, ", ") + ">";
+  } else {
+    auto type = GoogleSqlTypeName(field, type_factory);
+    if (!type.ok()) {
+      return type.status();
+    }
+    text = *type;
+    if (field.collation.has_value() && *field.collation != default_collation.value_or("")) {
+      text += " COLLATE " + QuoteLiteral(*field.collation);
+    }
+  }
+  return repeated ? "ARRAY<" + text + ">" : text;
+}
+
 absl::StatusOr<std::string> TableDdl(const std::string& project, const std::string& dataset,
                                      const std::string& table,
                                      const std::vector<FieldSchema>& schema,
+                                     const std::optional<std::string>& default_collation,
                                      googlesql::TypeFactory* type_factory) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
-    absl::StatusOr<std::string> type = GoogleSqlTypeName(field, type_factory);
+    absl::StatusOr<std::string> type = ColumnTypeDdl(field, default_collation, type_factory);
     if (!type.ok()) {
       return type.status();
     }
@@ -137,6 +169,7 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
       // A clone or snapshot names its base table and the time it was made, as snapshot_time_ms.
       std::optional<BaseTableDefinition> base;
       bool snapshot = false;
+      std::optional<std::string> default_collation;
       int64_t creation_time =
           view_description.has_value() ? view_description->metadata.creation_time : 0;
       if (!view_query.has_value()) {
@@ -146,11 +179,16 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
           base = snapshot ? std::move(description->metadata.snapshot)
                           : std::move(description->metadata.clone);
           creation_time = description->metadata.creation_time;
+          default_collation = description->metadata.default_collation;
         }
-        absl::StatusOr<std::string> table_ddl =
-            TableDdl(project, dataset.dataset_id, table, *schema, context.type_factory);
+        absl::StatusOr<std::string> table_ddl = TableDdl(
+            project, dataset.dataset_id, table, *schema, default_collation, context.type_factory);
         if (!table_ddl.ok()) {
           return table_ddl.status();
+        }
+        if (default_collation.has_value()) {
+          table_ddl->pop_back();
+          *table_ddl += "\nDEFAULT COLLATE " + QuoteLiteral(*default_collation) + ";";
         }
         ddl = String(*table_ddl);
       } else if (!view_query->empty()) {
@@ -181,7 +219,7 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
                      kNull,
                      kNull,
                      ddl,
-                     kNull,
+                     default_collation.has_value() ? String(*default_collation) : kNull,
                      kNull,
                      kNull,
                  }));

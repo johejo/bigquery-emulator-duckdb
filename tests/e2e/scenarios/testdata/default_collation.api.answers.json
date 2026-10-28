@@ -1,0 +1,1054 @@
+{
+  "version": 1,
+  "cases": {
+    "dataset_patch_empty": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "create_dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "create_table": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "table_after": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "update": {
+          "defaultCollation": "",
+          "status": 200
+        }
+      }
+    },
+    "dataset_patch_null": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "create_dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "create_table": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "table_after": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "update": {
+          "defaultCollation": "",
+          "status": 200
+        }
+      }
+    },
+    "dataset_update_omitted": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "create_dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "create_table": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "table_after": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "update": {
+          "defaultCollation": "",
+          "status": 200
+        }
+      }
+    },
+    "ddl_inheritance": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "binary"
+                },
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": ""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": "before_change"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": "after_change"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ctas"
+                },
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ctas"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": ""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": "before_change"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": "after_change"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": ""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "before_change"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "after_change"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            }
+          ]
+        },
+        "schema": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "c",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "b",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "f",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "a",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "before_change",
+                "type": "STRING"
+              },
+              {
+                "name": "after_change",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "tables": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "binary"
+                },
+                {
+                  "v": ""
+                },
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.e2e_5mhtqrclszwowhgtytlh2essii_ddl_inheritance.binary`\n(\n  c STRING\n)\nDEFAULT COLLATE '';"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "copied"
+                },
+                {
+                  "v": ""
+                },
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.e2e_5mhtqrclszwowhgtytlh2essii_ddl_inheritance.copied`\n(\n  c STRING COLLATE 'und:ci',\n  b STRING,\n  s STRUCT\u003cf STRING COLLATE 'und:ci'\u003e,\n  a ARRAY\u003cSTRING COLLATE 'und:ci'\u003e,\n  before_change STRING COLLATE 'und:ci',\n  after_change STRING\n)\nDEFAULT COLLATE '';"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ctas"
+                },
+                {
+                  "v": "und:ci"
+                },
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.e2e_5mhtqrclszwowhgtytlh2essii_ddl_inheritance.ctas`\n(\n  c STRING,\n  b STRING\n)\nDEFAULT COLLATE 'und:ci';"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "liked"
+                },
+                {
+                  "v": ""
+                },
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.e2e_5mhtqrclszwowhgtytlh2essii_ddl_inheritance.liked`\n(\n  c STRING COLLATE 'und:ci',\n  b STRING,\n  s STRUCT\u003cf STRING COLLATE 'und:ci'\u003e,\n  a ARRAY\u003cSTRING COLLATE 'und:ci'\u003e,\n  before_change STRING COLLATE 'und:ci',\n  after_change STRING\n)\nDEFAULT COLLATE '';"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": ""
+                },
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.e2e_5mhtqrclszwowhgtytlh2essii_ddl_inheritance.t`\n(\n  c STRING COLLATE 'und:ci',\n  b STRING,\n  s STRUCT\u003cf STRING COLLATE 'und:ci'\u003e,\n  a ARRAY\u003cSTRING COLLATE 'und:ci'\u003e,\n  before_change STRING COLLATE 'und:ci',\n  after_change STRING\n)\nDEFAULT COLLATE '';"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "table_patch_empty": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "create_dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "create_table": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "table_after": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "update": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "table_patch_null": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "create_dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "create_table": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "table_after": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "update": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "table_update_omitted": {
+      "project": "johejo-sandbox",
+      "run": "5mhtqrclszwowhgtytlh2essii",
+      "steps": {
+        "create_dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "create_table": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "table_after": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "update": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "inherited",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "inherited",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  }
+}

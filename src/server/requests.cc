@@ -70,6 +70,7 @@ const ResourceMask& DatasetFields() {
                                              "resourceTags",
                                              "defaultTableExpirationMs",
                                              "defaultRoundingMode",
+                                             "defaultCollation",
                                              "location",
                                          }));
   return *kFields;
@@ -109,6 +110,7 @@ const ResourceMask& TableFields() {
                                            "resourceTags",
                                            "expirationTime",
                                            "defaultRoundingMode",
+                                           "defaultCollation",
                                            "tableConstraints",
                                            "encryptionConfiguration",
                                        }));

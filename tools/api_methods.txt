@@ -27,7 +27,7 @@ setup POST /bigquery/v2/projects/test/queries {"query": "CREATE SNAPSHOT TABLE d
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
-note bigquery.datasets.get | Returns the reference, description, friendly name, labels, resource tags, default table expiration, default rounding mode and location.
+note bigquery.datasets.get | Returns the reference, description, friendly name, labels, resource tags, default table expiration, default rounding mode, default collation and location.
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "description": "data", "friendlyName": "E", "labels": {"env": "test"}, "location": "US"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "EU"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "asia-northeast1"}
@@ -35,6 +35,7 @@ request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"da
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultTableExpirationMs": "3600000"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "access": [{"role": "READER", "specialGroup": "projectReaders"}]}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultCollation": "und:ci"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "resourceTags": {"123456789012/env": "test"}}
 note bigquery.datasets.insert | See [Datasets](compatibility.md#datasets) and [Resource tags](compatibility.md#resource-tags).
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
@@ -44,9 +45,11 @@ note bigquery.datasets.list | Filters by label value or key presence (`labels.ke
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultTableExpirationMs": "3600000"}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"location": "EU"}
+request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultCollation": "und:ci"}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"resourceTags": {"123456789012/env": "test"}}
-note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `resourceTags`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag. See [Resource tags](compatibility.md#resource-tags).
+note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `resourceTags`, `defaultTableExpirationMs`, which `0` clears, `defaultRoundingMode` and `defaultCollation`. Ignores the etag. See [Resource tags](compatibility.md#resource-tags).
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
+request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultCollation": "und:ci"}
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
 note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, labels, resource tags and default table expiration, and the friendly name when the request sets it.
 
@@ -135,6 +138,7 @@ request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "10", "scale": "1", "roundingMode": "ROUND_HALF_EVEN", "defaultValueExpression": "1"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC"}]}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "defaultCollation": "und:ci"}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "encryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"mv"},"materializedView":{"query":"SELECT COUNT(*) AS n FROM test.d.t"}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"mv"},"materializedView":{"query":"SELECT COUNT(*) AS n FROM test.d.t","enableRefresh":false}}
@@ -145,6 +149,7 @@ request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultRoundingMode": "ROUND_HALF_EVEN"}
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultCollation": "und:ci"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/h {"defaultRoundingMode": "ROUND_HALF_EVEN", "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}, {"name": "added", "type": "NUMERIC", "precision": "5", "scale": "1"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"encryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"resourceTags": {"123456789012/env": "test"}}

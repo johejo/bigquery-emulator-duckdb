@@ -205,7 +205,9 @@ locale at secondary strength, whose Unicode data can order some strings differen
 BigQuery's.
 
 Tables, views and query destination tables keep their columns' collations. Table and dataset
-default collations are unsupported, as are materialized views with collated columns.
+default collations are supported through DDL and REST. Copy jobs involving a default collation,
+job replacement of a destination with a default collation, default collations on views, and
+materialized views with collated columns remain unsupported.
 
 ### RANGE values
 

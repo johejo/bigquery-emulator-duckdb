@@ -53,9 +53,13 @@ absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
             CreationTime(metadata->creation_time),
             kNull,
             String(location),
-            String(absl::StrCat("CREATE SCHEMA `", dataset.project_id, ".", dataset.dataset_id,
-                                "`\nOPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
-            kNull,
+            String(absl::StrCat(
+                "CREATE SCHEMA `", dataset.project_id, ".", dataset.dataset_id, "`\n",
+                metadata->default_collation.has_value()
+                    ? "DEFAULT COLLATE " + QuoteLiteral(*metadata->default_collation) + "\n"
+                    : "",
+                "OPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
+            metadata->default_collation.has_value() ? String(*metadata->default_collation) : kNull,
             kNull,
         }));
   }

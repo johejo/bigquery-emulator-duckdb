@@ -1,0 +1,252 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run 5mhtqrclszwowhgtytlh2essii.
+# An empty default leaves new columns unassigned, unlike an explicit column COLLATE ''.
+# Table null/omitted REST defaults are kept; dataset null/full-update omission clears to ''.
+description: >-
+  Default collation metadata and inheritance through DDL and REST, including full updates,
+  null versus empty, CTAS, copies, and nested schema additions.
+vars:
+  dataset: e2e_${run}_${case}
+  original_schema:
+    fields:
+      - {name: inherited, type: STRING, collation: 'und:ci'}
+      - {name: binary, type: STRING, collation: ''}
+      - {name: repeated, type: STRING, mode: REPEATED, collation: 'und:ci'}
+      - name: nested
+        type: RECORD
+        fields:
+          - {name: inherited, type: STRING, collation: 'und:ci'}
+          - {name: binary, type: STRING, collation: ''}
+templates:
+  workflow:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+            defaultCollation: 'und:ci'
+        observe:
+          defaultCollation: /body/defaultCollation
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: inherited, type: STRING}
+                - {name: binary, type: STRING, collation: ''}
+                - {name: repeated, type: STRING, mode: REPEATED}
+                - name: nested
+                  type: RECORD
+                  fields:
+                    - {name: inherited, type: STRING}
+                    - {name: binary, type: STRING, collation: ''}
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+      - name: update
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/${resource}
+          body: ${body}
+        observe:
+          status: /status
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+          error: /body/error
+      - name: table_after
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: table_patch_empty
+    template: workflow
+    vars:
+      method: PATCH
+      resource: tables/t
+      body: {defaultCollation: ''}
+    expect:
+      create_dataset: {defaultCollation: 'und:ci'}
+      create_table: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+      update: {status: 200, defaultCollation: '', schema: '${original_schema}'}
+      table_after: {defaultCollation: '', schema: '${original_schema}'}
+  - name: table_patch_null
+    template: workflow
+    vars:
+      method: PATCH
+      resource: tables/t
+      body: {defaultCollation: null}
+    expect:
+      create_dataset: {defaultCollation: 'und:ci'}
+      create_table: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+      update: {status: 200, defaultCollation: 'und:ci', schema: '${original_schema}'}
+      table_after: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+  - name: table_update_omitted
+    template: workflow
+    vars:
+      method: PUT
+      resource: tables/t
+      body: {}
+    expect:
+      create_dataset: {defaultCollation: 'und:ci'}
+      create_table: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+      update: {status: 200, defaultCollation: 'und:ci', schema: '${original_schema}'}
+      table_after: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+  - name: dataset_patch_empty
+    template: workflow
+    vars:
+      method: PATCH
+      resource: ''
+      body: {defaultCollation: ''}
+    expect:
+      create_dataset: {defaultCollation: 'und:ci'}
+      create_table: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+      update: {status: 200, defaultCollation: ''}
+      table_after: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+  - name: dataset_patch_null
+    template: workflow
+    vars:
+      method: PATCH
+      resource: ''
+      body: {defaultCollation: null}
+    expect:
+      create_dataset: {defaultCollation: 'und:ci'}
+      create_table: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+      update: {status: 200, defaultCollation: ''}
+      table_after: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+  - name: dataset_update_omitted
+    template: workflow
+    vars:
+      method: PUT
+      resource: ''
+      body: {datasetReference: {projectId: '${project}', datasetId: '${dataset}'}}
+    expect:
+      create_dataset: {defaultCollation: 'und:ci'}
+      create_table: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+      update: {status: 200, defaultCollation: ''}
+      table_after: {defaultCollation: 'und:ci', schema: '${original_schema}'}
+  - name: ddl_inheritance
+    expect:
+      columns:
+        rows:
+          - {f: [{v: binary}, {v: c}, {v: 'NULL'}]}
+          - {f: [{v: copied}, {v: c}, {v: 'und:ci'}]}
+          - {f: [{v: copied}, {v: b}, {v: ''}]}
+          - {f: [{v: copied}, {v: s}, {v: 'NULL'}]}
+          - {f: [{v: copied}, {v: a}, {v: 'und:ci'}]}
+          - {f: [{v: copied}, {v: before_change}, {v: 'und:ci'}]}
+          - {f: [{v: copied}, {v: after_change}, {v: 'NULL'}]}
+          - {f: [{v: ctas}, {v: c}, {v: 'und:ci'}]}
+          - {f: [{v: ctas}, {v: b}, {v: 'und:ci'}]}
+          - {f: [{v: liked}, {v: c}, {v: 'und:ci'}]}
+          - {f: [{v: liked}, {v: b}, {v: ''}]}
+          - {f: [{v: liked}, {v: s}, {v: 'NULL'}]}
+          - {f: [{v: liked}, {v: a}, {v: 'und:ci'}]}
+          - {f: [{v: liked}, {v: before_change}, {v: 'und:ci'}]}
+          - {f: [{v: liked}, {v: after_change}, {v: 'NULL'}]}
+          - {f: [{v: t}, {v: c}, {v: 'und:ci'}]}
+          - {f: [{v: t}, {v: b}, {v: ''}]}
+          - {f: [{v: t}, {v: s}, {v: 'NULL'}]}
+          - {f: [{v: t}, {v: a}, {v: 'und:ci'}]}
+          - {f: [{v: t}, {v: before_change}, {v: 'und:ci'}]}
+          - {f: [{v: t}, {v: after_change}, {v: 'NULL'}]}
+      schema:
+        defaultCollation: ''
+        schema:
+          fields:
+            - {name: c, type: STRING, collation: 'und:ci'}
+            - {name: b, type: STRING, collation: ''}
+            - name: s
+              type: RECORD
+              fields: [{name: f, type: STRING, collation: 'und:ci'}]
+            - {name: a, type: STRING, mode: REPEATED, collation: 'und:ci'}
+            - {name: before_change, type: STRING, collation: 'und:ci'}
+            - {name: after_change, type: STRING}
+      tables:
+        rows:
+          - f:
+              - {v: binary}
+              - {v: ''}
+              - {v: "CREATE TABLE `${project}.${dataset}.binary`\n(\n  c STRING\n)\nDEFAULT COLLATE '';"}
+          - f:
+              - {v: copied}
+              - {v: ''}
+              - {v: "CREATE TABLE `${project}.${dataset}.copied`\n(\n  c STRING COLLATE 'und:ci',\n  b STRING,\n  s STRUCT<f STRING COLLATE 'und:ci'>,\n  a ARRAY<STRING COLLATE 'und:ci'>,\n  before_change STRING COLLATE 'und:ci',\n  after_change STRING\n)\nDEFAULT COLLATE '';"}
+          - f:
+              - {v: ctas}
+              - {v: 'und:ci'}
+              - {v: "CREATE TABLE `${project}.${dataset}.ctas`\n(\n  c STRING,\n  b STRING\n)\nDEFAULT COLLATE 'und:ci';"}
+          - f:
+              - {v: liked}
+              - {v: ''}
+              - {v: "CREATE TABLE `${project}.${dataset}.liked`\n(\n  c STRING COLLATE 'und:ci',\n  b STRING,\n  s STRUCT<f STRING COLLATE 'und:ci'>,\n  a ARRAY<STRING COLLATE 'und:ci'>,\n  before_change STRING COLLATE 'und:ci',\n  after_change STRING\n)\nDEFAULT COLLATE '';"}
+          - f:
+              - {v: t}
+              - {v: ''}
+              - {v: "CREATE TABLE `${project}.${dataset}.t`\n(\n  c STRING COLLATE 'und:ci',\n  b STRING,\n  s STRUCT<f STRING COLLATE 'und:ci'>,\n  a ARRAY<STRING COLLATE 'und:ci'>,\n  before_change STRING COLLATE 'und:ci',\n  after_change STRING\n)\nDEFAULT COLLATE '';"}
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: >-
+              CREATE SCHEMA `${project}.${dataset}` DEFAULT COLLATE 'und:ci';
+              CREATE TABLE `${project}.${dataset}.t` (c STRING, b STRING COLLATE '', s STRUCT<f STRING>, a ARRAY<STRING>);
+              ALTER SCHEMA `${project}.${dataset}` SET DEFAULT COLLATE '';
+              CREATE TABLE `${project}.${dataset}.binary` (c STRING);
+              ALTER TABLE `${project}.${dataset}.t` ADD COLUMN before_change STRING;
+              ALTER TABLE `${project}.${dataset}.t` SET DEFAULT COLLATE '';
+              ALTER TABLE `${project}.${dataset}.t` ADD COLUMN after_change STRING;
+              CREATE TABLE `${project}.${dataset}.ctas` DEFAULT COLLATE 'und:ci' AS SELECT 'a' AS c, COLLATE('a', '') AS b;
+              CREATE TABLE `${project}.${dataset}.copied` COPY `${project}.${dataset}.t`;
+              CREATE TABLE `${project}.${dataset}.liked` LIKE `${project}.${dataset}.t`;
+      - name: columns
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: >-
+              SELECT table_name, column_name, collation_name
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.COLUMNS`
+              ORDER BY table_name, ordinal_position
+        observe:
+          rows: /body/rows
+      - name: tables
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: >-
+              SELECT table_name, default_collation_name, ddl
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` ORDER BY table_name
+        observe:
+          rows: /body/rows
+      - name: schema
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

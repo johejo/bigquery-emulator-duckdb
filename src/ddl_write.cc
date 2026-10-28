@@ -71,6 +71,9 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
   if (updates.default_rounding_mode.has_value()) {
     metadata.default_rounding_mode = *updates.default_rounding_mode;
   }
+  if (updates.default_collation.has_value()) {
+    metadata.default_collation = updates.default_collation;
+  }
 }
 
 int64_t NowMillis() {
@@ -109,6 +112,9 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
   ValidateLabels(metadata.labels);
   ValidateResourceTags(metadata.resource_tags);
   ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
+  if (metadata.default_collation.has_value()) {
+    ValidateCollation(*metadata.default_collation);
+  }
   const std::string table = DatasetMetadataTable(dataset.project_id);
   std::vector<std::string> statements = {
       std::format("DELETE FROM {} WHERE dataset_id = {}", table, QuoteLiteral(dataset.dataset_id)),
@@ -141,6 +147,9 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset) {
 }
 
 DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset) {
+  if (view.metadata.default_collation.has_value()) {
+    throw ApiError::Unsupported("defaultCollation on a view");
+  }
   const TableReference& table = view.table;
   TableMetadata metadata = view.metadata;
   // A view tables.update replaces keeps the creation time it is given.
@@ -194,6 +203,16 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
       metadata.default_rounding_mode = dataset.default_rounding_mode;
     }
   }
+  if (!definition.copies_table) {
+    if (!metadata.default_collation.has_value() && !definition.temporary) {
+      metadata.default_collation = dataset.default_collation;
+    }
+    ApplyDefaultCollation(schema, metadata.default_collation);
+  }
+  if (metadata.default_collation.has_value()) {
+    ValidateCollation(*metadata.default_collation);
+  }
+  ValidatePartitioning(metadata, schema);
   if (!definition.keeps_rounding_modes) {
     ApplyDefaultRoundingMode(schema, metadata.default_rounding_mode);
   }
@@ -257,6 +276,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
           add->field.mode == FieldMode::kRepeated ? " DEFAULT []" : ""));
       schema.push_back(add->field);
       ApplyDefaultRoundingMode(schema.back(), metadata.default_rounding_mode);
+      ApplyDefaultCollation(schema.back(), metadata.default_collation);
       commented.push_back(add->field.name);
     } else if (const auto* drop = std::get_if<DropColumnAction>(&action)) {
       const auto column = FindColumn(schema, drop->name);

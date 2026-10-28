@@ -421,10 +421,50 @@ void CheckCollations(const std::vector<FieldSchema>& schema) {
                               " and has collation, but collation is only allowed for STRING type "
                               "columns or STRING type fields in ARRAY or STRUCT");
     }
-    if (field.collation.has_value() && !field.collation->empty() && *field.collation != "und:ci") {
-      throw ApiError::Invalid("Unsupported collation: " + *field.collation);
+    if (field.collation.has_value()) {
+      ValidateCollation(*field.collation);
     }
     CheckCollations(field.fields);
+  }
+}
+
+void ValidateCollation(const std::string& specification) {
+  if (!specification.empty() && specification != "und:ci") {
+    throw ApiError::Invalid("Unsupported collation: " + specification);
+  }
+}
+
+void ApplyDefaultCollation(FieldSchema& field, const std::optional<std::string>& specification) {
+  if (!specification.has_value() || specification->empty()) {
+    return;
+  }
+  if (field.type == FieldType::kString && !field.collation.has_value()) {
+    field.collation = specification;
+  }
+  ApplyDefaultCollation(field.fields, specification);
+}
+
+void ApplyDefaultCollation(std::vector<FieldSchema>& schema,
+                           const std::optional<std::string>& specification) {
+  for (FieldSchema& field : schema) {
+    ApplyDefaultCollation(field, specification);
+  }
+}
+
+void ApplyDefaultCollation(const std::vector<FieldSchema>& current,
+                           std::vector<FieldSchema>& updated,
+                           const std::optional<std::string>& specification) {
+  for (FieldSchema& field : updated) {
+    const auto existing = std::ranges::find_if(current, [&](const FieldSchema& before) {
+      return std::ranges::equal(before.name, field.name, [](unsigned char a, unsigned char b) {
+        return std::tolower(a) == std::tolower(b);
+      });
+    });
+    if (existing == current.end()) {
+      ApplyDefaultCollation(field, specification);
+    } else {
+      ApplyDefaultCollation(existing->fields, field.fields, specification);
+    }
   }
 }
 
