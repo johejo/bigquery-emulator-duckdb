@@ -1,4 +1,4 @@
-#include "src/load.h"
+#include "src/file_read.h"
 
 #include <zlib.h>
 
@@ -25,8 +25,8 @@
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/file_read_options.h"
 #include "src/gcs.h"
-#include "src/job_options.h"
 #include "src/parquet_metadata.h"
 #include "src/schema_sql.h"
 #include "src/temporary_files.h"
@@ -35,8 +35,8 @@ namespace bigquery_emulator_duckdb {
 
 using nlohmann::json;
 
-std::vector<std::string> StageLoadSources(const std::vector<std::string>& uris, FileFormat format,
-                                          GcsClient& gcs, TemporaryFiles& downloads) {
+std::vector<FileSource> StageFileSources(const std::vector<std::string>& uris, FileFormat format,
+                                         GcsClient& gcs, TemporaryFiles& downloads) {
   std::vector<std::string> sources;
   for (const std::string& uri : uris) {
     if (uri.starts_with("gs://")) {
@@ -46,7 +46,7 @@ std::vector<std::string> StageLoadSources(const std::vector<std::string>& uris, 
       sources.push_back(uri);
     }
   }
-  std::vector<std::string> paths;
+  std::vector<FileSource> staged;
   for (const std::string& uri : sources) {
     std::string path;
     if (uri.starts_with("gs://")) {
@@ -78,9 +78,9 @@ std::vector<std::string> StageLoadSources(const std::vector<std::string>& uris, 
         path = compressed;
       }
     }
-    paths.push_back(path);
+    staged.push_back({.uri = uri, .path = path});
   }
-  return paths;
+  return staged;
 }
 
 namespace {
@@ -420,7 +420,7 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column,
 
 // `field` with each BIGNUMERIC or Base64-encoded BYTES in it, at any depth, a STRING.
 // DuckDB's JSON reader cannot read a BIGNUM, which it would for a cast of a column it detects
-// as JSON when every value is null. A load reads those values as text, as StageJsonNumerics
+// as JSON when every value is null. The reader reads those values as text, as StageJsonNumerics
 // writes them.
 FieldSchema JsonTextFields(FieldSchema field) {
   if (field.type == FieldType::kBigNumeric) {
@@ -462,10 +462,11 @@ std::string JsonValue(const std::string& name, const FieldSchema& field, int dep
 
 }  // namespace
 
-ParquetSources StageParquetSources(const std::vector<std::string>& paths, TemporaryFiles& downloads,
+ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
                                    bool list_inference) {
   ParquetSources sources;
-  for (const std::string& path : paths) {
+  for (const FileSource& input : inputs) {
+    const std::string& path = input.path;
     ThriftValue metadata = ReadParquetMetadata(path);
     ParquetColumn columns = ParquetColumns(metadata, list_inference);
     bool geo = false;
@@ -518,7 +519,7 @@ ParquetSources StageParquetSources(const std::vector<std::string>& paths, Tempor
         return true;
       });
     }
-    if (sources.paths.empty()) {
+    if (sources.sources.empty()) {
       sources.columns = columns;
     } else if (columns != sources.columns &&
                (columns.HasWideDecimal() || sources.columns.HasWideDecimal())) {
@@ -538,7 +539,7 @@ ParquetSources StageParquetSources(const std::vector<std::string>& paths, Tempor
     std::vector<size_t> wide;
     WideDecimals(columns, wide);
     if (wide.empty() && !geo) {
-      sources.paths.push_back(path);
+      sources.sources.push_back(input);
       continue;
     }
     for (const size_t index : wide) {
@@ -555,7 +556,7 @@ ParquetSources StageParquetSources(const std::vector<std::string>& paths, Tempor
     const std::string staged = downloads.Create();
     std::filesystem::copy_file(path, staged, std::filesystem::copy_options::overwrite_existing);
     RewriteParquetMetadata(staged, metadata);
-    sources.paths.push_back(staged);
+    sources.sources.push_back({.uri = input.uri, .path = staged});
   }
   return sources;
 }
@@ -572,15 +573,15 @@ void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& 
   }
 }
 
-std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths,
-                                           const std::vector<FieldSchema>& schema,
-                                           TemporaryFiles& downloads) {
+std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources,
+                                          const std::vector<FieldSchema>& schema,
+                                          TemporaryFiles& downloads) {
   if (!HasType(schema, FieldType::kNumeric) && !HasType(schema, FieldType::kBigNumeric)) {
-    return paths;
+    return sources;
   }
-  std::vector<std::string> staged;
-  for (const std::string& path : paths) {
-    const std::string contents = ReadMaybeGzip(path);
+  std::vector<FileSource> staged;
+  for (const FileSource& source : sources) {
+    const std::string contents = ReadMaybeGzip(source.path);
     std::string rewritten;
     for (std::size_t start = 0; start < contents.size();) {
       std::size_t end = contents.find('\n', start);
@@ -598,15 +599,15 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
       rewritten += '\n';
       start = end + 1;
     }
-    staged.push_back(downloads.Write(rewritten));
+    staged.push_back({.uri = source.uri, .path = downloads.Write(rewritten)});
   }
   return staged;
 }
 
-std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>& paths,
-                      const std::vector<FieldSchema>& schema, const ParquetColumn& parquet) {
-  const auto* csv = std::get_if<CsvLoadOptions>(&options);
-  const bool is_parquet = std::holds_alternative<ParquetLoadOptions>(options);
+std::string FileReadQuery(const FileReadOptions& options, const std::vector<FileSource>& sources,
+                          const std::vector<FieldSchema>& schema, const ParquetColumn& parquet) {
+  const auto* csv = std::get_if<CsvReadOptions>(&options);
+  const bool is_parquet = std::holds_alternative<ParquetReadOptions>(options);
   // BigQuery fails on a Parquet column that is not a group, but loads a group of `start` and
   // `end` as NULL, which the emulator rejects as unsupported below.
   if (is_parquet) {
@@ -627,13 +628,13 @@ std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>
   }
   for (const FieldType type : {FieldType::kInterval, FieldType::kRange}) {
     if (csv == nullptr && HasType(schema, type)) {
-      throw ApiError::Unsupported(
-          "loading " + std::string(FieldTypeName(type)) + " columns from " +
-          std::string(FileFormatName(is_parquet ? FileFormat::kParquet : FileFormat::kJson)));
+      throw ApiError::Unsupported("loading " + std::string(FieldTypeName(type)) + " columns from " +
+                                  std::string(is_parquet ? "PARQUET" : "NEWLINE_DELIMITED_JSON"));
     }
   }
   std::vector<std::string> quoted;
-  std::ranges::transform(paths, std::back_inserter(quoted), QuoteLiteral);
+  std::ranges::transform(sources, std::back_inserter(quoted),
+                         [](const FileSource& source) { return QuoteLiteral(source.path); });
   const std::string files = "[" + Join(quoted, ", ") + "]";
   std::string sql;
   if (csv != nullptr) {
@@ -672,7 +673,7 @@ std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>
       return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);
     }
     sql += ')';
-  } else if (std::holds_alternative<JsonLoadOptions>(options)) {
+  } else if (std::holds_alternative<JsonReadOptions>(options)) {
     sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
     // A column no row has is NULL: UNION ALL BY NAME, which matches names without case, adds it.
     if (!schema.empty()) {

@@ -1,0 +1,22 @@
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <variant>
+
+namespace bigquery_emulator_duckdb {
+
+enum class FileFormat : uint8_t { kCsv, kJson, kParquet };
+enum class DecimalTargetType : uint8_t { kNumeric, kBigNumeric, kString };
+
+// Reader settings only. Callers validate their own load or external-table options before
+// mapping them to these settings; destination and schema-update policies do not belong here.
+struct CsvReadOptions {
+  int skip_leading_rows = 0;
+  std::string field_delimiter = ",";
+};
+struct JsonReadOptions {};
+struct ParquetReadOptions {};
+using FileReadOptions = std::variant<CsvReadOptions, JsonReadOptions, ParquetReadOptions>;
+
+}  // namespace bigquery_emulator_duckdb

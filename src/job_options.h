@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -8,10 +7,10 @@
 
 #include "nlohmann/json_fwd.hpp"
 #include "src/extract_options.h"
+#include "src/file_read_options.h"
 
 namespace bigquery_emulator_duckdb {
 
-enum class FileFormat : uint8_t { kCsv, kJson, kParquet };
 std::string_view FileFormatName(FileFormat format);
 FileFormat ParseLoadFormat(const nlohmann::json& configuration);
 
@@ -26,7 +25,6 @@ struct ParquetLoadOptions {
 using LoadOptions = std::variant<CsvLoadOptions, JsonLoadOptions, ParquetLoadOptions>;
 LoadOptions ParseLoadOptions(FileFormat format, const nlohmann::json& configuration);
 std::vector<std::string> ParseLoadSourceUris(const nlohmann::json& configuration);
-enum class DecimalTargetType : uint8_t { kNumeric, kBigNumeric, kString };
 // Decimal inference only consults known string entries; other entries are ignored.
 std::vector<DecimalTargetType> ParseDecimalTargetTypes(const nlohmann::json& configuration);
 

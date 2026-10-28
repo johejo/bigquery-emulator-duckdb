@@ -19,7 +19,11 @@
 
 #include "gtest/gtest.h"
 #include "src/api_error.h"
+#include "src/field_schema.h"
+#include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/httplib.h"
+#include "src/temporary_files.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -60,7 +64,7 @@ class GcsTest : public ::testing::Test {
       EXPECT_EQ(request.get_header_value("Authorization"), authorization_);
       EXPECT_EQ(request.path, "/storage/v1/b/bucket/o/nested/a.json");
       EXPECT_EQ(request.get_param_value("alt"), "media");
-      response.set_content("fixture\n", "application/octet-stream");
+      response.set_content(contents_, "application/octet-stream");
     });
     server_.Post("/token", [this](const httplib::Request&, httplib::Response& response) {
       ++token_requests_;
@@ -132,12 +136,48 @@ class GcsTest : public ::testing::Test {
   std::map<std::string, std::optional<std::string>> environment_;
   std::filesystem::path directory_;
   std::filesystem::path output_;
+  std::string contents_ = "fixture\n";
   std::string endpoint_;
   std::string authorization_;
   bool require_adc_ = false;
   std::atomic<int> requests_ = 0;
   std::atomic<int> token_requests_ = 0;
 };
+
+TEST_F(GcsTest, StagesSourcesWithCallerOwnedLifetime) {
+  std::string path;
+  {
+    TemporaryFiles files;
+    const auto sources = StageFileSources({kUri}, FileFormat::kJson, client(), files);
+    ASSERT_EQ(sources.size(), 1);
+    EXPECT_EQ(sources.front().uri, kUri);
+    path = sources.front().path;
+    EXPECT_EQ(ReadFile(path), "fixture\n");
+    EXPECT_EQ(requests_, 1);
+  }
+  EXPECT_FALSE(std::filesystem::exists(path));
+}
+
+TEST_F(GcsTest, JsonStagingKeepsSourceIdentityAndCleansUp) {
+  contents_ = R"({"value":1.234567890123456789})";
+  std::string downloaded;
+  std::string rewritten;
+  {
+    TemporaryFiles files;
+    const auto sources = StageFileSources({kUri}, FileFormat::kJson, client(), files);
+    const auto staged =
+        StageJsonNumerics(sources, {{.name = "value", .type = FieldType::kBigNumeric}}, files);
+    ASSERT_EQ(staged.size(), 1);
+    EXPECT_EQ(staged.front().uri, kUri);
+    downloaded = sources.front().path;
+    rewritten = staged.front().path;
+    EXPECT_NE(downloaded, rewritten);
+    EXPECT_TRUE(std::filesystem::exists(downloaded));
+    EXPECT_TRUE(std::filesystem::exists(rewritten));
+  }
+  EXPECT_FALSE(std::filesystem::exists(downloaded));
+  EXPECT_FALSE(std::filesystem::exists(rewritten));
+}
 
 TEST_F(GcsTest, DefaultsToPublicStorageApi) {
   unsetenv("STORAGE_EMULATOR_HOST");
