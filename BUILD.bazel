@@ -677,6 +677,7 @@ cc_library(
         "//src/googlesql_geography_duckdb",
         "//src/googlesql_hll_duckdb",
         "//src/googlesql_text_analysis_duckdb",
+        "//src/kll_duckdb",
     ],
     linkstatic = True,
     deps = [

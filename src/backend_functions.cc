@@ -26,6 +26,7 @@
 #include "src/googlesql_geography_duckdb/geography.h"
 #include "src/googlesql_hll_duckdb/hll.h"
 #include "src/googlesql_text_analysis_duckdb/text_analysis.h"
+#include "src/kll_duckdb/kll.h"
 #include "src/spanner_query.h"
 
 namespace bigquery_emulator_duckdb {
@@ -92,6 +93,7 @@ void RegisterBackendFunctions(duckdb_database database,
   functions_duckdb::RegisterStringFunctions(connection.get(), functions);
   text_analysis_duckdb::RegisterTextAnalysisFunctions(connection.get());
   hll_duckdb::RegisterHllCountFunctions(connection.get());
+  kll_duckdb::RegisterKllFunctions(connection.get());
   functions_duckdb::RegisterDatetimeFunctions(connection.get(), functions);
   functions_duckdb::RegisterCastFunctions(connection.get());
   functions_duckdb::RegisterJsonFunctions(connection.get(), functions);

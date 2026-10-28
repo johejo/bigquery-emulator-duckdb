@@ -58,7 +58,7 @@ functions.
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
 | [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
-| [KLL functions](#kll-functions) | 0 | 0 | 11 | 0 |
+| [KLL functions](#kll-functions) | 2 | 0 | 9 | 0 |
 | [Mathematical functions](#mathematical-functions) | 48 | 2 | 0 | 0 |
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
@@ -385,8 +385,8 @@ functions.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`KLL_QUANTILES.EXTRACT_FLOAT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Unsupported |  |  |
-| [`KLL_QUANTILES.EXTRACT_INT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Unsupported |  |  |
+| [`KLL_QUANTILES.EXTRACT_FLOAT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Supported | Emulator function |  |
+| [`KLL_QUANTILES.EXTRACT_INT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Supported | Emulator function |  |
 | [`KLL_QUANTILES.EXTRACT_POINT_FLOAT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Unsupported |  |  |
 | [`KLL_QUANTILES.EXTRACT_POINT_INT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Unsupported |  |  |
 | [`KLL_QUANTILES.INIT_FLOAT64`](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md) | Unsupported |  |  |

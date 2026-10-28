@@ -320,6 +320,22 @@ constexpr auto kHandlers =
                 {.handler = AddKeyFromRawBytes, .implementation = Implementation::kGoogleSQL},
             },
             {
+                "KLL_QUANTILES.EXTRACT_INT64",
+                {
+                    .handler = KllExtract,
+                    .implementation = Implementation::kCustom,
+                    .uses = {TypeUse::kRejectsSafe},
+                },
+            },
+            {
+                "KLL_QUANTILES.EXTRACT_FLOAT64",
+                {
+                    .handler = KllExtract,
+                    .implementation = Implementation::kCustom,
+                    .uses = {TypeUse::kRejectsSafe},
+                },
+            },
+            {
                 "TEXT_ANALYZE",
                 {
                     .handler = TextAnalyze,

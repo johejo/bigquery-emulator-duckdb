@@ -292,7 +292,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
   if (functions.HasTypeUse(name, TypeUse::kRejectsSafe) &&
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
-    throw std::invalid_argument("SAFE with function " + call.function()->Name() +
+    throw std::invalid_argument("SAFE with function " +
+                                call.function()->FullName(/*include_group=*/false) +
                                 " is not supported.");
   }
   if (name == "SESSION_USER" && !scope.context.defaults.has_session_user) {

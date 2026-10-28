@@ -1,0 +1,20 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+cc_library(
+    name = "kll_duckdb",
+    srcs = ["kll.cc"],
+    hdrs = ["kll.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//:duckdb_handle",
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)

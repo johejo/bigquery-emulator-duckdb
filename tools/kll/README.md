@@ -1,8 +1,10 @@
 # KLL compatibility evidence
 
-KLL is not implemented. This directory keeps the evidence needed for a native
-BigQuery sketch reader and for testing a future writer. It is not a specification
-of BigQuery's internal compaction algorithm.
+The native reader in [src/kll_duckdb/](../../src/kll_duckdb/kll.cc) implements
+`KLL_QUANTILES.EXTRACT_INT64` and `KLL_QUANTILES.EXTRACT_FLOAT64`; INIT, MERGE and
+point extraction remain unsupported. This directory keeps the evidence for that
+reader and for testing a future writer. It is not a specification of BigQuery's
+internal compaction algorithm.
 
 ## Independent observations
 
@@ -17,10 +19,13 @@ These files contain maintainer-recorded BigQuery responses with their original S
   acceptance.
 - [sampler.answers.txt](sampler.answers.txt): extraction boundaries that distinguish
   retained mass from input count, and isolated sampler field mutations.
+- [reader.answers.txt](reader.answers.txt): NULL-sketch argument validation,
+  NaN/infinity extraction and the constant-number-of-quantiles restriction.
 
 Do not regenerate these archives or use their INIT/MERGE bytes as golden writer
 outputs: KLL is non-deterministic. Fixed bytes **with independently recorded
-EXTRACT answers** can become client-visible reader tests. Decoding a sketch locally
+EXTRACT answers** are client-visible reader tests in
+[scalars/kll.txt](../../tests/e2e/goclient/testdata/scalars/kll.txt). Decoding a sketch locally
 is not an independent expected query answer.
 
 ## Observed encoding
@@ -94,7 +99,10 @@ The archives also establish:
   weight zero was skipped. Invalid precision zero still failed on empty input.
 - Empty MERGE_INT64/FLOAT64 returns `[]`; empty MERGE_POINT returns NULL.
 - INT64/FLOAT64 sketch mismatches fail instead of converting.
-- EXTRACT_POINT's phi must be constant. Precision must be a literal or query
+- EXTRACT's number of quantiles and EXTRACT_POINT's phi must be constant.
+  An out-of-range number of quantiles fails even for a NULL sketch, whose valid
+  extraction is reported as an empty array in query results.
+  Precision must be a literal or query
   parameter and cannot be NULL; EXTRACT quantile arguments cannot be NULL either.
 - SAFE was rejected for INIT and EXTRACT_INT64. SAFE.EXTRACT_POINT with negative
   literal phi failed argument validation, not a demonstrated runtime SAFE path.
