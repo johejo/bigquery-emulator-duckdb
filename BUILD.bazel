@@ -1022,6 +1022,12 @@ cc_library(
 )
 
 cc_library(
+    name = "file_read_options",
+    hdrs = ["src/file_read_options.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_library(
     name = "job_options",
     srcs = ["src/job_options.cc"],
     hdrs = ["src/job_options.h"],
@@ -1029,14 +1035,15 @@ cc_library(
     deps = [
         ":api_error",
         ":extract_options",
+        ":file_read_options",
         "@nlohmann_json//:json",
     ],
 )
 
 cc_library(
-    name = "load",
-    srcs = ["src/load.cc"],
-    hdrs = ["src/load.h"],
+    name = "file_read",
+    srcs = ["src/file_read.cc"],
+    hdrs = ["src/file_read.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         "@abseil-cpp//absl/status",
@@ -1047,8 +1054,8 @@ cc_library(
         ":bignumeric",
         ":duckdb_sql",
         ":field_schema",
+        ":file_read_options",
         ":gcs",
-        ":job_options",
         ":parquet_metadata",
         ":schema_sql",
         ":temporary_files",
@@ -1095,9 +1102,10 @@ cc_library(
         ":emulator_functions",
         ":extract",
         ":extract_options",
+        ":file_read",
+        ":file_read_options",
         ":job_options",
         ":language_options",
-        ":load",
         ":logging",
         ":object_ref",
         ":parquet_metadata",
@@ -1425,8 +1433,12 @@ cc_test(
     linkstatic = True,
     deps = [
         ":api_error",
+        ":field_schema",
+        ":file_read",
+        ":file_read_options",
         ":gcs",
         ":httplib",
+        ":temporary_files",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
@@ -1717,9 +1729,10 @@ cc_test(
         ":backend_error",
         ":catalog",
         ":default_dataset",
-        ":duckdb_sql",
         ":emulator_functions",
         ":field_schema",
+        ":file_read",
+        ":file_read_options",
         ":references",
         ":result_rows",
         ":statement_resources",

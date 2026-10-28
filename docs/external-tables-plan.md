@@ -42,11 +42,22 @@ sources into ordinary tables at creation time.
 - Validation: `just fmt` and `just check` passed, including C++ tests, end-to-end
   tests and generated support-table checks.
 
-## 3. Share only the file-reading pieces needed by the first implementation
+## 3. Share only the file-reading pieces needed by the first implementation (implemented)
 
-- Reuse GCS acquisition, format staging and type conversion from load jobs.
-- Keep external-table options separate from load options and destination handling.
-- Preserve original URI identity for future _FILE_NAME support.
+- `file_read` shares GCS acquisition, CSV/JSON/Parquet staging, schema inference
+  adjustments and type conversion with load jobs. It does not prepare or execute SQL;
+  callers own the `TemporaryFiles` used during staging.
+- Reader settings are independent of load-job options. Load jobs map validated options
+  to reader settings and retain destination handling, schema updates and rounding
+  policies in `emulator_jobs.cc`. External-table options remain unimplemented and must
+  be validated separately before using these readers.
+- Each staged source keeps its concrete original URI after wildcard expansion alongside
+  its current local path. JSON numeric rewriting and Parquet metadata rewriting replace
+  only the path, preserving source identity for future _FILE_NAME support.
+- GCS staging tests cover source identity and caller-owned cleanup, including JSON
+  rewriting. Statement-resource tests exercise the shared CSV reader; existing load-job
+  end-to-end tests cover preserved format and conversion behavior.
+- Validation: `just fmt` and `just check` passed.
 
 ## Before accepting external tables
 

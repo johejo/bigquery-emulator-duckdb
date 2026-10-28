@@ -31,9 +31,10 @@
 #include "src/extract.h"
 #include "src/extract_options.h"
 #include "src/field_schema.h"
+#include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/gcs.h"
 #include "src/job_options.h"
-#include "src/load.h"
 #include "src/location.h"
 #include "src/logging.h"
 #include "src/parquet_metadata.h"
@@ -326,8 +327,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     const json& config = load.configuration;
     const FileFormat format = ParseLoadFormat(config);
     TemporaryFiles downloads;
-    std::vector<std::string> paths =
-        StageLoadSources(ParseLoadSourceUris(config), format, gcs_client_, downloads);
+    std::vector<FileSource> sources =
+        StageFileSources(ParseLoadSourceUris(config), format, gcs_client_, downloads);
     // The destination's schema, or none when the load creates it.
     std::optional<std::vector<FieldSchema>> existing;
     try {
@@ -344,20 +345,30 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       requested_schema = *existing;
     }
     const LoadOptions options = ParseLoadOptions(format, config);
+    // Map validated job options to reader settings; no destination policy crosses this boundary.
+    FileReadOptions read_options = ParquetReadOptions{};
+    if (const auto* csv = std::get_if<CsvLoadOptions>(&options)) {
+      read_options = CsvReadOptions{
+          .skip_leading_rows = csv->skip_leading_rows,
+          .field_delimiter = csv->field_delimiter,
+      };
+    } else if (std::holds_alternative<JsonLoadOptions>(options)) {
+      read_options = JsonReadOptions{};
+    }
     ParquetColumn parquet;
     if (std::holds_alternative<JsonLoadOptions>(options)) {
-      paths = StageJsonNumerics(paths, requested_schema, downloads);
+      sources = StageJsonNumerics(sources, requested_schema, downloads);
     } else if (const auto* parquet_options = std::get_if<ParquetLoadOptions>(&options)) {
-      ParquetSources sources =
-          StageParquetSources(paths, downloads, parquet_options->enable_list_inference);
-      paths = std::move(sources.paths);
-      parquet = std::move(sources.columns);
+      ParquetSources staged =
+          StageParquetSources(sources, downloads, parquet_options->enable_list_inference);
+      sources = std::move(staged.sources);
+      parquet = std::move(staged.columns);
       if (requested_schema.empty() &&
           (parquet.HasWideDecimal() ||
            std::ranges::any_of(parquet.children, [](const auto& column) {
              return column.edges != ParquetColumn::Edges::kNone;
            }))) {
-        requested_schema = Prepare(LoadQuery(options, paths, {}, parquet)).schema;
+        requested_schema = Prepare(FileReadQuery(read_options, sources, {}, parquet)).schema;
         DetectParquetSchema(requested_schema, parquet, ParseDecimalTargetTypes(config));
       }
     }
@@ -369,7 +380,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         field = WithoutRoundingParameters(std::move(field));
       }
     }
-    std::string sql = LoadQuery(options, paths, read_schema, parquet);
+    std::string sql = FileReadQuery(read_options, sources, read_schema, parquet);
     const QueryResult prepared = Prepare(sql);
     std::vector<FieldSchema> written =
         requested_schema.empty() ? prepared.schema : requested_schema;

@@ -8,6 +8,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/extract_options.h"
+#include "src/file_read_options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

@@ -18,9 +18,10 @@
 #include "src/backend_error.h"
 #include "src/catalog.h"
 #include "src/default_dataset.h"
-#include "src/duckdb_sql.h"
 #include "src/emulator_functions.h"
 #include "src/field_schema.h"
+#include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/references.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
@@ -55,8 +56,9 @@ class FileSource : public TableSource {
 };
 
 std::string FileQuery(const std::string& path) {
-  return "SELECT value FROM read_csv(" + QuoteLiteral(path) +
-         ", header = true, columns = {'value': 'BIGINT'})";
+  // Exercise the same reader as load jobs through a statement-owned source.
+  return FileReadQuery(CsvReadOptions{.skip_leading_rows = 1}, {{.uri = path, .path = path}},
+                       {{.name = "value", .type = FieldType::kInteger}});
 }
 
 TranslatedStatement TranslateRead(
