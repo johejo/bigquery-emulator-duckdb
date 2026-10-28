@@ -1,7 +1,6 @@
 #include "src/server/requests.h"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -14,8 +13,12 @@
 
 #include "absl/log/absl_log.h"
 #include "absl/status/status.h"
+#include "google/cloud/bigquery/v2/dataset.pb.h"
 #include "google/cloud/bigquery/v2/job.pb.h"
 #include "google/cloud/bigquery/v2/job_config.pb.h"
+#include "google/cloud/bigquery/v2/routine.pb.h"
+#include "google/cloud/bigquery/v2/routine_reference.pb.h"
+#include "google/cloud/bigquery/v2/table.pb.h"
 #include "google/cloud/bigquery/v2/table_reference.pb.h"
 #include "google/protobuf/timestamp.pb.h"
 #include "google/protobuf/util/json_util.h"
@@ -180,12 +183,6 @@ const ResourceMask& QueryRequestFields() {
   return *kFields;
 }
 
-constexpr auto kProcedureArgumentModes = std::to_array<std::string_view>({
-    "IN",
-    "OUT",
-    "INOUT",
-});
-
 using nlohmann::json;
 namespace v2 = google::cloud::bigquery::v2;
 
@@ -218,17 +215,6 @@ int64_t QueryParamInt(const httplib::Request& request, const char* name, int64_t
   } catch (const std::exception&) {
     throw ApiError::Invalid(std::string("Invalid value for ") + name);
   }
-}
-
-// The string `object[key]`, or "" when it is missing.
-std::string StringField(const json& object, const char* key, std::string_view what) {
-  if (!object.contains(key)) {
-    return "";
-  }
-  if (!object[key].is_string()) {
-    throw ApiError::Invalid("Invalid " + std::string(what));
-  }
-  return object[key].get<std::string>();
 }
 
 // Reads a TableReference, whose project defaults to the job's. `what` names it in errors.
@@ -702,15 +688,15 @@ TableGetRequest ParseTableGet(const httplib::Request& request) {
 // BigQuery ignores the fields a Dataset or Table resource lacks, at any depth, as it does a job's.
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& resource) {
   const json body = CheckResource(resource, "Dataset", DatasetFields(), UnknownFields::kIgnore);
-  const json reference = body.value("datasetReference", json::object());
-  if (!reference.is_object() || !reference.contains("datasetId")) {
+  const auto dataset = ToProto<v2::Dataset>(body);
+  if (dataset.dataset_reference().dataset_id().empty()) {
     throw ApiError::Invalid("Required parameter is missing: datasetId");
   }
   return {
       .dataset =
           DatasetReference{
               .project_id = project_id,
-              .dataset_id = StringField(reference, "datasetId", "dataset ID"),
+              .dataset_id = dataset.dataset_reference().dataset_id(),
           },
       .metadata = DatasetMetadataFromJson(body),
   };
@@ -718,24 +704,24 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const jso
 
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json& resource) {
   const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore);
-  const json reference = body.value("tableReference", json::object());
-  if (!reference.is_object() || !reference.contains("tableId")) {
+  const auto table = ToProto<v2::Table>(body);
+  if (table.table_reference().table_id().empty()) {
     throw ApiError::Invalid("Required parameter is missing: tableId");
   }
   TableInsertRequest request;
   request.table = TableReference{
       .project_id = dataset.project_id,
       .dataset_id = dataset.dataset_id,
-      .table_id = StringField(reference, "tableId", "table ID"),
+      .table_id = table.table_reference().table_id(),
   };
-  if (body.contains("materializedView")) {
-    if (body.contains("view")) {
+  if (table.has_materialized_view()) {
+    if (table.has_view()) {
       throw ApiError::Invalid("Cannot specify both view and materializedView");
     }
     request.materialized = true;
     request.view = body["materializedView"];
-  } else if (body.contains("view")) {
-    if (!body.value("tableConstraints", json()).is_null()) {
+  } else if (table.has_view()) {
+    if (table.has_table_constraints()) {
       throw ApiError::Invalid("Cannot specify the table constraints when creating view.");
     }
     request.view = body["view"];
@@ -748,76 +734,72 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
 
 Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   json resource = CheckResource(body, "Routine", RoutineFields());
-  const json reference = resource.value("routineReference", json::object());
+  const auto routine = ToProto<v2::Routine>(resource);
   resource.erase("routineReference");
-  const std::string id = reference.value("routineId", "");
-  if (id.empty()) {
+  const v2::RoutineReference& reference = routine.routine_reference();
+  if (reference.routine_id().empty()) {
     throw ApiError::Invalid("Required parameter is missing: routineId");
   }
-  if (reference.value("projectId", "") != dataset.project_id ||
-      reference.value("datasetId", "") != dataset.dataset_id) {
+  if (reference.project_id() != dataset.project_id ||
+      reference.dataset_id() != dataset.dataset_id) {
     throw ApiError::Invalid("Routine reference does not match the request path");
   }
-  const std::string type = resource.value("routineType", "");
-  const bool procedure = type == "PROCEDURE";
-  const bool tvf = type == "TABLE_VALUED_FUNCTION";
-  if (!procedure && !tvf && type != "SCALAR_FUNCTION") {
+  const bool procedure = routine.routine_type() == v2::Routine::PROCEDURE;
+  const bool tvf = routine.routine_type() == v2::Routine::TABLE_VALUED_FUNCTION;
+  if (!procedure && !tvf && routine.routine_type() != v2::Routine::SCALAR_FUNCTION) {
     throw ApiError::Unsupported(
         "routines other than SQL scalar functions, table functions and procedures");
   }
-  if (!procedure && resource.contains("strictMode")) {
+  if (!procedure && routine.has_strict_mode()) {
     throw ApiError::Unsupported("strictMode on functions");
   }
-  if (resource.contains("returnType") && (procedure || tvf)) {
+  if (routine.has_return_type() && (procedure || tvf)) {
     throw ApiError::Invalid("Only scalar functions can have returnType");
   }
-  if (resource.contains("returnTableType") && !tvf) {
+  if (routine.has_return_table_type() && !tvf) {
     throw ApiError::Invalid("Only table functions can have returnTableType");
   }
-  const std::string language = resource.value("language", "SQL");
-  if (language != "SQL" && language != "PYTHON") {
+  const bool python = routine.language() == v2::Routine::PYTHON;
+  if (!python && routine.language() != v2::Routine::SQL &&
+      routine.language() != v2::Routine::LANGUAGE_UNSPECIFIED) {
     throw ApiError::Unsupported("non-SQL routines other than Python scalar functions");
   }
-  resource["language"] = language;
-  if (language == "PYTHON") {
-    if (procedure || tvf || !resource.contains("returnType") ||
-        resource.value(json::json_pointer("/externalRuntimeOptions/runtimeVersion"), "") !=
-            "python-3.11") {
+  resource["language"] = python ? "PYTHON" : "SQL";
+  if (python) {
+    if (procedure || tvf || !routine.has_return_type() ||
+        routine.external_runtime_options().runtime_version() != "python-3.11") {
       throw ApiError::Unsupported("Python routines without a fixed result and python-3.11 runtime");
     }
-    if (resource.value(json::json_pointer("/pythonOptions/entryPoint"), "").empty()) {
+    if (routine.python_options().entry_point().empty()) {
       throw ApiError::Unsupported("Python routines without an entryPoint");
     }
-  } else if (resource.contains("externalRuntimeOptions") || resource.contains("pythonOptions")) {
+  } else if (routine.has_external_runtime_options() || routine.has_python_options()) {
     throw ApiError::Unsupported("Python options on SQL routines");
   }
-  if (resource.value("definitionBody", "").empty()) {
+  if (routine.definition_body().empty()) {
     throw ApiError::Invalid("Required parameter is missing: definitionBody");
   }
   if (!resource.contains("arguments")) {
     resource["arguments"] = json::array();
   }
-  for (const json& argument : resource["arguments"]) {
-    if (argument.value("name", "").empty()) {
+  for (const v2::Routine::Argument& argument : routine.arguments()) {
+    if (argument.name().empty()) {
       throw ApiError::Invalid("Invalid routine argument");
     }
-    if (argument.contains("mode")) {
-      const std::string mode = argument["mode"].get<std::string>();
-      if (!procedure) {
-        throw ApiError::Unsupported("routine argument field mode");
-      }
-      if (std::ranges::find(kProcedureArgumentModes, mode) == kProcedureArgumentModes.end()) {
-        throw ApiError::Unsupported("procedure argument mode " + mode);
-      }
+    // Procedures take every mode.
+    if (argument.mode() != v2::Routine::Argument::MODE_UNSPECIFIED && !procedure) {
+      throw ApiError::Unsupported("routine argument field mode");
     }
-    const std::string kind = argument.value("argumentKind", "");
-    if ((procedure || tvf) && kind == "ANY_TYPE") {
+    const v2::Routine::Argument::ArgumentKind kind = argument.argument_kind();
+    if ((procedure || tvf) && kind == v2::Routine::Argument::ANY_TYPE) {
       throw ApiError::Unsupported("procedure or TVF arguments of ANY TYPE");
     }
-    if (!kind.empty() && kind != "FIXED_TYPE" && kind != "ANY_TYPE") {
-      throw ApiError::Unsupported("routine argument kind " + kind);
+    if (kind != v2::Routine::Argument::ARGUMENT_KIND_UNSPECIFIED &&
+        kind != v2::Routine::Argument::FIXED_TYPE && kind != v2::Routine::Argument::ANY_TYPE) {
+      throw ApiError::Unsupported("routine argument kind " +
+                                  v2::Routine::Argument::ArgumentKind_Name(kind));
     }
-    if (kind == "ANY_TYPE" && argument.contains("dataType")) {
+    if (kind == v2::Routine::Argument::ANY_TYPE && argument.has_data_type()) {
       throw ApiError::Invalid("ANY_TYPE arguments cannot have dataType");
     }
   }
@@ -826,7 +808,7 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
           {
               .project_id = dataset.project_id,
               .dataset_id = dataset.dataset_id,
-              .routine_id = id,
+              .routine_id = reference.routine_id(),
           },
       .resource = std::move(resource),
   };
@@ -840,16 +822,17 @@ json ParseDatasetUpdate(const json& body, bool patch) {
 TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
   const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore,
                                   patch ? Change::kPatch : Change::kUpdate);
-  if (!body.value("materializedView", json()).is_null()) {
+  const auto table = ToProto<v2::Table>(body);
+  if (table.has_materialized_view()) {
     throw ApiError::Unsupported("updating materializedView");
   }
   TableUpdateRequest request{.resource = body, .schema = std::nullopt, .view = std::nullopt};
   // As BigQuery answers, a patch that sets the schema to null keeps it; the emulator keeps a view
   // set to null too.
-  if (!body.value("schema", json()).is_null()) {
+  if (table.has_schema()) {
     request.schema = SchemaFromJson(body["schema"]);
   }
-  if (!body.value("view", json()).is_null()) {
+  if (table.has_view()) {
     request.view = body["view"];
   }
   return request;
