@@ -690,7 +690,7 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const jso
   const json body = CheckResource(resource, "Dataset", DatasetFields(), UnknownFields::kIgnore);
   const auto dataset = ToProto<v2::Dataset>(body);
   if (dataset.dataset_reference().dataset_id().empty()) {
-    throw ApiError::Invalid("Required parameter is missing: datasetId");
+    throw ApiError::Required("dataset_id");
   }
   return {
       .dataset =
@@ -706,7 +706,7 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   const json body = CheckResource(resource, "Table", TableFields(), UnknownFields::kIgnore);
   const auto table = ToProto<v2::Table>(body);
   if (table.table_reference().table_id().empty()) {
-    throw ApiError::Invalid("Required parameter is missing: tableId");
+    throw ApiError::Required("table_id");
   }
   TableInsertRequest request;
   request.table = TableReference{
@@ -732,13 +732,16 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   return request;
 }
 
-Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
+Routine ParseRoutine(const DatasetReference& dataset, const json& body, std::string_view method) {
   json resource = CheckResource(body, "Routine", RoutineFields());
   const auto routine = ToProto<v2::Routine>(resource);
   resource.erase("routineReference");
   const v2::RoutineReference& reference = routine.routine_reference();
-  if (reference.routine_id().empty()) {
-    throw ApiError::Invalid("Required parameter is missing: routineId");
+  if (reference.project_id().empty() || reference.dataset_id().empty() ||
+      reference.routine_id().empty()) {
+    throw ApiError::Invalid(
+        "Project ID, dataset ID and routine ID cannot be missing or empty in call to " +
+        std::string(method));
   }
   if (reference.project_id() != dataset.project_id ||
       reference.dataset_id() != dataset.dataset_id) {
@@ -782,7 +785,15 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   if (!resource.contains("arguments")) {
     resource["arguments"] = json::array();
   }
-  for (const v2::Routine::Argument& argument : routine.arguments()) {
+  for (int i = 0; i < routine.arguments_size(); ++i) {
+    const v2::Routine::Argument& argument = routine.arguments(i);
+    // BigQuery reads an UNSPECIFIED enum as one left out, and returns none.
+    if (argument.mode() == v2::Routine::Argument::MODE_UNSPECIFIED) {
+      resource["arguments"][i].erase("mode");
+    }
+    if (argument.argument_kind() == v2::Routine::Argument::ARGUMENT_KIND_UNSPECIFIED) {
+      resource["arguments"][i].erase("argumentKind");
+    }
     if (argument.name().empty()) {
       throw ApiError::Invalid("Invalid routine argument");
     }

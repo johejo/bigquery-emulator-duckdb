@@ -4,6 +4,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -141,7 +142,9 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id,
                                         const nlohmann::json& resource);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset,
                                     const nlohmann::json& resource);
-Routine ParseRoutine(const DatasetReference& dataset, const nlohmann::json& body);
+// routines.insert or routines.update, which `method` names in errors.
+Routine ParseRoutine(const DatasetReference& dataset, const nlohmann::json& body,
+                     std::string_view method);
 // The checked Dataset resource of datasets.patch (`patch`) or datasets.update, for
 // UpdateDatasetMetadata.
 nlohmann::json ParseDatasetUpdate(const nlohmann::json& body, bool patch);

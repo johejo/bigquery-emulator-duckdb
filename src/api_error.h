@@ -16,6 +16,10 @@ class ApiError : public std::runtime_error {
     return {400, "invalidQuery", message};
   }
   static ApiError Invalid(const std::string& message) { return {400, "invalid", message}; }
+  // A required field left out or empty, named as BigQuery names it, such as dataset_id.
+  static ApiError Required(const std::string& field) {
+    return {400, "required", "Required parameter is missing: " + field};
+  }
   static ApiError NotFound(const std::string& message) { return {404, "notFound", message}; }
   static ApiError Duplicate(const std::string& message) { return {409, "duplicate", message}; }
   static ApiError Internal(const std::string& message) { return {500, "internalError", message}; }
