@@ -9,6 +9,7 @@
 #include "src/duckdb_handle.h"
 #include "src/googlesql_aead_duckdb/aead.h"
 #include "src/googlesql_collation_duckdb/collation.h"
+#include "src/googlesql_differential_privacy_duckdb/differential_privacy.h"
 #include "src/googlesql_functions_duckdb/bignumeric.h"
 #include "src/googlesql_functions_duckdb/cast.h"
 #include "src/googlesql_functions_duckdb/contains_substr.h"
@@ -94,6 +95,7 @@ void RegisterBackendFunctions(duckdb_database database,
   text_analysis_duckdb::RegisterTextAnalysisFunctions(connection.get());
   hll_duckdb::RegisterHllCountFunctions(connection.get());
   kll_duckdb::RegisterKllFunctions(connection.get());
+  differential_privacy_duckdb::RegisterDifferentialPrivacyFunctions(connection.get());
   functions_duckdb::RegisterDatetimeFunctions(connection.get(), functions);
   functions_duckdb::RegisterCastFunctions(connection.get());
   functions_duckdb::RegisterJsonFunctions(connection.get(), functions);

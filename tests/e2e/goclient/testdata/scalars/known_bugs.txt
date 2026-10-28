@@ -17,6 +17,12 @@ SELECT AVG(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.79
 SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x
 !> "NaN"
 
+# BigQuery fails for an extremely large epsilon such as 1e308, though 1e300 runs
+# (differential_privacy.txt).
+# third_party/bigquery_docs/reference/standard-sql/query-syntax.md
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e308, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+!> error:
+
 # BigQuery reports where the exception was thrown; QuickJS keeps only where an Error was created.
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()

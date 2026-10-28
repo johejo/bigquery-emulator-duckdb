@@ -338,6 +338,10 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   options.set_language(GoogleSqlLanguageOptions());
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
+  // SELECT WITH DIFFERENTIAL_PRIVACY aggregates each privacy unit's contributions first, and
+  // BigQuery's max_groups_contributed defaults to 1.
+  options.enable_rewrite(googlesql::REWRITE_ANONYMIZATION);
+  GOOGLESQL_RETURN_IF_ERROR(options.set_default_anon_kappa_value(1));
   // Keep the inliner's argument bindings as expressions. Turning them into uncorrelated
   // scalar subqueries would let DuckDB evaluate RAND() just once for an entire input table.
   if (settings.script != nullptr) {

@@ -37,6 +37,17 @@ go_sdk.from_file(
     go_mod = "//:go.mod",
 )
 
+# Google's differential privacy library, at the version GoogleSQL's reference implementation uses.
+googlesql_http_archive_deps = use_extension(
+    "@googlesql//bazel:http_archive_deps.bzl",
+    "googlesql_http_archive_deps",
+)
+use_repo(
+    googlesql_http_archive_deps,
+    "com_google_cc_differential_privacy",
+    "com_google_differential_privacy",
+)
+
 clang_tidy_repository = use_repo_rule("//tools/clang_tidy:repository.bzl", "clang_tidy_repository")
 
 clang_tidy_repository(

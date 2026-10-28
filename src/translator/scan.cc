@@ -35,6 +35,7 @@
 #include "src/translator/aggregate.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
+#include "src/translator/differential_privacy.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
 #include "src/translator/graph.h"
@@ -787,6 +788,10 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   }
   if (scan.Is<googlesql::ResolvedAggregateScan>()) {
     return AggregateScan(*scan.GetAs<googlesql::ResolvedAggregateScan>(), scope);
+  }
+  if (scan.Is<googlesql::ResolvedDifferentialPrivacyAggregateScan>()) {
+    return DifferentialPrivacyAggregateScan(
+        *scan.GetAs<googlesql::ResolvedDifferentialPrivacyAggregateScan>(), scope);
   }
   if (scan.Is<googlesql::ResolvedAnalyticScan>()) {
     return AnalyticScan(*scan.GetAs<googlesql::ResolvedAnalyticScan>(), scope);

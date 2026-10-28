@@ -348,6 +348,13 @@ writes ([KLL sketches](architecture.md#kll-sketches)). At the default precision 
 64,000 values, so a sketch and each group's aggregation state can reach hundreds of KB per level;
 queries with many groups use correspondingly more memory.
 
+## Differential privacy
+
+`SELECT WITH DIFFERENTIAL_PRIVACY` adds noise and removes small groups with Google's differential
+privacy library, as GoogleSQL's reference implementation does. It computes `AVG`, `COUNT` and
+`SUM`; `PERCENTILE_CONT` is unsupported.
+Privacy parameters and contribution bounds must be literals, as BigQuery requires.
+
 ## Result schemas and values
 
 Tables written by another DuckDB client may contain types BigQuery does not have:
