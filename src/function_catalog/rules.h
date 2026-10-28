@@ -231,6 +231,8 @@ enum class TypeUse : std::uint8_t {
   kRejectsCollation,
   // BigQuery rejects OVER on these aggregate functions although GoogleSQL accepts it.
   kRejectsOver,
+  // BigQuery rejects DISTINCT on these aggregate functions although GoogleSQL accepts it.
+  kRejectsDistinct,
 };
 
 // A constexpr set of type attributes, also used by the plain and handler registrations.

@@ -1,0 +1,179 @@
+# Completed maintainer-recorded BigQuery round; archived for investigation.
+# BigQuery KLL behavior questions, separate from wire-format specimens.
+# Specification: third_party/bigquery_docs/reference/standard-sql/kll_functions.md.
+# No expected values are inferred from the emulator or GoogleSQL.
+# Use small exact states or constant populations so compaction randomness does not
+# turn an observed approximate percentile into a golden result.
+
+# Quantile rank selection at ties and exact boundaries (not interpolation).
+SELECT ARRAY(SELECT AS STRUCT phi, KLL_QUANTILES.EXTRACT_POINT_INT64(s, phi) AS value FROM UNNEST([0.0, 0.249, 0.25, 0.251, 0.5, 0.75, 1.0]) AS phi ORDER BY phi)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([10, 20, 30, 40]) AS x)
+?> error: Argument #2 must be constant; error in KLL_QUANTILES.EXTRACT_POINT_INT64 expression
+
+SELECT ARRAY(SELECT AS STRUCT phi, KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, phi) AS value FROM UNNEST([0.0, 0.249, 0.25, 0.251, 0.5, 0.75, 1.0]) AS phi ORDER BY phi)
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST(ARRAY<FLOAT64>[10, 20, 30, 40]) AS x)
+?> error: Argument #2 must be constant; error in KLL_QUANTILES.EXTRACT_POINT_FLOAT64 expression
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 8)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1, 1, 2, 2]) AS x)
+?> [{"v":"1"},{"v":"1"},{"v":"1"},{"v":"1"},{"v":"1"},{"v":"2"},{"v":"2"},{"v":"2"},{"v":"2"}]
+
+# NULL weight, NULL precision, and validation versus skipped NULL input.
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => w) AS s FROM UNNEST([STRUCT(1 AS x, 1 AS w), (2, NULL), (3, 1)]))
+?> [{"v":"1"},{"v":"1"},{"v":"3"}]
+
+SELECT KLL_QUANTILES.INIT_INT64(x, CAST(NULL AS INT64)) IS NULL FROM UNNEST([1]) AS x
+?> error: Argument 2 to KLL_QUANTILES.INIT_INT64 must be non-NULL at [1:36]
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => CAST(NULL AS INT64)) IS NULL FROM UNNEST([1]) AS x
+?> "true"
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => 0) IS NULL FROM UNNEST(ARRAY<INT64>[NULL]) AS x
+?> "true"
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 0) IS NULL FROM UNNEST(ARRAY<INT64>[]) AS x
+?> error: Provided Precision: 0 but Precision needs to be in the range [1, 100000]; error in KLL_QUANTILES.INIT_INT64 function.
+
+# Named weight with precision omitted; per-row precision and NULL precision.
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x, weight => w) AS s FROM UNNEST([STRUCT(1 AS x, 3 AS w), (2, 1), (3, 1)]))
+?> [{"v":"1"},{"v":"1"},{"v":"3"}]
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x, p) AS s FROM UNNEST([STRUCT(1 AS x, 1000 AS p), (2, 2000)]))
+?> error: Argument 2 to KLL_QUANTILES.INIT_INT64 must be a literal or query parameter at [2:42]
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x, p) AS s FROM UNNEST([STRUCT(1 AS x, 1000 AS p), (2, NULL)]))
+?> error: Argument 2 to KLL_QUANTILES.INIT_INT64 must be a literal or query parameter at [2:42]
+
+# Error messages and SAFE handling at argument boundaries.
+SELECT KLL_QUANTILES.INIT_INT64(x, 0) FROM UNNEST([1]) AS x
+?> error: Provided Precision: 0 but Precision needs to be in the range [1, 100000]; error in KLL_QUANTILES.INIT_INT64 function.
+
+SELECT KLL_QUANTILES.INIT_FLOAT64(x, 100001) FROM UNNEST(ARRAY<FLOAT64>[1]) AS x
+?> error: Provided Precision: 100001 but Precision needs to be in the range [1, 100000]; error in KLL_QUANTILES.INIT_FLOAT64 function.
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => 0) FROM UNNEST([1]) AS x
+?> error: Provided Weight: 0 but Weight needs to be in the inclusive interval [1, 2147483647]; error in KLL_QUANTILES.INIT_INT64 function.
+
+SELECT KLL_QUANTILES.INIT_FLOAT64(x, 1000, weight => -1) FROM UNNEST(ARRAY<FLOAT64>[1]) AS x
+?> error: Provided Weight: -1 but Weight needs to be in the inclusive interval [1, 2147483647]; error in KLL_QUANTILES.INIT_FLOAT64 function.
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => 2147483648) FROM UNNEST([1]) AS x
+?> error: Provided Weight: 2147483648 but Weight needs to be in the inclusive interval [1, 2147483647]; error in KLL_QUANTILES.INIT_INT64 function.
+
+SELECT SAFE.KLL_QUANTILES.INIT_INT64(x, 1000, weight => 0) IS NULL FROM UNNEST([1]) AS x
+?> error: SAFE is unsupported with aggregate function init_int64
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 0)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_INT64 must be at least 1 at [1:39]
+
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(s, 100001)
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST(ARRAY<FLOAT64>[1]) AS x)
+?> error: Provided num_quantiles: 100001 but num_quantiles must be in the range [1, 100000]; error in KLL_QUANTILES.EXTRACT_FLOAT64 expression
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_INT64(s, -0.1)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_INT64 must be between 0 and 1 at [1:45]
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 1.1)
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST(ARRAY<FLOAT64>[1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_FLOAT64 must be between 0 and 1 at [1:47]
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, CAST('NaN' AS FLOAT64))
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST(ARRAY<FLOAT64>[1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_FLOAT64 must be between 0 and 1 at [1:47]
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_INT64(s, CAST('inf' AS FLOAT64))
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_INT64 must be between 0 and 1 at [1:45]
+
+SELECT SAFE.KLL_QUANTILES.EXTRACT_INT64(b'bad', 2)
+?> error: SAFE with function kll_quantiles.extract_int64 is not supported.
+
+SELECT SAFE.KLL_QUANTILES.EXTRACT_POINT_INT64(s, -0.1)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_INT64 must be between 0 and 1 at [1:50]
+
+# Validation order: NULL sketch versus invalid quantile, malformed sketch versus NULL argument.
+SELECT KLL_QUANTILES.EXTRACT_INT64(CAST(NULL AS BYTES), 0)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_INT64 must be at least 1 at [1:57]
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_FLOAT64(CAST(NULL AS BYTES), 1.1)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_FLOAT64 must be between 0 and 1 at [1:65]
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(b'bad', CAST(NULL AS INT64))
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_INT64 must be non-NULL at [1:44]
+
+SELECT KLL_QUANTILES.EXTRACT_POINT_INT64(b'bad', CAST(NULL AS FLOAT64))
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_POINT_INT64 must be non-NULL at [1:50]
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, CAST(NULL AS INT64))
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x)
+?> error: Argument 2 to KLL_QUANTILES.EXTRACT_INT64 must be non-NULL at [1:39]
+
+# Cross-type extraction and merge: no implicit INT64/FLOAT64 conversion.
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(s, 2)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x)
+?> error: Expected sketch value type FLOAT64 but found INT64 type; error in KLL_QUANTILES.EXTRACT_FLOAT64 expression
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2)
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST(ARRAY<FLOAT64>[1]) AS x)
+?> error: Expected sketch value type INT64 but found FLOAT64 type; error in KLL_QUANTILES.EXTRACT_INT64 expression
+
+SELECT KLL_QUANTILES.MERGE_PARTIAL(s)
+FROM (
+  SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x
+  UNION ALL
+  SELECT KLL_QUANTILES.INIT_FLOAT64(x) FROM UNNEST(ARRAY<FLOAT64>[1]) AS x
+)
+?> error: Merging sketches with different value types is not allowed. Expected sketch value type INT64 but found FLOAT64 type; error in KLL_QUANTILES.MERGE_PARTIAL function.
+
+# Empty MERGE variants, whose non-BYTES result behavior needs recording.
+SELECT KLL_QUANTILES.MERGE_INT64(s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
+?> []
+
+SELECT KLL_QUANTILES.MERGE_FLOAT64(s, 2) FROM UNNEST(ARRAY<BYTES>[NULL]) AS s
+?> []
+
+SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 0.5) FROM UNNEST(ARRAY<BYTES>[NULL]) AS s
+?> null
+
+SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) FROM UNNEST(ARRAY<BYTES>[]) AS s
+?> null
+
+# Different precisions, NULL sketches, and all four non-BYTES MERGE functions.
+WITH sketches AS (
+  SELECT KLL_QUANTILES.INIT_INT64(x, 1000) AS s FROM UNNEST([1, 2]) AS x
+  UNION ALL
+  SELECT KLL_QUANTILES.INIT_INT64(x, 2000) FROM UNNEST([3, 4]) AS x
+  UNION ALL SELECT CAST(NULL AS BYTES)
+)
+SELECT STRUCT(KLL_QUANTILES.MERGE_INT64(s, 4) AS quantiles, KLL_QUANTILES.MERGE_POINT_INT64(s, 0.5) AS point) FROM sketches
+?> {"f":[{"v":[{"v":"1"},{"v":"1"},{"v":"2"},{"v":"3"},{"v":"4"}]},{"v":"2"}]}
+
+WITH sketches AS (
+  SELECT KLL_QUANTILES.INIT_FLOAT64(x, 1000) AS s FROM UNNEST(ARRAY<FLOAT64>[1, 2]) AS x
+  UNION ALL
+  SELECT KLL_QUANTILES.INIT_FLOAT64(x, 2000) FROM UNNEST(ARRAY<FLOAT64>[3, 4]) AS x
+  UNION ALL SELECT CAST(NULL AS BYTES)
+)
+SELECT STRUCT(KLL_QUANTILES.MERGE_FLOAT64(s, 4) AS quantiles, KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) AS point) FROM sketches
+?> {"f":[{"v":[{"v":"1.0"},{"v":"1.0"},{"v":"2.0"},{"v":"3.0"},{"v":"4.0"}]},{"v":"2.0"}]}
+
+# NaN retention, infinities, signed zero: serialize values as strings for inspection.
+SELECT ARRAY(SELECT FORMAT('%T', v) FROM UNNEST(KLL_QUANTILES.EXTRACT_FLOAT64(s, 6)) AS v WITH OFFSET AS i ORDER BY i)
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST([CAST('NaN' AS FLOAT64), CAST('-inf' AS FLOAT64), -1.0, CAST('-0.0' AS FLOAT64), 0.0, 1.0, CAST('inf' AS FLOAT64)]) AS x)
+?> [{"v":"CAST(\"nan\" AS FLOAT64)"},{"v":"CAST(\"-inf\" AS FLOAT64)"},{"v":"-1.0"},{"v":"0.0"},{"v":"0.0"},{"v":"1.0"},{"v":"CAST(\"inf\" AS FLOAT64)"}]
+
+SELECT FORMAT('%T', KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.5))
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST([CAST('NaN' AS FLOAT64), CAST('NaN' AS FLOAT64)]) AS x)
+?> "CAST(\"nan\" AS FLOAT64)"
+
+# A large weighted constant population exercises compaction without random results.
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 4)
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1, weight => 2147483647) AS s FROM UNNEST([42, 42]) AS x)
+?> [{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"}]

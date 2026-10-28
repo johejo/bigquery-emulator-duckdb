@@ -341,6 +341,13 @@ tables or positional query parameters.
 `APPROX_TOP_SUM` computes exact sums, collecting the input rows before grouping them, so its memory
 use grows with the input size rather than with the requested number of results.
 
+`KLL_QUANTILES` sketches keep up to `64 * precision` items per compaction level, more than
+BigQuery's sketches retain, so they grow larger and their approximate quantiles can differ from
+BigQuery's for the same input. BigQuery reads and merges them; their bytes differ from those it
+writes ([KLL sketches](architecture.md#kll-sketches)). At the default precision a level holds up to
+64,000 values, so a sketch and each group's aggregation state can reach hundreds of KB per level;
+queries with many groups use correspondingly more memory.
+
 ## Result schemas and values
 
 Tables written by another DuckDB client may contain types BigQuery does not have:

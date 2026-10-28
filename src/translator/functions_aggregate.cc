@@ -219,6 +219,69 @@ constexpr StaticAggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
   return rule;
 }
 
+constexpr std::string_view kKllInitArguments[] = {"$1", "$2", "$3"};
+constexpr std::string_view kKllInitDefaults[] = {"", "1000", "1"};
+constexpr ConstantArgument kKllPrecision[] = {
+    {
+        .argument = 2,
+        .description = "precision",
+        .message = "Argument 2 must be a literal or query parameter",
+    },
+};
+constexpr ConstantArgument kKllQuantiles[] = {
+    {.argument = 2, .description = "num_quantiles", .message = "Argument #2 must be constant"},
+};
+
+template <bool kInteger>
+std::string FinishKllInit(const std::string& sql, const std::vector<std::string>& args,
+                          const std::string& /*tail*/) {
+  const std::string precision = args.size() > 1 ? args.at(1) : "1000";
+  const std::string name = kInteger ? "KLL_QUANTILES.INIT_INT64" : "KLL_QUANTILES.INIT_FLOAT64";
+  return "CASE WHEN " + precision + " BETWEEN 1 AND 100000 THEN " + sql + " ELSE " +
+         Raise("'Provided Precision: ' || coalesce(CAST(" + precision +
+                   " AS VARCHAR), 'NULL') || ' but Precision needs to be in the range [1, 100000]; "
+                   "error in " +
+                   name + " function.'",
+               false) +
+         " END";
+}
+
+constexpr StaticAggregateRule KllInit(bool integer) {
+  return {
+      .function = integer ? "bq_kll_init_int64" : "bq_kll_init_float64",
+      .arguments = kKllInitArguments,
+      .defaults = kKllInitDefaults,
+      .distinct = AggregateRule::Distinct::kUnsupported,
+      .finish = integer ? FinishKllInit<true> : FinishKllInit<false>,
+      .constant_arguments = kKllPrecision,
+  };
+}
+
+template <bool kInteger, bool kPoint>
+std::string FinishKllMerge(const std::string& sql, const std::vector<std::string>& args,
+                           const std::string& /*tail*/) {
+  return std::string(kPoint ? "bq_kll_extract_point_" : "bq_kll_extract_") +
+         (kInteger ? "int64" : "float64") + "(" + sql + ", " + args.at(1) + ")";
+}
+
+// BigQuery takes none of the KLL aggregates with SAFE, OVER or DISTINCT.
+constexpr function_catalog::TypeUses kKllUses = {
+    TypeUse::kRejectsSafe,
+    TypeUse::kRejectsOver,
+    TypeUse::kRejectsDistinct,
+};
+
+template <bool kInteger, bool kPoint>
+constexpr StaticAggregateRule KllMerge() {
+  return {
+      .function = kInteger ? "bq_kll_merge_int64" : "bq_kll_merge_float64",
+      .arguments = kValueArgument,
+      .distinct = AggregateRule::Distinct::kUnsupported,
+      .finish = FinishKllMerge<kInteger, kPoint>,
+      .constant_arguments = kKllQuantiles,
+  };
+}
+
 // Aggregate functions, which also take a window.
 }  // namespace
 
@@ -378,6 +441,17 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
              {
                  .uses = {TypeUse::kBigNumeric},
              }),
+
+      Define("KLL_QUANTILES.INIT_INT64", {KllInit(true)}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.INIT_FLOAT64", {KllInit(false)}, {.uses = kKllUses}),
+      Define(
+          "KLL_QUANTILES.MERGE_PARTIAL",
+          {{.function = "bq_kll_merge_partial", .distinct = AggregateRule::Distinct::kUnsupported}},
+          {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_INT64", {KllMerge<true, false>()}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_FLOAT64", {KllMerge<false, false>()}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_POINT_INT64", {KllMerge<true, true>()}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_POINT_FLOAT64", {KllMerge<false, true>()}, {.uses = kKllUses}),
 
       Define("HLL_COUNT.INIT",
              {

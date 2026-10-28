@@ -1,0 +1,97 @@
+# Expected results: third_party/bigquery_docs/reference/standard-sql/kll_functions.md
+# (INIT weighted examples, EXTRACT quartiles, MERGE median and point examples).
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 4) FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1000) AS s FROM UNNEST(GENERATE_ARRAY(1, 100)) AS x)
+=> [{"v":"1"},{"v":"25"},{"v":"50"},{"v":"75"},{"v":"100"}]
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2) FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => y) AS s FROM UNNEST([STRUCT(1 AS x, 1 AS y), (2, 3), (3, 1), (4, 1), (5, 1)]))
+=> [{"v":"1"},{"v":"2"},{"v":"5"}]
+
+SELECT KLL_QUANTILES.MERGE_INT64(s, 2) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1,2,3,4,5]) AS x UNION ALL SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([6,7,8,9,10]) AS x)
+=> [{"v":"1"},{"v":"5"},{"v":"10"}]
+
+SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 0.9) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1,2,3,4,5]) AS x UNION ALL SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([6,7,8,9,10]) AS x)
+=> "9"
+
+# Independent BigQuery observations: tools/kll/quantiles.answers.txt.
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 2) FROM (SELECT KLL_QUANTILES.INIT_INT64(x, weight => w) AS s FROM UNNEST([STRUCT(1 AS x, 3 AS w), (2, 1), (3, 1)]))
+=> [{"v":"1"},{"v":"1"},{"v":"3"}]
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => CAST(NULL AS INT64)) IS NULL FROM UNNEST([1]) AS x
+=> "true"
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 1000, weight => 0) IS NULL FROM UNNEST(ARRAY<INT64>[NULL]) AS x
+=> "true"
+
+SELECT KLL_QUANTILES.INIT_INT64(x, 0) IS NULL FROM UNNEST(ARRAY<INT64>[]) AS x
+=> error: Provided Precision: 0 but Precision needs to be in the range [1, 100000]; error in KLL_QUANTILES.INIT_INT64 function.
+
+SELECT KLL_QUANTILES.INIT_FLOAT64(x, 1000, weight => -1) FROM UNNEST(ARRAY<FLOAT64>[1]) AS x
+=> error: Provided Weight: -1 but Weight needs to be in the inclusive interval [1, 2147483647]; error in KLL_QUANTILES.INIT_FLOAT64 function.
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(s, 4) FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1, weight => 2147483647) AS s FROM UNNEST([42,42]) AS x)
+=> [{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"}]
+
+SELECT SAFE.KLL_QUANTILES.INIT_INT64(x, 1000, weight => 0) IS NULL FROM UNNEST([1]) AS x
+=> error: SAFE is unsupported with aggregate function init_int64
+
+SELECT KLL_QUANTILES.MERGE_INT64(s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> []
+
+SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> null
+
+WITH sketches AS (SELECT KLL_QUANTILES.INIT_FLOAT64(x, 1000) AS s FROM UNNEST(ARRAY<FLOAT64>[1,2]) AS x UNION ALL SELECT KLL_QUANTILES.INIT_FLOAT64(x, 2000) FROM UNNEST(ARRAY<FLOAT64>[3,4]) AS x UNION ALL SELECT CAST(NULL AS BYTES)) SELECT KLL_QUANTILES.MERGE_FLOAT64(s, 4) FROM sketches
+=> [{"v":"1.0"},{"v":"1.0"},{"v":"2.0"},{"v":"3.0"},{"v":"4.0"}]
+
+# The stored compacted sketches retain exact extrema: tools/kll/followup.answers.txt.
+SELECT [KLL_QUANTILES.MERGE_POINT_INT64(s, 0.0), KLL_QUANTILES.MERGE_POINT_INT64(s, 1.0)] FROM UNNEST([FROM_HEX('087110804020048a074c080310011a0101220280402a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a041202b92732090a02ad1410830c180c')]) AS s
+=> [{"v":"1"},{"v":"8192"}]
+
+# Documented exact extrema must survive compaction, even at precision 1.
+SELECT [KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.0), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 1.0)] FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1) AS s FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS x)
+=> [{"v":"1"},{"v":"100000"}]
+
+# Constant populations have no approximation error, including after compaction.
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(s, 2) FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(42.0, 1) AS s FROM UNNEST(GENERATE_ARRAY(1, 100000)))
+=> [{"v":"42.0"},{"v":"42.0"},{"v":"42.0"}]
+
+# MERGE_PARTIAL type errors: tools/kll/quantiles.answers.txt.
+SELECT KLL_QUANTILES.MERGE_PARTIAL(s) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1]) AS x UNION ALL SELECT KLL_QUANTILES.INIT_FLOAT64(x) FROM UNNEST(ARRAY<FLOAT64>[1]) AS x)
+=> error contains: Merging sketches with different value types is not allowed.
+
+# Empty INIT: tools/kll/sketch_format.answers.txt.
+SELECT KLL_QUANTILES.INIT_FLOAT64(x) IS NULL FROM UNNEST(ARRAY<FLOAT64>[]) AS x
+=> "true"
+
+# Source: BigQuery answers collected by the maintainer.
+# BigQuery takes none of the aggregates with SAFE, OVER or DISTINCT.
+
+SELECT SAFE.KLL_QUANTILES.INIT_FLOAT64(x) IS NULL FROM UNNEST([1.0]) AS x
+=> error: SAFE is unsupported with aggregate function init_float64
+
+SELECT SAFE.KLL_QUANTILES.MERGE_PARTIAL(s) IS NULL FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: SAFE is unsupported with aggregate function merge_partial
+
+SELECT SAFE.KLL_QUANTILES.MERGE_INT64(s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: SAFE is unsupported with aggregate function merge_int64
+
+SELECT SAFE.KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: SAFE is unsupported with aggregate function merge_point_float64
+
+SELECT KLL_QUANTILES.INIT_INT64(x) OVER () IS NULL FROM UNNEST([1]) AS x
+=> error: Analytic function INIT_INT64 is not supported.
+
+SELECT KLL_QUANTILES.MERGE_PARTIAL(s) OVER () IS NULL FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Analytic function MERGE_PARTIAL is not supported.
+
+SELECT KLL_QUANTILES.MERGE_INT64(s, 2) OVER () FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Analytic function MERGE_INT64 is not supported.
+
+SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) OVER () FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Analytic function MERGE_POINT_FLOAT64 is not supported.
+
+SELECT KLL_QUANTILES.INIT_INT64(DISTINCT x) IS NULL FROM UNNEST([1, 1]) AS x
+=> error: Aggregate function KLL_QUANTILES.INIT_INT64 cannot be used with DISTINCT modifier.
+
+SELECT KLL_QUANTILES.MERGE_INT64(DISTINCT s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Aggregate function KLL_QUANTILES.MERGE_INT64 cannot be used with DISTINCT modifier.

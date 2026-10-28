@@ -205,6 +205,39 @@ row reads, copies and extracts share it; writes that retain external numeric sto
 - [Spanner](../src/spanner_query.cc): a `PLAN` RPC supplies result metadata; google-cloud-cpp
   streams rows into a DuckDB table function with one reader and bounded chunks.
 
+### KLL sketches
+
+[src/kll_duckdb/](../src/kll_duckdb/kll.cc) reads and writes BigQuery's KLL sketch BYTES:
+a protobuf envelope, not Apache DataSketches' binary preamble, whose observed fields,
+fixed-sketch EXTRACT answers and SQL validation cases [tools/kll/](../tools/kll/README.md)
+keeps. The reader decodes INT64 exactly, includes the sampled value and weight, normalizes
+ranks by retained mass rather than input count, and returns the stored extrema at the
+endpoints; integer rank arithmetic avoids rounding INT64 values or array-quantile ranks
+through FLOAT64. It bounds wire reads, varints, level shifts and accumulated weights,
+rejects ambiguous duplicate singular fields, accepts absent encoding versions and explicit
+versions 1/2, skips unknown varint/length-delimited fields, and rejects other wire forms
+and versions.
+
+INIT and MERGE share one writer: unbiased randomized pair compactors with a fixed capacity
+of `64 * precision` items per level and exact, separately stored extrema. Weighted inserts
+split a weight into powers of two, and merging imports each retained weight, including a
+native sketch's sampler mass, without expanding it into rows. Input count and retained
+mass stay separate. A merge keeps the first non-empty sketch's precision and lowers it
+to the smaller one only when the incoming sketch has been compacted, following the
+documented exception for inputs small enough to be captured exactly; BigQuery kept the
+first sketch's precision for exact inputs in either order
+([merge precision answers](../tools/kll/merge_precision.answers.txt)). The writer does not
+reproduce BigQuery's capacity formula, compaction thresholds or random sequence, so its
+bytes differ from BigQuery's for the same input; BigQuery reads and merges them
+([writer answers](../tools/kll/writer.answers.txt)). The fixed capacity trades space for a
+simple error argument; capacities that shrink toward the top level, as in KLL, are deferred
+until each precision's rank error is justified for them.
+
+A typed MERGE or MERGE_POINT merges as MERGE_PARTIAL does and extracts from the result
+with EXTRACT's reader. A translator handler and the aggregate rules enforce the constant
+number-of-quantiles and phi restrictions, which GoogleSQL's builtin signatures do not
+impose; the backend validates the argument range before propagating a NULL sketch.
+
 ## Metadata and routines
 
 [duckdb_catalog.cc](../src/duckdb_catalog.cc) reads metadata and removes expired relations using

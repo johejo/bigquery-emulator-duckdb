@@ -1,0 +1,79 @@
+# Follow-up to maintainer answers archived in tools/kll/.
+# All phi arguments are literal: BigQuery rejected the original per-row phi queries.
+# Fixed bytes are copied from BigQuery observations, never emulator output.
+# Do not replace these with INIT calls: compaction would change the sampled state.
+
+# Rank selection, with the original four-element exact populations.
+SELECT [KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.0), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.249), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.25), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.251), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.5), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.75), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 1.0)]
+FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([10, 20, 30, 40]) AS x)
+?> [{"v":"10"},{"v":"10"},{"v":"10"},{"v":"20"},{"v":"20"},{"v":"30"},{"v":"40"}]
+
+SELECT [KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.0), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.249), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.25), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.251), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.5), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.75), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 1.0)]
+FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST(ARRAY<FLOAT64>[10, 20, 30, 40]) AS x)
+?> [{"v":"10.0"},{"v":"10.0"},{"v":"10.0"},{"v":"20.0"},{"v":"20.0"},{"v":"30.0"},{"v":"40.0"}]
+
+# Exact INT64 specimen: INIT([9,-3,5,-1,9]), default precision.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871100520048a0727088a1710e8071a0afdffffffffffffffff012201092a10120efdffffffffffffffff0102060400'), 8)
+?> [{"v":"-3"},{"v":"-3"},{"v":"-1"},{"v":"-1"},{"v":"5"},{"v":"9"},{"v":"9"},{"v":"9"},{"v":"9"}]
+
+# Exact full-range INT64 specimen: INIT([INT64_MIN,0,INT64_MAX]).
+# Deltas cross the sign boundary, requiring unsigned modular accumulation.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871100320048a073e088a1710e8071a0a808080808080808080012209ffffffffffffffff7f2a1f121d8080808080808080800180808080808080808001ffffffffffffffff7f'), 4)
+?> [{"v":"-9223372036854775808"},{"v":"-9223372036854775808"},{"v":"0"},{"v":"9223372036854775807"},{"v":"9223372036854775807"}]
+
+# Exact FLOAT64 specimen: INIT([9.5,-3.25,5.125,-1.0,9.5]).
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(FROM_HEX('08711005200a8a0746088a1710e8071a080000000000000ac0220800000000000023402a2a0a280000000000000ac0000000000000f0bf000000000080144000000000000023400000000000002340'), 8)
+?> [{"v":"-3.25"},{"v":"-3.25"},{"v":"-1.0"},{"v":"-1.0"},{"v":"5.125"},{"v":"9.5"},{"v":"9.5"},{"v":"9.5"},{"v":"9.5"}]
+
+# Compacted INT64 specimens, precision=1, inputs GENERATE_ARRAY(1,n).
+# n=4: payload field 6 first appears in this recorded sequence.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871100420048a071d080310011a01012201042a0212002a041202010232070a010410011801'), 8)
+?> [{"v":"1"},{"v":"1"},{"v":"1"},{"v":"1"},{"v":"3"},{"v":"3"},{"v":"3"},{"v":"4"},{"v":"4"}]
+
+# n=16: sum(level item counts * 2^level)=8, but outer n=16.
+# Any decoder treating weighted level counts as the complete population is wrong.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871101020048a0724080310011a01012201102a0212002a0212002a0212002a0312010432070a011010071803'), 8)
+?> [{"v":"1"},{"v":"4"},{"v":"4"},{"v":"4"},{"v":"4"},{"v":"16"},{"v":"16"},{"v":"16"},{"v":"16"}]
+
+# n=1024: multiple retained values at a high level, plus field 6.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('087110800820048a0741080310011a0101220280082a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0612049502990532080a02f607101d1809'), 8)
+?> [{"v":"1"},{"v":"277"},{"v":"277"},{"v":"277"},{"v":"942"},{"v":"942"},{"v":"942"},{"v":"942"},{"v":"1024"}]
+
+# Compacted FLOAT64: precision=1, x/8 for x in [-2048,2048], n=4097.
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(FROM_HEX('0871108120200a8a0769080310011a0800000000000070c0220800000000000070402a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a120a1000000000004867c00000000000f85240320f0a080000000000946b4010d606180b'), 8)
+?> [{"v":"-256.0"},{"v":"-186.25"},{"v":"-186.25"},{"v":"-186.25"},{"v":"75.875"},{"v":"75.875"},{"v":"75.875"},{"v":"220.625"},{"v":"256.0"}]
+
+# Weighted INIT_INT64([42],1000,weight=>2); all mass in level 1.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871100220048a0715088a1710e8071a012a22012a2a0212002a0312012a'), 4)
+?> [{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"}]
+
+# Fixed mixed-precision merged INT64 state, n=8192. Original inputs:
+# INIT(GENERATE_ARRAY(1,4096),1) + INIT(GENERATE_ARRAY(4097,8192),1000).
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('087110804020048a074c080310011a0101220280402a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a0212002a041202b92732090a02ad1410830c180c'), 8)
+?> [{"v":"1"},{"v":"2605"},{"v":"2605"},{"v":"5049"},{"v":"5049"},{"v":"5049"},{"v":"5049"},{"v":"5049"},{"v":"8192"}]
+
+# FLOAT64 counterpart: same input ranges and precisions, values x/8.
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(FROM_HEX('0871108040200a8a076d080310011a08000000000000c03f220800000000000090402a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a120a100000000000f069400000000000e38d40320f0a080000000000927840108108180c'), 8)
+?> [{"v":"0.125"},{"v":"207.5"},{"v":"207.5"},{"v":"207.5"},{"v":"393.125"},{"v":"956.375"},{"v":"956.375"},{"v":"956.375"},{"v":"1024.0"}]
+
+# Merge fixed compacted bytes; check exact extrema, not random interior quantiles.
+SELECT STRUCT(KLL_QUANTILES.MERGE_POINT_INT64(s, 0.0) AS minimum, KLL_QUANTILES.MERGE_POINT_INT64(s, 1.0) AS maximum)
+FROM UNNEST([
+  FROM_HEX('0871100420048a071d080310011a01012201042a0212002a041202010232070a010410011801'),
+  FROM_HEX('0871101020048a0724080310011a01012201102a0212002a0212002a0212002a0312010432070a011010071803')
+]) AS s
+?> {"f":[{"v":"1"},{"v":"16"}]}
+
+# Outer encoding_version (field 3) was absent in every recorded specimen.
+# Add explicit version=1 to the recorded singleton 1; do not assume acceptance.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('08711001180120048a0711088a1710e8071a01012201012a03120101'), 2)
+?> [{"v":"1"},{"v":"1"},{"v":"1"}]
+
+# Same specimen with explicit version=2.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('08711001180220048a0711088a1710e8071a01012201012a03120101'), 2)
+?> [{"v":"1"},{"v":"1"},{"v":"1"}]
+
+# Well-formed unknown varint field 1000=1 appended to the singleton 1.
+# The original trailing-byte case only tested malformed protobuf (0xff).
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871100120048a0711088a1710e8071a01012201012a03120101c03e01'), 2)
+?> [{"v":"1"},{"v":"1"},{"v":"1"}]

@@ -1,0 +1,17 @@
+# Additional native-reader boundaries not settled by the recorded investigation.
+# Fixtures are BigQuery-produced sketches from tools/kll/sketch_format.answers.txt.
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(CAST(NULL AS BYTES), 2)
+?> []
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(CAST(NULL AS BYTES), 100001)
+?> error: Provided num_quantiles: 100001 but num_quantiles must be in the range [1, 100000]; error in KLL_QUANTILES.EXTRACT_INT64 expression
+
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(FROM_HEX('08711001200a8a0726088a1710e8071a08000000000000f87f2208000000000000f87f2a0a0a08000000000000f87f'), 2)
+?> [{"v":"NaN"},{"v":"NaN"},{"v":"NaN"}]
+
+SELECT KLL_QUANTILES.EXTRACT_FLOAT64(FROM_HEX('08711001200a8a0726088a1710e8071a08000000000000f0ff2208000000000000f0ff2a0a0a08000000000000f0ff'), 2)
+?> [{"v":"-Infinity"},{"v":"-Infinity"},{"v":"-Infinity"}]
+
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871100120048a0711088a1710e8071a01012201012a03120101'), n) FROM UNNEST([1, 2]) AS n
+?> error: Argument #2 must be constant; error in KLL_QUANTILES.EXTRACT_INT64 expression

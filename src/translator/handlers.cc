@@ -422,6 +422,29 @@ std::optional<std::string> AddKeyFromRawBytes(const ScalarCall& call) {
          ")";
 }
 
+// KLL extraction requires a constant number of quantiles or phi even though
+// GoogleSQL's builtin signatures do not enforce that restriction.
+std::optional<std::string> KllExtract(const ScalarCall& call) {
+  if (call.arguments.size() != 2) {
+    return std::nullopt;
+  }
+  const auto constant = function_catalog::IsConstantExpression(call.Argument(1));
+  if (!constant) {
+    return std::nullopt;
+  }
+  if (!*constant) {
+    throw std::invalid_argument("Argument #2 must be constant; error in " + std::string(call.name) +
+                                " expression");
+  }
+  const bool point = call.name == "KLL_QUANTILES.EXTRACT_POINT_INT64" ||
+                     call.name == "KLL_QUANTILES.EXTRACT_POINT_FLOAT64";
+  const bool integer = call.name == "KLL_QUANTILES.EXTRACT_INT64" ||
+                       call.name == "KLL_QUANTILES.EXTRACT_POINT_INT64";
+  const std::string function = std::string(point ? "bq_kll_extract_point_" : "bq_kll_extract_") +
+                               (integer ? "int64" : "float64");
+  return function + "(" + Join(Sqls(call), ", ") + ")";
+}
+
 // TEXT_ANALYZE, whose analyzer and analyzer_options BigQuery requires to be constant. GoogleSQL
 // passes both, the omitted ones as their defaults.
 std::optional<std::string> TextAnalyze(const ScalarCall& call) {

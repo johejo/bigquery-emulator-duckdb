@@ -26,6 +26,7 @@ std::optional<std::string> ConcatStrings(const function_catalog::ScalarCall& cal
 std::optional<std::string> Format(const function_catalog::ScalarCall& call);
 std::optional<std::string> Extremum(const function_catalog::ScalarCall& call);
 std::optional<std::string> AddKeyFromRawBytes(const function_catalog::ScalarCall& call);
+std::optional<std::string> KllExtract(const function_catalog::ScalarCall& call);
 std::optional<std::string> TextAnalyze(const function_catalog::ScalarCall& call);
 std::optional<std::string> MakeRef(const function_catalog::ScalarCall& call);
 std::optional<std::string> FetchMetadata(const function_catalog::ScalarCall& call);
