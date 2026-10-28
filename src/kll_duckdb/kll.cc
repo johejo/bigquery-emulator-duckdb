@@ -477,6 +477,9 @@ struct Builder {
       throw InvalidSketch();
     }
     Extrema(from.minimum, from.maximum);
+    // An exact input keeps the mergee's precision, as BigQuery does in either order
+    // (tools/kll/merge_precision.answers.txt), even when the mergee is compacted; a
+    // compacted input lowers it, as documented.
     if (mass == 0) {
       precision = from.precision;
     } else if (from.levels.size() > 1) {

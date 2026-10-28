@@ -26,6 +26,8 @@ These files contain maintainer-recorded BigQuery responses with their original S
   FLOAT64 phi boundaries immediately around a retained-mass tie.
 - [writer.answers.txt](writer.answers.txt): BigQuery EXTRACT, MERGE and MERGE_PARTIAL
   answers for emulator-produced compacted INT64/FLOAT64 sketches.
+- [merge_precision.answers.txt](merge_precision.answers.txt): mixed-precision merges
+  with exact, compacted and weighted mergees, in both array orders.
 
 Do not regenerate these archives or use their INIT/MERGE bytes as golden writer
 outputs: KLL is non-deterministic. Fixed bytes **with independently recorded
@@ -119,8 +121,16 @@ The archives also establish:
 
 Use the saved [function reference](../../third_party/bigquery_docs/reference/standard-sql/kll_functions.md)
 for documented precision, weight and argument limits and merge precision rules.
-The recorded exact-state mixed-precision merge did not always downgrade, so do not
-replace those rules with an unconditional minimum-precision rule.
+Exact mixed-precision merges kept the first sketch's precision in both array
+orders ([merge_precision.answers.txt](merge_precision.answers.txt)): the mergee's
+precision is maintained, so do not replace those rules with an unconditional
+minimum-precision rule. Merges with a compacted input returned the lowest precision.
+
+A compacted or multi-level weighted mergee also kept its precision after an exact
+lower-precision input, and an exact precision-1 mergee kept precision 1 after a compacted
+precision-1000 input. These results agree with both "keep the mergee's precision" and
+"take the minimum when the input is compacted"; an exact high-precision mergee followed by a
+compacted lower-precision input would distinguish them.
 
 ## Offline diagnostic
 

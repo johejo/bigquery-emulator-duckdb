@@ -224,7 +224,9 @@ split a weight into powers of two, and merging imports each retained weight, inc
 native sketch's sampler mass, without expanding it into rows. Input count and retained
 mass stay separate. A merge keeps the first non-empty sketch's precision and lowers it
 to the smaller one only when the incoming sketch has been compacted, following the
-documented exception for inputs small enough to be captured exactly. The writer does not
+documented exception for inputs small enough to be captured exactly; BigQuery kept the
+first sketch's precision for exact inputs in either order
+([merge precision answers](../tools/kll/merge_precision.answers.txt)). The writer does not
 reproduce BigQuery's capacity formula, compaction thresholds or random sequence, so its
 bytes differ from BigQuery's for the same input; BigQuery reads and merges them
 ([writer answers](../tools/kll/writer.answers.txt)). The fixed capacity trades space for a
