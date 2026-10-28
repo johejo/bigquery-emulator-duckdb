@@ -29,146 +29,148 @@ namespace {
 
 // The routine fields ParseRoutine handles, although it supports only some of their values.
 const ResourceMask& RoutineFields() {
-  static const ResourceMask* const kFields = new ResourceMask(MaskOf({
-      "routineReference",
-      "routineType",
-      "language",
-      "arguments.name",
-      "arguments.argumentKind",
-      "arguments.dataType",
-      "arguments.mode",
-      "returnType",
-      "returnTableType",
-      "definitionBody",
-      "description",
-      "strictMode",
-      "pythonOptions.entryPoint",
-      "externalRuntimeOptions.runtimeVersion",
-  }));
+  static const ResourceMask* const kFields =
+      new ResourceMask(MaskOf("Routine", {
+                                             "routineReference",
+                                             "routineType",
+                                             "language",
+                                             "arguments.name",
+                                             "arguments.argumentKind",
+                                             "arguments.dataType",
+                                             "arguments.mode",
+                                             "returnType",
+                                             "returnTableType",
+                                             "definitionBody",
+                                             "description",
+                                             "strictMode",
+                                             "pythonOptions.entryPoint",
+                                             "externalRuntimeOptions.runtimeVersion",
+                                         }));
   return *kFields;
 }
 
 // The fields of a Dataset resource datasets.insert, patch and update handle, although they
 // support only some of their values.
 const ResourceMask& DatasetFields() {
-  static const ResourceMask* const kFields = new ResourceMask(MaskOf({
-      "datasetReference",
-      "description",
-      "friendlyName",
-      "labels",
-      "resourceTags",
-      "defaultTableExpirationMs",
-      "defaultRoundingMode",
-      "location",
-  }));
+  static const ResourceMask* const kFields =
+      new ResourceMask(MaskOf("Dataset", {
+                                             "datasetReference",
+                                             "description",
+                                             "friendlyName",
+                                             "labels",
+                                             "resourceTags",
+                                             "defaultTableExpirationMs",
+                                             "defaultRoundingMode",
+                                             "location",
+                                         }));
   return *kFields;
 }
 
 // The fields of a Table resource tables.insert, patch and update handle, although they support
 // only some of their values.
 const ResourceMask& TableFields() {
-  static const ResourceMask* const kFields = [] {
-    auto* fields = new ResourceMask(MaskOf({
-        "tableReference",
-        "schema.fields.name",
-        "schema.fields.type",
-        "schema.fields.mode",
-        "schema.fields.fields",
-        "schema.fields.description",
-        "schema.fields.maxLength",
-        "schema.fields.precision",
-        "schema.fields.scale",
-        "schema.fields.roundingMode",
-        "schema.fields.rangeElementType",
-        "schema.fields.defaultValueExpression",
-        "schema.fields.policyTags",
-        "view.query",
-        "view.useLegacySql",
-        "materializedView.query",
-        "materializedView.enableRefresh",
-        "materializedView.allowNonIncrementalDefinition",
-        "timePartitioning",
-        "rangePartitioning",
-        "clustering",
-        "requirePartitionFilter",
-        "description",
-        "friendlyName",
-        "labels",
-        "resourceTags",
-        "expirationTime",
-        "defaultRoundingMode",
-        "tableConstraints",
-        "encryptionConfiguration",
-    }));
-    fields->fields["schema"].fields["fields"].fields["fields"].recursive = true;
-    return fields;
-  }();
+  static const ResourceMask* const kFields =
+      new ResourceMask(MaskOf("Table", {
+                                           "tableReference",
+                                           "schema.fields.name",
+                                           "schema.fields.type",
+                                           "schema.fields.mode",
+                                           "schema.fields.fields",
+                                           "schema.fields.description",
+                                           "schema.fields.maxLength",
+                                           "schema.fields.precision",
+                                           "schema.fields.scale",
+                                           "schema.fields.roundingMode",
+                                           "schema.fields.rangeElementType",
+                                           "schema.fields.defaultValueExpression",
+                                           "schema.fields.policyTags",
+                                           "view.query",
+                                           "view.useLegacySql",
+                                           "materializedView.query",
+                                           "materializedView.enableRefresh",
+                                           "materializedView.allowNonIncrementalDefinition",
+                                           "timePartitioning",
+                                           "rangePartitioning",
+                                           "clustering",
+                                           "requirePartitionFilter",
+                                           "description",
+                                           "friendlyName",
+                                           "labels",
+                                           "resourceTags",
+                                           "expirationTime",
+                                           "defaultRoundingMode",
+                                           "tableConstraints",
+                                           "encryptionConfiguration",
+                                       }));
   return *kFields;
 }
 
 // The fields of a job resource ParseJobInsert handles, although it supports only some of their
 // values.
 const ResourceMask& JobFields() {
-  static const ResourceMask* const kFields = new ResourceMask(MaskOf({
-      "jobReference",
-      "configuration.dryRun",
-      "configuration.query.query",
-      "configuration.query.useLegacySql",
-      "configuration.query.defaultDataset",
-      "configuration.query.queryParameters",
-      "configuration.query.parameterMode",
-      "configuration.query.destinationTable",
-      "configuration.query.createDisposition",
-      "configuration.query.writeDisposition",
-      "configuration.query.destinationEncryptionConfiguration",
-      "configuration.load.destinationTable",
-      "configuration.load.createDisposition",
-      "configuration.load.writeDisposition",
-      "configuration.load.destinationEncryptionConfiguration",
-      "configuration.load.sourceUris",
-      "configuration.load.sourceFormat",
-      "configuration.load.schema",
-      "configuration.load.skipLeadingRows",
-      "configuration.load.fieldDelimiter",
-      "configuration.load.parquetOptions.enableListInference",
-      "configuration.load.decimalTargetTypes",
-      // Loads detect a schema whenever neither they nor their destination give one.
-      "configuration.load.autodetect",
-      "configuration.copy",
-      "configuration.extract.sourceTable",
-      "configuration.extract.destinationUri",
-      "configuration.extract.destinationUris",
-      "configuration.extract.destinationFormat",
-      "configuration.extract.compression",
-      "configuration.extract.fieldDelimiter",
-      "configuration.extract.printHeader",
-  }));
+  static const ResourceMask* const kFields = new ResourceMask(MaskOf(
+      "Job", {
+                 "jobReference",
+                 "configuration.dryRun",
+                 "configuration.query.query",
+                 "configuration.query.useLegacySql",
+                 "configuration.query.defaultDataset",
+                 "configuration.query.queryParameters",
+                 "configuration.query.parameterMode",
+                 "configuration.query.destinationTable",
+                 "configuration.query.createDisposition",
+                 "configuration.query.writeDisposition",
+                 "configuration.query.destinationEncryptionConfiguration",
+                 "configuration.load.destinationTable",
+                 "configuration.load.createDisposition",
+                 "configuration.load.writeDisposition",
+                 "configuration.load.destinationEncryptionConfiguration",
+                 "configuration.load.sourceUris",
+                 "configuration.load.sourceFormat",
+                 "configuration.load.schema",
+                 "configuration.load.skipLeadingRows",
+                 "configuration.load.fieldDelimiter",
+                 "configuration.load.parquetOptions.enableListInference",
+                 "configuration.load.decimalTargetTypes",
+                 // Loads detect a schema whenever neither they nor their destination give one.
+                 "configuration.load.autodetect",
+                 "configuration.copy",
+                 "configuration.extract.sourceTable",
+                 "configuration.extract.destinationUri",
+                 "configuration.extract.destinationUris",
+                 "configuration.extract.destinationFormat",
+                 "configuration.extract.compression",
+                 "configuration.extract.fieldDelimiter",
+                 "configuration.extract.printHeader",
+             }));
   return *kFields;
 }
 
 // The fields of a jobs.query request ParseQuery handles, although it supports only some of their
 // values.
 const ResourceMask& QueryRequestFields() {
-  static const ResourceMask* const kFields = new ResourceMask(MaskOf({
-      "kind",
-      "query",
-      "useLegacySql",
-      "defaultDataset",
-      "queryParameters",
-      "parameterMode",
-      "destinationEncryptionConfiguration",
-      "location",
-      "dryRun",
-      "maxResults",
-      "formatOptions.useInt64Timestamp",
-      // Ignored: jobs finish before they are inserted, the emulator keeps no job labels and
-      // caches no results, and clients such as the Go client send a requestId with every request
-      // for BigQuery to deduplicate their retries.
-      "timeoutMs",
-      "labels",
-      "useQueryCache",
-      "requestId",
-  }));
+  static const ResourceMask* const kFields = new ResourceMask(
+      MaskOf("QueryRequest",
+             {
+                 "kind",
+                 "query",
+                 "useLegacySql",
+                 "defaultDataset",
+                 "queryParameters",
+                 "parameterMode",
+                 "destinationEncryptionConfiguration",
+                 "location",
+                 "dryRun",
+                 "maxResults",
+                 "formatOptions.useInt64Timestamp",
+                 // Ignored: jobs finish before they are inserted, the emulator keeps no job labels
+                 // and caches no results, and clients such as the Go client send a requestId with
+                 // every request for BigQuery to deduplicate their retries.
+                 "timeoutMs",
+                 "labels",
+                 "useQueryCache",
+                 "requestId",
+             }));
   return *kFields;
 }
 
