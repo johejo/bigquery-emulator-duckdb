@@ -304,11 +304,6 @@ json CheckObject(const json& value, const json& schema, const Descriptor* messag
   const json& properties = schema.at("properties");
   // Schemas nested in another, such as those of QueryParameterType.structTypes, have no id.
   const std::string id = schema.value("id", "");
-  for (const auto& [name, child] : accepted.fields) {
-    if (!properties.contains(name)) {
-      throw std::logic_error(std::format("The {} schema has no field {}", id, name));
-    }
-  }
   if (!value.is_object()) {
     throw ApiError::Invalid(
         message == nullptr
@@ -434,19 +429,32 @@ json CheckValue(const json& value, const json& property, const FieldDescriptor* 
 
 }  // namespace
 
-ResourceMask MaskOf(std::initializer_list<std::string_view> paths) {
+ResourceMask MaskOf(std::string_view schema, std::initializer_list<std::string_view> paths) {
   ResourceMask mask;
-  for (std::string_view path : paths) {
+  const json& root = Discovery()["schemas"].at(std::string(schema));
+  for (const std::string_view full_path : paths) {
+    std::string_view path = full_path;
+    const json* object = &root;
     ResourceMask* field = &mask;
     while (true) {
       const size_t dot = path.find('.');
-      field = &field->fields[std::string(path.substr(0, dot))];
+      const std::string name(path.substr(0, dot));
+      if (!object->contains("properties") || !(*object)["properties"].contains(name)) {
+        throw std::logic_error(std::format("The {} schema has no field {}", schema, full_path));
+      }
+      const json* child = &Resolved((*object)["properties"][name]);
+      if (child->value("type", "") == "array") {
+        child = &Resolved((*child)["items"]);
+      }
+      field = &field->fields[name];
       if (dot == std::string_view::npos) {
+        field->all = true;
+        field->recursive = child == object;
         break;
       }
+      object = child;
       path.remove_prefix(dot + 1);
     }
-    field->all = true;
   }
   return mask;
 }

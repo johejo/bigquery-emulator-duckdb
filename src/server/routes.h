@@ -44,9 +44,12 @@ struct ResourceMask {
   bool recursive = false;
 };
 
-// The mask of dot-separated field paths such as "arguments.name". A path may pass through
-// repeated fields, which then stand for each of their elements.
-ResourceMask MaskOf(std::initializer_list<std::string_view> paths);
+// The mask of dot-separated field paths of the discovery document's `schema`, such as
+// "arguments.name" of Routine. A path may pass through repeated fields, which then stand for each
+// of their elements, and one that ends at a field of its holder's schema, such as
+// TableFieldSchema.fields, gives the field its holder's mask. Throws std::logic_error when the
+// schema lacks a path.
+ResourceMask MaskOf(std::string_view schema, std::initializer_list<std::string_view> paths);
 
 // The parsed discovery document.
 const nlohmann::json& Discovery();
