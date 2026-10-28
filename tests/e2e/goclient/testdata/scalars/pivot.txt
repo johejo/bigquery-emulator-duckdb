@@ -2,7 +2,7 @@
 # GoogleSQL's reference implementation accepts these forms, but BigQuery's PIVOT rewriter
 # rejects HAVING modifiers and null-respecting ARRAY_AGG (even when no NULL reaches it).
 # The null-handling restriction is also documented in
-# ../../../../../third_party/bigquery_docs/reference/standard-sql/query-syntax.md.
+# third_party/bigquery_docs/reference/standard-sql/query-syntax.md.
 SELECT TO_JSON_STRING(p) FROM (
   SELECT 'a' AS k, 1 AS v UNION ALL SELECT 'b', 9 UNION ALL SELECT 'a', 2
 ) PIVOT(MAX(v HAVING MAX v) FOR k IN ('a', 'b', 'missing')) AS p
