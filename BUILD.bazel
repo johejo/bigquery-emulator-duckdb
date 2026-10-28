@@ -1266,7 +1266,7 @@ cc_library(
         "CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND=120",
         "CPPHTTPLIB_THREAD_POOL_MAX_COUNT=1024",
     ],
-    deps = ["@cpp-httplib//:httplib"],
+    deps = ["@cpp_httplib//:httplib"],
 )
 
 cc_library(
