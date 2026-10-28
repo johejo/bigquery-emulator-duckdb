@@ -23,7 +23,7 @@
 #include "src/googlesql_geography/value.h"
 #include "src/googlesql_geography/wkt.h"
 #include "src/googlesql_geography_duckdb/codec.h"
-#include "src/interval.h"
+#include "src/interval_sql.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {

@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
-#include "duckdb.h"
 #include "googlesql/public/types/annotation.h"
 #include "src/field_schema.h"
 
@@ -41,25 +40,6 @@ inline constexpr std::string_view kRangeOrderError =
 // for an unbounded end. Where `start` does not precede `end` it is `raise`, by default the SQL
 // that raises kRangeOrderError. Each bound is evaluated more than once.
 std::string DuckDbRange(std::string_view start, std::string_view end, std::string_view raise = "");
-
-// Whether the DuckDB `type` is the STRUCT that keeps a RANGE.
-bool IsRange(duckdb_logical_type type);
-
-// Whether the DuckDB `type` is the STRUCT that keeps a STRUCT<>.
-bool IsEmptyStruct(duckdb_logical_type type);
-
-// The TableFieldSchema BigQuery reports for the result column `name` of DuckDB type `type`.
-FieldSchema ResultFieldSchema(const std::string& name, duckdb_logical_type type);
-
-// The first DuckDB type in `type`, including array elements and struct fields, that the emulator
-// does not support as storage, or an empty string. Only marked BIGNUM columns contain units of
-// 10^-38; a plain BIGNUM is an integer, with a range larger than BIGNUMERIC's.
-std::string UnsupportedDuckDbType(duckdb_logical_type type);
-
-// A DuckDB expression that converts `sql`, of the external numeric storage type `type`, to the
-// units used by all query expressions, or nullopt when the stored values already have them.
-// Arrays and structs preserve NULLs, including a NULL struct rather than a struct of NULL fields.
-std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_logical_type type);
 
 // Whether a type contains STRUCT<>, including array elements and struct fields.
 bool HasEmptyStruct(const googlesql::Type* type);

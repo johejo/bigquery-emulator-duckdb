@@ -21,6 +21,7 @@
 #include "src/backend_initializer.h"
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
+#include "src/duckdb_types.h"
 #include "src/duckpgq.h"
 #include "src/field_schema.h"
 #include "src/googlesql_functions_duckdb/objectref_options.h"
@@ -31,7 +32,6 @@
 #include "src/result_chunks.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
-#include "src/type_mapping.h"
 
 // DuckDB v2 requires explicit registration of statically linked extensions before opening a
 // database. Keep using duckdb.h's V1 C API for database access.

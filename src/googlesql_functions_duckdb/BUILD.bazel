@@ -120,8 +120,8 @@ cc_library(
     implementation_deps = [
         "//:bignumeric",
         "//:duckdb_handle",
+        "//:duckdb_types",
         "//:interval",
-        "//:type_mapping",
         "//src/duckdb_functions:apply",
         "//src/duckdb_functions:register",
         "//src/duckdb_functions:scalar",
@@ -295,6 +295,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "//:bignumeric",
+        "//:duckdb_types",
         "//:interval",
         "//:language_options",
         "//:type_mapping",

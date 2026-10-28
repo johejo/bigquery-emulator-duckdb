@@ -22,10 +22,10 @@
 #include "googlesql/public/value.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/duckdb_types.h"
 #include "src/interval.h"
 #include "src/result_chunks.h"
 #include "src/result_rows.h"
-#include "src/type_mapping.h"
 #include "src/vector_value.h"
 
 namespace bigquery_emulator_duckdb {
