@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 func binary(t *testing.T) string {
@@ -24,11 +24,11 @@ func binary(t *testing.T) string {
 	return path
 }
 
-func server(t *testing.T, dir string, args ...string) *emulatorprocess.Process {
+func server(t *testing.T, dir string, args ...string) *serverprocess.Emulator {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary(t), dir,
+	p, err := serverprocess.StartEmulator(ctx, binary(t), dir,
 		append([]string{"--host", "127.0.0.1", "--http-port", "0"}, args...)...)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func server(t *testing.T, dir string, args ...string) *emulatorprocess.Process {
 	return p
 }
 
-func stop(t *testing.T, p *emulatorprocess.Process) {
+func stop(t *testing.T, p *serverprocess.Emulator) {
 	t.Helper()
 	if err := p.Stop(); err != nil {
 		t.Error(err)

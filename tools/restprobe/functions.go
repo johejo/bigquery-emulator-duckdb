@@ -15,10 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/mysqlprocess"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/postgresprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 //go:embed functions_preamble.md
@@ -139,20 +137,20 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 	}
 	defer os.RemoveAll(dir)
 	startup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	postgres, err := postgresprocess.Start(startup, filepath.Join(dir, "data"))
+	postgres, err := serverprocess.StartPostgres(startup, filepath.Join(dir, "data"))
 	cancel()
 	if err != nil {
 		return err
 	}
 	defer postgres.Stop()
 	mysqlStartup, cancelMySQL := context.WithTimeout(context.Background(), 60*time.Second)
-	mysql, err := mysqlprocess.Start(mysqlStartup, filepath.Join(dir, "mysql"))
+	mysql, err := serverprocess.StartMySQL(mysqlStartup, filepath.Join(dir, "mysql"))
 	cancelMySQL()
 	if err != nil {
 		return err
 	}
 	defer mysql.Stop()
-	emulators := make(chan *emulatorprocess.Process, runtime.NumCPU())
+	emulators := make(chan *serverprocess.Emulator, runtime.NumCPU())
 	defer func() {
 		close(emulators)
 		for emulator := range emulators {

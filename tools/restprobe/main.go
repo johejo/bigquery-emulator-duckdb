@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 type line struct {
@@ -65,10 +65,10 @@ func firstLine(text string) string {
 	return first
 }
 
-func startEmulator(binary string, args ...string) (*emulatorprocess.Process, error) {
+func startEmulator(binary string, args ...string) (*serverprocess.Emulator, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	return emulatorprocess.Start(ctx, binary, "", append([]string{"--host", "127.0.0.1", "--http-port", "0",
+	return serverprocess.StartEmulator(ctx, binary, "", append([]string{"--host", "127.0.0.1", "--http-port", "0",
 		"--project", `{"projectId":"test","numericId":"123456789012"}`}, args...)...)
 }
 

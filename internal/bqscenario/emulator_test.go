@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 // Exercise the complete workflows locally, including upload, job polling and gRPC streams. All
@@ -22,7 +22,7 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 	}
 	startup, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	process, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--project", `{"projectId":"test"}`)
+	process, err := serverprocess.StartEmulator(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--project", `{"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}

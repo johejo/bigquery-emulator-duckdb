@@ -16,8 +16,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -403,7 +403,7 @@ func main() {
 }
 
 func run(ctx context.Context, binary string, w io.Writer) error {
-	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0",
+	p, err := serverprocess.StartEmulator(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 		"--project", `{"projectId":"`+project+`"}`)
 	if err != nil {
 		return err

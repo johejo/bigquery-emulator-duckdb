@@ -15,7 +15,7 @@ import (
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
 	"cloud.google.com/go/bigquery/storage/managedwriter"
 	"cloud.google.com/go/civil"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -381,11 +381,11 @@ func TestStorageStateAfterRestart(t *testing.T) {
 		t.Skip("run just e2e")
 	}
 	dataDir := t.TempDir()
-	start := func() (*emulatorprocess.Process, *bigquery.Client, storagepb.BigQueryWriteClient) {
+	start := func() (*serverprocess.Emulator, *bigquery.Client, storagepb.BigQueryWriteClient) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
-		p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--data-dir", dataDir, "--project", `{"projectId":"test"}`)
+		p, err := serverprocess.StartEmulator(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--data-dir", dataDir, "--project", `{"projectId":"test"}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -441,7 +441,7 @@ func TestShutdownWithIdleAppendConnection(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--project", `{"projectId":"test"}`)
+	p, err := serverprocess.StartEmulator(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", "--project", `{"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}

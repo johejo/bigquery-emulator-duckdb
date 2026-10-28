@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -30,7 +30,7 @@ func start(t *testing.T) *bigquery.Client {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
+	p, err := serverprocess.StartEmulator(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}

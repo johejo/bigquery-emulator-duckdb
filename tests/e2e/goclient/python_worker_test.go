@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/option"
 )
 
@@ -131,7 +131,7 @@ func pythonWorkerClient(t *testing.T, binary string, timeout time.Duration, memo
 	ctx := t.Context()
 	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	process, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
+	process, err := serverprocess.StartEmulator(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 		`--project={"projectId":"python-worker"}`, fmt.Sprintf("--python-timeout-ms=%d", timeout.Milliseconds()),
 		fmt.Sprintf("--python-memory-mib=%d", memoryMiB))
 	if err != nil {

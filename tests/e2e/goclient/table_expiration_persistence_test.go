@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
@@ -20,11 +20,11 @@ func TestTableExpirationPersistence(t *testing.T) {
 	}
 	ctx := t.Context()
 	dir := t.TempDir()
-	start := func() (*emulatorprocess.Process, *bigquery.Client) {
+	start := func() (*serverprocess.Emulator, *bigquery.Client) {
 		t.Helper()
 		startup, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
-		p, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
+		p, err := serverprocess.StartEmulator(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 			"--data-dir", dir, `--project={"projectId":"expiration"}`)
 		if err != nil {
 			t.Fatal(err)

@@ -1,4 +1,4 @@
-package emulatorprocess
+package serverprocess
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	// Start chooses an ephemeral gRPC listener; the helper models that emulator flag.
+	// StartEmulator chooses an ephemeral gRPC listener; the helper models that emulator flag.
 	flag.Int("grpc-port", 0, "helper gRPC port")
 }
 
@@ -49,7 +49,7 @@ func TestProcessHelper(t *testing.T) {
 func TestStartAndStop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	p, err := Start(ctx, os.Args[0], t.TempDir(), "-test.run=^TestProcessHelper$", "--", "ready")
+	p, err := StartEmulator(ctx, os.Args[0], t.TempDir(), "-test.run=^TestProcessHelper$", "--", "ready")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestLogDirKeepsStderr(t *testing.T) {
 	t.Setenv("EMULATOR_LOG_DIR", dir)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	p, err := Start(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "ready")
+	p, err := StartEmulator(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "ready")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestLogDirKeepsStderr(t *testing.T) {
 func TestStartupFailureIncludesStderr(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	p, err := Start(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "failure")
+	p, err := StartEmulator(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "failure")
 	if p != nil || err == nil || !strings.Contains(err.Error(), "invalid configuration") || !strings.Contains(err.Error(), "exit status 7") {
 		t.Fatalf("Start = %v, %v", p, err)
 	}
@@ -103,7 +103,7 @@ func TestStartupFailureIncludesStderr(t *testing.T) {
 func TestStartupTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
-	p, err := Start(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "hang")
+	p, err := StartEmulator(ctx, os.Args[0], "", "-test.run=^TestProcessHelper$", "--", "hang")
 	if p != nil || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Start = %v, %v", p, err)
 	}
