@@ -210,6 +210,8 @@ enum class TypeUse : std::uint8_t {
   // Only compare their STRING arguments, so that under an operation collation they compare the
   // arguments' collation keys.
   kComparesCollationKeys,
+  // Compare under an operation collation while returning original values, not their keys.
+  kSelectsCollationValues,
   // STRUCT handlers that also compare INTERVAL fields, by their keys. BigQuery
   // compares no ARRAYs, also in STRUCT fields.
   kComparesStructsWithInterval,

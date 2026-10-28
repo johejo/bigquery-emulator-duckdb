@@ -45,7 +45,7 @@ functions.
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
 | [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
-| [Conditional expressions](#conditional-expressions) | 3 | 2 | 0 | 0 |
+| [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 | 0 |
 | [Conversion functions](#conversion-functions) | 4 | 0 | 0 | 0 |
 | [Date functions](#date-functions) | 12 | 0 | 0 | 0 |
 | [Datetime functions](#datetime-functions) | 8 | 0 | 0 | 0 |
@@ -162,11 +162,11 @@ functions.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`CASE`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Partial | DuckDB SQL, in code | Unsupported: function $CASE_WITH_VALUE with collation. |
+| [`CASE`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB SQL, in code |  |
 | [`COALESCE`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB function |  |
 | [`IF`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB SQL |  |
 | [`IFNULL`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB function |  |
-| [`NULLIF`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Partial | DuckDB SQL | Unsupported: function NULLIF with collation. |
+| [`NULLIF`](../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md) | Supported | DuckDB SQL |  |
 
 ## Conversion functions
 
