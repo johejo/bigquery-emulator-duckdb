@@ -24,7 +24,7 @@ rejected.
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 23 | 8 | 1 |
-| [Collation](#collation) | 8 | 3 | 3 |
+| [Collation](#collation) | 10 | 1 | 3 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -133,12 +133,12 @@ rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Collated comparisons | Supported | See [Collation](compatibility.md#collation). |
-| Collated `IN` | Partial | Unsupported: IN subquery with collation. |
+| Collated `IN` | Supported |  |
 | Collated `LIKE` | Unsupported |  |
 | Collated joins | Supported |  |
 | Collated `ORDER BY` | Supported |  |
 | Collated `GROUP BY` | Unsupported |  |
-| Collated window functions | Partial | Unsupported: PARTITION BY with collation. |
+| Collated window functions | Supported |  |
 | Collated set operations | Partial | Unsupported: set operation DISTINCT with collation. |
 | Column collation | Supported |  |
 | Table default collation | Supported |  |

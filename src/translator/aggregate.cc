@@ -21,6 +21,7 @@
 #include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
 #include "src/language_options.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -286,11 +287,15 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     if (!partition->hint_list().empty()) {
       return std::nullopt;
     }
-    if (!partition->collation_list().empty()) {
-      return Unsupported(scope, "PARTITION BY with collation");
-    }
     std::vector<std::string> keys;
-    for (const auto& ref : partition->partition_by_list()) {
+    for (int i = 0; i < partition->partition_by_list_size(); ++i) {
+      const auto& ref = partition->partition_by_list(i);
+      const auto collation = partition->collation_list().empty()
+                                 ? std::optional<std::string>("")
+                                 : OperationCollation(partition->collation_list(i), scope);
+      if (!collation) {
+        return std::nullopt;
+      }
       if (HasGraph(ref->type())) {
         return Unsupported(scope, "PARTITION BY with graph values");
       }
@@ -304,7 +309,8 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
       if (!key) {
         return std::nullopt;
       }
-      keys.push_back(ref->type()->IsInterval() ? IntervalKey(*key) : *key);
+      keys.push_back(
+          CollationKey(ref->type()->IsInterval() ? IntervalKey(*key) : *key, *collation));
     }
     window.push_back("PARTITION BY " + Join(keys, ", "));
   }

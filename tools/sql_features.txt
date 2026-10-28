@@ -386,6 +386,7 @@ query Collated comparisons | SELECT COLLATE(name, 'und:ci') BETWEEN 'A' AND 'B' 
 query Collated `IN` | SELECT COLLATE(name, 'und:ci') IN ('A', 'B') FROM t
 query Collated `IN` | SELECT COLLATE(name, 'und:ci') NOT IN ('A', 'B') FROM t
 query Collated `IN` | SELECT COLLATE(name, 'und:ci') IN (SELECT 'A') FROM t
+query Collated `IN` | SELECT name NOT IN (SELECT COLLATE('A', 'und:ci')) FROM t
 query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') LIKE 'A%' FROM t
 query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') NOT LIKE 'A%' FROM t
 query Collated `LIKE` | SELECT COLLATE(name, 'und:ci') LIKE ANY ('A%', 'B') FROM t
@@ -397,6 +398,7 @@ query Collated `ORDER BY` | SELECT ARRAY_AGG(id ORDER BY COLLATE(name, 'und:ci')
 query Collated `GROUP BY` | SELECT COLLATE(name, 'und:ci') AS n FROM t GROUP BY n
 query Collated `GROUP BY` | SELECT DISTINCT COLLATE(name, 'und:ci') FROM t
 query Collated window functions | SELECT ROW_NUMBER() OVER (PARTITION BY COLLATE(name, 'und:ci')) FROM t
+query Collated window functions | SELECT COUNT(*) OVER (PARTITION BY id, COLLATE(name, 'und:ci')) FROM t
 query Collated window functions | SELECT ROW_NUMBER() OVER (ORDER BY COLLATE(name, 'und:ci')) FROM t
 query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t UNION ALL SELECT name FROM t
 query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t UNION DISTINCT SELECT name FROM t

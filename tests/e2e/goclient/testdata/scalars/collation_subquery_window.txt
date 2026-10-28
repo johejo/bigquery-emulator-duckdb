@@ -1,0 +1,94 @@
+# Collated comparisons and window grouping follow:
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# IN's NULL and empty-set rules:
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+# The resolver can take the operation collation from either side.
+SELECT COLLATE('a', 'und:ci') IN (SELECT 'A')
+=> "true"
+
+SELECT 'a' IN (SELECT COLLATE('A', 'und:ci'))
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') NOT IN (SELECT 'A')
+=> "false"
+
+SELECT COLLATE('a', 'und:ci') IN (SELECT 'b')
+=> "false"
+
+SELECT COLLATE('a', 'und:ci') NOT IN (SELECT 'b')
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') IN (SELECT w FROM UNNEST(['A', NULL]) AS w)
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') IN (SELECT w FROM UNNEST(['b', NULL]) AS w)
+=> null
+
+SELECT COLLATE('a', 'und:ci') NOT IN (SELECT CAST(NULL AS STRING))
+=> null
+
+SELECT COLLATE(NULL, 'und:ci') IN (SELECT 'A')
+=> null
+
+SELECT COLLATE(NULL, 'und:ci') IN (SELECT w FROM UNNEST(ARRAY<STRING>[]) AS w)
+=> "false"
+
+SELECT COLLATE(NULL, 'und:ci') NOT IN (SELECT w FROM UNNEST(ARRAY<STRING>[]) AS w)
+=> "true"
+
+SELECT COLLATE('', 'und:ci') IN (SELECT '')
+=> "true"
+
+SELECT COLLATE('あ', 'und:ci') IN (SELECT 'ア')
+=> "true"
+
+SELECT COLLATE('ß', 'und:ci') IN (SELECT 'ss')
+=> "false"
+
+SELECT COLLATE(COLLATE('a', 'und:ci'), '') IN (SELECT 'A')
+=> "false"
+
+# A correlated subquery keeps the outer value and its comparison collation.
+SELECT COUNTIF(w IN (SELECT COLLATE(v, 'und:ci') FROM UNNEST(['A']) AS v WHERE n = 1))
+FROM UNNEST([STRUCT('a' AS w, 1 AS n), ('a', 2), ('b', 1)])
+=> "1"
+
+# Partitioning compares keys but leaves returned strings unchanged.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (
+  SELECT id, COUNT(*) OVER (PARTITION BY COLLATE(w, 'und:ci')) AS n
+  FROM UNNEST(['a', 'A', 'b', NULL, NULL]) AS w WITH OFFSET AS id
+)
+=> [{"v":"2"},{"v":"2"},{"v":"1"},{"v":"2"},{"v":"2"}]
+
+# Each key has its own collation: only the first of two string keys is collated.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (
+  SELECT id, COUNT(*) OVER (PARTITION BY COLLATE(w, 'und:ci'), k, g) AS n
+  FROM UNNEST([
+    STRUCT(0 AS id, 'a' AS w, 'x' AS k, 1 AS g),
+    (1, 'A', 'x', 1), (2, 'a', 'X', 1), (3, 'A', 'x', 2)
+  ])
+)
+=> [{"v":"2"},{"v":"2"},{"v":"1"},{"v":"1"}]
+
+# An uncollated key before a collated key also preserves their positions.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (
+  SELECT id, COUNT(*) OVER (PARTITION BY k, COLLATE(w, 'und:ci')) AS n
+  FROM UNNEST([STRUCT(0 AS id, 1 AS k, 'a' AS w), (1, 1, 'A'), (2, 2, 'a')])
+)
+=> [{"v":"2"},{"v":"2"},{"v":"1"}]
+
+# Named windows combine collated partitioning, ordering and a ROWS frame.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (
+  SELECT id, SUM(id + 1) OVER win AS n
+  FROM UNNEST(['a', 'b', 'A']) AS w WITH OFFSET AS id
+  WINDOW win AS (PARTITION BY COLLATE(w, 'und:ci') ORDER BY id
+                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+)
+=> [{"v":"1"},{"v":"2"},{"v":"4"}]
+
+SELECT ARRAY_AGG(w ORDER BY id) FROM (
+  SELECT id, w, ROW_NUMBER() OVER (PARTITION BY w ORDER BY id) AS n
+  FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS w WITH OFFSET AS id
+) WHERE n = 1
+=> [{"v":"a"},{"v":"b"}]
