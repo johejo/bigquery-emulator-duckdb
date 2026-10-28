@@ -1,0 +1,23 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+cc_library(
+    name = "googlesql_collation",
+    srcs = ["collation.cc"],
+    hdrs = ["collation.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/strings:cord",
+        "@abseil-cpp//absl/synchronization",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:collator",
+    ],
+    linkstatic = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)

@@ -31,6 +31,7 @@
 #include "src/external_query.h"
 #include "src/table_source.h"
 #include "src/translator/aggregate.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -392,6 +393,13 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   const bool distinct = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT ||
                         set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT ||
                         set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT;
+  // DISTINCT compares rows by their columns' collations, which the resolved AST does not record.
+  if (distinct &&
+      std::ranges::any_of(set.column_list(), [](const googlesql::ResolvedColumn& column) {
+        return HasCollation(column.type_annotation_map());
+      })) {
+    return Unsupported(scope, "set operation DISTINCT with collation");
+  }
   Relation result;
   std::vector<std::string> names;
   bool intervals = false;

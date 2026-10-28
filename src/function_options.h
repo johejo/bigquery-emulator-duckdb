@@ -16,6 +16,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .trunc_early_positive_zero = true,
       .json_strict_numbers = true,
       .json_preserve_negative_zero = true,
+      .bigquery_collations = true,
   };
 }
 

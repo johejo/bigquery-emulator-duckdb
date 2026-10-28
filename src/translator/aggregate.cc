@@ -273,8 +273,11 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
                                   const Columns& columns) {
   std::vector<std::string> window;
   if (const auto* partition = group.partition_by(); partition != nullptr) {
-    if (!partition->hint_list().empty() || !partition->collation_list().empty()) {
+    if (!partition->hint_list().empty()) {
       return std::nullopt;
+    }
+    if (!partition->collation_list().empty()) {
+      return Unsupported(scope, "PARTITION BY with collation");
     }
     std::vector<std::string> keys;
     for (const auto& ref : partition->partition_by_list()) {

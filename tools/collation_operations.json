@@ -1,0 +1,73 @@
+{
+  "operations": [
+    {
+      "name": "COUNT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "distinct": true
+    },
+    {
+      "name": "MAX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md"
+    },
+    {
+      "name": "MIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md"
+    },
+    {
+      "name": "CASE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md"
+    },
+    {
+      "name": "CASE expr",
+      "source": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md"
+    },
+    {
+      "name": "NULLIF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md"
+    },
+    {
+      "name": "GREATEST",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md"
+    },
+    {
+      "name": "LEAST",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md"
+    },
+    {
+      "name": "Comparison operators",
+      "source": "third_party/bigquery_docs/reference/standard-sql/operators.md"
+    },
+    {
+      "name": "IN operator",
+      "source": "third_party/bigquery_docs/reference/standard-sql/operators.md"
+    },
+    {
+      "name": "LIKE operator",
+      "source": "third_party/bigquery_docs/reference/standard-sql/operators.md"
+    },
+    {
+      "name": "ENDS_WITH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md"
+    },
+    {
+      "name": "INSTR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md"
+    },
+    {
+      "name": "REPLACE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md"
+    },
+    {
+      "name": "SPLIT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md"
+    },
+    {
+      "name": "STARTS_WITH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md"
+    },
+    {
+      "name": "STRPOS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md"
+    }
+  ]
+}

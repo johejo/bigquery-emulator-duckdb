@@ -122,6 +122,7 @@ constexpr auto kHandlers =
                         {
                             TypeUse::kCompares,
                             TypeUse::kComparesIntervalKeys,
+                            TypeUse::kComparesCollationKeys,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },

@@ -1,0 +1,136 @@
+# Comparisons and ordering under a collation, and its propagation:
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# third_party/bigquery_docs/reference/standard-sql/string_functions.md
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+WITH Words AS (SELECT COLLATE('a', 'und:ci') AS char1, COLLATE('Z', 'und:ci') AS char2)
+SELECT (Words.char1 < Words.char2) AS a_less_than_Z FROM Words
+=> "true"
+
+WITH Words AS (SELECT 'a' AS char1, 'Z' AS char2)
+SELECT (Words.char1 < Words.char2) AS a_less_than_Z FROM Words
+=> "false"
+
+SELECT COLLATE('Foo', 'und:ci') = COLLATE('foo', 'und:ci')
+=> "true"
+
+# One collated operand collates the comparison.
+SELECT COLLATE('Foo', 'und:ci') = 'foo'
+=> "true"
+
+SELECT 'Foo' = COLLATE('foo', 'und:ci')
+=> "true"
+
+SELECT COLLATE('Foo', 'und:ci') != 'foo'
+=> "false"
+
+# The difference between sharp s and ss is secondary, so und:ci tells them apart.
+SELECT COLLATE('MASSE', 'und:ci') = COLLATE('Maße', 'und:ci')
+=> "false"
+
+# Kana differences are tertiary or quaternary.
+SELECT COLLATE('あ', 'und:ci') = COLLATE('ア', 'und:ci')
+=> "true"
+
+SELECT 'あ' = 'ア'
+=> "false"
+
+# Strings with different code points compare equal when their collation units do.
+SELECT COLLATE('å', 'und:ci') = COLLATE('Å', 'und:ci')
+=> "true"
+
+SELECT COLLATE('ẞ', 'und:ci') > COLLATE('SS', 'und:ci')
+=> "true"
+
+SELECT COLLATE('ẞ1', 'und:ci') < COLLATE('SS2', 'und:ci')
+=> "true"
+
+SELECT COLLATE('b', 'und:ci') BETWEEN 'A' AND 'C'
+=> "true"
+
+SELECT COLLATE('b', 'und:ci') NOT BETWEEN 'A' AND 'C'
+=> "false"
+
+SELECT COLLATE('a', 'und:ci') IN ('B', 'A')
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') NOT IN ('B', 'A')
+=> "false"
+
+SELECT COLLATE(NULL, 'und:ci') = 'a'
+=> null
+
+SELECT COLLATE(NULL, 'und:ci')
+=> null
+
+# The value is the string itself.
+SELECT COLLATE('Foo', 'und:ci')
+=> "Foo"
+
+# An empty specification removes the collation.
+SELECT COLLATE(COLLATE('Foo', 'und:ci'), '') = 'foo'
+=> "false"
+
+SELECT COLLATE('Foo', '') = 'foo'
+=> "false"
+
+# A sorted query uses the collation of the values it sorts.
+SELECT ARRAY(SELECT w FROM UNNEST(['Zebra', COLLATE('apple', 'und:ci')]) AS w ORDER BY w)
+=> [{"v":"apple"},{"v":"Zebra"}]
+
+SELECT ARRAY(SELECT w FROM UNNEST(['Zebra', 'apple']) AS w ORDER BY w)
+=> [{"v":"Zebra"},{"v":"apple"}]
+
+SELECT ARRAY(SELECT w FROM UNNEST(['Zebra', COLLATE('apple', 'und:ci')]) AS w ORDER BY w DESC)
+=> [{"v":"Zebra"},{"v":"apple"}]
+
+# Ignorable code points such as U+2060 do not affect the order.
+SELECT ARRAY(
+  SELECT fruit FROM UNNEST([
+    COLLATE('oran⁠ge1', 'und:ci'),
+    COLLATE('⁠orange2', 'und:ci'),
+    COLLATE('orange3', 'und:ci')
+  ]) AS fruit
+  ORDER BY fruit
+)
+=> [{"v":"oran⁠ge1"},{"v":"⁠orange2"},{"v":"orange3"}]
+
+SELECT ARRAY_AGG(w ORDER BY w) FROM UNNEST(['Zebra', COLLATE('apple', 'und:ci')]) AS w
+=> [{"v":"apple"},{"v":"Zebra"}]
+
+SELECT ARRAY_AGG(w ORDER BY r) FROM (
+  SELECT w, ROW_NUMBER() OVER (ORDER BY w) AS r FROM UNNEST(['Zebra', COLLATE('apple', 'und:ci')]) AS w
+)
+=> [{"v":"apple"},{"v":"Zebra"}]
+
+# Joins compare their keys under the collation.
+SELECT COUNT(*) FROM UNNEST([COLLATE('a', 'und:ci')]) AS a JOIN UNNEST(['A', 'a', 'b']) AS b ON a = b
+=> "2"
+
+SELECT COUNT(*) FROM UNNEST([COLLATE('a', 'und:ci')]) AS k JOIN UNNEST(['A', 'a', 'b']) AS k USING (k)
+=> "2"
+
+# Functions, operators and expressions propagate the collation of their inputs.
+SELECT UPPER(COLLATE('a', 'und:ci')) = 'a'
+=> "true"
+
+SELECT CONCAT(COLLATE('a', 'und:ci'), 'b') = 'AB'
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') || 'b' = 'AB'
+=> "true"
+
+SELECT [COLLATE('a', 'und:ci'), 'b'][OFFSET(1)] = 'B'
+=> "true"
+
+SELECT STRUCT(COLLATE('a', 'und:ci') AS s).s = 'A'
+=> "true"
+
+SELECT IF(TRUE, COLLATE('a', 'und:ci'), 'b') = 'A'
+=> "true"
+
+SELECT COALESCE(COLLATE('a', 'und:ci'), 'b') = 'A'
+=> "true"
+
+SELECT CASE WHEN COLLATE('a', 'und:ci') = 'A' THEN 'equal' ELSE 'different' END
+=> "equal"

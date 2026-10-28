@@ -1,0 +1,114 @@
+version: 1
+description: >-
+  Record where BigQuery reports collations in schemas: a query result's schema, a table created
+  from a collated query, a query's destination table and a view over collated columns. The
+  emulator does not record collations in schemas yet, and rejects the statements whose schema
+  would keep one.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  schema:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: ${statement}
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          errors: /body/errors
+          schema: /body/schema
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}
+        observe:
+          schema: /body/schema
+          defaultCollation: /body/defaultCollation
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: create_table_as_select
+    template: schema
+    vars:
+      table: t
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.t` AS
+        SELECT COLLATE('a', 'und:ci') AS c, STRUCT(COLLATE('b', 'und:ci') AS f) AS s,
+        [COLLATE('c', 'und:ci')] AS a
+  - name: view
+    template: schema
+    vars:
+      table: v
+      statement: >-
+        CREATE VIEW `${project}.${dataset}.v` AS SELECT COLLATE('a', 'und:ci') AS c
+  - name: query_result
+    steps:
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT COLLATE('a', 'und:ci') AS c, STRUCT(COLLATE('b', 'und:ci') AS f) AS s
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          errors: /body/errors
+          schema: /body/schema
+  - name: destination_table
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            configuration:
+              query:
+                query: SELECT COLLATE('a', 'und:ci') AS c
+                useLegacySql: false
+                destinationTable:
+                  projectId: ${project}
+                  datasetId: ${dataset}
+                  tableId: t
+        bind:
+          job: /body/jobReference/jobId
+          location: /body/jobReference/location
+      - name: wait
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=${location}
+        until: {/body/status/state: DONE}
+        observe:
+          errorResult: /body/status/errorResult
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

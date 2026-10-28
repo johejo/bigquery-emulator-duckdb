@@ -1056,6 +1056,9 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  {.arity = 1, .spelling = "abs($1)"},
              },
              {.uses = {TypeUse::kBigNumeric}}),
+      // A collation is a type annotation, which GoogleSQL propagates to the operations that use
+      // it; the value is the string itself, once the specification is checked.
+      Define("COLLATE", {{.arity = 2, .spelling = "bq_collate($1, $2)"}}),
       Define("$IS_TRUE", {{.arity = 1, .spelling = "($1 IS TRUE)"}}),
       Define("$IS_FALSE", {{.arity = 1, .spelling = "($1 IS FALSE)"}}),
       Define("$NOT", {{.arity = 1, .spelling = "(NOT $1)"}}),
@@ -1504,6 +1507,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
@@ -1518,6 +1522,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
@@ -1528,28 +1533,52 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           "$LESS",
           {
               .rules = Compare("<"),
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
       {
           "$LESS_OR_EQUAL",
           {
               .rules = Compare("<="),
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
       {
           "$GREATER",
           {
               .rules = Compare(">"),
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
       {
           "$GREATER_OR_EQUAL",
           {
               .rules = Compare(">="),
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
       {
@@ -1565,7 +1594,13 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                       },
                       {.arity = 3, .spelling = "($1 BETWEEN $2 AND $3)"},
                   },
-              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesCollationKeys,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
       {"$BITWISE_LEFT_SHIFT", {.rules = Shift("<<")}},

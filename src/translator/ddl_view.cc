@@ -13,6 +13,7 @@
 #include "src/table_metadata.h"
 #include "src/table_path.h"
 #include "src/translated_statement.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"
 #include "src/translator/ddl_names.h"
@@ -113,6 +114,10 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
     const auto type = DuckDbType(output->column().type());
     if (column == relation->columns.end() || !type) {
       return std::nullopt;
+    }
+    // The view's schema, through which the catalog reads it, does not record collations yet.
+    if (HasCollation(output->column().type_annotation_map())) {
+      return Unsupported(scope, "view column collation");
     }
     auto field = BigQueryFieldSchema(output->name(), output->column().type());
     if (!field.ok()) {

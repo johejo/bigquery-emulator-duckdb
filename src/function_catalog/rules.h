@@ -207,6 +207,9 @@ enum class TypeUse : std::uint8_t {
   kBuildsOrReadsInterval,
   // Only compare their INTERVAL arguments or ARRAY elements, so they compare the values' keys.
   kComparesIntervalKeys,
+  // Only compare their STRING arguments, so that under an operation collation they compare the
+  // arguments' collation keys.
+  kComparesCollationKeys,
   // STRUCT handlers that also compare INTERVAL fields, by their keys. BigQuery
   // compares no ARRAYs, also in STRUCT fields.
   kComparesStructsWithInterval,

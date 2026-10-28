@@ -4,7 +4,9 @@
 // arguments of its types, unless the hints file gives the calls; a signature the probe cannot build
 // a valid call for is reported as untested. The hints file gives the samples, the values that
 // templated arguments take, and notes on a function's behavior, so that changing them needs no
-// rebuild.
+// rebuild. Each function that tools/collation_operations.json lists, from BigQuery's
+// documentation, is also called with a collated argument in each signature GoogleSQL marks as
+// using the operation collation.
 //
 // Each output line is a JSON object: the function's name, the pages that document it, how the
 // emulator implements it, its note, the queries to run and the probes settled without one.
@@ -285,11 +287,23 @@ struct Call {
   std::string untested;
 };
 
-// The call of a signature with <T1>, or `element_type`, bound to `element`.
+// How a generated call collates its arguments.
+struct Collation {
+  bool collated = false;
+  // Calls an aggregate with DISTINCT, the only form that compares under the collation.
+  bool distinct = false;
+};
+
+constexpr char kCollatedSample[] = "COLLATE('abc', 'und:ci')";
+
+// The call of a signature with <T1>, or `element_type`, bound to `element`. A collated call binds
+// <T1> to STRING and collates the first argument of STRING or <T1>, from which GoogleSQL
+// propagates the collation to the operation.
 Call GeneratedCall(const std::string& name, const googlesql::Function& function,
                    const googlesql::FunctionSignature& signature, const std::string& text,
                    Hints& hints, const std::string& element, const std::string& element_type,
-                   bool longest) {
+                   bool longest, Collation collation = {}) {
+  bool collated = false;
   // A RANGE of `element` starts at it, and is unbounded where a second element would end it.
   const bool range = IsRangeSignature(signature);
   bool element_used = false;
@@ -305,7 +319,13 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
     const std::string type = TypeKey(argument);
     const googlesql::SignatureArgumentKind kind = argument.kind();
     std::optional<std::string> sample;
-    if (longest && argument.optional()) {
+    if (collation.collated && (type == "STRING" || kind == googlesql::ARG_KIND_EXPR_ANY_1 ||
+                               kind == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1)) {
+      const std::string value = collated ? "'abc'" : kCollatedSample;
+      collated = true;
+      sample = kind == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1 ? "[" + value + "]" : value;
+    }
+    if (!sample && longest && argument.optional()) {
       sample = Find(hints.optional_samples, type);
     }
     if (!sample) {
@@ -344,7 +364,10 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
     }
     previous_type = argument.type();
   }
-  std::string call = name + "(";
+  if (collation.collated && !collated) {
+    return {.sql = "", .untested = "no collatable argument in " + text};
+  }
+  std::string call = name + (collation.distinct ? "(DISTINCT " : "(");
   for (size_t i = 0; i < arguments.size(); ++i) {
     call += (i == 0 ? "" : ", ") + arguments.at(i);
   }
@@ -362,7 +385,8 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
 // where the hints ask for it.
 std::vector<std::pair<std::string, Call>> GeneratedCalls(const std::string& name,
                                                          const googlesql::Function& function,
-                                                         Hints& hints) {
+                                                         Hints& hints,
+                                                         std::optional<bool> collation_distinct) {
   std::vector<std::pair<std::string, Call>> calls;
   for (const googlesql::FunctionSignature& signature : function.signatures()) {
     if (!IsBigQuerySignature(signature)) {
@@ -381,6 +405,15 @@ std::vector<std::pair<std::string, Call>> GeneratedCalls(const std::string& name
     if (optional && hints.Longest(text)) {
       calls.emplace_back(text, GeneratedCall(name, function, signature, text, hints, "", "",
                                              /*longest=*/true));
+    }
+    // A function BigQuery documents as supporting collation, in the signatures whose operation
+    // GoogleSQL collates; only DISTINCT collates COUNT.
+    if (collation_distinct &&
+        (*collation_distinct || signature.options().uses_operation_collation()) &&
+        !signature.options().rejects_collation()) {
+      calls.emplace_back(text, GeneratedCall(name, function, signature, text, hints, "", "",
+                                             /*longest=*/false,
+                                             {.collated = true, .distinct = *collation_distinct}));
     }
   }
   return calls;
@@ -411,8 +444,8 @@ std::string Implementation(const std::string& name, const function_catalog::Func
 int Main(int argc, char** argv) {
   std::vector<std::string> args(argv + 1, argv + argc);
   const bool list_signatures = std::erase(args, "--signatures") > 0;
-  if (args.size() != 2) {
-    std::cerr << "usage: function_probe [--signatures] FUNCTIONS_FILE HINTS_FILE\n";
+  if (args.size() != 3) {
+    std::cerr << "usage: function_probe [--signatures] FUNCTIONS_FILE HINTS_FILE COLLATION_FILE\n";
     return 2;
   }
   // The pages and anchors that document each function. A name can be documented on several
@@ -422,6 +455,23 @@ int Main(int argc, char** argv) {
     functions[name].push_back(doc);
   }
   Hints hints = ReadHints(args.at(1), functions);
+  // Whether each function BigQuery documents as supporting collation does so only with DISTINCT.
+  // Other operations it lists, such as the comparison operators, are SQL features.
+  std::map<std::string, bool> collations;
+  {
+    std::ifstream in(args.at(2));
+    if (!in) {
+      throw std::runtime_error("cannot read " + args.at(2));
+    }
+    const nlohmann::json catalog = nlohmann::json::parse(in);
+    for (const auto& operation : catalog.at("operations")) {
+      const auto name = operation.at("name").get<std::string>();
+      if (functions.contains(name)) {
+        collations[name] = operation.value("distinct", false);
+      }
+    }
+  }
+  std::vector<std::string> uncollated;
 
   googlesql::TypeFactory type_factory;
   NoTables tables;
@@ -452,7 +502,10 @@ int Main(int argc, char** argv) {
     if (const auto hinted = hints.queries.find(name); hinted != hints.queries.end()) {
       line["queries"] = hinted->second;
     } else if (known) {
-      for (const auto& [signature, call] : GeneratedCalls(name, *function, hints)) {
+      const auto collation = collations.find(name);
+      for (const auto& [signature, call] : GeneratedCalls(
+               name, *function, hints,
+               collation == collations.end() ? std::nullopt : std::optional(collation->second))) {
         if (list_signatures) {
           std::cout << signature << "\n  " << (call.sql.empty() ? call.untested : call.sql) << "\n";
         } else if (call.sql.empty()) {
@@ -469,9 +522,23 @@ int Main(int argc, char** argv) {
         line["queries"].push_back(query);
       }
     }
+    if (collations.contains(name) &&
+        std::ranges::none_of(line["queries"], [](const nlohmann::json& query) {
+          return query.get<std::string>().find(kCollatedSample) != std::string::npos;
+        })) {
+      uncollated.push_back(name);
+    }
     if (!list_signatures) {
       std::cout << line.dump() << "\n";
     }
+  }
+  // A documented function no call collates has no signature GoogleSQL collates, or hints that
+  // replace its calls; such a function needs an extra_query that calls it with kCollatedSample.
+  for (const std::string& name : uncollated) {
+    std::cerr << args.at(2) << ": no call collates " << name << "\n";
+  }
+  if (!uncollated.empty()) {
+    return 1;
   }
   if (const std::vector<std::string> unused = hints.Unused(); !unused.empty()) {
     for (const std::string& pattern : unused) {

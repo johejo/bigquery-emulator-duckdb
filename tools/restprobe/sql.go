@@ -84,7 +84,7 @@ func classify(sql, message string) probereport.Probe {
 		return probereport.Probe{Outcome: probereport.Unsupported, Detail: feature}
 	}
 	if prefix := analyzerError.FindString(message); prefix != "" {
-		// A feature whose language option the emulator leaves off, such as COLLATE, is one it does
+		// A feature whose language option the emulator leaves off is one it does
 		// not support rather than a query the probe got wrong.
 		if feature, _, ok := strings.Cut(message[len(prefix):], " not supported"); ok {
 			return probereport.Probe{Outcome: probereport.Unsupported, Detail: strings.TrimSuffix(feature, " is")}

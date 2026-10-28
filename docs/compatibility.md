@@ -195,6 +195,19 @@ INT64, and subtraction between DATE, DATETIME, TIMESTAMP or TIME values. Other l
 - Loads accept only CSV, with the full `Y-M D H:M:S[.F]` form. Extracts and Storage API reads
   are unsupported.
 
+### Collation
+
+[Collations](../third_party/bigquery_docs/reference/standard-sql/collation-concepts.md) are
+limited to comparisons, `IN` lists, joins and `ORDER BY`, including window and aggregate
+ordering; [sql.md](sql.md#collation) and [functions.md](functions.md) list the other operations,
+which are unsupported with a collation. `und:ci` compares with GoogleSQL's collator, ICU's root
+locale at secondary strength, whose Unicode data can order some strings differently from
+BigQuery's.
+
+Schemas do not record collations yet: column and default collations are unsupported, as are
+views and query destination tables with collated columns. Query results report their schemas
+without collations.
+
 ### RANGE values
 
 Functions over RANGE values are limited to range functions, casts, comparisons, JSON functions,

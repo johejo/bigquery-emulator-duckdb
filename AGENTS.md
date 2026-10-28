@@ -123,6 +123,30 @@ Check each overload against BigQuery's documentation for:
 
 Cover each of these that applies with a case in `tests/e2e/goclient/testdata/scalars/`.
 
+## Collation
+
+GoogleSQL's resolver decides which collation each operation uses and records it in the resolved
+AST; do not derive it from argument types. Read collations only through
+`src/translator/collation.h`, including the column annotations of operations whose collation the
+AST does not record, such as set operations. Apply one by what the operation does:
+
+- **Collation keys**: an operation that only compares, orders or groups strings uses their
+  `CollationKey`s, which are equal and ordered exactly as the strings are under the collation.
+  Mark a function that only compares its STRING arguments `kComparesCollationKeys`. An operation
+  that returns a compared value, such as MIN, GREATEST or GROUP BY, still returns the value
+  rather than its key; which of equal values it returns needs a source.
+- **GoogleSQL's collated implementations**: an operation that searches or matches within strings,
+  such as STARTS_WITH, REPLACE or LIKE, calls `googlesql/public/functions/string_with_collation.h`
+  through a backend function that takes the specification.
+
+Any other operation rejects a non-empty collation as unsupported; a value carries one freely where
+no operation uses it. Until `FieldSchema` records collations, also reject schemas that would keep
+one, such as tables, views and query destinations. Recording them means giving catalog columns
+their collation annotations, with DDL, the REST API and INFORMATION_SCHEMA agreeing.
+`tools/collation_operations.json`, generated from the documentation, and the Collation section of
+`tools/sql_features.txt` list the operations to cover; `docs/functions.md` and `docs/sql.md` show
+what remains.
+
 ## Tests and probes
 
 Each layer checks one thing; write a form in the layer that checks it, and never copy SQL and its

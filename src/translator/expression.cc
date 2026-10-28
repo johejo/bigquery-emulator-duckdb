@@ -18,6 +18,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/comparison.h"
+#include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/function.h"
 #include "src/translator/literal.h"
@@ -305,7 +306,7 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
         return Unsupported(scope, "IN subquery with INTERVAL");
       }
       if (!subquery.in_collation().Empty()) {
-        return std::nullopt;
+        return Unsupported(scope, "IN subquery with collation");
       }
       const auto value = Expression(*subquery.in_expr(), scope, columns);
       if (!value) {
@@ -327,7 +328,12 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
 
 std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item, const Scope& scope,
                                      const Columns& columns) {
-  if (item.collation_name() != nullptr || !item.collation().Empty()) {
+  // BigQuery has no ORDER BY ... COLLATE clause; the collation comes from the ordered value.
+  if (item.collation_name() != nullptr) {
+    return Unsupported(scope, "ORDER BY with COLLATE");
+  }
+  const auto collation = OperationCollation(item.collation(), scope);
+  if (!collation) {
     return std::nullopt;
   }
   auto column = Expression(*item.column_ref(), scope, columns);
@@ -337,6 +343,7 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
   if (item.column_ref()->type()->IsInterval()) {
     column = IntervalKey(*column);
   }
+  column = CollationKey(*column, *collation);
   // BigQuery sorts NULL first for ASC and last for DESC, unlike DuckDB's ASC default.
   const bool nulls_first =
       item.null_order() == googlesql::ResolvedOrderByItem::NULLS_FIRST ||
@@ -364,7 +371,7 @@ Scope Nested(const Scope& scope, const Columns& columns) {
 std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const Scope& scope,
                                       const Columns& columns) {
   const auto type = DuckDbType(expr.type());
-  if (!type || expr.type_annotation_map() != nullptr) {
+  if (!type || !OnlyCollations(expr.type_annotation_map())) {
     return Unsupported(scope, "type " + expr.type()->DebugString());
   }
   if (expr.Is<googlesql::ResolvedLiteral>()) {

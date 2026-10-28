@@ -23,7 +23,8 @@ rejected.
 | [Graphs](#graphs) | 0 | 4 | 0 |
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 23 | 8 | 2 |
+| [DDL](#ddl) | 23 | 8 | 1 |
+| [Collation](#collation) | 4 | 3 | 7 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -104,7 +105,6 @@ rejected.
 | Default rounding modes | Supported |  |
 | Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option partition_expiration_days. |
 | Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: ALTER TABLE action AddConstraintAction; ALTER TABLE action DropConstraintAction. |
-| Collation | Unsupported |  |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `CREATE TABLE LIKE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
@@ -127,6 +127,25 @@ rejected.
 | `DROP TABLE FUNCTION` | Supported |  |
 | `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedure arguments of ANY TYPE. |
 | `DROP PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: persistent routine name missing without a dataset. |
+
+## Collation
+
+| Feature | Status | Notes |
+| --- | --- | --- |
+| Collated comparisons | Supported | See [Collation](compatibility.md#collation). |
+| Collated `IN` | Partial | Unsupported: IN subquery with collation. |
+| Collated `LIKE` | Unsupported |  |
+| Collated joins | Supported |  |
+| Collated `ORDER BY` | Supported |  |
+| Collated `GROUP BY` | Unsupported |  |
+| Collated window functions | Partial | Unsupported: PARTITION BY with collation. |
+| Collated set operations | Partial | Unsupported: set operation DISTINCT with collation. |
+| Column collation | Unsupported |  |
+| Table default collation | Unsupported |  |
+| Dataset default collation | Unsupported |  |
+| Collated views | Unsupported |  |
+| Collated materialized views | Unsupported |  |
+| Collated table functions | Supported |  |
 
 ## Multi-statement queries
 

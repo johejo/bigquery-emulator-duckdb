@@ -1,0 +1,27 @@
+# Collation errors:
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+# BigQuery takes und:ci and the empty specification; their messages are unverified.
+SELECT COLLATE('a', 'und:cs')
+=> error:
+
+SELECT COLLATE('a', 'binary')
+=> error:
+
+SELECT COLLATE('a', 'fr')
+=> error:
+
+# The documentation spells the message "Collation isn't allowed on argument x ('und:ci'). Use
+# COLLATE(arg, '') to remove collation".
+CREATE TEMP FUNCTION f(x STRING) AS (x);
+SELECT f(COLLATE('a', 'und:ci'))
+=> error:
+
+CREATE TEMP FUNCTION f(x STRING) AS (COLLATE(x, 'und:ci'));
+SELECT f('a')
+=> error contains: in return type of user-defined function body is not allowed
+
+# [NOT] IN UNNEST does not support collation.
+SELECT COLLATE('a', 'und:ci') IN UNNEST(['A'])
+=> error:
