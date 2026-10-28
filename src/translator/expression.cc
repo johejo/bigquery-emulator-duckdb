@@ -305,8 +305,9 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
       if (HasInterval(in_type) && !in_type->IsInterval() && !in_type->IsStruct()) {
         return Unsupported(scope, "IN subquery with INTERVAL");
       }
-      if (!subquery.in_collation().Empty()) {
-        return Unsupported(scope, "IN subquery with collation");
+      const auto collation = OperationCollation(subquery.in_collation(), scope);
+      if (!collation) {
+        return std::nullopt;
       }
       const auto value = Expression(*subquery.in_expr(), scope, columns);
       if (!value) {
@@ -319,7 +320,8 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
       if (subquery.in_expr()->type()->IsStruct()) {
         return StructInArray(subquery.in_expr()->type(), *value, "ARRAY(" + select + ")");
       }
-      return "(" + *value + " IN (" + select + "))";
+      return "(" + CollationKey(*value, *collation) + " IN (SELECT " +
+             CollationKey(column->second, *collation) + relation->From() + "))";
     }
     default:
       return std::nullopt;
