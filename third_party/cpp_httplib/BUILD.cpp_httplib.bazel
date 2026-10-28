@@ -1,9 +1,11 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-# Header-only and without TLS or compression; //:httplib sets the emulator's configuration macros.
+# Header-only and without TLS; //:httplib sets the emulator's other configuration macros.
 cc_library(
     name = "httplib",
     hdrs = ["httplib.h"],
+    defines = ["CPPHTTPLIB_ZLIB_SUPPORT"],
     includes = ["."],
     visibility = ["//visibility:public"],
+    deps = ["@zlib"],
 )
