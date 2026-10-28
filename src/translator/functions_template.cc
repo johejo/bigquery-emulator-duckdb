@@ -965,7 +965,8 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  {.arity = 1, .spelling = "(-$1)"},
              },
              {.uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric}}),
-      // SAFE_DIVIDE returns NULL for both division by zero and finite-input overflow.
+      // SAFE_DIVIDE returns NULL for both division by zero and finite-input overflow. CASE avoids
+      // DuckDB v2's NULLIF macro binder.
       Define("SAFE_DIVIDE",
              {
                  {
@@ -978,10 +979,10 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  {
                      .arity = 2,
                      .spelling = "CASE WHEN $2 = 0 OR (isfinite($1) AND isfinite($2) AND "
-                                 "isinf($1 / NULLIF($2, 0))) THEN NULL ELSE $1 / $2 END",
+                                 "isinf($1 / $2)) THEN NULL ELSE $1 / $2 END",
                      .conditions = kDouble,
                  },
-                 {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
+                 {.arity = 2, .spelling = "($1 / CASE WHEN $2 = 0 THEN NULL ELSE $2 END)"},
              },
              {.uses = {TypeUse::kBigNumeric}}),
       // DuckDB returns NULL on a zero divisor, and MOD(INT64_MIN, -1) overflows instead of 0.
