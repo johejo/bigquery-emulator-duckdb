@@ -63,6 +63,16 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
         })))) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with graph values");
   }
+  // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
+  if (functions.HasTypeUse(name, TypeUse::kRejectsSafe) &&
+      call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
+    throw std::invalid_argument("SAFE is unsupported with aggregate function " +
+                                call.function()->Name());
+  }
+  if (functions.HasTypeUse(name, TypeUse::kRejectsDistinct) && call.distinct()) {
+    throw std::invalid_argument("Aggregate function " + name +
+                                " cannot be used with DISTINCT modifier.");
+  }
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||

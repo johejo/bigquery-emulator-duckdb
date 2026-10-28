@@ -31,6 +31,9 @@ SELECT KLL_QUANTILES.INIT_FLOAT64(x, 1000, weight => -1) FROM UNNEST(ARRAY<FLOAT
 SELECT KLL_QUANTILES.EXTRACT_INT64(s, 4) FROM (SELECT KLL_QUANTILES.INIT_INT64(x, 1, weight => 2147483647) AS s FROM UNNEST([42,42]) AS x)
 => [{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"},{"v":"42"}]
 
+SELECT SAFE.KLL_QUANTILES.INIT_INT64(x, 1000, weight => 0) IS NULL FROM UNNEST([1]) AS x
+=> error: SAFE is unsupported with aggregate function init_int64
+
 SELECT KLL_QUANTILES.MERGE_INT64(s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
 => []
 
@@ -59,3 +62,36 @@ SELECT KLL_QUANTILES.MERGE_PARTIAL(s) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) A
 # Empty INIT: tools/kll/sketch_format.answers.txt.
 SELECT KLL_QUANTILES.INIT_FLOAT64(x) IS NULL FROM UNNEST(ARRAY<FLOAT64>[]) AS x
 => "true"
+
+# Source: BigQuery answers collected by the maintainer.
+# BigQuery takes none of the aggregates with SAFE, OVER or DISTINCT.
+
+SELECT SAFE.KLL_QUANTILES.INIT_FLOAT64(x) IS NULL FROM UNNEST([1.0]) AS x
+=> error: SAFE is unsupported with aggregate function init_float64
+
+SELECT SAFE.KLL_QUANTILES.MERGE_PARTIAL(s) IS NULL FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: SAFE is unsupported with aggregate function merge_partial
+
+SELECT SAFE.KLL_QUANTILES.MERGE_INT64(s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: SAFE is unsupported with aggregate function merge_int64
+
+SELECT SAFE.KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: SAFE is unsupported with aggregate function merge_point_float64
+
+SELECT KLL_QUANTILES.INIT_INT64(x) OVER () IS NULL FROM UNNEST([1]) AS x
+=> error: Analytic function INIT_INT64 is not supported.
+
+SELECT KLL_QUANTILES.MERGE_PARTIAL(s) OVER () IS NULL FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Analytic function MERGE_PARTIAL is not supported.
+
+SELECT KLL_QUANTILES.MERGE_INT64(s, 2) OVER () FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Analytic function MERGE_INT64 is not supported.
+
+SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) OVER () FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Analytic function MERGE_POINT_FLOAT64 is not supported.
+
+SELECT KLL_QUANTILES.INIT_INT64(DISTINCT x) IS NULL FROM UNNEST([1, 1]) AS x
+=> error: Aggregate function KLL_QUANTILES.INIT_INT64 cannot be used with DISTINCT modifier.
+
+SELECT KLL_QUANTILES.MERGE_INT64(DISTINCT s, 2) FROM UNNEST(ARRAY<BYTES>[]) AS s
+=> error: Aggregate function KLL_QUANTILES.MERGE_INT64 cannot be used with DISTINCT modifier.

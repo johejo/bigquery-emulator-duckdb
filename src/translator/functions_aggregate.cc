@@ -264,6 +264,13 @@ std::string FinishKllMerge(const std::string& sql, const std::vector<std::string
          (kInteger ? "int64" : "float64") + "(" + sql + ", " + args.at(1) + ")";
 }
 
+// BigQuery takes none of the KLL aggregates with SAFE, OVER or DISTINCT.
+constexpr function_catalog::TypeUses kKllUses = {
+    TypeUse::kRejectsSafe,
+    TypeUse::kRejectsOver,
+    TypeUse::kRejectsDistinct,
+};
+
 template <bool kInteger, bool kPoint>
 constexpr StaticAggregateRule KllMerge() {
   return {
@@ -435,20 +442,16 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  .uses = {TypeUse::kBigNumeric},
              }),
 
-      Define("KLL_QUANTILES.INIT_INT64", {KllInit(true)}, {.uses = {TypeUse::kRejectsOver}}),
-      Define("KLL_QUANTILES.INIT_FLOAT64", {KllInit(false)}, {.uses = {TypeUse::kRejectsOver}}),
+      Define("KLL_QUANTILES.INIT_INT64", {KllInit(true)}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.INIT_FLOAT64", {KllInit(false)}, {.uses = kKllUses}),
       Define(
           "KLL_QUANTILES.MERGE_PARTIAL",
           {{.function = "bq_kll_merge_partial", .distinct = AggregateRule::Distinct::kUnsupported}},
-          {.uses = {TypeUse::kRejectsOver}}),
-      Define("KLL_QUANTILES.MERGE_INT64", {KllMerge<true, false>()},
-             {.uses = {TypeUse::kRejectsOver}}),
-      Define("KLL_QUANTILES.MERGE_FLOAT64", {KllMerge<false, false>()},
-             {.uses = {TypeUse::kRejectsOver}}),
-      Define("KLL_QUANTILES.MERGE_POINT_INT64", {KllMerge<true, true>()},
-             {.uses = {TypeUse::kRejectsOver}}),
-      Define("KLL_QUANTILES.MERGE_POINT_FLOAT64", {KllMerge<false, true>()},
-             {.uses = {TypeUse::kRejectsOver}}),
+          {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_INT64", {KllMerge<true, false>()}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_FLOAT64", {KllMerge<false, false>()}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_POINT_INT64", {KllMerge<true, true>()}, {.uses = kKllUses}),
+      Define("KLL_QUANTILES.MERGE_POINT_FLOAT64", {KllMerge<false, true>()}, {.uses = kKllUses}),
 
       Define("HLL_COUNT.INIT",
              {
