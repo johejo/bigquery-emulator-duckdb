@@ -1,13 +1,14 @@
 version: 1
-# Recorded on BigQuery in project johejo-sandbox, run eorttcsidcpquia6yq64cswijt; the answers
-# sidecar keeps the observations. Rejections observe their status, reason and message.
+# Recorded on BigQuery in project johejo-sandbox, runs eorttcsidcpquia6yq64cswijt and
+# yfs5kf2veu7er2pu77hliq7uvo (routine_update_empty_id); the answers sidecar keeps the
+# observations. Rejections observe their status, reason and message.
 #
 # BigQuery reads an empty string or an UNSPECIFIED enum as a field left out: it reports an empty
 # ID missing, runs a routine of language LANGUAGE_UNSPECIFIED as SQL, returns no argument mode or
 # kind that is UNSPECIFIED, and takes empty dispositions as their defaults.
 description: >-
   Empty IDs, explicit UNSPECIFIED enum values and empty dispositions in datasets.insert,
-  tables.insert, routines.insert and jobs.insert.
+  tables.insert, routines.insert, routines.update and jobs.insert.
 vars:
   dataset: e2e_${run}_${case}
 templates:
@@ -127,6 +128,48 @@ cases:
         message: >-
           Project ID, dataset ID and routine ID cannot be missing or empty in call to
           routines.insert
+  - name: routine_update_empty_id
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+          body:
+            routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: f}
+            routineType: SCALAR_FUNCTION
+            definitionBody: '1'
+      - name: update
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines/f
+          body:
+            routineReference: {projectId: '${project}', datasetId: '${dataset}', routineId: ''}
+            routineType: SCALAR_FUNCTION
+            definitionBody: '2'
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      update:
+        status: 400
+        reason: invalid
+        message: >-
+          Project ID, dataset ID and routine ID cannot be missing or empty in call to
+          routines.update
   - name: routine_language_unspecified
     template: routine
     vars:
@@ -231,7 +274,8 @@ cases:
           method: GET
           path: /bigquery/v2/projects/${project}/jobs/${second_job}?location=US
         until: {/body/status/state: DONE}
-        # The emulator also gives this error a location, which BigQuery leaves out.
+        # The emulator also gives this error a location, which BigQuery leaves out
+        # (known_bugs/job_error_result.api.yaml).
         observe:
           reason: /body/status/errorResult/reason
           message: /body/status/errorResult/message

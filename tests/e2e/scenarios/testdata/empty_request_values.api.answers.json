@@ -162,6 +162,31 @@
         }
       }
     },
+    "routine_update_empty_id": {
+      "project": "johejo-sandbox",
+      "run": "yfs5kf2veu7er2pu77hliq7uvo",
+      "steps": {
+        "update": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Project ID, dataset ID and routine ID cannot be missing or empty in call to routines.update",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Project ID, dataset ID and routine ID cannot be missing or empty in call to routines.update",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
     "table_empty_id": {
       "project": "johejo-sandbox",
       "run": "eorttcsidcpquia6yq64cswijt",

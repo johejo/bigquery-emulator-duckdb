@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "cases": {
+    "write_empty_error_result": {
+      "project": "johejo-sandbox",
+      "run": "eorttcsidcpquia6yq64cswijt",
+      "steps": {
+        "first_done": {},
+        "rows": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "second_done": {
+          "errorResult": {
+            "message": "Already Exists: Table johejo-sandbox:bqa_eorttcsidcpquia6yq64cswijt_query_job_empty_dispositions.t",
+            "reason": "duplicate"
+          }
+        }
+      }
+    }
+  }
+}
