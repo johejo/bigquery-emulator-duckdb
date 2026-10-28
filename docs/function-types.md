@@ -327,7 +327,7 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | [REPLACE](function-types/string.md#replace) | 2 | Supported |
 | [REVERSE](function-types/string.md#reverse) | 2 | Supported |
 | [RIGHT](function-types/string.md#right) | 2 | Supported |
-| [ROUND](function-types/mathematical.md#round) | 10 | Broken |
+| [ROUND](function-types/mathematical.md#round) | 10 | Supported |
 | `ROW_NUMBER` | 0 | Not enumerated |
 | [RPAD](function-types/string.md#rpad) | 4 | Supported |
 | [RTRIM](function-types/string.md#rtrim) | 3 | Supported |
@@ -459,7 +459,7 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `TO_JSON_STRING` | 0 | Not enumerated |
 | [TRANSLATE](function-types/string.md#translate) | 2 | Supported |
 | [TRIM](function-types/string.md#trim) | 3 | Supported |
-| [TRUNC](function-types/mathematical.md#trunc) | 8 | Broken |
+| [TRUNC](function-types/mathematical.md#trunc) | 8 | Supported |
 | `TYPEOF` | 0 | Not enumerated |
 | `UNICODE` | 0 | Not enumerated |
 | `UNIX_DATE` | 0 | Not enumerated |

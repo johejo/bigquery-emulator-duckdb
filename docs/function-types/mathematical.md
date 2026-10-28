@@ -221,8 +221,8 @@ Source: [ROUND](../../third_party/bigquery_docs/reference/standard-sql/mathemati
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 | `INT64, INT64` | `FLOAT64` | Supported |  |
-| `NUMERIC, INT64` | `NUMERIC` | Broken | `SELECT ROUND(a0, a1) AS result FROM (SELECT CAST(2 AS NUMERIC) AS a0, CAST(2 AS INT64) AS a1)`: Binder Error: The "precision" argument in function "round" must be a constant expression |
-| `NUMERIC, INT64, STRING` | `NUMERIC` | Broken | `SELECT ROUND(a0, a1, 'ROUND_HALF_EVEN') AS result FROM (SELECT CAST(2 AS NUMERIC) AS a0, CAST(2 AS INT64) AS a1)`: Binder Error: The "precision" argument in function "round" must be a constant expression |
+| `NUMERIC, INT64` | `NUMERIC` | Supported |  |
+| `NUMERIC, INT64, STRING` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, INT64, STRING` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64, INT64` | `FLOAT64` | Supported |  |
@@ -363,6 +363,6 @@ Source: [TRUNC](../../third_party/bigquery_docs/reference/standard-sql/mathemati
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 | `INT64, INT64` | `FLOAT64` | Supported |  |
-| `NUMERIC, INT64` | `NUMERIC` | Broken | `SELECT TRUNC(a0, a1) AS result FROM (SELECT CAST(2 AS NUMERIC) AS a0, CAST(2 AS INT64) AS a1)`: Binder Error: The "precision" argument in function "trunc" must be a constant expression |
+| `NUMERIC, INT64` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64, INT64` | `FLOAT64` | Supported |  |

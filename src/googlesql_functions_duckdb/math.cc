@@ -20,6 +20,7 @@
 #include "googlesql/public/functions/distance.h"
 #include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/numeric.h"
+#include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
@@ -246,6 +247,13 @@ bool TruncDigits(double value, int64_t digits, bool early_positive_zero, double*
   return fn::TruncDecimal(value, digits, out, error);
 }
 
+// NUMERIC keeps its decimal precision for both modes, including nonconstant digits.
+template <fn::RoundingMode kMode>
+bool RoundNumericWithMode(googlesql::NumericValue in, int64_t digits, googlesql::NumericValue* out,
+                          absl::Status* error) {
+  return fn::RoundDecimalWithRoundingMode(in, digits, kMode, out, error);
+}
+
 // Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix,
@@ -275,6 +283,12 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
            Apply<fn::Divide<T>, Errors::kNull>);
   Register(connection, ("bq_log" + suffix).c_str(), two, type.get(), Apply<fn::Logarithm<T>>);
   Register(connection, "bq_parse_numeric", {kVarchar}, type.get(), Apply<fn::ParseNumeric>);
+  LogicalType const digits(duckdb_create_logical_type(kBigint));
+  const std::vector<duckdb_logical_type> with_digits = {type.get(), digits.get()};
+  Register(connection, "bq_round_numeric", with_digits, type.get(), Apply<fn::RoundDecimal<T>>);
+  Register(connection, "bq_round_numeric_half_even", with_digits, type.get(),
+           Apply<RoundNumericWithMode<fn::RoundingMode::ROUND_HALF_EVEN>>);
+  Register(connection, "bq_trunc_numeric", with_digits, type.get(), Apply<fn::TruncDecimal<T>>);
 }
 
 }  // namespace

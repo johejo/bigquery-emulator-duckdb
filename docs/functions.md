@@ -436,7 +436,7 @@ functions.
 | [`POWER`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | GoogleSQL function |  |
 | [`RAND`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB function, renamed |  |
 | [`RANGE_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
-| [`ROUND`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
+| [`ROUND`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL / GoogleSQL function |  |
 | [`SAFE_ADD`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | SAFE. operator |  |
 | [`SAFE_DIVIDE`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | DuckDB SQL |  |
 | [`SAFE_MULTIPLY`](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md) | Supported | SAFE. operator |  |
