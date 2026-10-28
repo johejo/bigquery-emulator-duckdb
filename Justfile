@@ -139,8 +139,8 @@ docs: function-types-update collation-operations-update
     {{ _api_probe }} | {{ _test_go }} run ./tools/bigquerydocs render docs/api.md > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
     {{ _storage_probe }} > docs/storage.md.tmp && mv docs/storage.md.tmp docs/storage.md
 
-# Fails when function, SQL, DDL option, REST or Storage docs are stale.
-docs-check:
+# Validates saved citations and fails when function, SQL, DDL option, REST or Storage docs are stale.
+docs-check: bigquery-docs-check
     {{ _test_go }} run ./tools/functioncoverage third_party/bigquery_docs | diff -u tools/function_types.json - || { echo "function type catalog is stale; run just function-types-update" >&2; exit 1; }
     {{ _test_go }} run ./tools/collationcoverage third_party/bigquery_docs | diff -u tools/collation_operations.json - || { echo "collation catalog is stale; run just collation-operations-update" >&2; exit 1; }
     bazelisk build //:function_probe //:bigquery-emulator-duckdb

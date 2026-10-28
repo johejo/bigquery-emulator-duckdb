@@ -1,6 +1,6 @@
 # Finite-input arithmetic must not produce infinity. NULL propagation and SAFE behavior:
-# ../../../../../third_party/bigquery_docs/reference/standard-sql/operators.md
-# ../../../../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+# third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
 # Overflow inputs also appear in GoogleSQL's arithmetic compliance test data.
 SELECT x + x FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
 => error contains: double overflow
