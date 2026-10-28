@@ -1,0 +1,34 @@
+# Completed maintainer-recorded BigQuery round; archived for investigation.
+# Targeted questions after tools/kll/followup.answers.txt.
+# The candidate extraction model includes payload field 6.1 as a sampled value
+# with weight field 6.2, then normalizes by total retained weight (not outer n).
+# It matches all recorded fixed-sketch quantiles, but these boundaries distinguish
+# nearby alternative rules. These are questions, not guessed expected values.
+
+# Recorded n=4, precision=1: levels [(1,2),(3,2)], extra sample (4,1).
+# Candidate total mass=5, although outer n=4. Probe the exact mass boundaries.
+SELECT [KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.4), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.400001), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.8), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.800001)]
+FROM (SELECT FROM_HEX('0871100420048a071d080310011a01012201042a0212002a041202010232070a010410011801') AS s)
+?> [{"v":"1"},{"v":"3"},{"v":"3"},{"v":"4"}]
+
+# Recorded n=16, precision=1: level value 4 has weight 8, sample 16 has weight 7.
+# A model normalized by original n would cross the boundary earlier.
+SELECT [KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.5), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.51), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.533), KLL_QUANTILES.EXTRACT_POINT_INT64(s, 0.534)]
+FROM (SELECT FROM_HEX('0871101020048a0724080310011a01012201102a0212002a0212002a0212002a0312010432070a011010071803') AS s)
+?> [{"v":"4"},{"v":"4"},{"v":"4"},{"v":"16"}]
+
+# Recorded FLOAT64 n=4097: levels (-186.25,2048),(75.875,2048), sample (220.625,854).
+# Candidate mass=4950; boundaries are 2048/4950 and 4096/4950.
+SELECT [KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.413), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.414), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.827), KLL_QUANTILES.EXTRACT_POINT_FLOAT64(s, 0.828)]
+FROM (SELECT FROM_HEX('0871108120200a8a0769080310011a0800000000000070c0220800000000000070402a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a020a002a120a1000000000004867c00000000000f85240320f0a080000000000946b4010d606180b') AS s)
+?> [{"v":"-186.25"},{"v":"75.875"},{"v":"75.875"},{"v":"220.625"}]
+
+# Mutate only sampler weight 7 -> 0 in recorded n=16. Is it accepted, and ignored?
+# The sample value, outer n and all level messages remain unchanged.
+SELECT KLL_QUANTILES.EXTRACT_POINT_INT64(FROM_HEX('0871101020048a0724080310011a01012201102a0212002a0212002a0212002a0312010432070a011010001803'), 0.75)
+?> "4"
+
+# Mutate only sampler field 3, 3 -> 4, in recorded n=16.
+# This asks whether the exponent-like field affects reading or only future updates.
+SELECT KLL_QUANTILES.EXTRACT_INT64(FROM_HEX('0871101020048a0724080310011a01012201102a0212002a0212002a0212002a0312010432070a011010071804'), 8)
+?> [{"v":"1"},{"v":"4"},{"v":"4"},{"v":"4"},{"v":"4"},{"v":"16"},{"v":"16"},{"v":"16"},{"v":"16"}]
