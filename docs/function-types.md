@@ -82,8 +82,8 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | [ARRAY_AGG](function-types/aggregate.md#array_agg) | 20 | Supported |
 | [ARRAY_CONCAT](function-types/array.md#array_concat) | 40 | Supported |
 | [ARRAY_CONCAT_AGG](function-types/aggregate.md#array_concat_agg) | 20 | Partial |
-| [ARRAY_FIRST](function-types/array.md#array_first) | 20 | Partial |
-| [ARRAY_LAST](function-types/array.md#array_last) | 20 | Partial |
+| [ARRAY_FIRST](function-types/array.md#array_first) | 20 | Supported |
+| [ARRAY_LAST](function-types/array.md#array_last) | 20 | Supported |
 | [ARRAY_LENGTH](function-types/array.md#array_length) | 20 | Supported |
 | [ARRAY_REVERSE](function-types/array.md#array_reverse) | 20 | Supported |
 | [ARRAY_SLICE](function-types/array.md#array_slice) | 20 | Supported |

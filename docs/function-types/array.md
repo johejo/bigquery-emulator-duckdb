@@ -80,7 +80,7 @@ Source: [ARRAY_FIRST](../../third_party/bigquery_docs/reference/standard-sql/arr
 | `ARRAY<TIME>` | `TIME` | Supported |  |
 | `ARRAY<TIMESTAMP>` | `TIMESTAMP` | Supported |  |
 | `ARRAY<INTERVAL>` | `INTERVAL` | Supported |  |
-| `ARRAY<GEOGRAPHY>` | `GEOGRAPHY` | Unsupported | function ERROR with GEOGRAPHY |
+| `ARRAY<GEOGRAPHY>` | `GEOGRAPHY` | Supported |  |
 | `ARRAY<JSON>` | `JSON` | Supported |  |
 | `ARRAY<RANGE<DATE>>` | `RANGE<DATE>` | Supported |  |
 | `ARRAY<RANGE<DATETIME>>` | `RANGE<DATETIME>` | Supported |  |
@@ -107,7 +107,7 @@ Source: [ARRAY_LAST](../../third_party/bigquery_docs/reference/standard-sql/arra
 | `ARRAY<TIME>` | `TIME` | Supported |  |
 | `ARRAY<TIMESTAMP>` | `TIMESTAMP` | Supported |  |
 | `ARRAY<INTERVAL>` | `INTERVAL` | Supported |  |
-| `ARRAY<GEOGRAPHY>` | `GEOGRAPHY` | Unsupported | function ERROR with GEOGRAPHY |
+| `ARRAY<GEOGRAPHY>` | `GEOGRAPHY` | Supported |  |
 | `ARRAY<JSON>` | `JSON` | Supported |  |
 | `ARRAY<RANGE<DATE>>` | `RANGE<DATE>` | Supported |  |
 | `ARRAY<RANGE<DATETIME>>` | `RANGE<DATETIME>` | Supported |  |
