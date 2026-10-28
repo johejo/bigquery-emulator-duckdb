@@ -29,6 +29,7 @@
 #include "src/connection_id.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
 #include "src/translator/aggregate.h"
@@ -765,7 +766,11 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     // A view such as INFORMATION_SCHEMA.TABLES is read from the query that computes it.
     const auto* sql_table = dynamic_cast<const SqlTable*>(table->table());
     const auto* stored_table = dynamic_cast<const BigQueryTable*>(table->table());
-    const auto read_query = stored_table == nullptr ? std::nullopt : stored_table->ReadQuery();
+    const auto read_query =
+        history || stored_table == nullptr
+            ? std::nullopt
+            : StatementResources::ReadQuery(stored_table->reference(), stored_table->ReadQuery(),
+                                            scope.context.resources);
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +
                  (history                ? "(" + *history + ") AS v"

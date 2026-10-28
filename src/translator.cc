@@ -36,11 +36,20 @@ std::optional<TranslatedStatement> TranslateStatement(
     const QueryParameters& parameters, const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
   TranslatedStatement translated;
+  translated.statement_type = translator::StatementType(statement);
+  // Stored DuckDB definitions must never capture a prepared read's temporary paths.
+  // Definitions stored as original GoogleSQL do not need to prepare their sources at creation.
+  const bool definition = translated.statement_type == "CREATE_VIEW" ||
+                          translated.statement_type == "CREATE_MATERIALIZED_VIEW" ||
+                          translated.statement_type == "CREATE_FUNCTION" ||
+                          translated.statement_type == "CREATE_TABLE_FUNCTION";
+  translated.resources = definition ? nullptr : defaults.resources;
   translator::Context context{
       .functions = functions,
       .parameters = parameters,
       .defaults = defaults,
       .statement = translated,
+      .resources = translated.resources.get(),
       .system_variables = system_variables,
   };
   auto sql = translator::Statement(statement, translator::Scope{.context = context});
@@ -51,7 +60,6 @@ std::optional<TranslatedStatement> TranslateStatement(
     return std::nullopt;
   }
   translated.sql = *std::move(sql);
-  translated.statement_type = translator::StatementType(statement);
   translated.result_schema = ResultSchema(statement);
   return translated;
 }
@@ -60,13 +68,15 @@ std::optional<std::string> TranslateExpression(
     const function_catalog::Catalog& functions, const googlesql::ResolvedExpr& expression,
     const QueryParameters& parameters, const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
-  // Context takes a statement, though an expression records nothing in it.
+  // Context takes a statement, though an expression records nothing in it. The caller must
+  // retain defaults.resources through execution of the returned SQL.
   TranslatedStatement translated;
   translator::Context context{
       .functions = functions,
       .parameters = parameters,
       .defaults = defaults,
       .statement = translated,
+      .resources = defaults.resources.get(),
       .system_variables = system_variables,
   };
   auto sql = translator::Expression(expression, translator::Scope{.context = context}, {});

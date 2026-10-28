@@ -24,6 +24,7 @@
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/spanner_query.h"
+#include "src/statement_resources.h"
 #include "src/table_comments.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
@@ -88,8 +89,9 @@ class DuckDbTableSource : public TableSource {
     return result.rows.String(0, 0);
   }
 
-  std::optional<std::string> ReadQuery(const TableReference& table) override {
-    return TableReadQuery(backend_, table);
+  std::optional<TableRead> ReadQuery(const TableReference& table) override {
+    const auto query = TableReadQuery(backend_, table);
+    return query ? std::optional<TableRead>(*query) : std::nullopt;
   }
 
   TableWriteRestriction WriteRestriction(const TableReference& table) override {

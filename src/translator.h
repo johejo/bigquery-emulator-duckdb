@@ -33,7 +33,9 @@ struct FieldSchema;
 // then names. Errors are not caught, so that a failed translation is not reported as an unsupported
 // one. The statement's catalog and TypeFactory must remain alive for this call. A statement of a
 // script reads the script's variables as catalog constants and its system variables from
-// `system_variables`.
+// `system_variables`. Resource-backed reads prepare after analysis using defaults.resources,
+// which the returned statement retains through execution; callers retain it with returned rows.
+// Without an owner such reads are unsupported, as they are in stored SQL definitions.
 std::optional<TranslatedStatement> TranslateStatement(
     const function_catalog::Catalog& functions, const googlesql::ResolvedStatement& statement,
     const QueryParameters& parameters = {},
@@ -44,6 +46,7 @@ std::optional<TranslatedStatement> TranslateStatement(
 
 // Translates the expression of a script, such as a variable's DEFAULT or an IF condition, into a
 // DuckDB query returning its value as one row of one column, like TranslateStatement does.
+// The caller must keep defaults.resources alive through execution and consumption of the value.
 std::optional<std::string> TranslateExpression(
     const function_catalog::Catalog& functions, const googlesql::ResolvedExpr& expression,
     const QueryParameters& parameters, const DefaultDataset& defaults, std::string* unsupported,

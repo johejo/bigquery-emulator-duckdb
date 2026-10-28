@@ -17,13 +17,30 @@ sources into ordinary tables at creation time.
   added numeric-storage DELETE, TRUNCATE and MERGE rejection cases.
 - Validation: `just fmt` and `just check` passed.
 
-## 2. Own resources for the duration of statement execution
+## 2. Own resources for the duration of statement execution (implemented)
 
-- Separate definition resolution from source preparation and execution.
-- Retain staged files through execution and result consumption; clean up on errors.
-- Avoid duplicate preparation within a statement and sharing across concurrent jobs.
-- Persist source definitions, never temporary paths. Specify dry-run behavior before
-  introducing source access during analysis.
+- Resolve schemas during analysis without preparing sources. `TableRead` separates
+  fixed read SQL from a self-contained preparation that runs during translation,
+  after analysis, with a statement-owned `TemporaryFiles` instance.
+- `StatementResources` caches prepared reads by resolved table reference within one
+  statement, never across statements or concurrent jobs. Translated SQL retains its
+  owner through execution; result-row copies and Storage Read snapshots retain it
+  through consumption. Script statements and scalar expressions get separate owners.
+- Preparation, translation and execution failures release the staged files when
+  their execution scope unwinds. C++ tests inject staged sources to check cleanup,
+  repeated reads, concurrent statements and result/snapshot lifetimes without
+  accepting external tables through DDL or REST.
+- Resource-backed reads in dry runs are explicitly unsupported before preparation
+  or DuckDB binding, which can itself access files. Fixed read queries, including
+  numeric-storage conversion, keep their existing dry-run behavior. Actual external
+  table dry-run semantics still need specification before accepting those tables.
+- Translations of stored definitions have no execution resource owner: a view that
+  would need staging is rejected before preparation. Definitions stored as original
+  GoogleSQL, such as table functions, do not prepare their reads at creation. Neither
+  can capture temporary source paths; external-table definitions themselves still
+  need a persistence strategy before they can be accepted.
+- Validation: `just fmt` and `just check` passed, including C++ tests, end-to-end
+  tests and generated support-table checks.
 
 ## 3. Share only the file-reading pieces needed by the first implementation
 

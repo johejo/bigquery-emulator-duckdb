@@ -31,6 +31,7 @@
 #include "src/postgres_scanner.h"
 #include "src/result_chunks.h"
 #include "src/result_rows.h"
+#include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
 
 // DuckDB v2 requires explicit registration of statically linked extensions before opening a
@@ -311,13 +312,15 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
 }
 
 std::shared_ptr<const StorageSnapshot> Backend::ExecuteStorageRead(
-    const std::string& sql, std::vector<FieldSchema> schema) {
+    const std::string& sql, std::vector<FieldSchema> schema,
+    std::shared_ptr<const StatementResources> resources) {
   const auto session = std::shared_ptr<Backend>(NewSession());
   const CallConnection connection = session->Connect();
   RunSetup(connection.get(), {});
   Result result;
   Query(connection.get(), sql, result);
-  return std::make_shared<const StorageSnapshot>(result.result, std::move(schema), session);
+  return std::make_shared<const StorageSnapshot>(result.result, std::move(schema), session,
+                                                 std::move(resources));
 }
 
 void Backend::ExecuteDdl(const std::string& sql,

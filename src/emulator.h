@@ -307,7 +307,7 @@ class Emulator {
       const std::string& default_project, const std::string& default_dataset,
       JobLocation* location = nullptr,
       const googlesql::SystemVariableValuesMap* system_variables = nullptr,
-      bool stores_result = false);
+      bool stores_result = false, bool dry_run = false);
   // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
   static std::optional<std::string> DatasetLocation(Backend& backend,
                                                     const DatasetReference& dataset);

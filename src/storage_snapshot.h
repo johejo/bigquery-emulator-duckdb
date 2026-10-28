@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "src/field_schema.h"
+#include "src/statement_resources.h"
 
 struct duckdb_result;
 
@@ -22,7 +23,8 @@ class StorageSnapshot {
   // Fetches every row of `result`, whose columns are the fields of `schema`. The session keeps
   // the connection that Arrow export options name alive.
   StorageSnapshot(duckdb_result& result, std::vector<FieldSchema> schema,
-                  std::shared_ptr<Backend> session);
+                  std::shared_ptr<Backend> session,
+                  std::shared_ptr<const StatementResources> resources = {});
   ~StorageSnapshot();
   StorageSnapshot(const StorageSnapshot&) = delete;
   StorageSnapshot& operator=(const StorageSnapshot&) = delete;

@@ -11,6 +11,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/statement_resources.h"
 #include "src/table_metadata.h"
 
 namespace googlesql {
@@ -160,6 +161,9 @@ struct TranslatedStatement {
   // Empty for ALTER TABLE and ALTER SCHEMA, whose DuckDB statements depend on what the table or
   // dataset has when they run.
   std::string sql;
+  // Owns any prepared reads named by sql through execution. Never part of stored definitions;
+  // a result that needs it beyond execution shares ownership rather than borrowing this object.
+  std::shared_ptr<StatementResources> resources = {};
   // JobStatistics2.statementType: SELECT, INSERT, CREATE_TABLE_AS_SELECT, DROP_VIEW, ...
   std::string statement_type;
   // The schema of the rows a query returns, as ResultSchema reports it; empty for other statements.
