@@ -952,6 +952,13 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         throw std::invalid_argument("Analytic function " + ToUpperAscii(call->function()->Name()) +
                                     " is not supported.");
       }
+      if (IsBuiltinFunction(*call->function()) && call->distinct() &&
+          scope.context.functions.HasTypeUse(
+              ToUpperAscii(call->function()->FullName(/*include_group=*/false)),
+              TypeUse::kRejectsAnalyticDistinct)) {
+        throw std::invalid_argument("Analytic function " + call->function()->Name() +
+                                    " does not support DISTINCT.");
+      }
       const auto type = DuckDbType(call->type());
       const auto over = Window(*group, call->window_frame(), scope, input_columns);
       if (!type || !over) {

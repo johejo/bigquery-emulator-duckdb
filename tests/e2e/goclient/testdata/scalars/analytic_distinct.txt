@@ -1,0 +1,15 @@
+# BigQuery's answers: DISTINCT with OVER, which GoogleSQL takes on every aggregate function that
+# takes DISTINCT, works on some of them only. The documentation shows COUNT and SUM:
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+
+SELECT ARRAY(SELECT AVG(DISTINCT x) OVER () FROM UNNEST([1, 1, 2]) AS x)
+=> [{"v":"1.5"},{"v":"1.5"},{"v":"1.5"}]
+
+SELECT ARRAY(SELECT MAX(DISTINCT x) OVER () FROM UNNEST([1, 2]) AS x)
+=> [{"v":"2"},{"v":"2"}]
+
+SELECT ARRAY(SELECT STRING_AGG(DISTINCT x) OVER () FROM UNNEST(['a', 'a']) AS x)
+=> error: Analytic function string_agg does not support DISTINCT.
+
+SELECT ARRAY(SELECT LOGICAL_OR(DISTINCT x) OVER () FROM UNNEST([TRUE, FALSE]) AS x)
+=> error: Analytic function logical_or does not support DISTINCT.

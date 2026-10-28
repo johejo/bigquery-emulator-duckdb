@@ -451,7 +451,12 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses =
+                     {
+                         TypeUse::kAggregatesRange,
+                         TypeUse::kBigNumeric,
+                         TypeUse::kRejectsAnalyticDistinct,
+                     },
              }),
       // ARRAY_CONCAT_AGG skips NULL arrays.
 
@@ -613,6 +618,9 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .limit = kJoin,
                      .finish = Unhex,
                  },
+             },
+             {
+                 .uses = {TypeUse::kRejectsAnalyticDistinct},
              }),
       // COUNT counts only TRUE after converting FALSE and NULL to NULL, and returns 0
       // for empty inputs and window frames. DISTINCT still counts TRUE at most once.
@@ -622,7 +630,8 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "count", .arguments = kCountIfArguments},
              }),
       Define("LOGICAL_AND", {{.function = "bool_and"}}),
-      Define("LOGICAL_OR", {{.function = "bool_or"}}),
+      Define("LOGICAL_OR", {{.function = "bool_or"}},
+             {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
       Define("BIT_AND", {{.function = "bit_and"}}),
       Define("BIT_OR", {{.function = "bit_or"}}),
       Define("BIT_XOR", {{.function = "bit_xor"}}),
