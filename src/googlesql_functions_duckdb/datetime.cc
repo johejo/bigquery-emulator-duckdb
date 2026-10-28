@@ -23,11 +23,11 @@
 #include "src/duckdb_functions/register.h"
 #include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/duckdb_types.h"
 #include "src/googlesql_functions/datetime.h"
 #include "src/googlesql_functions/format.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/interval.h"
-#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
 using namespace duckdb_functions;

@@ -53,7 +53,9 @@ of DuckDB execution. The main entry points are:
 backend compatibility options. Normal execution adds BigQuery declarations; the compliance driver
 selects only GoogleSQL builtins, without the additional declarations or `EXTERNAL_QUERY`. The
 selection follows scripts, routine bodies and views through their statement-local catalogs.
-- [type_mapping.cc](../src/type_mapping.cc): REST schema, GoogleSQL and DuckDB type conversions.
+- [type_mapping.cc](../src/type_mapping.cc): REST schema, GoogleSQL and DuckDB type conversions,
+  which translation uses without linking DuckDB; [duckdb_types.cc](../src/duckdb_types.cc) reads
+  the DuckDB types of results and stored columns.
 - [information_schema.cc](../src/information_schema.cc): metadata rows computed during analysis
   and carried into the translated query. Dataset, table and routine views have separate
   sources, with column definitions beside their row builders.

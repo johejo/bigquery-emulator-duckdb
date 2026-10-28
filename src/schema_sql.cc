@@ -18,7 +18,7 @@
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
-#include "src/interval.h"
+#include "src/interval_sql.h"
 #include "src/references.h"
 #include "src/type_mapping.h"
 

@@ -20,6 +20,7 @@
 #include "nlohmann/json.hpp"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/duckdb_types.h"
 #include "src/googlesql_functions/datetime.h"
 #include "src/interval.h"
 #include "src/language_options.h"
