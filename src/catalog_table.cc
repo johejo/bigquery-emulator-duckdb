@@ -34,8 +34,12 @@ std::optional<std::vector<int>> BigQueryTable::PrimaryKey() const {
   return columns;
 }
 
-std::optional<std::string> BigQueryTable::NumericReadQuery() const {
-  return source_.NumericReadQuery(reference());
+std::optional<std::string> BigQueryTable::ReadQuery() const {
+  return source_.ReadQuery(reference());
+}
+
+TableWriteRestriction BigQueryTable::WriteRestriction() const {
+  return source_.WriteRestriction(reference());
 }
 
 }  // namespace bigquery_emulator_duckdb

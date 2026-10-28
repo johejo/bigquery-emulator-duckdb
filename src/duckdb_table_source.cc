@@ -88,8 +88,12 @@ class DuckDbTableSource : public TableSource {
     return result.rows.String(0, 0);
   }
 
-  std::optional<std::string> NumericReadQuery(const TableReference& table) override {
-    return backend_.NumericReadQuery(QualifiedName(table));
+  std::optional<std::string> ReadQuery(const TableReference& table) override {
+    return TableReadQuery(backend_, table);
+  }
+
+  TableWriteRestriction WriteRestriction(const TableReference& table) override {
+    return TableWriteRestrictionOf(backend_, table);
   }
 
   absl::StatusOr<std::string> TimeTravelQuery(const TableReference& table, int64_t time) override {

@@ -92,6 +92,11 @@ struct TableMetadata {
   [[nodiscard]] nlohmann::json ToJson() const;
 };
 
+// Why ordinary row writes are forbidden. Independent of how rows are read: a snapshot
+// reads native storage, while a converted read query need not imply a write restriction.
+// Metadata changes and explicit table replacement have their own validation.
+enum class TableWriteRestriction : uint8_t { kNone, kExternalNumericStorage, kSnapshot };
+
 // The schema and metadata of a table as tables.get reports them.
 struct TableDescription {
   std::vector<FieldSchema> schema;
