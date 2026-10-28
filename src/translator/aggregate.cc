@@ -214,8 +214,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     if (!sql) {
       return std::nullopt;
     }
-    // A zero-row aggregate is NULL, not the empty list/string a zero-length slice yields.
-    limit = "nullif(" + *sql + ", 0)";
+    // A zero-row aggregate is NULL, not the empty list/string a zero-length slice yields. CASE
+    // avoids DuckDB v2's NULLIF macro binder.
+    limit = "CASE WHEN " + *sql + " = 0 THEN NULL ELSE " + *sql + " END";
     if (rule->limit == AggregateRule::Limit::kJoin) {
       conditions.push_back(args.at(0) + " IS NOT NULL");
       const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +
