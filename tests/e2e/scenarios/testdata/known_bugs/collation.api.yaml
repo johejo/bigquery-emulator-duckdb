@@ -1,16 +1,14 @@
 version: 1
 # Recorded on BigQuery in project johejo-sandbox, run l363n2yqs7fv7idu23nyuidffo; the answers
-# sidecar keeps the observations. BigQuery keeps the collations of a table created from a
-# collated query, of a query's destination table and of a view's columns. The emulator rejects
-# these statements until tables and views record collations; move each case to
-# ../collation.api.yaml then.
+# sidecar keeps the observations. BigQuery answers CREATE TABLE AS SELECT and CREATE VIEW in
+# jobs.query with the schema of the table or view they create, which the emulator leaves out of
+# DDL responses. ../collation.api.yaml checks the schemas the table and the view keep.
 description: >-
-  Schemas that keep collations, which the emulator rejects: a table created from a collated query,
-  a query's destination table and a view over collated columns.
+  The schema jobs.query returns for a CREATE TABLE AS SELECT and a CREATE VIEW of collated columns.
 vars:
   dataset: e2e_${run}_${case}
 templates:
-  schema:
+  statement:
     steps:
       - name: create_dataset
         rest:
@@ -31,13 +29,6 @@ templates:
           error: /body/error
           errors: /body/errors
           schema: /body/schema
-      - name: table
-        rest:
-          method: GET
-          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}
-        observe:
-          schema: /body/schema
-          defaultCollation: /body/defaultCollation
     cleanup:
       - name: delete_dataset
         rest:
@@ -45,9 +36,8 @@ templates:
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
 cases:
   - name: create_table_as_select
-    template: schema
+    template: statement
     vars:
-      table: t
       statement: >-
         CREATE TABLE `${project}.${dataset}.t` AS
         SELECT COLLATE('a', 'und:ci') AS c, STRUCT(COLLATE('b', 'und:ci') AS f) AS s,
@@ -62,19 +52,9 @@ cases:
               name: s
               type: RECORD
             - {collation: und:ci, mode: REPEATED, name: a, type: STRING}
-      table:
-        schema:
-          fields:
-            - {collation: und:ci, name: c, type: STRING}
-            - fields:
-                - {collation: und:ci, name: f, type: STRING}
-              name: s
-              type: RECORD
-            - {collation: und:ci, mode: REPEATED, name: a, type: STRING}
   - name: view
-    template: schema
+    template: statement
     vars:
-      table: v
       statement: >-
         CREATE VIEW `${project}.${dataset}.v` AS SELECT COLLATE('a', 'und:ci') AS c
     expect:
@@ -82,56 +62,3 @@ cases:
         schema:
           fields:
             - {collation: und:ci, name: c, type: STRING}
-      table:
-        schema:
-          fields:
-            - {collation: und:ci, name: c, type: STRING}
-  - name: destination_table
-    steps:
-      - name: create_dataset
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/datasets
-          body:
-            datasetReference: {datasetId: '${dataset}'}
-            location: US
-      - name: insert_job
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/jobs
-          body:
-            configuration:
-              query:
-                query: SELECT COLLATE('a', 'und:ci') AS c
-                useLegacySql: false
-                destinationTable:
-                  projectId: ${project}
-                  datasetId: ${dataset}
-                  tableId: t
-        bind:
-          job: /body/jobReference/jobId
-          location: /body/jobReference/location
-      - name: wait
-        rest:
-          method: GET
-          path: /bigquery/v2/projects/${project}/jobs/${job}?location=${location}
-        until: {/body/status/state: DONE}
-        observe:
-          errorResult: /body/status/errorResult
-      - name: table
-        rest:
-          method: GET
-          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
-        observe:
-          schema: /body/schema
-    cleanup:
-      - name: delete_dataset
-        rest:
-          method: DELETE
-          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
-    expect:
-      wait: {}
-      table:
-        schema:
-          fields:
-            - {collation: und:ci, mode: NULLABLE, name: c, type: STRING}

@@ -263,14 +263,18 @@ class EmulatorTestDriver : public googlesql::TestDriver {
       // engine does not support.
       // The public API cannot describe pseudo-columns. Loading them as ordinary columns
       // would silently change SELECT *; leave such tables unsupported, like value tables. So are
-      // tables with annotated columns, such as collations, which schemas do not record yet and
-      // would otherwise compare without.
+      // tables with columns annotated otherwise than with collations, which schemas record;
+      // a table whose collations BigQuery does not take fails to load.
       if (table.options.is_value_table() ||
           std::ranges::any_of(table.options.pseudo_columns(), [](bool pseudo) { return pseudo; }) ||
-          std::ranges::any_of(table.options.column_annotations(),
-                              [](const googlesql::AnnotationMap* annotations) {
-                                return !googlesql::AnnotationMap::IsNullOrEmpty(annotations);
-                              })) {
+          std::ranges::any_of(
+              table.options.column_annotations(), [](const googlesql::AnnotationMap* annotations) {
+                if (annotations == nullptr) return false;
+                std::unique_ptr<googlesql::AnnotationMap> others = annotations->Clone();
+                others->UnsetAnnotationRecursively(
+                    static_cast<int>(googlesql::AnnotationKind::kCollation));
+                return !others->Empty();
+              })) {
         continue;
       }
       const googlesql::StructType& row_type =
@@ -281,6 +285,9 @@ class EmulatorTestDriver : public googlesql::TestDriver {
         const googlesql::StructType::StructField& column = row_type.field(i);
         absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(column.name, column.type);
         if (field.ok() && column.type->IsSupportedType(GetSupportedLanguageOptions())) {
+          if (std::cmp_less(i, table.options.column_annotations().size())) {
+            SetCollations(*field, table.options.column_annotations().at(i));
+          }
           schema.push_back(*std::move(field));
           columns.push_back(i);
         }

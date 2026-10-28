@@ -16,6 +16,7 @@
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/annotation.h"
 #include "src/analyzer_functions/functions.h"
 #include "src/builtin_catalog.h"
 #include "src/builtin_function_options.h"
@@ -101,7 +102,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
     return status;
   }
   for (const FieldSchema& field : *schema) {
-    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, type_factory_);
+    absl::StatusOr<googlesql::AnnotatedType> type = GoogleSqlAnnotatedType(field, type_factory_);
     if (!type.ok()) {
       return type.status();
     }

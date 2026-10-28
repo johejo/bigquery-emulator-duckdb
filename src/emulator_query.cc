@@ -664,10 +664,6 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
     }
-    // A destination table would keep its columns' collations, which tables do not record yet.
-    if (request.destination_table.has_value() && translation.result_has_collation) {
-      throw ApiError::Unsupported("destination tables with collated columns");
-    }
     QueryResult result;
     if (!request.dry_run) {
       // A destination table reports the mode of each field, as a query result does.

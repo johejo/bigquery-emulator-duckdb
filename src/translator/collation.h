@@ -11,7 +11,6 @@
 namespace googlesql {
 class AnnotationMap;
 class ResolvedCollation;
-class ResolvedStatement;
 }  // namespace googlesql
 
 // Collations, in collation.cc. GoogleSQL's resolver propagates collations through expressions
@@ -45,9 +44,5 @@ bool OnlyCollations(const googlesql::AnnotationMap* annotations);
 // Whether `annotations` hold a non-empty collation at any depth. Operations whose collation the
 // resolved AST does not record, such as set operations, reject such columns.
 bool HasCollation(const googlesql::AnnotationMap* annotations);
-
-// Whether a column of the rows `statement`, a query, returns holds a non-empty collation, which a
-// destination table would keep as the column's collation.
-bool ResultHasCollation(const googlesql::ResolvedStatement& statement);
 
 }  // namespace bigquery_emulator_duckdb::translator

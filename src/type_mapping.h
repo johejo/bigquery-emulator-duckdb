@@ -10,6 +10,7 @@
 
 #include "absl/status/statusor.h"
 #include "duckdb.h"
+#include "googlesql/public/types/annotation.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
@@ -78,6 +79,16 @@ bool HasGraph(const googlesql::Type* type);
 // Maps a BigQuery TableFieldSchema to the GoogleSQL type of the column.
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory);
+
+// GoogleSqlType annotated with the collations of `field` and its fields, as a column of a table
+// gives them to the expressions that read it; the annotations are owned by `type_factory`.
+absl::StatusOr<googlesql::AnnotatedType> GoogleSqlAnnotatedType(
+    const FieldSchema& field, googlesql::TypeFactory* type_factory);
+
+// The inverse of GoogleSqlAnnotatedType: gives `field`, described by BigQueryFieldSchema, and its
+// fields the non-empty collations `annotations` hold, as BigQuery reports them; a REPEATED field
+// reports its elements' collation.
+void SetCollations(FieldSchema& field, const googlesql::AnnotationMap* annotations);
 
 // The name of the GoogleSQL type of the column that `field` describes, as BigQuery spells it in
 // DDL and INFORMATION_SCHEMA, such as ARRAY<STRUCT<a INT64>>.

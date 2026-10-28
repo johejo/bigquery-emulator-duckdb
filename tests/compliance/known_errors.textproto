@@ -2195,7 +2195,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "The fixture's tables with collated columns, and graphs over them, are not loaded, since schemas do not record collations yet, so the statement fails to resolve"
+  reason: "The fixture's tables with collated columns, and graphs over them, are not loaded, since they have columns collated 'binary', which BigQuery does not take, so the statement fails to resolve"
   label: "collation_test:comparison_with_column_collation_binary_between"
   label: "collation_test:comparison_with_column_collation_binary_eq"
   label: "collation_test:comparison_with_column_collation_binary_greater"

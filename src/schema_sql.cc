@@ -170,6 +170,12 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
     if (after.default_value_expression != before.default_value_expression) {
       throw ApiError::Unsupported("changing the default value of field " + name);
     }
+    if (after.collation != before.collation) {
+      throw ApiError::Invalid(std::format(
+          "{} Invalid schema update. Updating field collation is not supported. Field {} has "
+          "changed collation from \"{}\" to \"{}\"",
+          mismatch, name, before.collation.value_or(""), after.collation.value_or("")));
+    }
     // DuckDB enforces REQUIRED only on columns; a field of a record keeps it in its metadata.
     if (after.mode != before.mode && path.empty()) {
       statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL",

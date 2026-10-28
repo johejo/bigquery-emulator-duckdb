@@ -405,11 +405,14 @@ query Collated set operations | SELECT COLLATE(name, 'und:ci') FROM t EXCEPT DIS
 query Column collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
 query Column collation | CREATE TABLE n (a STRUCT<b STRING COLLATE 'und:ci'>, c ARRAY<STRING COLLATE 'und:ci'>)
 query Column collation | ALTER TABLE t ADD COLUMN c STRING COLLATE 'und:ci'
+query Column collation | CREATE TABLE n (a STRING COLLATE 'und:ci'); INSERT n (a) VALUES ('A'); SELECT a FROM n WHERE a = 'a'
+query Column collation | CREATE TABLE n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
 query Table default collation | CREATE TABLE n (a STRING) DEFAULT COLLATE 'und:ci'
 query Table default collation | ALTER TABLE t SET DEFAULT COLLATE 'und:ci'
 query Dataset default collation | CREATE SCHEMA n DEFAULT COLLATE 'und:ci'
 query Dataset default collation | ALTER SCHEMA d SET DEFAULT COLLATE 'und:ci'
 query Collated views | CREATE VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
+query Collated views | CREATE VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t; SELECT c FROM n WHERE c = 'A'
 query Collated materialized views | CREATE MATERIALIZED VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
 query Collated table functions | CREATE TABLE FUNCTION d.f() AS (SELECT COLLATE(name, 'und:ci') AS c FROM d.t); SELECT c FROM d.f()
 note Collated comparisons | See [Collation](compatibility.md#collation).

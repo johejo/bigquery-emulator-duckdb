@@ -32,54 +32,7 @@
               }
             ]
           }
-        },
-        "table": {
-          "schema": {
-            "fields": [
-              {
-                "collation": "und:ci",
-                "name": "c",
-                "type": "STRING"
-              },
-              {
-                "fields": [
-                  {
-                    "collation": "und:ci",
-                    "name": "f",
-                    "type": "STRING"
-                  }
-                ],
-                "name": "s",
-                "type": "RECORD"
-              },
-              {
-                "collation": "und:ci",
-                "mode": "REPEATED",
-                "name": "a",
-                "type": "STRING"
-              }
-            ]
-          }
         }
-      }
-    },
-    "destination_table": {
-      "project": "johejo-sandbox",
-      "run": "l363n2yqs7fv7idu23nyuidffo",
-      "steps": {
-        "table": {
-          "schema": {
-            "fields": [
-              {
-                "collation": "und:ci",
-                "mode": "NULLABLE",
-                "name": "c",
-                "type": "STRING"
-              }
-            ]
-          }
-        },
-        "wait": {}
       }
     },
     "view": {
@@ -87,17 +40,6 @@
       "run": "l363n2yqs7fv7idu23nyuidffo",
       "steps": {
         "statement": {
-          "schema": {
-            "fields": [
-              {
-                "collation": "und:ci",
-                "name": "c",
-                "type": "STRING"
-              }
-            ]
-          }
-        },
-        "table": {
           "schema": {
             "fields": [
               {

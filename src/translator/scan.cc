@@ -751,7 +751,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     std::vector<std::string> projections;
     for (int i = 0; i < table->column_list_size(); ++i) {
       const auto& column = table->column_list(i);
-      if (!DuckDbType(column.type()) || column.type_annotation_map() != nullptr) {
+      if (!DuckDbType(column.type()) || !OnlyCollations(column.type_annotation_map())) {
         return Unsupported(scope, "column type " + column.type()->DebugString());
       }
       const std::string alias = ColumnName(column.column_id());

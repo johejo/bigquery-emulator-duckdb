@@ -387,6 +387,14 @@ void ValidateClustering(const std::vector<std::string>& clustering,
       throw ApiError::Invalid(std::format("Field {} of type {} cannot be a clustering field",
                                           field->name, FieldTypeName(field->type)));
     }
+    // BigQuery's message, where
+    // third_party/bigquery_docs/reference/standard-sql/collation-concepts.md documents "CLUSTER BY
+    // STRING column word with collation und:ci isn't supported".
+    if (field->collation.has_value() && !field->collation->empty()) {
+      throw ApiError::Invalid(
+          std::format("Fields specified for clustering cannot have collation. Invalid field: {}.",
+                      field->name));
+    }
   }
 }
 

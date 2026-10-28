@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
 #include "src/ddl_option_types.h"
@@ -115,14 +116,16 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
     if (column == relation->columns.end() || !type) {
       return std::nullopt;
     }
-    // The view's schema, through which the catalog reads it, does not record collations yet.
-    if (HasCollation(output->column().type_annotation_map())) {
-      return Unsupported(scope, "view column collation");
+    const googlesql::AnnotationMap* annotations = output->column().type_annotation_map();
+    if (materialized && HasCollation(annotations)) {
+      return Unsupported(scope, "materialized view column collation");
     }
     auto field = BigQueryFieldSchema(output->name(), output->column().type());
     if (!field.ok()) {
       return Unsupported(scope, field.status().message());
     }
+    // tables.get and INFORMATION_SCHEMA report the collations of the view's columns.
+    SetCollations(*field, annotations);
     view.schema.push_back(*std::move(field));
     // Preserve GoogleSQL result types when the view is later read through the catalog.
     projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +

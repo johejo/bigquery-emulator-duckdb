@@ -1,0 +1,438 @@
+{
+  "version": 1,
+  "cases": {
+    "ddl_binary_specification": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Collation 'binary' is unsupported.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Collation 'binary' is unsupported.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_clustering": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Fields specified for clustering cannot have collation. Invalid field: word.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Fields specified for clustering cannot have collation. Invalid field: word.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_columns": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "add_column": {},
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "STRUCT\u003cf STRING, g STRING\u003e"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "e"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": ""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "n"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "w"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {},
+        "field_paths": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "e"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": ""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "n"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "STRUCT\u003cf STRING, g STRING\u003e"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s.f"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s.g"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "NULL"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "w"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "und:ci"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "c",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "name": "f",
+                    "type": "STRING"
+                  },
+                  {
+                    "name": "g",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "a",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "e",
+                "type": "STRING"
+              },
+              {
+                "name": "n",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "w",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_unsupported_specification": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Collation 'und:cs' is unsupported.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Collation 'und:cs' is unsupported.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_empty": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "collation": "",
+                "name": "c",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "insert_integer": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Field c with type INTEGER and has collation, but collation is only allowed for STRING type columns or STRING type fields in ARRAY or STRUCT",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Field c with type INTEGER and has collation, but collation is only allowed for STRING type columns or STRING type fields in ARRAY or STRUCT",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_string": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "insert": {
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "name": "c",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "insert_unsupported_specification": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "insert": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported collation: und:cs",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported collation: und:cs",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_collation": {
+      "project": "johejo-sandbox",
+      "run": "x2ropk2xkgochasmj7x2jsvbgi",
+      "steps": {
+        "insert": {},
+        "patch": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Provided Schema does not match Table johejo-sandbox:bqa_x2ropk2xkgochasmj7x2jsvbgi_patch_collation.t. Invalid schema update. Updating field collation is not supported. Field c has changed collation from \"und:ci\" to \"\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Provided Schema does not match Table johejo-sandbox:bqa_x2ropk2xkgochasmj7x2jsvbgi_patch_collation.t. Invalid schema update. Updating field collation is not supported. Field c has changed collation from \"und:ci\" to \"\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

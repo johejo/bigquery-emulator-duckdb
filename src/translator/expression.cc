@@ -493,7 +493,9 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   }
   if (expr.Is<googlesql::ResolvedCast>()) {
     const auto* cast = expr.GetAs<googlesql::ResolvedCast>();
-    if (cast->extended_cast() != nullptr || !cast->type_modifiers().IsEmpty()) {
+    // A collation, such as an INSERT's to a collated column, annotates the result and leaves the
+    // value unchanged.
+    if (cast->extended_cast() != nullptr || !cast->type_modifiers().type_parameters().IsEmpty()) {
       return Unsupported(scope, "CAST with type parameters");
     }
     const auto argument = Expression(*cast->expr(), scope, columns);

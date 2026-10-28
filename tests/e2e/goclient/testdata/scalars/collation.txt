@@ -178,3 +178,55 @@ WITH RECURSIVE r AS (
 )
 SELECT x = 'A' FROM r
 => "true"
+
+# A column's collation applies to the operations that read it, as an expression's does; an empty
+# collation is binary.
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+CREATE TEMP TABLE t (c STRING COLLATE 'und:ci');
+INSERT t (c) VALUES ('Apple'), ('apple'), ('Banana');
+SELECT COUNTIF(c = 'APPLE') FROM t
+=> "2"
+
+CREATE TEMP TABLE t (c STRING COLLATE '');
+INSERT t (c) VALUES ('Apple'), ('apple'), ('Banana');
+SELECT COUNTIF(c = 'APPLE') FROM t
+=> "0"
+
+CREATE TEMP TABLE t (c STRING COLLATE 'und:ci');
+INSERT t (c) VALUES ('b'), ('C'), ('a');
+SELECT ARRAY_TO_STRING(ARRAY(SELECT c FROM t ORDER BY c), ',')
+=> "a,b,C"
+
+CREATE TEMP TABLE t (s STRUCT<f STRING COLLATE 'und:ci', g STRING>);
+INSERT t (s) VALUES (STRUCT('a', 'b'));
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT s.f = 'A' AS f, s.g = 'B' AS g FROM t))
+=> "[{\"f\":true,\"g\":false}]"
+
+CREATE TEMP TABLE t (a ARRAY<STRING COLLATE 'und:ci'>);
+INSERT t (a) VALUES (['a']);
+SELECT a[OFFSET(0)] = 'A' FROM t
+=> "true"
+
+CREATE TEMP TABLE l (c STRING COLLATE 'und:ci');
+CREATE TEMP TABLE r (c STRING);
+INSERT l (c) VALUES ('a');
+INSERT r (c) VALUES ('A');
+SELECT COUNT(*) FROM l JOIN r USING (c)
+=> "1"
+
+# A view keeps the collations of its columns.
+SELECT COUNTIF(c = 'APPLE') FROM collated_view
+=> "2"
+
+# A table created from a query keeps its columns' collations.
+CREATE TEMP TABLE t AS SELECT COLLATE('Apple', 'und:ci') AS c;
+SELECT COUNTIF(c = 'APPLE') FROM t
+=> "1"
+
+# Updating and deleting compare under the column's collation.
+CREATE TEMP TABLE t (c STRING COLLATE 'und:ci', n INT64);
+INSERT t (c, n) VALUES ('Apple', 1), ('Banana', 2);
+UPDATE t SET n = 3 WHERE c = 'apple';
+DELETE t WHERE c = 'BANANA';
+SELECT TO_JSON_STRING(ARRAY(SELECT n FROM t))
+=> "[3]"
