@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <initializer_list>
 #include <optional>
 #include <span>
@@ -473,15 +474,29 @@ std::vector<Rule> Extract() {
                 Part(2, {"dayofweek"}),
             },
     });
-    rules.push_back({
-        .arity = arity,
-        .spelling = "CAST(strftime(" + value + ", '%U') AS BIGINT)",
-        .conditions =
-            {
-                Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}),
-                Part(2, {"week"}),
-            },
-    });
+    // The number of the week's first weekday on or before the value in its year, so days before
+    // the first one are in week 0.
+    for (const auto& [part, weekday] : std::initializer_list<std::pair<std::string_view, int>>{
+             {"week", 0},
+             {"week_monday", 1},
+             {"week_tuesday", 2},
+             {"week_wednesday", 3},
+             {"week_thursday", 4},
+             {"week_friday", 5},
+             {"week_saturday", 6},
+         }) {
+      rules.push_back({
+          .arity = arity,
+          .spelling = std::format(
+              "((date_part('dayofyear', {0}) + 6 - (date_part('dayofweek', {0}) + {1}) % 7) // 7)",
+              value, 7 - weekday),
+          .conditions =
+              {
+                  Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}),
+                  Part(2, {part}),
+              },
+      });
+    }
     rules.push_back({
         .arity = arity,
         .spelling = "date_part('week', " + value + ")",
