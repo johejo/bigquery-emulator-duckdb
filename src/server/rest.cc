@@ -3,10 +3,10 @@
 #include <sys/socket.h>  // IWYU pragma: keep
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <exception>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -17,10 +17,12 @@
 #include <variant>
 #include <vector>
 
+#include "absl/log/absl_log.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
 #include "src/httplib.h"
+#include "src/logging.h"
 #include "src/references.h"
 #include "src/server/requests.h"
 #include "src/server/resources.h"
@@ -53,8 +55,13 @@ class RestServer::Impl {
     http_.set_socket_options([](auto socket) {
       httplib::set_socket_opt(socket, SOL_SOCKET, SO_REUSEADDR, 1);  // NOLINT(misc-include-cleaner)
     });
+    // A handler and the logger run on the thread that read the request.
+    http_.set_pre_routing_handler([this](const httplib::Request&, httplib::Response&) {
+      SetLogRequest(++requests_);
+      return httplib::Server::HandlerResponse::Unhandled;
+    });
     http_.set_logger([](const httplib::Request& request, const httplib::Response& response) {
-      std::cerr << request.method << " " << request.path << " -> " << response.status << '\n';
+      ABSL_LOG(INFO) << request.method << " " << request.path << " -> " << response.status;
     });
     http_.set_exception_handler([](const httplib::Request&, httplib::Response& response,
                                    const std::exception_ptr& exception) {
@@ -66,6 +73,7 @@ class RestServer::Impl {
       } catch (...) {
         message = "Internal error";
       }
+      ABSL_LOG(ERROR) << message;
       response.status = 500;
       response.set_content(ErrorBody(ApiError::Internal(message)).dump(), "application/json");
     });
@@ -146,6 +154,9 @@ class RestServer::Impl {
   }
 
   static void WriteError(httplib::Response& response, const ApiError& error) {
+    if (error.http_status() >= 500) {
+      ABSL_LOG(ERROR) << error.what();
+    }
     response.status = error.http_status();
     response.set_content(ErrorBody(error).dump(), "application/json");
   }
@@ -484,6 +495,8 @@ class RestServer::Impl {
   Emulator& emulator_;
   RestServer& server_;
   httplib::Server http_;
+  // The number of requests read so far, which identifies each in the log.
+  std::atomic<uint64_t> requests_ = 0;
   std::mutex uploads_mutex_;
   std::unordered_map<std::string, LoadRequest> uploads_;
   uint64_t next_upload_id_ = 1;
