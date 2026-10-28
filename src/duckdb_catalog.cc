@@ -194,16 +194,36 @@ std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& tab
   return schema;
 }
 
+std::optional<std::string> TableReadQuery(Backend& backend, const TableReference& table) {
+  return backend.NumericReadQuery(QualifiedName(table));
+}
+
+TableWriteRestriction TableWriteRestrictionOf(Backend& backend, const TableReference& table) {
+  if (backend.NumericReadQuery(QualifiedName(table)).has_value()) {
+    return TableWriteRestriction::kExternalNumericStorage;
+  }
+  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
+  if (comment && CommentMetadata(*comment).snapshot.has_value()) {
+    return TableWriteRestriction::kSnapshot;
+  }
+  return TableWriteRestriction::kNone;
+}
+
 std::string ReadTableRelation(Backend& backend, const TableReference& table) {
-  const std::string relation = QualifiedName(table);
-  const auto converted = backend.NumericReadQuery(relation);
-  return converted ? "(" + *converted + ") AS _bq_storage" : relation;
+  const auto query = TableReadQuery(backend, table);
+  return query ? "(" + *query + ") AS _bq_storage" : QualifiedName(table);
 }
 
 void CheckWritableTable(Backend& backend, const TableReference& table) {
-  if (backend.NumericReadQuery(QualifiedName(table)).has_value()) {
-    throw ApiError::Unsupported("writing to external numeric storage in " + TableName(table) +
-                                "; copy the table first");
+  switch (TableWriteRestrictionOf(backend, table)) {
+    case TableWriteRestriction::kExternalNumericStorage:
+      throw ApiError::Unsupported("writing to external numeric storage in " + TableName(table) +
+                                  "; copy the table first");
+    case TableWriteRestriction::kSnapshot:
+      throw ApiError::Invalid("Table " + TableName(table) +
+                              " is a snapshot, and snapshots are immutable.");
+    case TableWriteRestriction::kNone:
+      return;
   }
 }
 

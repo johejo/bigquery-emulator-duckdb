@@ -83,6 +83,19 @@ func TestDuckDBNumericStorage(t *testing.T) {
 		}
 	}
 	check(source)
+	// DELETE, TRUNCATE and MERGE must honor the same row-write restriction as INSERT
+	// and UPDATE (covered by the restart scenarios), even if they need no conversion.
+	for _, sql := range []string{
+		"DELETE numerics.foreign_numbers WHERE TRUE",
+		"TRUNCATE TABLE numerics.foreign_numbers",
+		"MERGE numerics.foreign_numbers t USING (SELECT 1 AS id) s ON TRUE WHEN MATCHED THEN DELETE",
+	} {
+		job, err := client.Query(sql).Run(ctx)
+		if err := runJob(ctx, job, err); err == nil || !strings.Contains(err.Error(), "DML on external numeric storage") {
+			t.Fatalf("%s: got %v, want external numeric storage error", sql, err)
+		}
+	}
+	check(source)
 	copied := dataset.Table("copied")
 	job, err := copied.CopierFrom(source).Run(ctx)
 	if err := runJob(ctx, job, err); err != nil {

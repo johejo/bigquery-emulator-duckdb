@@ -47,6 +47,7 @@ cc_library(
         "//:python_function",
         "//:references",
         "//:schema_sql",
+        "//:table_metadata",
         "//:table_path",
         "//:table_source",
         "//:translated_statement",

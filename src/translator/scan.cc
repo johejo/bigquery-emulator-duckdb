@@ -29,6 +29,7 @@
 #include "src/connection_id.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/table_metadata.h"
 #include "src/table_source.h"
 #include "src/translator/aggregate.h"
 #include "src/translator/collation.h"
@@ -661,7 +662,7 @@ std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& sc
       !expression.type()->IsTimestamp()) {
     return Unsupported(scope, "FOR SYSTEM_TIME AS OF this table");
   }
-  if (stored->NumericReadQuery().has_value()) {
+  if (stored->WriteRestriction() == TableWriteRestriction::kExternalNumericStorage) {
     return Unsupported(scope, "FOR SYSTEM_TIME AS OF external numeric storage");
   }
   if (!ZoneIndependent(expression)) {
@@ -764,13 +765,12 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     // A view such as INFORMATION_SCHEMA.TABLES is read from the query that computes it.
     const auto* sql_table = dynamic_cast<const SqlTable*>(table->table());
     const auto* stored_table = dynamic_cast<const BigQueryTable*>(table->table());
-    const auto converted =
-        stored_table == nullptr ? std::nullopt : stored_table->NumericReadQuery();
+    const auto read_query = stored_table == nullptr ? std::nullopt : stored_table->ReadQuery();
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +
                  (history                ? "(" + *history + ") AS v"
                   : sql_table != nullptr ? "(" + sql_table->sql() + ") AS v"
-                  : converted            ? "(" + *converted + ") AS v"
+                  : read_query           ? "(" + *read_query + ") AS v"
                                          : QuoteIdentifierPath(table->table()->FullName()));
     return result;
   }

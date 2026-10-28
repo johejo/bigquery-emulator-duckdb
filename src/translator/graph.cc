@@ -228,7 +228,7 @@ std::optional<std::string> CreatePropertyGraph(
       }
       const auto* stored = dynamic_cast<const BigQueryTable*>(table.table());
       const auto description = stored == nullptr ? std::nullopt : stored->Describe();
-      if (stored == nullptr || stored->NumericReadQuery() ||
+      if (stored == nullptr || stored->ReadQuery() ||
           (description && description->metadata.require_partition_filter)) {
         return Unsupported(
             scope, "graph element tables with external storage or required partition filters");

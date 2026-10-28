@@ -30,10 +30,18 @@ class TableSource {
     return std::nullopt;
   }
 
-  // A query that converts a table's external numeric storage to query values, or nullopt for
-  // the emulator's native storage. A table that needs this conversion is read-only.
-  virtual std::optional<std::string> NumericReadQuery(const TableReference& /*table*/) {
+  // An alternative query of the table's rows, with its declared column names and query
+  // types, or nullopt to read its named relation. Does not determine write permissions.
+  virtual std::optional<std::string> ReadQuery(const TableReference& /*table*/) {
     return std::nullopt;
+  }
+
+  // Restrictions on ordinary row writes, not metadata changes or table replacement.
+  // Implementations with other storage restrictions extend the snapshot check.
+  virtual TableWriteRestriction WriteRestriction(const TableReference& table) {
+    const auto description = DescribeTable(table.project_id, table.dataset_id, table.table_id);
+    return description && description->metadata.snapshot ? TableWriteRestriction::kSnapshot
+                                                         : TableWriteRestriction::kNone;
   }
 
   // A query of the rows `table` had at `time`, in microseconds since the Unix epoch, for FOR

@@ -514,11 +514,12 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
 // these messages.
 // The query of the rows that CREATE TABLE COPY, CLONE or CREATE SNAPSHOT TABLE copies from `scan`,
 // a scan of a table SourceDescription accepted, or none for the rows it has now that need no
-// conversion. Sets `time` to the time FOR SYSTEM_TIME AS OF reads it at, as tables.get reports it.
+// alternative read query. Sets `time` to the time FOR SYSTEM_TIME AS OF reads it at, as
+// tables.get reports it.
 std::optional<std::optional<std::string>> SourceRows(const googlesql::ResolvedTableScan& scan,
                                                      const Scope& scope, std::string& time) {
   if (scan.for_system_time_expr() == nullptr) {
-    return dynamic_cast<const BigQueryTable*>(scan.table())->NumericReadQuery();
+    return dynamic_cast<const BigQueryTable*>(scan.table())->ReadQuery();
   }
   int64_t micros = 0;
   std::optional<std::string> rows = TimeTravelRows(scan, scope, micros);

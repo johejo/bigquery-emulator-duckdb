@@ -43,9 +43,13 @@ std::optional<std::optional<std::string>> ViewComment(Backend& backend,
 
 // Restores view and column metadata without requiring a view's execution identity.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table);
-// The table as a FROM relation, converting external numeric columns when needed.
+// An alternative query of the table's rows, or nullopt for its named relation.
+std::optional<std::string> TableReadQuery(Backend& backend, const TableReference& table);
+// Restrictions on ordinary row writes, independent of the table's read query.
+TableWriteRestriction TableWriteRestrictionOf(Backend& backend, const TableReference& table);
+// The table as a FROM relation, using its alternative read query when present.
 std::string ReadTableRelation(Backend& backend, const TableReference& table);
-// Rejects writes whose query values would be interpreted as a different physical number.
+// Rejects ordinary row writes to restricted storage, including snapshots.
 void CheckWritableTable(Backend& backend, const TableReference& table);
 
 std::optional<std::string> LocationOf(Backend& backend, const DatasetReference& dataset);
