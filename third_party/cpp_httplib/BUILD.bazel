@@ -1,1 +1,4 @@
-exports_files(["openssl.patch"])
+exports_files([
+    "openssl.patch",
+    "thread_pool.patch",
+])
