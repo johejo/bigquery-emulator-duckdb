@@ -17,6 +17,7 @@
 #include <variant>
 #include <vector>
 
+#include "absl/log/absl_log.h"
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -34,6 +35,7 @@
 #include "src/job_options.h"
 #include "src/load.h"
 #include "src/location.h"
+#include "src/logging.h"
 #include "src/parquet_metadata.h"
 #include "src/references.h"
 #include "src/result_googlesql.h"
@@ -258,16 +260,30 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job, JobLocatio
     }
   }
 
-  try {
-    body(*job);
-  } catch (const ApiError& error) {
-    job->error = error;
-  } catch (const std::exception& error) {
-    job->error = job->query() != nullptr ? ApiError::InvalidQuery(error.what())
-                                         : ApiError::Invalid(error.what());
+  {
+    const ScopedLogJob log_job(JobKey(job->project_id, job->job_id));
+    if (job->query() != nullptr) {
+      ABSL_VLOG(1) << "Query: " << job->query()->query;
+    }
+    try {
+      body(*job);
+    } catch (const ApiError& error) {
+      job->error = error;
+    } catch (const std::exception& error) {
+      job->error = job->query() != nullptr ? ApiError::InvalidQuery(error.what())
+                                           : ApiError::Invalid(error.what());
+    }
+    job->location = location.Resolve();
+    job->end_time_ms = NowMillis();
+    const int64_t elapsed = job->end_time_ms - job->creation_time_ms;
+    if (!job->error.has_value()) {
+      ABSL_LOG(INFO) << "Job done in " << elapsed << " ms";
+    } else if (job->error->http_status() >= 500) {
+      ABSL_LOG(ERROR) << "Job failed in " << elapsed << " ms: " << job->error->what();
+    } else {
+      ABSL_LOG(INFO) << "Job failed in " << elapsed << " ms: " << job->error->what();
+    }
   }
-  job->location = location.Resolve();
-  job->end_time_ms = NowMillis();
 
   if (job->dry_run()) {
     return job;

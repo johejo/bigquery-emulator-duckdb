@@ -265,6 +265,38 @@ steps:
       command: >-
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --unknown -e 'SELECT 1'
     test: current.exit_code == 2 && current.stdout == ""
+  # The log file gets every message at the level, appended; the jobs, their query text and the
+  # DuckDB SQL they run at debug, which standard error would only get from warnings up.
+  log_file_appends_at_level:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --log-file "$dir/log" \
+          --log-level debug -e 'SELECT 1 AS x'
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --log-file "$dir/log" \
+          -e 'SELECT 2 AS y'
+        cat "$dir/log"
+    test: |
+      current.exit_code == 0 && current.stderr == "" &&
+      current.stdout startsWith '{"x":"1"}' + "\n" + '{"y":"2"}' + "\n" &&
+      current.stdout matches '(?m)^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{6}Z DEBUG job=test:job_1 Query: SELECT 1 AS x$' &&
+      current.stdout contains ' DEBUG job=test:job_1 DuckDB: ' &&
+      current.stdout matches '(?ms)(^\\S+ INFO job=test:job_1 Job done in \\d+ ms$.*){2}' &&
+      !(current.stdout contains 'Query: SELECT 2 AS y')
+  log_level_invalid:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --log-level trace -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
+  log_file_unwritable:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --log-file "$dir/missing/log" \
+          -e 'SELECT 1'
+    test: current.exit_code == 1 && current.stdout == ""
   # runn cannot give the shell a terminal, so a Go test drives it through a pty.
   terminal:
     exec:

@@ -862,6 +862,7 @@ cc_library(
         ":type_mapping",
         ":vector_value",
         "//third_party/duckdb",
+        "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:civil_time",
@@ -1062,6 +1063,7 @@ cc_library(
         ":job_options",
         ":language_options",
         ":load",
+        ":logging",
         ":object_ref",
         ":parquet_metadata",
         ":result_googlesql",
@@ -1078,6 +1080,7 @@ cc_library(
         ":translator",
         ":type_mapping",
         "//src/translator:literal",
+        "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
@@ -1300,6 +1303,7 @@ cc_binary(
         ":builtin_function_options",
         ":emulator",
         ":external_query",
+        ":logging",
         ":project",
         ":python_worker",
         ":server",
@@ -1610,6 +1614,22 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = ["@abseil-cpp//absl/strings"],
     linkstatic = True,
+)
+
+cc_library(
+    name = "logging",
+    srcs = ["src/logging.cc"],
+    hdrs = ["src/logging.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/base:log_severity",
+        "@abseil-cpp//absl/log:globals",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/log:log_entry",
+        "@abseil-cpp//absl/log:log_sink",
+        "@abseil-cpp//absl/log:log_sink_registry",
+        "@abseil-cpp//absl/time",
+    ],
 )
 
 cc_library(

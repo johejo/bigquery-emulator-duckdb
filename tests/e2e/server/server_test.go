@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -166,5 +168,31 @@ func TestIPv6Host(t *testing.T) {
 				t.Fatalf("rootUrl = %q, want %q", document.RootURL, p.URL+"/")
 			}
 		})
+	}
+}
+
+// With --log-file, the log goes to the file, appended, and standard error keeps only the startup
+// announcement, which callers read.
+func TestLogFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "log")
+	if err := os.WriteFile(path, []byte("kept\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := start(t, "--host", "127.0.0.1", "--log-file", path)
+	response, err := http.Get(p.URL + "/bigquery/v2/projects")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if err := p.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := regexp.MustCompile(`(?m)^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z INFO request=\d+ GET /bigquery/v2/projects -> 200$`)
+	if !strings.HasPrefix(string(data), "kept\n") || !line.Match(data) {
+		t.Fatalf("log file:\n%s", data)
 	}
 }

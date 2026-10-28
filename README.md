@@ -244,6 +244,19 @@ DuckDB CLI displays those integers; its ordinary numeric operations do not imple
 semantics. Use the emulator to read or update those values. For tables created by other DuckDB
 clients, see [external type mappings and write limits](docs/compatibility.md#result-schemas-and-values).
 
+## Logging
+
+`serve` logs each REST request, each job's outcome and internal errors to standard error as text
+lines that name the request and job they belong to. `--log-file PATH` appends them to a file
+instead, and `--log-level` chooses `debug`, `info` (the default), `warning` or `error`; `debug`
+adds each query's text and the DuckDB SQL it runs. The startup announcement stays on standard
+error. `shell` writes only warnings and errors to standard error unless `--log-file` is given.
+
+```sh
+bazel-bin/bigquery-emulator-duckdb serve --project='{"projectId":"test"}' \
+  --log-file emulator.log --log-level debug
+```
+
 ## Google Cloud Storage
 
 Load jobs read `gs://` objects from [fake-gcs-server](https://github.com/fsouza/fake-gcs-server)

@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/absl_log.h"
 #include "duckdb.h"
 #include "duckdb_static_extension.h"
 #include "nlohmann/json.hpp"
@@ -80,10 +81,21 @@ std::string ErrorMessage(const char* error, std::string_view fallback) {
   return std::string(message);
 }
 
-void Query(duckdb_connection connection, const std::string& sql, Result& result) {
+void Execute(duckdb_connection connection, const std::string& sql, Result& result) {
   if (duckdb_query(connection, sql.c_str(), &result.result) == DuckDBError) {
     throw BackendError(ErrorMessage(duckdb_result_error(&result.result), "DuckDB query failed"));
   }
+}
+
+void Query(duckdb_connection connection, const std::string& sql, Result& result) {
+  ABSL_VLOG(1) << "DuckDB: " << sql;
+  Execute(connection, sql, result);
+}
+
+// Runs a setting that every connection gets, which the log leaves out.
+void Configure(duckdb_connection connection, const std::string& sql) {
+  Result result;
+  Execute(connection, sql, result);
 }
 
 void Query(duckdb_connection connection, const std::string& sql) {
@@ -113,6 +125,7 @@ QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const 
 
 // Prepares `sql`, which binds names and types without running the statement.
 Prepared PrepareStatement(duckdb_connection connection, const std::string& sql) {
+  ABSL_VLOG(1) << "DuckDB prepare: " << sql;
   Prepared prepared;
   if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
     throw BackendError(
@@ -141,7 +154,7 @@ std::vector<Column> Columns(const Prepared& prepared) {
 
 // BigQuery evaluates timestamps in UTC; setup must run on the same connection.
 void RunSetup(duckdb_connection connection, const std::vector<std::string>& setup) {
-  Query(connection, "SET TimeZone = 'UTC'");
+  Configure(connection, "SET TimeZone = 'UTC'");
   for (const std::string& statement : setup) {
     Query(connection, statement);
   }
@@ -205,9 +218,9 @@ struct Backend::Database {
     if (duckdb_connect(handle.get(), connection.out()) == DuckDBError) {
       throw BackendError("DuckDB failed to connect");
     }
-    Query(connection.get(), "SET active_grammar_extensions = ['duckpgq']");
-    Query(connection.get(), "SET duckpgq_vertex_join_elimination = false");
-    Query(connection.get(), "SET duckpgq_factorized_joins = false");
+    Configure(connection.get(), "SET active_grammar_extensions = ['duckpgq']");
+    Configure(connection.get(), "SET duckpgq_vertex_join_elimination = false");
+    Configure(connection.get(), "SET duckpgq_factorized_joins = false");
     return Connection(connection.release());
   }
 };
@@ -398,6 +411,7 @@ std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
   }
   for (size_t i = 0; i < statements.size(); ++i) {
     Result result;
+    ABSL_VLOG(1) << "DuckDB: " << statements.at(i);
     if (duckdb_query(connection.get(), statements.at(i).c_str(), &result.result) == DuckDBError) {
       const char* error = duckdb_result_error(&result.result);
       errors.emplace_back(i, error != nullptr ? error : "DuckDB insert failed");

@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/absl_log.h"
 #include "google/cloud/bigquery/storage/v1/storage.grpc.pb.h"
 #include "google/cloud/bigquery/storage/v1/storage.pb.h"
 #include "google/cloud/bigquery/storage/v1/stream.pb.h"
@@ -81,8 +82,12 @@ grpc::Status Guard(F&& body) {
                                   : message.find("does not support") != std::string::npos
                                       ? grpc::StatusCode::UNIMPLEMENTED
                                       : grpc::StatusCode::INVALID_ARGUMENT;
+    if (code == grpc::StatusCode::INTERNAL) {
+      ABSL_LOG(ERROR) << message;
+    }
     return {code, message};
   } catch (const std::exception& error) {
+    ABSL_LOG(ERROR) << error.what();
     return {grpc::StatusCode::INTERNAL, error.what()};
   }
 }

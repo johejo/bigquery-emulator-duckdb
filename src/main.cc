@@ -24,6 +24,7 @@
 #include "src/external_query.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
+#include "src/logging.h"
 #include "src/project.h"
 #include "src/python_worker.h"
 #include "src/server.h"
@@ -36,6 +37,7 @@
 namespace {
 
 constexpr const char* kUdfs = "UDF limits";
+constexpr const char* kLogging = "Logging";
 constexpr const char* kDebugging = "Debugging";
 
 // What both the server and the shell configure.
@@ -46,6 +48,8 @@ struct EmulatorFlags {
   bigquery_emulator_duckdb::udf::PythonOptions python;
   std::vector<std::string> projects;
   std::vector<std::string> connections;
+  std::string log_file;
+  bigquery_emulator_duckdb::LogLevel log_level = bigquery_emulator_duckdb::LogLevel::kInfo;
 };
 
 void AddEmulatorFlags(CLI::App& app, EmulatorFlags& flags) {
@@ -115,6 +119,23 @@ void AddEmulatorFlags(CLI::App& app, EmulatorFlags& flags) {
       ->type_name("MIB")
       ->check(positive)
       ->group(kUdfs);
+  app.add_option("--log-file", flags.log_file,
+                 "Append the log to PATH (default: standard error, where the shell writes only "
+                 "warnings and errors)")
+      ->type_name("PATH")
+      ->group(kLogging);
+  app.add_option_function<std::string>(
+         "--log-level",
+         [&flags](const std::string& value) {
+           const auto level = bigquery_emulator_duckdb::ParseLogLevel(value);
+           if (!level.has_value()) {
+             throw CLI::ValidationError("--log-level", "must be debug, info, warning or error");
+           }
+           flags.log_level = *level;
+         },
+         "debug, info, warning or error; debug adds query text and DuckDB SQL (default: info)")
+      ->type_name("LEVEL")
+      ->group(kLogging);
 }
 
 // Blocks SIGINT and SIGTERM in the calling thread and every thread it starts afterwards, so that
@@ -221,6 +242,12 @@ int Run(int argc, char* const* argv) {
   }
 
   const EmulatorFlags& used = shell->parsed() ? shell_flags : serve_flags;
+  // The shell's standard error belongs to its user, so it gets only what needs attention there.
+  bigquery_emulator_duckdb::StartLogging(
+      shell->parsed() && used.log_file.empty()
+          ? std::max(used.log_level, bigquery_emulator_duckdb::LogLevel::kWarning)
+          : used.log_level,
+      used.log_file);
   std::vector<bigquery_emulator_duckdb::Project> projects;
   std::ranges::transform(used.projects, std::back_inserter(projects),
                          bigquery_emulator_duckdb::ReadProjectArgument);
