@@ -18,7 +18,9 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/external_table.h"
 #include "src/field_schema.h"
+#include "src/gcs.h"
 #include "src/location.h"
 #include "src/mysql_query.h"
 #include "src/references.h"
@@ -52,11 +54,12 @@ std::optional<std::string> ConnectionLocation(const std::string& key) {
 class DuckDbTableSource : public TableSource {
  public:
   // `project_ids` maps each project's ID and number to its ID, as Emulator::ResolveProject does.
-  DuckDbTableSource(Backend& backend, ExternalConnections& connections,
+  DuckDbTableSource(Backend& backend, ExternalConnections& connections, GcsClient gcs,
                     const std::unordered_map<std::string, std::string>& project_ids,
                     JobLocation* location)
       : backend_(backend),
         connections_(connections),
+        gcs_(std::move(gcs)),
         project_ids_(project_ids),
         location_(location) {}
 
@@ -90,6 +93,11 @@ class DuckDbTableSource : public TableSource {
   }
 
   std::optional<TableRead> ReadQuery(const TableReference& table) override {
+    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
+    if (metadata.external_data) {
+      return GcsExternalRead(*metadata.external_data, TableSchema(backend_, table), gcs_);
+    }
     const auto query = TableReadQuery(backend_, table);
     return query ? std::optional<TableRead>(*query) : std::nullopt;
   }
@@ -102,6 +110,9 @@ class DuckDbTableSource : public TableSource {
     const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
     if (!comment.has_value() || !project_ids_.contains(table.project_id)) {
       return absl::UnimplementedError("FOR SYSTEM_TIME AS OF a temporary table");
+    }
+    if (CommentMetadata(*comment).external_data) {
+      return absl::UnimplementedError("FOR SYSTEM_TIME AS OF an external table");
     }
     return bigquery_emulator_duckdb::TimeTravelQuery(backend_, table,
                                                      CommentMetadata(*comment).creation_time, time);
@@ -337,6 +348,7 @@ class DuckDbTableSource : public TableSource {
 
   Backend& backend_;
   ExternalConnections& connections_;
+  GcsClient gcs_;
   const std::unordered_map<std::string, std::string>& project_ids_;
   JobLocation* location_;
   // DatasetLocation's answers, by project:dataset.
@@ -346,9 +358,10 @@ class DuckDbTableSource : public TableSource {
 }  // namespace
 
 std::unique_ptr<TableSource> NewDuckDbTableSource(
-    Backend& backend, ExternalConnections& connections,
+    Backend& backend, ExternalConnections& connections, GcsClient gcs,
     const std::unordered_map<std::string, std::string>& project_ids, JobLocation* location) {
-  return std::make_unique<DuckDbTableSource>(backend, connections, project_ids, location);
+  return std::make_unique<DuckDbTableSource>(backend, connections, std::move(gcs), project_ids,
+                                             location);
 }
 
 }  // namespace bigquery_emulator_duckdb

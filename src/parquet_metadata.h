@@ -84,6 +84,7 @@ inline constexpr int16_t kElementConvertedType = 6;
 inline constexpr int16_t kElementScale = 7;
 inline constexpr int16_t kElementPrecision = 8;
 inline constexpr int16_t kElementLogicalType = 10;
+inline constexpr int16_t kLogicalString = 1;
 inline constexpr int16_t kLogicalMap = 2;
 inline constexpr int16_t kLogicalList = 3;
 inline constexpr int16_t kLogicalDecimal = 5;
@@ -99,12 +100,15 @@ inline constexpr int16_t kColumnBloomFilterOffset = 14;
 inline constexpr int16_t kColumnBloomFilterLength = 15;
 
 // Values of SchemaElement's type, repetition_type and converted_type.
+inline constexpr int64_t kBoolean = 0;
 inline constexpr int64_t kInt32 = 1;
 inline constexpr int64_t kInt64 = 2;
+inline constexpr int64_t kDouble = 5;
 inline constexpr int64_t kByteArray = 6;
 inline constexpr int64_t kFixedLenByteArray = 7;
 inline constexpr int64_t kOptional = 1;
 inline constexpr int64_t kRepeated = 2;
+inline constexpr int64_t kConvertedUtf8 = 0;
 inline constexpr int64_t kConvertedMap = 1;
 inline constexpr int64_t kConvertedMapKeyValue = 2;
 inline constexpr int64_t kConvertedList = 3;

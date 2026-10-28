@@ -203,6 +203,9 @@ TableWriteRestriction TableWriteRestrictionOf(Backend& backend, const TableRefer
     return TableWriteRestriction::kExternalNumericStorage;
   }
   const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
+  if (comment && CommentMetadata(*comment).external_data) {
+    return TableWriteRestriction::kExternal;
+  }
   if (comment && CommentMetadata(*comment).snapshot.has_value()) {
     return TableWriteRestriction::kSnapshot;
   }
@@ -210,6 +213,9 @@ TableWriteRestriction TableWriteRestrictionOf(Backend& backend, const TableRefer
 }
 
 std::string ReadTableRelation(Backend& backend, const TableReference& table) {
+  if (TableWriteRestrictionOf(backend, table) == TableWriteRestriction::kExternal) {
+    throw ApiError::Unsupported("reading an external table through this API; use a query");
+  }
   const auto query = TableReadQuery(backend, table);
   return query ? "(" + *query + ") AS _bq_storage" : QualifiedName(table);
 }
@@ -219,6 +225,8 @@ void CheckWritableTable(Backend& backend, const TableReference& table) {
     case TableWriteRestriction::kExternalNumericStorage:
       throw ApiError::Unsupported("writing to external numeric storage in " + TableName(table) +
                                   "; copy the table first");
+    case TableWriteRestriction::kExternal:
+      throw ApiError::Invalid("Cannot write to external table " + TableName(table));
     case TableWriteRestriction::kSnapshot:
       throw ApiError::Invalid("Table " + TableName(table) +
                               " is a snapshot, and snapshots are immutable.");

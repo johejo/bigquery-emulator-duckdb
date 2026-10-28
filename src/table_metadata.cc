@@ -413,6 +413,15 @@ void ValidateClustering(const std::vector<std::string>& clustering,
 
 json TableMetadata::ToJson() const {
   json fields = json::object();
+  if (external_data) {
+    fields["externalDataConfiguration"] = {
+        {"sourceFormat", "PARQUET"},
+        {"sourceUris", external_data->uris},
+    };
+    if (external_data->autodetect.has_value()) {
+      fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
+    }
+  }
   if (creation_time != 0) {
     fields["creationTime"] = std::to_string(creation_time);
   }
@@ -539,6 +548,39 @@ json DatasetMetadata::ToJson() const {
 
 TableMetadata TableMetadataFromJson(const json& table) {
   TableMetadata metadata;
+  if (table.contains("externalDataConfiguration") &&
+      !table["externalDataConfiguration"].is_null()) {
+    const auto& config = table["externalDataConfiguration"];
+    if (!config.is_object()) {
+      throw ApiError::Invalid("externalDataConfiguration must be an object");
+    }
+    for (const auto& [name, value] : config.items()) {
+      if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
+          name != "autodetect") {
+        throw ApiError::Unsupported("externalDataConfiguration." + name);
+      }
+    }
+    if (config.value("sourceFormat", "") != "PARQUET") {
+      throw ApiError::Unsupported("external tables other than PARQUET");
+    }
+    const auto uris = config.value("sourceUris", json::array());
+    if (!uris.is_array() || uris.empty()) {
+      throw ApiError::Invalid("externalDataConfiguration.sourceUris must not be empty");
+    }
+    metadata.external_data.emplace();
+    if (config.contains("autodetect")) {
+      if (config["autodetect"] != false) {
+        throw ApiError::Unsupported("external table schema autodetection");
+      }
+      metadata.external_data->autodetect = false;
+    }
+    for (const auto& uri : uris) {
+      if (!uri.is_string() || !uri.get_ref<const std::string&>().starts_with("gs://")) {
+        throw ApiError::Unsupported("external table sources other than gs://");
+      }
+      metadata.external_data->uris.push_back(uri.get<std::string>());
+    }
+  }
   ParsePartitioning(table, metadata);
   UpdateTableMetadata(metadata, table, /*patch=*/false);
   return metadata;

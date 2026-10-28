@@ -1,7 +1,9 @@
 #include "src/information_schema_tables.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -59,6 +61,7 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
                                      const std::string& table,
                                      const std::vector<FieldSchema>& schema,
                                      const std::optional<std::string>& default_collation,
+                                     const std::optional<GcsExternalData>& external,
                                      googlesql::TypeFactory* type_factory) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
@@ -69,8 +72,17 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     columns.push_back("  " + field.name + " " + *type +
                       (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
   }
-  return "CREATE TABLE `" + project + "." + dataset + "." + table + "`\n(\n" +
-         absl::StrJoin(columns, ",\n") + "\n);";
+  std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
+                    "." + dataset + "." + table + "`";
+  if (!external) {
+    ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
+  }
+  if (external) {
+    std::vector<std::string> uris;
+    std::ranges::transform(external->uris, std::back_inserter(uris), StringOptionValue);
+    ddl += "\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
+  }
+  return ddl + ";";
 }
 
 std::string ViewDdl(const std::string& project, const std::string& dataset,
@@ -169,6 +181,7 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
       // A clone or snapshot names its base table and the time it was made, as snapshot_time_ms.
       std::optional<BaseTableDefinition> base;
       bool snapshot = false;
+      std::optional<GcsExternalData> external;
       std::optional<std::string> default_collation;
       int64_t creation_time =
           view_description.has_value() ? view_description->metadata.creation_time : 0;
@@ -176,13 +189,15 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
         if (std::optional<TableDescription> description =
                 context.source.DescribeTable(project, dataset.dataset_id, table)) {
           snapshot = description->metadata.snapshot.has_value();
+          external = description->metadata.external_data;
           base = snapshot ? std::move(description->metadata.snapshot)
                           : std::move(description->metadata.clone);
           creation_time = description->metadata.creation_time;
           default_collation = description->metadata.default_collation;
         }
-        absl::StatusOr<std::string> table_ddl = TableDdl(
-            project, dataset.dataset_id, table, *schema, default_collation, context.type_factory);
+        absl::StatusOr<std::string> table_ddl =
+            TableDdl(project, dataset.dataset_id, table, *schema, default_collation, external,
+                     context.type_factory);
         if (!table_ddl.ok()) {
           return table_ddl.status();
         }
@@ -200,11 +215,12 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
                  {
                      String(view_description && view_description->materialized ? "MATERIALIZED VIEW"
                             : view_query.has_value()                           ? "VIEW"
+                            : external                                         ? "EXTERNAL"
                             : snapshot                                         ? "SNAPSHOT"
                             : base.has_value()                                 ? "CLONE"
                                                                                : "BASE TABLE"),
-                     view_query.has_value() ? kNull : String("NATIVE"),
-                     String(view_query.has_value() || snapshot ? "NO" : "YES"),
+                     view_query.has_value() || external ? kNull : String("NATIVE"),
+                     String(view_query.has_value() || snapshot || external ? "NO" : "YES"),
                      String("NO"),
                      String("NO"),
                      String("NO"),
@@ -269,6 +285,17 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
           CommonOptions(metadata->description, metadata->friendly_name, metadata->labels,
                         metadata->default_rounding_mode, metadata->label_order,
                         metadata->resource_tags, metadata->tag_order);
+      if (metadata->external_data) {
+        std::vector<std::string> uris;
+        std::ranges::transform(metadata->external_data->uris, std::back_inserter(uris),
+                               StringOptionValue);
+        options.push_back({.name = "format", .type = "STRING", .value = "\"PARQUET\""});
+        options.push_back({
+            .name = "uris",
+            .type = "ARRAY<STRING>",
+            .value = "[" + absl::StrJoin(uris, ", ") + "]",
+        });
+      }
       if (metadata->restored_from_snapshot) {
         if (metadata->friendly_name.empty()) {
           options.push_back({.name = "friendly_name", .type = "STRING", .value = "\"\""});

@@ -93,6 +93,8 @@ std::string TableId(const TableReference& table) {
 
 const char* TableTypeName(TableType type) {
   switch (type) {
+    case TableType::kExternal:
+      return "EXTERNAL";
     case TableType::kTable:
       return "TABLE";
     case TableType::kSnapshot:
@@ -486,6 +488,7 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
 json TableResource(const TableInfo& info) {
   const TableType type = info.materialized                    ? TableType::kMaterializedView
                          : info.view_query                    ? TableType::kView
+                         : info.metadata.external_data        ? TableType::kExternal
                          : info.metadata.snapshot.has_value() ? TableType::kSnapshot
                                                               : TableType::kTable;
   json resource{
@@ -552,6 +555,7 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
     // snapshotDefinition.
     item.update(entry.metadata.ToJson());
     item.erase("description");
+    item.erase("externalDataConfiguration");
     item.erase("cloneDefinition");
     item.erase("snapshotDefinition");
     entries.push_back(std::move(item));

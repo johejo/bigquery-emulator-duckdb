@@ -674,6 +674,9 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (info.view_query) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "Cannot write to a logical view");
     }
+    if (info.metadata.external_data) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED, "Storage Write of external tables is not supported");
+    }
     if (info.metadata.snapshot.has_value()) {
       const std::string name =
           ProjectNumber(table.project_id) + ":" + table.dataset_id + "." + table.table_id;

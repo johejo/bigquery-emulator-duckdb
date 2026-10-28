@@ -20,6 +20,7 @@ enum class DdlOptionContext : uint8_t {
   kCreateView,
   kCreateMaterializedView,
   kCreateSnapshotTable,
+  kCreateExternalTable,
   kColumn,
   kCreateFunction,
   kCreateTableFunction,
@@ -41,6 +42,8 @@ enum class DdlOptionId : uint8_t {
   kRuntimeVersion,
   kEntryPoint,
   kStrictMode,
+  kFormat,
+  kUris,
 };
 std::string_view DdlOptionContextName(DdlOptionContext context);
 std::string_view DdlOptionName(DdlOptionId option);
@@ -49,7 +52,7 @@ std::optional<DdlOptionId> ParseDdlOptionId(std::string_view name);
 
 // Types of the options the DDL handlers implement. The catalog test checks these
 // against BigQuery's option catalog; they do not determine support.
-enum class DdlOptionType : uint8_t { kString, kBool, kFloat64, kTimestamp, kLabels };
+enum class DdlOptionType : uint8_t { kString, kBool, kFloat64, kTimestamp, kLabels, kStrings };
 struct DdlOptionDefinition {
   DdlOptionContext context;
   DdlOptionId name;

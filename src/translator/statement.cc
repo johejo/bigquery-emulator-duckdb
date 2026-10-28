@@ -45,6 +45,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (statement.Is<googlesql::ResolvedMergeStmt>()) {
     return Merge(*statement.GetAs<googlesql::ResolvedMergeStmt>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedCreateExternalTableStmt>()) {
+    return CreateExternalTable(*statement.GetAs<googlesql::ResolvedCreateExternalTableStmt>(),
+                               scope);
+  }
   if (statement.Is<googlesql::ResolvedCreateTableStmt>()) {
     return CreateTable(*statement.GetAs<googlesql::ResolvedCreateTableStmt>(), scope);
   }
@@ -166,6 +170,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   }
   if (statement.Is<googlesql::ResolvedMergeStmt>()) {
     return "MERGE";
+  }
+  if (statement.Is<googlesql::ResolvedCreateExternalTableStmt>()) {
+    return "CREATE_EXTERNAL_TABLE";
   }
   if (statement.Is<googlesql::ResolvedCreateTableStmt>()) {
     return "CREATE_TABLE";

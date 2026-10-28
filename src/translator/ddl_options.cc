@@ -373,12 +373,40 @@ bool RoundingModeOption(const googlesql::Value& value, RoundingMode& into) {
 std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionContext statement,
                                              const Scope& scope, TableMetadata metadata) {
   const bool table = statement == DdlOptionContext::kCreateTable;
+  const bool external = statement == DdlOptionContext::kCreateExternalTable;
+  bool format = false;
+  if (external) {
+    metadata.external_data.emplace();
+  }
   for (const auto& option : options) {
     const auto decoded = DecodeDdlOption(*option, statement, scope);
+    if (decoded && external && decoded->id == DdlOptionId::kFormat) {
+      format = !decoded->value.is_null() && decoded->value.string_value() == "PARQUET";
+      if (!format) {
+        return Unsupported(scope, "external tables other than PARQUET");
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kUris) {
+      if (decoded->value.is_null()) {
+        return Unsupported(scope, "NULL external table uris");
+      }
+      for (int i = 0; i < decoded->value.num_elements(); ++i) {
+        const auto& uri = decoded->value.element(i);
+        if (uri.is_null()) {
+          return Unsupported(scope, "NULL external table URI");
+        }
+        metadata.external_data->uris.push_back(uri.string_value());
+      }
+      continue;
+    }
     if (!decoded || !ApplyTableOption(decoded->id, decoded->value, table, metadata)) {
       return Unsupported(
           scope, std::string(DdlOptionContextName(statement)) + " option " + option->name());
     }
+  }
+  if (external && (!format || metadata.external_data->uris.empty())) {
+    return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
   }
   return metadata;
 }

@@ -305,7 +305,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     destination.project_id = destination.project_id.empty()
                                  ? request.project_id
                                  : ResolveProject(destination.project_id);
-    RejectSnapshotWrite(GetTable(destination, /*include_row_count=*/false));
+    RejectReadOnlyWrite(GetTable(destination, /*include_row_count=*/false));
   } catch (const ApiError& error) {
     if (error.http_status() != 404) {
       throw;
@@ -661,7 +661,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     throw ApiError::Invalid("Cannot write to a view: " + TableName(destination));
   }
   if (existing.has_value()) {
-    RejectSnapshotWrite(*existing);
+    RejectReadOnlyWrite(*existing);
   }
   if (!existing.has_value() && create == CreateDisposition::kCreateNever) {
     throw ApiError::NotFound("Not found: Table " + TableName(destination));

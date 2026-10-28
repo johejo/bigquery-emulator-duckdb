@@ -1,0 +1,304 @@
+version: 1
+# BigQuery project johejo-sandbox, run 4dz5jbz6ccj6yzq7lkudlgqaj4; original observations
+# are retained in external_table.api.answers.json. Contrary to the schema restriction in
+# [ExternalDataConfiguration](third_party/bigquery_docs/reference/rest/v2/tables.md),
+# BigQuery accepts externalDataConfiguration.schema for Parquet and returns it as table.schema.
+description: External table creation without source access, schema placement and metadata, verified on BigQuery. Sources deliberately do not exist; no GCS fixture upload is needed.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: gs://bqanswers-missing-${run}/missing.parquet
+  schema:
+    fields:
+      - name: id
+        type: INTEGER
+  external_config:
+    sourceFormat: PARQUET
+    sourceUris:
+      - ${uri}
+  expected_table:
+    external: ${external_config}
+    numBytes: "0"
+    numRows: "0"
+    schema:
+      fields:
+        - mode: NULLABLE
+          name: id
+          type: INTEGER
+    type: EXTERNAL
+  expected_table_info:
+    rows:
+      - f:
+          - v: EXTERNAL
+          - v: null
+          - v: NO
+          - v: |-
+              CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+              OPTIONS(
+                format="PARQUET",
+                uris=["${uri}"]
+              );
+  expected_table_options:
+    rows:
+      - f:
+          - v: format
+          - v: STRING
+          - v: '"PARQUET"'
+      - f:
+          - v: uris
+          - v: ARRAY<STRING>
+          - v: '["${uri}"]'
+templates:
+  metadata:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+          numRows: /body/numRows
+          numBytes: /body/numBytes
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+          numRows: /body/numRows
+          numBytes: /body/numBytes
+      - name: list
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+        observe:
+          type: /body/tables/0/type
+          external: /body/tables/0/externalDataConfiguration
+      - name: information_schema_options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: SELECT table_type, managed_table_type, is_insertable_into, ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+        expectFailure: true
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: explicit_table_schema
+    template: metadata
+    vars:
+      table:
+        tableReference:
+          tableId: t
+        schema: ${schema}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+    expect:
+      create: ${expected_table}
+      get: ${expected_table}
+      list:
+        type: EXTERNAL
+      information_schema: ${expected_table_info}
+      information_schema_options: ${expected_table_options}
+  - name: explicit_external_schema
+    template: metadata
+    vars:
+      table:
+        tableReference:
+          tableId: t
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+          schema: ${schema}
+    expect:
+      create: ${expected_table}
+      get: ${expected_table}
+      list:
+        type: EXTERNAL
+      information_schema: ${expected_table_info}
+      information_schema_options: ${expected_table_options}
+  - name: both_schemas
+    template: metadata
+    vars:
+      table:
+        tableReference:
+          tableId: t
+        schema: ${schema}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+          schema: ${schema}
+    expect:
+      create: ${expected_table}
+      get: ${expected_table}
+      list:
+        type: EXTERNAL
+      information_schema: ${expected_table_info}
+      information_schema_options: ${expected_table_options}
+  - name: conflicting_schemas
+    template: rejected
+    vars:
+      table:
+        tableReference:
+          tableId: t
+        schema: ${schema}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+          schema:
+            fields:
+              - name: other
+                type: STRING
+    expect:
+      create:
+        status: 400
+        reason: invalid
+        message: When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same.
+  - name: explicit_autodetect_false
+    template: metadata
+    vars:
+      table:
+        tableReference:
+          tableId: t
+        schema: ${schema}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+          autodetect: false
+      external_config:
+        autodetect: false
+        sourceFormat: PARQUET
+        sourceUris:
+          - ${uri}
+    expect:
+      create: ${expected_table}
+      get: ${expected_table}
+      list:
+        type: EXTERNAL
+      information_schema: ${expected_table_info}
+      information_schema_options: ${expected_table_options}
+  - name: ddl_missing_source
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64) OPTIONS (format = 'PARQUET', uris = ['${uri}'])
+        observe:
+          errors: /body/errors
+          jobComplete: /body/jobComplete
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: SELECT COUNT(*) FROM `${project}.${dataset}.t`
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+        expectFailure: true
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create:
+        jobComplete: true
+      get:
+        external:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+        schema:
+          fields:
+            - name: id
+              type: INTEGER
+        type: EXTERNAL
+      query:
+        status: 404
+        reason: notFound
+        message: 'Not found: URI gs://bqanswers-missing-${run}'

@@ -117,11 +117,11 @@ struct GcsClient::Impl {
 
 GcsClient::GcsClient() {
   Endpoint endpoint = EndpointFromEnvironment();
-  impl_ = std::make_unique<Impl>(std::move(endpoint.url), endpoint.emulator);
+  impl_ = std::make_shared<Impl>(std::move(endpoint.url), endpoint.emulator);
 }
 
 GcsClient::GcsClient(std::string endpoint, bool emulator)
-    : impl_(std::make_unique<Impl>(std::move(endpoint), emulator)) {}
+    : impl_(std::make_shared<Impl>(std::move(endpoint), emulator)) {}
 
 GcsClient::~GcsClient() = default;
 
@@ -192,7 +192,15 @@ void GcsClient::Download(const std::string& uri, const std::filesystem::path& ou
   storage::Client client = impl_->client();
   const cloud::Status status = client.DownloadToFile(bucket, object, output.string());
   if (!status.ok()) {
-    throw ApiError::Invalid("Could not read GCS object: " + uri + " (" + status.message() + ")");
+    const std::string message = "Could not read GCS object: " + uri + " (" + status.message() + ")";
+    if (status.code() == cloud::StatusCode::kNotFound) {
+      const auto metadata = client.GetBucketMetadata(bucket);
+      if (!metadata && metadata.status().code() == cloud::StatusCode::kNotFound) {
+        throw ApiError::NotFound("Not found: URI gs://" + bucket);
+      }
+      throw ApiError::NotFound(message);
+    }
+    throw ApiError::Invalid(message);
   }
 }
 

@@ -1,5 +1,6 @@
 #include "src/table_comments.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -10,6 +11,7 @@
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/gcs.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 
@@ -75,6 +77,37 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
                                   const std::vector<FieldSchema>& schema) {
   ValidateLabels(metadata.labels);
   ValidateResourceTags(metadata.resource_tags);
+  if (metadata.external_data) {
+    if (metadata.external_data->uris.empty()) {
+      throw ApiError::Invalid("External table source URIs must not be empty");
+    }
+    for (const auto& uri : metadata.external_data->uris) {
+      if (!uri.starts_with("gs://")) {
+        throw ApiError::Unsupported("external table sources other than gs://");
+      }
+      FindGcsWildcard(uri);
+    }
+    if (schema.empty()) {
+      throw ApiError::Unsupported("external tables without an explicit schema");
+    }
+    if (metadata.partitioned() || metadata.require_partition_filter ||
+        !metadata.clustering.empty() || !metadata.primary_key.empty() ||
+        metadata.default_collation ||
+        metadata.default_rounding_mode != RoundingMode::kUnspecified || metadata.clone ||
+        metadata.snapshot) {
+      throw ApiError::Unsupported("external table storage options");
+    }
+    const auto unsupported = std::ranges::find_if(schema, [](const FieldSchema& field) {
+      return field.mode != FieldMode::kNullable || field.max_length || field.precision ||
+             field.scale || field.collation || !field.default_value_expression.empty() ||
+             (field.type != FieldType::kInteger && field.type != FieldType::kString &&
+              field.type != FieldType::kBoolean && field.type != FieldType::kFloat &&
+              field.type != FieldType::kBytes);
+    });
+    if (unsupported != schema.end()) {
+      throw ApiError::Unsupported("this external table column definition: " + unsupported->name);
+    }
+  }
   ValidatePartitioning(metadata, schema);
   metadata.primary_key = PrimaryKeyColumns(metadata.primary_key, schema);
   json comment = metadata.ToJson();
@@ -92,6 +125,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
 }
 
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
+  if (view.metadata.external_data) {
+    throw ApiError::Invalid("A view cannot have externalDataConfiguration");
+  }
   ValidateLabels(view.metadata.labels);
   ValidateResourceTags(view.metadata.resource_tags);
   if (view.metadata.require_partition_filter) {

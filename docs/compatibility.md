@@ -56,6 +56,20 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ## Tables
 
+### External tables
+
+GCS external tables support Parquet with an explicit schema, through `CREATE EXTERNAL TABLE`
+or `tables.insert`. Sources must use `gs://` URIs; multiple URIs and a single wildcard per URI
+are supported. Schemas are limited to nullable scalar INT64, BOOL, FLOAT64, STRING and BYTES.
+Parquet columns must use matching INT64, BOOLEAN, DOUBLE, UTF8 STRING or unannotated BYTE_ARRAY
+storage; coercions, nested/repeated fields and autodetection are unsupported.
+
+CSV, JSON, Bigtable, BigLake connections, Hive partitioning, metadata caching, `_FILE_NAME`,
+configuration updates, `ALTER TABLE`, `DROP EXTERNAL TABLE`, replacement, stored views over
+external tables and time travel are unsupported. Query dry runs and stored definitions reject external reads rather
+than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
+not read external tables; use a query instead. Writes to external tables are rejected.
+
 ### Resource tags
 
 DDL `tags` and REST `resourceTags` share stored metadata for datasets, tables and views,
@@ -119,7 +133,8 @@ and `DROP CONSTRAINT` are unsupported.
 
 Supported actions are `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS`, `ADD PRIMARY KEY`,
 `DROP PRIMARY KEY`, and `ALTER COLUMN` with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`. Other actions are unsupported. Column options
-have the limits described under [Options and expiration](#options-and-expiration).
+have the limits described under [Options and expiration](#options-and-expiration). See also
+[External tables](#external-tables).
 
 ### Copies and clones
 

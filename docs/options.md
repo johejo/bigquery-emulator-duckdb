@@ -43,6 +43,9 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
 | [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 2 | 0 | 2 | 31 |
+| [CREATE EXTERNAL TABLE format](#create-external-table-format) | 0 | 1 | 0 | 0 |
+| [CREATE EXTERNAL TABLE uris](#create-external-table-uris) | 1 | 0 | 0 | 0 |
 
 ## CREATE SCHEMA
 
@@ -273,6 +276,58 @@ the emulator rejected.
 | --- | --- | --- | --- |
 | [`entry_point`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
+## CREATE EXTERNAL TABLE
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`allow_jagged_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`allow_quoted_newlines`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`compression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`decimal_target_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`enable_list_inference`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`enable_logical_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`encoding`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`enum_as_string`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
+| [`field_delimiter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`hive_partition_uri_prefix`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`file_set_spec_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`ignore_unknown_values`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`json_extension`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`max_bad_records`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
+| [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
+| [`null_marker`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`null_markers`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
+| [`object_metadata`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`preserve_ascii_control_characters`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`projection_fields`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`quote`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`reference_file_schema_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`require_hive_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`sheet_range`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`skip_leading_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
+| [`source_column_match`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`time_zone`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`date_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`datetime_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`time_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`timestamp_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+
+## CREATE EXTERNAL TABLE format
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'AVRO')`; `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'CSV')`; `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'NEWLINE_DELIMITED_JSON')`; `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'ORC')`. |
+
+## CREATE EXTERNAL TABLE uris
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Supported |  |
+
 ## Unprobed contexts
 
 These contexts have no statement template yet, so none of their options is probed.
@@ -299,6 +354,5 @@ These contexts have no statement template yet, so none of their options is probe
 - [ALTER RESERVATION SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `ignore_idle_slots`, `slot_capacity`, `target_job_concurrency`, `autoscale_max_slots`, `secondary_location`, `is_primary`, `labels`
 - [ALTER DATA_POLICY SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `data_policy_type`, `masking_expression`
 - [ALTER CONNECTION SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `friendly_name`, `description`
-- [CREATE EXTERNAL TABLE](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `allow_jagged_rows`, `allow_quoted_newlines`, `bigtable_options`, `compression`, `decimal_target_types`, `description`, `enable_list_inference`, `enable_logical_types`, `encoding`, `enum_as_string`, `expiration_timestamp`, `field_delimiter`, `format`, `hive_partition_uri_prefix`, `file_set_spec_type`, `ignore_unknown_values`, `json_extension`, `max_bad_records`, `max_staleness`, `null_marker`, `null_markers`, `object_metadata`, `preserve_ascii_control_characters`, `projection_fields`, `quote`, `reference_file_schema_uri`, `require_hive_partition_filter`, `sheet_range`, `skip_leading_rows`, `source_column_match`, `tags`, `time_zone`, `date_format`, `datetime_format`, `time_format`, `timestamp_format`, `uris`
 - [CREATE TABLE generated column](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `asynchronous`
 - [CREATE EXTERNAL TABLE Bigtable URI](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `uris`

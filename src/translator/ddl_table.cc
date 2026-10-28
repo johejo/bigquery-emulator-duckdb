@@ -570,6 +570,9 @@ std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
                     reference.project_id, reference.dataset_id, reference.table_id, rejected,
                     takes_snapshots ? "TABLE, SNAPSHOT" : "TABLE"));
   }
+  if (description && description->metadata.external_data) {
+    return Unsupported(scope, std::string(statement) + " of an external table");
+  }
   if (description) {
     description->metadata.clone.reset();
   }
@@ -925,6 +928,50 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   }
   scope.context.statement.table = std::move(table);
   return *head + " (" + Join(columns, ", ") + ")";
+}
+
+std::optional<std::string> CreateExternalTable(
+    const googlesql::ResolvedCreateExternalTableStmt& create, const Scope& scope) {
+  if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
+      create.with_partition_columns() != nullptr || create.like_table() != nullptr ||
+      create.primary_key() != nullptr || !create.foreign_key_list().empty() ||
+      create.collation_name() != nullptr) {
+    return Unsupported(scope, "this CREATE EXTERNAL TABLE clause");
+  }
+  const auto head = CreateTableHead(create, scope);
+  const auto target = scope.context.statement.ddl_target_table;
+  auto metadata =
+      OptionsMetadata(create.option_list(), DdlOptionContext::kCreateExternalTable, scope);
+  if (!head || !target || !metadata) {
+    return std::nullopt;
+  }
+  TableDefinition table{
+      .table = *target,
+      .metadata = std::move(*metadata),
+      .if_not_exists =
+          create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS,
+  };
+  for (const auto& column : create.column_definition_list()) {
+    if (column->is_hidden() || column->generated_column_info() != nullptr ||
+        column->default_value() != nullptr) {
+      return Unsupported(scope, "this external table column definition");
+    }
+    auto field = ColumnField(*column, scope);
+    if (!field) {
+      return std::nullopt;
+    }
+    CheckFieldNames(*field, field->name);
+    table.schema.push_back(std::move(*field));
+  }
+  if (table.schema.empty()) {
+    return Unsupported(scope, "external tables without an explicit schema");
+  }
+  const auto columns = ColumnsSql(table.schema, scope);
+  if (!columns) {
+    return std::nullopt;
+  }
+  scope.context.statement.table = std::move(table);
+  return *head + " (" + *columns + ")";
 }
 
 // CREATE SNAPSHOT TABLE copies a table as CLONE does, into a table snapshot, which records the

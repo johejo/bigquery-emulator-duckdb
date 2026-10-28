@@ -64,6 +64,8 @@ bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
     case TableWriteRestriction::kExternalNumericStorage:
       Unsupported(scope, "DML on external numeric storage; copy the table first");
       return false;
+    case TableWriteRestriction::kExternal:
+      throw std::invalid_argument("Cannot modify external table " + TableName(stored->reference()));
     case TableWriteRestriction::kSnapshot:
       throw std::invalid_argument("Invalid value: Table " + TableName(stored->reference()) +
                                   " is a snapshot, and snapshots are immutable.");
