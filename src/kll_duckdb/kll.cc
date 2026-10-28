@@ -343,6 +343,13 @@ absl::StatusOr<std::optional<std::vector<T>>> Extract(const Arguments& arguments
 // every level. Compared with geometrically shrinking KLL capacities this uses
 // more space: O(precision * log(n)). Squared rank error is O(n^2 / capacity^2).
 // Weighted insertion decomposes weights into bits instead of expanding rows.
+//
+// Deferred: at the default precision a level holds up to 64000 values, so each
+// group's state and serialized sketch can be hundreds of KB per level, far more
+// than BigQuery's (its precision-1000 specimen kept 3339 values in a level), and
+// many groups multiply that. Shrinking capacities toward the top level, as KLL
+// does, would cut this but needs its own rank-error argument for each precision;
+// see docs/compatibility.md#approximate-aggregates.
 template <typename T>
 bool Less(T a, T b) {
   if constexpr (std::is_same_v<T, double>) {
@@ -405,6 +412,8 @@ struct Builder {
       maximum = high;
     }
   }
+  // Sorts a level only when it overflows, which then leaves at most one value, so
+  // each insert costs O(log precision) amortized.
   void Compact() {
     for (std::size_t level = 0; level < levels.size(); ++level) {
       if (levels.at(level).size() <= 64 * precision) {

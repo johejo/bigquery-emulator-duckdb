@@ -227,7 +227,9 @@ to the smaller one only when the incoming sketch has been compacted, following t
 documented exception for inputs small enough to be captured exactly. The writer does not
 reproduce BigQuery's capacity formula, compaction thresholds or random sequence, so its
 bytes differ from BigQuery's for the same input; BigQuery reads and merges them
-([writer answers](../tools/kll/writer.answers.txt)).
+([writer answers](../tools/kll/writer.answers.txt)). The fixed capacity trades space for a
+simple error argument; capacities that shrink toward the top level, as in KLL, are deferred
+until each precision's rank error is justified for them.
 
 A typed MERGE or MERGE_POINT merges as MERGE_PARTIAL does and extracts from the result
 with EXTRACT's reader. A translator handler and the aggregate rules enforce the constant
