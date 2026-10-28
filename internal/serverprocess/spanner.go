@@ -1,5 +1,4 @@
-// Package spannerprocess runs the standalone Spanner emulator for federated-query E2E tests.
-package spannerprocess
+package serverprocess
 
 import (
 	"bytes"
@@ -12,21 +11,18 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
 )
 
-// Process owns an isolated emulator, with one empty GoogleSQL database.
-type Process struct {
+// Spanner owns an isolated emulator, with one empty GoogleSQL database.
+type Spanner struct {
 	Host     string
 	Database string
-	cmd      *exec.Cmd
-	done     chan struct{}
-	err      error
+	process  *process
 }
 
-// Start runs the standalone Spanner emulator on free loopback ports.
+// StartSpanner runs the standalone Spanner emulator on free loopback ports.
 // SPANNER_EMULATOR_GATEWAY selects gateway_main, as the Nix development shell does.
-func Start(ctx context.Context) (*Process, error) {
+func StartSpanner(ctx context.Context) (*Spanner, error) {
 	grpc, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
@@ -41,45 +37,37 @@ func Start(ctx context.Context) (*Process, error) {
 	restHost := rest.Addr().String()
 	grpcPort := grpc.Addr().(*net.TCPAddr).Port
 	restPort := rest.Addr().(*net.TCPAddr).Port
-	p := &Process{Host: host, Database: "projects/test/instances/test/databases/test", done: make(chan struct{})}
+	p := &Spanner{Host: host, Database: "projects/test/instances/test/databases/test"}
 	gateway := os.Getenv("SPANNER_EMULATOR_GATEWAY")
 	if gateway == "" {
 		gateway = "gateway_main"
 	}
-	p.cmd = exec.Command(gateway, "--hostname=127.0.0.1", fmt.Sprintf("--grpc_port=%d", grpcPort), fmt.Sprintf("--http_port=%d", restPort))
-	p.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	p.cmd.Stderr = os.Stderr
+	cmd := exec.Command(gateway, "--hostname=127.0.0.1", fmt.Sprintf("--grpc_port=%d", grpcPort), fmt.Sprintf("--http_port=%d", restPort))
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Stderr = os.Stderr
 	if err := grpc.Close(); err != nil {
 		return nil, err
 	}
 	if err := rest.Close(); err != nil {
 		return nil, err
 	}
-	if err := p.cmd.Start(); err != nil {
+	p.process, err = startProcess(cmd, nil)
+	if err != nil {
 		return nil, err
 	}
-	go func() { p.err = p.cmd.Wait(); close(p.done) }()
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	for {
+	if err := p.process.poll(ctx, func(ctx context.Context) bool {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+restHost+"/v1/projects/test/instances", nil)
 		if err != nil {
-			return nil, errors.Join(err, p.Stop())
+			return false
 		}
 		response, err := http.DefaultClient.Do(request)
-		if err == nil {
-			response.Body.Close()
-			if response.StatusCode == http.StatusOK {
-				break
-			}
+		if err != nil {
+			return false
 		}
-		select {
-		case <-ctx.Done():
-			return nil, errors.Join(fmt.Errorf("waiting for Spanner emulator: %w", ctx.Err()), p.Stop())
-		case <-p.done:
-			return nil, fmt.Errorf("spanner emulator exited before accepting connections: %v", p.err)
-		case <-ticker.C:
-		}
+		response.Body.Close()
+		return response.StatusCode == http.StatusOK
+	}); err != nil {
+		return nil, errors.Join(fmt.Errorf("waiting for Spanner emulator: %w", err), p.Stop())
 	}
 	for _, operation := range []struct{ path, body string }{
 		{"/v1/projects/test/instances", `{"instanceId":"test","instance":{"config":"emulator-config","displayName":"test","nodeCount":1}}`},
@@ -104,15 +92,6 @@ func Start(ctx context.Context) (*Process, error) {
 }
 
 // Stop shuts down the gateway and its emulator child processes.
-func (p *Process) Stop() error {
-	select {
-	case <-p.done:
-		return nil
-	default:
-	}
-	if err := syscall.Kill(-p.cmd.Process.Pid, syscall.SIGTERM); err != nil {
-		return err
-	}
-	<-p.done
-	return nil
+func (p *Spanner) Stop() error {
+	return p.process.stop(syscall.SIGTERM, true, 0)
 }

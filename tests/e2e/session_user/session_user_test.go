@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 func binary(t *testing.T) string {
@@ -38,7 +38,7 @@ func TestEmptyIdentity(t *testing.T) {
 func TestUnconfigured(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary(t), "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
+	p, err := serverprocess.StartEmulator(ctx, binary(t), "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestConfigured(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
 			args = append([]string{"--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"one"}`, `--project={"projectId":"two"}`}, args...)
-			p, err := emulatorprocess.Start(ctx, binary(t), "", args...)
+			p, err := serverprocess.StartEmulator(ctx, binary(t), "", args...)
 			if err != nil {
 				t.Fatal(err)
 			}

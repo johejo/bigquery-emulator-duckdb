@@ -17,7 +17,7 @@ import (
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"github.com/linkedin/goavro/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -55,7 +55,7 @@ func TestReadDuckDBPhysicalTypes(t *testing.T) {
 	}
 	startup, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
+	p, err := serverprocess.StartEmulator(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 		"--data-dir", dir, `--project={"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)

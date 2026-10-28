@@ -13,7 +13,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
 	"github.com/apache/arrow-go/v18/parquet/file"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -43,7 +43,7 @@ func TestDuckDBNumericStorage(t *testing.T) {
 	}
 	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
+	p, err := serverprocess.StartEmulator(startup, binary, "", "--host", "127.0.0.1", "--http-port", "0",
 		"--data-dir", dir, `--project={"projectId":"test"}`)
 	if err != nil {
 		t.Fatal(err)

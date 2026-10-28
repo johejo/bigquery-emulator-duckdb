@@ -19,10 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/mysqlprocess"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/postgresprocess"
-	"github.com/johejo/bigquery-emulator-duckdb/internal/spannerprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 func main() {
@@ -49,7 +46,7 @@ func runn(ctx context.Context, args ...string) error {
 	return command(ctx, "runn", append([]string{"run", "--scopes", "run:exec"}, args...)...).Run()
 }
 
-func startEmulator(ctx context.Context, binary, dataDir string, projects []string, sessionUser string, connections ...string) (*emulatorprocess.Process, error) {
+func startEmulator(ctx context.Context, binary, dataDir string, projects []string, sessionUser string, connections ...string) (*serverprocess.Emulator, error) {
 	port := os.Getenv("BQ_EMULATOR_PORT")
 	if port == "" {
 		port = "0"
@@ -66,7 +63,7 @@ func startEmulator(ctx context.Context, binary, dataDir string, projects []strin
 	}
 	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(startup, binary, "", args...)
+	p, err := serverprocess.StartEmulator(startup, binary, "", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -172,14 +169,14 @@ func run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 	startup, cancelStartup := context.WithTimeout(ctx, 15*time.Second)
-	postgres, err := postgresprocess.Start(startup, postgresDir)
+	postgres, err := serverprocess.StartPostgres(startup, postgresDir)
 	cancelStartup()
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, postgres.Stop()) }()
 	startup, cancelMySQL := context.WithTimeout(ctx, 60*time.Second)
-	mysql, err := mysqlprocess.Start(startup, filepath.Join(tmp, "mysql"))
+	mysql, err := serverprocess.StartMySQL(startup, filepath.Join(tmp, "mysql"))
 	cancelMySQL()
 	if err != nil {
 		return err
@@ -197,7 +194,7 @@ func run(ctx context.Context, args []string) (err error) {
 	// can run these cases against an externally started emulator and empty database.
 	if runtime.GOOS == "linux" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") && os.Getenv("E2E_SPANNER_DATABASE") == "" {
 		startup, cancel := context.WithTimeout(ctx, 45*time.Second)
-		spanner, startErr := spannerprocess.Start(startup)
+		spanner, startErr := serverprocess.StartSpanner(startup)
 		cancel()
 		if startErr != nil {
 			return startErr

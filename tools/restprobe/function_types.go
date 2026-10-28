@@ -7,9 +7,9 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/functioncoverage"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 //go:embed function_types_preamble.md
@@ -106,7 +106,7 @@ func probeFunctionTypes(binary, catalogPath, functionsPath, outputDir string, ch
 	if len(calls) > 0 {
 		// Pure scalar/aggregate calls need no graph or external database fixtures.
 		workers := min(runtime.NumCPU(), 8, len(calls))
-		emulators := make(chan *emulatorprocess.Process, workers)
+		emulators := make(chan *serverprocess.Emulator, workers)
 		defer func() {
 			close(emulators)
 			for e := range emulators {

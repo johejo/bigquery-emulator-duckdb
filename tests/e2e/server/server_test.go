@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 )
 
 func binary(t *testing.T) string {
@@ -78,7 +78,7 @@ func rejectedListener(t *testing.T, flag, port string, code int) {
 func TestShutdownAfterAnnouncement(t *testing.T) {
 	for range 10 {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
-		p, err := emulatorprocess.Start(ctx, binary(t), "", "--host", "127.0.0.1", "--http-port", "0")
+		p, err := serverprocess.StartEmulator(ctx, binary(t), "", "--host", "127.0.0.1", "--http-port", "0")
 		cancel()
 		if err != nil {
 			t.Fatal(err)
@@ -89,11 +89,11 @@ func TestShutdownAfterAnnouncement(t *testing.T) {
 	}
 }
 
-func start(t *testing.T, args ...string) *emulatorprocess.Process {
+func start(t *testing.T, args ...string) *serverprocess.Emulator {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := emulatorprocess.Start(ctx, binary(t), "", append([]string{"--http-port", "0"}, args...)...)
+	p, err := serverprocess.StartEmulator(ctx, binary(t), "", append([]string{"--http-port", "0"}, args...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
