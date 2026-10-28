@@ -196,3 +196,33 @@ func TestLogFile(t *testing.T) {
 		t.Fatalf("log file:\n%s", data)
 	}
 }
+
+// At debug level, a query's parameters are logged as the request spells them.
+func TestLogQueryParameters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "log")
+	p := start(t, "--host", "127.0.0.1", `--project={"projectId":"test"}`, "--log-file", path,
+		"--log-level", "debug")
+	body := `{"query":"SELECT @x","useLegacySql":false,"queryParameters":` +
+		`[{"name":"x","parameterType":{"type":"INT64"},"parameterValue":{"value":"1"}}]}`
+	response, err := http.Post(p.URL+"/bigquery/v2/projects/test/queries", "application/json",
+		strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", response.StatusCode)
+	}
+	if err := p.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := regexp.MustCompile(`(?m) DEBUG request=\d+ Query parameters: ` +
+		regexp.QuoteMeta(`[{"name":"x","parameterType":{"type":"INT64"},"parameterValue":{"value":"1"}}]`) + `$`)
+	if !line.Match(data) {
+		t.Fatalf("log file:\n%s", data)
+	}
+}

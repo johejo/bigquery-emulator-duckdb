@@ -249,7 +249,7 @@ clients, see [external type mappings and write limits](docs/compatibility.md#res
 `serve` logs each REST request, each job's outcome and internal errors to standard error as text
 lines that name the request and job they belong to. `--log-file PATH` appends them to a file
 instead, and `--log-level` chooses `debug`, `info` (the default), `warning` or `error`; `debug`
-adds each query's text and the DuckDB SQL it runs. The startup announcement stays on standard
+adds each query's text and parameters and the DuckDB SQL it runs. The startup announcement stays on standard
 error. `shell` writes only warnings and errors to standard error unless `--log-file` is given.
 
 ```sh
