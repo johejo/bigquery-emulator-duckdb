@@ -137,6 +137,11 @@ query `TABLESAMPLE` | SELECT id FROM t TABLESAMPLE SYSTEM (50 PERCENT)
 query `TABLESAMPLE` | SELECT name FROM t TABLESAMPLE SYSTEM (12.5 PERCENT)
 query `TABLESAMPLE` | EXECUTE IMMEDIATE 'SELECT id FROM t TABLESAMPLE SYSTEM (@percent PERCENT)' USING 25 AS percent
 query `TABLESAMPLE` | EXECUTE IMMEDIATE 'SELECT id FROM t TABLESAMPLE SYSTEM (@percent PERCENT)' USING CAST('NaN' AS FLOAT64) AS percent
+query `WITH DIFFERENTIAL_PRIVACY` | SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) name, COUNT(*), COUNT(id, contribution_bounds_per_group => (0, 1)) FROM t GROUP BY name
+query `WITH DIFFERENTIAL_PRIVACY` | SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, max_groups_contributed=2, privacy_unit_column=id) SUM(id, contribution_bounds_per_group => (0, 10)), AVG(id) FROM t
+query `WITH DIFFERENTIAL_PRIVACY` | SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, max_groups_contributed=NULL, privacy_unit_column=t.id) AVG(CAST(id AS FLOAT64), contribution_bounds_per_group => (0, 10)) FROM t
+query `WITH DIFFERENTIAL_PRIVACY` | SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) PERCENTILE_CONT(id, 0.5, contribution_bounds_per_row => (0, 10)) FROM t
+note `WITH DIFFERENTIAL_PRIVACY` | See [Differential privacy](compatibility.md#differential-privacy).
 query Pipe syntax | FROM t |> WHERE id > 0 |> SELECT id, name |> ORDER BY id
 query Pipe syntax | FROM t |> AGGREGATE COUNT(*) GROUP BY name
 

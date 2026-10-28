@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "aggregate.cc",
         "collation.cc",
+        "differential_privacy.cc",
         "expression.cc",
         "function.cc",
         "graph.cc",
@@ -30,6 +31,7 @@ cc_library(
     hdrs = [
         "aggregate.h",
         "collation.h",
+        "differential_privacy.h",
         "expression.h",
         "function.h",
         "graph.h",
@@ -62,8 +64,10 @@ cc_library(
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer",
+        "@googlesql//googlesql/public:anonymization_utils",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:constant",
+        "@googlesql//googlesql/public:constant_evaluator",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",

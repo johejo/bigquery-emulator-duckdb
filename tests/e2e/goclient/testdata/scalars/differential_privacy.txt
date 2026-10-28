@@ -1,0 +1,43 @@
+## SELECT WITH DIFFERENTIAL_PRIVACY
+# BigQuery's answers. An epsilon of 1e20 removes the noise.
+# third_party/bigquery_docs/reference/standard-sql/query-syntax.md
+
+# max_groups_contributed, 1 by default, keeps each of the 100 units' contributions to one of its two
+# groups; NULL keeps them all. The documentation's examples with max_groups_contributed=1 count
+# professor 123 in both of its groups, as if the option were NULL.
+SELECT SUM(n) FROM (SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta=.01, privacy_unit_column=id) item, COUNT(*) AS n FROM UNNEST(GENERATE_ARRAY(1, 100)) AS id, UNNEST(['a', 'b']) AS item GROUP BY item)
+=> "100"
+
+SELECT SUM(n) FROM (SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta=.01, max_groups_contributed=NULL, privacy_unit_column=id) item, COUNT(*) AS n FROM UNNEST(GENERATE_ARRAY(1, 100)) AS id, UNNEST(['a', 'b']) AS item GROUP BY item)
+=> "200"
+
+# Large epsilons short of the 1e308 that the documentation says fails (known_bugs.txt).
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e100, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e200, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e300, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+# Explicit bounds clamp each contribution; SUM skips NaN and NULL values.
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta=.01, privacy_unit_column=id) SUM(x, contribution_bounds_per_group => (0, 10)) FROM UNNEST([STRUCT(1 AS id, 1.5 AS x), (2, CAST('nan' AS FLOAT64)), (3, NULL), (4, 20.0), (5, -3.0)])
+=> "11.5"
+
+# Implicit bounds, and 0 when the values are too few to compute them from.
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta=.01, privacy_unit_column=id) SUM(x) FROM UNNEST([STRUCT(1 AS id, 24 AS x), (2, 48), (3, 72)])
+=> "144"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.5, privacy_unit_column=id) AVG(x) FROM UNNEST([STRUCT(1 AS id, 1.5 AS x), (2, 2.5)])
+=> "0.0"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.5, privacy_unit_column=id) SUM(x) FROM UNNEST([STRUCT(1 AS id, 1.5 AS x), (2, 2.5)])
+=> "0.0"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.5, privacy_unit_column=id) SUM(x) FROM UNNEST([STRUCT(1 AS id, 1 AS x), (2, 2)])
+=> "0"
+
+# A group without enough privacy units for delta leaves no row.
+SELECT COUNT(*) FROM (SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=100, delta=1e-220, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id)
+=> "0"

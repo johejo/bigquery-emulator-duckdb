@@ -21,7 +21,7 @@ rejected.
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
 | [Graphs](#graphs) | 0 | 4 | 0 |
-| [Queries](#queries) | 34 | 1 | 0 |
+| [Queries](#queries) | 34 | 2 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 23 | 8 | 1 |
 | [Collation](#collation) | 10 | 1 | 3 |
@@ -73,6 +73,7 @@ rejected.
 | `PIVOT` | Supported |  |
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Supported |  |
+| `WITH DIFFERENTIAL_PRIVACY` | Partial | See [Differential privacy](compatibility.md#differential-privacy). Unsupported: differentially private PERCENTILE_CONT(ARRAY<DOUBLE>). |
 | Pipe syntax | Supported |  |
 | INTERVAL values | Supported | See [INTERVAL values](compatibility.md#interval-values). |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |

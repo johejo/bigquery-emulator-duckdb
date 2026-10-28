@@ -1,0 +1,38 @@
+# Differentially private aggregates the emulator does not compute yet.
+# third_party/bigquery_docs/reference/standard-sql/aggregate-dp-functions.md
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) PERCENTILE_CONT(x, 0.5, contribution_bounds_per_row => (0, 100)) FROM UNNEST([STRUCT(1 AS id, 2.0 AS x)])
+=> error contains: The emulator does not support differentially private PERCENTILE_CONT
+
+# BigQuery requires literal privacy parameters.
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=5 + 5, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1]) AS id
+=> error contains: The emulator does not support differential privacy options other than literals
+
+# Aggregates GoogleSQL takes that BigQuery rejects, with BigQuery's answers.
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) AVG(x) FROM UNNEST([STRUCT(1 AS id, NUMERIC '1.5' AS x)])
+=> error contains: $differential_privacy_avg aggregate function is not supported.
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) SUM(x) FROM UNNEST([STRUCT(1 AS id, NUMERIC '1.5' AS x)])
+=> error contains: $differential_privacy_sum aggregate function is not supported.
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) VAR_POP(x, contribution_bounds_per_row => (0, 10)) FROM UNNEST([STRUCT(1 AS id, 1.5 AS x)])
+=> error contains: Function not found: `$differential_privacy_var_pop`
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01, privacy_unit_column=id) STDDEV_POP(x, contribution_bounds_per_row => (0, 10)) FROM UNNEST([STRUCT(1 AS id, 1.5 AS x)])
+=> error contains: Function not found: `$differential_privacy_stddev_pop`
+
+# BigQuery's errors for invalid privacy parameters and bounds.
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> error contains: Differential privacy option DELTA must be set and non-NULL.
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1, delta=1.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> error contains: Delta must be finite, positive, and no greater than 1 but is 1.01
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta=0, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> error contains: Delta must be finite, positive, and no greater than 1 but is 0
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=0, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> error contains: Epsilon must be finite and positive, but is 0
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1, delta=.01, privacy_unit_column=id) SUM(id, contribution_bounds_per_group => (10, 0)) FROM UNNEST([1, 2]) AS id
+=> error contains: Lower bound cannot be greater than upper bound.
