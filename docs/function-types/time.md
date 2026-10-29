@@ -22,7 +22,7 @@ Source: [CURRENT_TIME](../../third_party/bigquery_docs/reference/standard-sql/ti
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
 | `` | `TIME` | Supported |  |
-| `STRING` | `TIME` | Unsupported | function CURRENT_TIME |
+| `STRING` | `TIME` | Supported |  |
 
 ## FORMAT_TIME
 

@@ -25,7 +25,7 @@ Source: [CURRENT_DATE](../../third_party/bigquery_docs/reference/standard-sql/da
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
 | `` | `DATE` | Supported |  |
-| `STRING` | `DATE` | Unsupported | function CURRENT_DATE |
+| `STRING` | `DATE` | Supported |  |
 
 ## DATE
 

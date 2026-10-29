@@ -118,6 +118,25 @@ SELECT UNIX_MICROS(DATE_SUB(TIMESTAMP_MICROS(1457859661123400), INTERVAL -1 DAY)
 SELECT UNIX_MICROS(DATE_TRUNC(TIMESTAMP_MICROS(1234567), SECOND))
 => "1000000"
 
+# CURRENT_DATE, CURRENT_DATETIME and CURRENT_TIME take a time zone that isn't a constant. Source:
+# BigQuery's answers to unverified/function_types.txt.
+SELECT CURRENT_DATE(tz) IS NOT NULL FROM (SELECT 'America/Los_Angeles' AS tz)
+=> "true"
+
+SELECT CURRENT_DATETIME(tz) IS NOT NULL FROM (SELECT 'America/Los_Angeles' AS tz)
+=> "true"
+
+SELECT CURRENT_TIME(tz) IS NOT NULL FROM (SELECT 'America/Los_Angeles' AS tz)
+=> "true"
+
+# The default time zone is UTC, and a NULL time zone gives NULL.
+# third_party/bigquery_docs/reference/standard-sql/date_functions.md
+SELECT CURRENT_DATE('UTC') = CURRENT_DATE()
+=> "true"
+
+SELECT CURRENT_DATE(CAST(NULL AS STRING)) IS NULL
+=> "true"
+
 ## Epoch conversions
 
 SELECT UNIX_MICROS(TIMESTAMP '2020-01-01 00:00:00')

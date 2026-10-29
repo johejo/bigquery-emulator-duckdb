@@ -116,17 +116,6 @@ SELECT ARRAY(SELECT VARIANCE(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
 !> error: Analytic function variance does not support DISTINCT.
 
 # BigQuery's answers to unverified/function_types.txt.
-# CURRENT_DATE, CURRENT_DATETIME and CURRENT_TIME take a time zone that isn't a constant.
-# third_party/bigquery_docs/reference/standard-sql/date_functions.md
-SELECT CURRENT_DATE(tz) IS NOT NULL FROM (SELECT 'America/Los_Angeles' AS tz)
-!> "true"
-
-SELECT CURRENT_DATETIME(tz) IS NOT NULL FROM (SELECT 'America/Los_Angeles' AS tz)
-!> "true"
-
-SELECT CURRENT_TIME(tz) IS NOT NULL FROM (SELECT 'America/Los_Angeles' AS tz)
-!> "true"
-
 # COUNT takes arrays of INTERVAL values.
 SELECT COUNT(a) FROM UNNEST([STRUCT([INTERVAL 1 DAY] AS a), STRUCT(CAST(NULL AS ARRAY<INTERVAL>))])
 !> "1"
