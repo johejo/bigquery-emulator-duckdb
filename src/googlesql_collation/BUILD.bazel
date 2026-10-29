@@ -9,10 +9,12 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:cord",
         "@abseil-cpp//absl/synchronization",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:collator",
+        "@googlesql//googlesql/public/functions:string_with_collation",
     ],
     linkstatic = True,
     visibility = ["//visibility:public"],

@@ -44,12 +44,14 @@ constexpr std::string_view kTrueDefault[] = {"true"};
 // These helpers only assemble views of static data; they do not generate SQL or own strings.
 constexpr std::array<StaticRule, 2> StringBytes(Arity arity, std::string_view text,
                                                 std::string_view bytes,
-                                                std::span<const std::string_view> defaults = {}) {
+                                                std::span<const std::string_view> defaults = {},
+                                                std::string_view collated = {}) {
   return {
       {
           {
               .arity = arity,
               .spelling = text,
+              .collated_spelling = collated,
               .conditions = ArgumentType<TYPE_STRING>::kFirst,
               .defaults = defaults,
           },
@@ -345,7 +347,8 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("LOWER", StringBytes(1, "bq_lower($1)", "bq_lower_bytes($1)")),
       Define("UPPER", StringBytes(1, "bq_upper($1)", "bq_upper_bytes($1)")),
       Define("REVERSE", StringBytes(1, "bq_reverse($1)", "bq_reverse_bytes($1)")),
-      Define("REPLACE", StringBytes(3, "bq_replace($1, $2, $3)", "bq_replace_bytes($1, $2, $3)")),
+      Define("REPLACE", StringBytes(3, "bq_replace($1, $2, $3)", "bq_replace_bytes($1, $2, $3)", {},
+                                    "bq_collation_replace($4, $1, $2, $3)")),
       Define("TRANSLATE",
              StringBytes(3, "bq_translate($1, $2, $3)", "bq_translate_bytes($1, $2, $3)")),
       Define("ASCII", StringBytes(1, "bq_ascii($1)", "bq_ascii_bytes($1)")),
@@ -399,11 +402,15 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("SUBSTR", kSubstr),
       Define("SUBSTRING", kSubstr),
 
-      Define("INSTR", StringBytes({2, 4}, "bq_instr($1, $2, $3, $4)",
-                                  "bq_instr_bytes($1, $2, $3, $4)", kFirstOccurrence)),
-      Define("STRPOS", StringBytes(2, "strpos($1, $2)", "bq_instr_bytes($1, $2, 1, 1)")),
-      Define("STARTS_WITH", StringBytes(2, "starts_with($1, $2)", "bq_starts_with_bytes($1, $2)")),
-      Define("ENDS_WITH", StringBytes(2, "ends_with($1, $2)", "bq_ends_with_bytes($1, $2)")),
+      Define("INSTR",
+             StringBytes({2, 4}, "bq_instr($1, $2, $3, $4)", "bq_instr_bytes($1, $2, $3, $4)",
+                         kFirstOccurrence, "bq_collation_instr($5, $1, $2, $3, $4)")),
+      Define("STRPOS", StringBytes(2, "strpos($1, $2)", "bq_instr_bytes($1, $2, 1, 1)", {},
+                                   "bq_collation_instr($3, $1, $2, 1, 1)")),
+      Define("STARTS_WITH", StringBytes(2, "starts_with($1, $2)", "bq_starts_with_bytes($1, $2)",
+                                        {}, "bq_collation_starts_with($3, $1, $2)")),
+      Define("ENDS_WITH", StringBytes(2, "ends_with($1, $2)", "bq_ends_with_bytes($1, $2)", {},
+                                      "bq_collation_ends_with($3, $1, $2)")),
 
       // CASE avoids DuckDB v2's IF macro binder.
       Define("SPLIT",
@@ -411,6 +418,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
                  {
                      .arity = {1, 2},
                      .spelling = "CASE WHEN $2 IS NULL THEN NULL ELSE split($1, $2) END",
+                     .collated_spelling = "bq_collation_split($3, $1, $2)",
                      .conditions = ArgumentType<TYPE_STRING>::kFirst,
                      .defaults = kCommaDefault,
                  },

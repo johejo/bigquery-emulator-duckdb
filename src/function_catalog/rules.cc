@@ -81,28 +81,34 @@ bool Trivial(std::string_view sql) {
 }
 
 // The rule's spelling with each !n replaced by the SQL raising error n.
-std::string WithErrors(const Rule& rule, bool safe) {
+std::string WithErrors(const Rule& rule, bool safe, std::string_view source) {
   std::string spelling;
-  for (std::size_t i = 0; i < rule.spelling.size(); ++i) {
-    const auto index = Placeholder(rule.spelling, i);
-    if (index && rule.spelling.at(i) == '!') {
+  for (std::size_t i = 0; i < source.size(); ++i) {
+    const auto index = Placeholder(source, i);
+    if (index && source.at(i) == '!') {
       spelling += Raise(rule.errors.at(*index), safe);
       ++i;
     } else {
-      spelling += rule.spelling.at(i);
+      spelling += source.at(i);
     }
   }
   return spelling;
 }
 
-std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& arguments, bool safe) {
-  const std::string spelling = WithErrors(rule, safe);
+std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& arguments, bool safe,
+                   std::string_view collation) {
+  const std::string spelling =
+      WithErrors(rule, safe, collation.empty() ? rule.spelling : rule.collated_spelling);
   std::vector<std::string> sql;
   sql.reserve(std::max<std::size_t>(arguments.size(), rule.arity.max));
   std::ranges::transform(arguments, std::back_inserter(sql), &FunctionArgument::sql);
   // An optional argument without a default must not appear in the spelling.
   for (std::size_t i = arguments.size(); i - rule.arity.min < rule.defaults.size(); ++i) {
     sql.emplace_back(rule.defaults.at(i - rule.arity.min));
+  }
+  if (!collation.empty()) {
+    sql.resize(rule.arity.max);
+    sql.push_back(QuoteLiteral(collation));
   }
   std::vector<int> uses(sql.size());
   for (std::size_t i = 0; i < spelling.size(); ++i) {
@@ -167,9 +173,16 @@ std::string Substitute(std::string_view spelling, const std::vector<std::string>
 
 }  // namespace
 
+bool Catalog::SupportsCollation(std::string_view upper_name) const {
+  const FunctionEntry* entry = Find(upper_name);
+  return entry != nullptr && std::ranges::any_of(entry->rules, [](const Rule& rule) {
+           return !rule.collated_spelling.empty();
+         });
+}
+
 std::optional<std::string> Catalog::Translate(std::string_view upper_name,
                                               const std::vector<FunctionArgument>& arguments,
-                                              bool safe) const {
+                                              bool safe, std::string_view collation) const {
   const FunctionEntry* entry = Find(upper_name);
   if (entry == nullptr) {
     return std::nullopt;
@@ -182,10 +195,14 @@ std::optional<std::string> Catalog::Translate(std::string_view upper_name,
     case Translation::kRules:
       // A function with rules is translated by them alone, so a call no rule matches, such as
       // one with an argument type the rules leave out, stays unsupported.
-      if (const auto rule = std::ranges::find_if(
-              entry->rules, [&](const Rule& candidate) { return Matches(candidate, arguments); });
+      if (const auto rule = std::ranges::find_if(entry->rules,
+                                                 [&](const Rule& candidate) {
+                                                   return (collation.empty() ||
+                                                           !candidate.collated_spelling.empty()) &&
+                                                          Matches(candidate, arguments);
+                                                 });
           rule != entry->rules.end()) {
-        return Expand(*rule, arguments, safe);
+        return Expand(*rule, arguments, safe, collation);
       }
       return std::nullopt;
     default:
@@ -236,6 +253,7 @@ Rule Own(const StaticRule& rule) {
   return {
       .arity = rule.arity,
       .spelling = std::string(rule.spelling),
+      .collated_spelling = std::string(rule.collated_spelling),
       .conditions = OwnConditions(rule.conditions),
       .defaults = {rule.defaults.begin(), rule.defaults.end()},
       .errors = {rule.errors.begin(), rule.errors.end()},
