@@ -23,23 +23,14 @@ namespace bigquery_emulator_duckdb::collation_duckdb {
 using namespace duckdb_functions;
 namespace {
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): COLLATE(value, specification).
-absl::StatusOr<std::string> Collate(std::string_view value, std::string_view specification,
-                                    bool und_ci_only) {
-  GOOGLESQL_RETURN_IF_ERROR(googlesql_collation::CheckSpecification(specification, und_ci_only));
-  return std::string(value);
-}
-
 // The DISTINCT values under the specification of the list the translator collects with list(),
 // with its direction (0 to keep them in input order, 1 to sort them ascending by their keys and
 // -1 descending) and whether NULL sorts first. Equal values, and NULL values, occur once, as the
 // first of them in input order, as BigQuery keeps them.
 void CollationDistinct(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const bool und_ci_only = FunctionContext<bool>(info);
   EachRow(
       info, input, output,
-      [und_ci_only](
-          const Arguments& args) -> absl::StatusOr<std::vector<std::optional<std::string>>> {
+      [](const Arguments& args) -> absl::StatusOr<std::vector<std::optional<std::string>>> {
         duckdb_vector vector = args.Vector(0);
         const auto entry = VectorElement<duckdb_list_entry>(vector, args.Row());
         duckdb_vector child = duckdb_list_vector_get_child(vector);
@@ -57,8 +48,8 @@ void CollationDistinct(duckdb_function_info info, duckdb_data_chunk input, duckd
             continue;
           }
           std::string value = VectorString(child, entry.offset + i);
-          GOOGLESQL_ASSIGN_OR_RETURN(
-              std::string key, googlesql_collation::SortKey(value, specification, und_ci_only));
+          GOOGLESQL_ASSIGN_OR_RETURN(std::string key,
+                                     googlesql_collation::SortKey(value, specification));
           if (keys.insert(key).second) {
             distinct.emplace_back(std::in_place, std::move(key), std::move(value));
           }
@@ -86,34 +77,26 @@ void CollationDistinct(duckdb_function_info info, duckdb_data_chunk input, duckd
 
 void RegisterCollationFunctions(duckdb_connection connection,
                                 const googlesql_collation::Options& options) {
-  RegisterWithContext(connection, "bq_collate", {kVarchar, kVarchar}, kVarchar,
-                      ApplyWithContext<Collate>, options.und_ci_only);
-  RegisterWithContext(connection, "bq_collation_key", {kVarchar, kVarchar}, kBlob,
-                      ApplyWithContext<googlesql_collation::SortKey>, options.und_ci_only);
+  Register(connection, "bq_collation_key", {kVarchar, kVarchar}, kBlob,
+           Apply<googlesql_collation::SortKey>);
   RegisterWithContext(connection, "bq_collation_like", {kVarchar, kVarchar, kVarchar}, kBoolean,
                       ApplyWithContext<googlesql_collation::Like>, options);
-  RegisterWithContext(connection, "bq_collation_starts_with", {kVarchar, kVarchar, kVarchar},
-                      kBoolean, ApplyWithContext<googlesql_collation::StartsWith>,
-                      options.und_ci_only);
-  RegisterWithContext(connection, "bq_collation_ends_with", {kVarchar, kVarchar, kVarchar},
-                      kBoolean, ApplyWithContext<googlesql_collation::EndsWith>,
-                      options.und_ci_only);
-  RegisterWithContext(connection, "bq_collation_instr",
-                      {kVarchar, kVarchar, kVarchar, kBigint, kBigint}, kBigint,
-                      ApplyWithContext<googlesql_collation::Instr>, options.und_ci_only);
-  RegisterWithContext(connection, "bq_collation_replace", {kVarchar, kVarchar, kVarchar, kVarchar},
-                      kVarchar, ApplyWithContext<googlesql_collation::Replace>,
-                      options.und_ci_only);
+  Register(connection, "bq_collation_starts_with", {kVarchar, kVarchar, kVarchar}, kBoolean,
+           Apply<googlesql_collation::StartsWith>);
+  Register(connection, "bq_collation_ends_with", {kVarchar, kVarchar, kVarchar}, kBoolean,
+           Apply<googlesql_collation::EndsWith>);
+  Register(connection, "bq_collation_instr", {kVarchar, kVarchar, kVarchar, kBigint, kBigint},
+           kBigint, Apply<googlesql_collation::Instr>);
+  Register(connection, "bq_collation_replace", {kVarchar, kVarchar, kVarchar, kVarchar}, kVarchar,
+           Apply<googlesql_collation::Replace>);
   const LogicalType varchar(duckdb_create_logical_type(kVarchar));
   const LogicalType list(duckdb_create_list_type(varchar.get()));
-  RegisterWithContext(connection, "bq_collation_split",
-                      {varchar.get(), varchar.get(), varchar.get()}, list.get(),
-                      ApplyWithContext<googlesql_collation::Split>, options.und_ci_only);
+  Register(connection, "bq_collation_split", {varchar.get(), varchar.get(), varchar.get()},
+           list.get(), Apply<googlesql_collation::Split>);
   const LogicalType bigint(duckdb_create_logical_type(kBigint));
   const LogicalType boolean(duckdb_create_logical_type(kBoolean));
-  RegisterWithContext(connection, "bq_collation_distinct",
-                      {list.get(), varchar.get(), bigint.get(), boolean.get()}, list.get(),
-                      CollationDistinct, options.und_ci_only);
+  Register(connection, "bq_collation_distinct",
+           {list.get(), varchar.get(), bigint.get(), boolean.get()}, list.get(), CollationDistinct);
 }
 
 }  // namespace bigquery_emulator_duckdb::collation_duckdb

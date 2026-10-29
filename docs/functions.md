@@ -551,7 +551,7 @@ functions.
 | [`CHR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`CODE_POINTS_TO_BYTES`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`CODE_POINTS_TO_STRING`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`COLLATE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
+| [`COLLATE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL, in code |  |
 | [`CONCAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL, in code |  |
 | [`CONTAINS_SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`EDIT_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |

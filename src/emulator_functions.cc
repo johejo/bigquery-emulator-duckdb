@@ -23,7 +23,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
     return *functions;
   }
   functions = std::make_unique<function_catalog::Catalog>();
-  translator::AddBuiltinFunctions(*functions);
+  translator::AddBuiltinFunctions(*functions, options.collate_und_ci_only);
   for (const auto& [name, definition] : functions_duckdb::TrigonometricFunctions()) {
     functions->AddRules(name, definition, function_catalog::Implementation::kGoogleSQL);
   }

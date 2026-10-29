@@ -15,6 +15,23 @@ SELECT COLLATE('a', 'UND:CI') = 'A'
 SELECT COLLATE('a', 'fr')
 => error:
 
+# Specifications are checked during analysis, independently of runtime evaluation.
+SELECT COLLATE(NULL, 'und:cs')
+=> error contains: Collation 'und:cs' in collate function is not supported.
+
+SELECT COLLATE(s, 'binary') FROM UNNEST(ARRAY<STRING>[]) AS s
+=> error contains: Collation 'binary' in collate function is not supported.
+
+SELECT COUNT(*) FROM (SELECT COLLATE(s, 'und:cs') AS unused FROM UNNEST(['a']) AS s)
+=> error contains: Collation 'und:cs' in collate function is not supported.
+
+SELECT IF(FALSE, COLLATE('a', 'und:cs'), 'b')
+=> error contains: Collation 'und:cs' in collate function is not supported.
+
+DECLARE s STRING DEFAULT COLLATE(NULL, 'und:cs');
+SELECT s
+=> error contains: Collation 'und:cs' in collate function is not supported.
+
 # The documentation spells the message "Collation isn't allowed on argument x ('und:ci'). Use
 # COLLATE(arg, '') to remove collation"; BigQuery answered with this one.
 # third_party/bigquery_docs/reference/standard-sql/collation-concepts.md

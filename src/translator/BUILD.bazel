@@ -103,6 +103,8 @@ cc_library(
     implementation_deps = [
         "//:duckdb_sql",
         "//:type_mapping",
+        "//src/googlesql_collation",
+        "@abseil-cpp//absl/status",
         "@googlesql//googlesql/public:type",
         "@nlohmann_json//:json",
     ],

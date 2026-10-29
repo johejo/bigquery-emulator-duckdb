@@ -8,6 +8,8 @@
 namespace bigquery_emulator_duckdb::translator {
 
 // The handlers that the registry in functions.cc names.
+std::optional<std::string> Collate(const function_catalog::ScalarCall& call);
+std::optional<std::string> CollateUndCiOnly(const function_catalog::ScalarCall& call);
 std::optional<std::string> MakeArray(const function_catalog::ScalarCall& call);
 std::optional<std::string> Logical(const function_catalog::ScalarCall& call);
 std::optional<std::string> InList(const function_catalog::ScalarCall& call);

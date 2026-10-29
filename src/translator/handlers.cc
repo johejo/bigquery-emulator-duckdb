@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "googlesql/public/type.h"
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
@@ -16,6 +17,7 @@
 #include "src/function_catalog/comparison.h"
 #include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
+#include "src/googlesql_collation/collation.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -41,6 +43,38 @@ std::vector<std::string> Sqls(const ScalarCall& call) {
 }
 
 }  // namespace
+
+// A collation is a type annotation, which GoogleSQL propagates to the operations that use
+// it; the value is the string itself, once the literal specification is checked.
+std::optional<std::string> Collate(const ScalarCall& call) {
+  if (call.arguments.size() != 2) {
+    return std::nullopt;
+  }
+  const auto specification = StringLiteral(call.Argument(1));
+  if (!specification) {
+    return std::nullopt;
+  }
+  const absl::Status status = googlesql_collation::CheckSpecification(*specification);
+  if (!status.ok()) {
+    throw std::invalid_argument(std::string(status.message()));
+  }
+  return call.arguments.at(0).sql;
+}
+
+std::optional<std::string> CollateUndCiOnly(const ScalarCall& call) {
+  if (call.arguments.size() != 2) {
+    return std::nullopt;
+  }
+  const auto specification = StringLiteral(call.Argument(1));
+  if (!specification) {
+    return std::nullopt;
+  }
+  if (!specification->empty() && *specification != "und:ci") {
+    throw std::invalid_argument("Collation '" + *specification +
+                                "' in collate function is not supported.");
+  }
+  return call.arguments.at(0).sql;
+}
 
 std::optional<std::string> MakeArray(const ScalarCall& call) {
   return "[" + Join(Sqls(call), ", ") + "]";
