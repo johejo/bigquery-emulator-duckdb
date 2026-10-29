@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "absl/status/status.h"
 #include "src/function_catalog/catalog.h"
@@ -48,11 +49,14 @@ std::optional<std::string> Collate(const function_catalog::ScalarCall& call) {
 }  // namespace
 
 // Assembly is expensive; cache each choice of options. Lookups are thread-safe.
-const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb::Options& options) {
+const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb::Options& options,
+                                                         bool fetch_object_metadata) {
   static std::mutex mutex;
-  static std::map<functions_duckdb::Options, std::unique_ptr<function_catalog::Catalog>> catalogs;
+  static std::map<std::pair<functions_duckdb::Options, bool>,
+                  std::unique_ptr<function_catalog::Catalog>>
+      catalogs;
   const std::scoped_lock lock(mutex);
-  auto& functions = catalogs[options];
+  auto& functions = catalogs[{options, fetch_object_metadata}];
   if (functions != nullptr) {
     return *functions;
   }
@@ -64,6 +68,9 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
                      .implementations = {function_catalog::Implementation::kSQLInCode},
                      .handler = options.collate_und_ci_only ? Collate<true> : Collate<false>,
                  });
+  if (!fetch_object_metadata) {
+    functions->Remove("OBJ.FETCH_METADATA");
+  }
   for (const auto& [name, definition] : functions_duckdb::TrigonometricFunctions()) {
     functions->AddRules(name, definition, function_catalog::Implementation::kGoogleSQL);
   }

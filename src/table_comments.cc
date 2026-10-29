@@ -11,7 +11,7 @@
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
-#include "src/gcs.h"
+#include "src/gcs_uri.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 

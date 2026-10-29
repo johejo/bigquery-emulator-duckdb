@@ -20,11 +20,11 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
-#include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/location.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
+#include "src/sql_runtime.h"
 #include "src/table_comments.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
@@ -34,14 +34,14 @@ namespace bigquery_emulator_duckdb {
 
 using nlohmann::json;
 
-std::vector<std::string> Emulator::ListTables(DatasetReference dataset) {
+std::vector<std::string> SqlRuntime::ListTables(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
-std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset) {
+std::vector<TableListEntry> SqlRuntime::ListTableEntries(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
@@ -70,7 +70,7 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
   return entries;
 }
 
-TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool expire) {
+TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, bool expire) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   const std::string location = GetDataset(dataset).Location();
@@ -117,8 +117,8 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
   return info;
 }
 
-TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
-                                const TableMetadata& metadata) {
+TableInfo SqlRuntime::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
+                                  const TableMetadata& metadata) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const DatasetMetadata dataset =
@@ -148,19 +148,19 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-TableInfo Emulator::CreateView(TableReference table, const json& definition,
-                               const TableMetadata& metadata, bool materialized) {
+TableInfo SqlRuntime::CreateView(TableReference table, const json& definition,
+                                 const TableMetadata& metadata, bool materialized) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   WriteView(table, definition, metadata, /*replace=*/false, materialized);
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-TableInfo Emulator::UpdateTable(TableReference table,
-                                const std::optional<std::vector<FieldSchema>>& schema,
-                                const std::optional<json>& view,
-                                const std::optional<TableMetadata>& metadata,
-                                bool rounding_mode_unspecified) {
+TableInfo SqlRuntime::UpdateTable(TableReference table,
+                                  const std::optional<std::vector<FieldSchema>>& schema,
+                                  const std::optional<json>& view,
+                                  const std::optional<TableMetadata>& metadata,
+                                  bool rounding_mode_unspecified) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
@@ -251,8 +251,8 @@ TableInfo Emulator::UpdateTable(TableReference table,
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-void Emulator::WriteView(TableReference table, const json& definition,
-                         const TableMetadata& metadata, bool replace, bool materialized) {
+void SqlRuntime::WriteView(TableReference table, const json& definition,
+                           const TableMetadata& metadata, bool replace, bool materialized) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
@@ -313,12 +313,12 @@ void Emulator::WriteView(TableReference table, const json& definition,
   }
 }
 
-int64_t Emulator::HistoryCreationTime(const TableReference& table,
-                                      const TableMetadata& metadata) const {
+int64_t SqlRuntime::HistoryCreationTime(const TableReference& table,
+                                        const TableMetadata& metadata) const {
   return project_ids_.contains(table.project_id) ? metadata.creation_time : 0;
 }
 
-std::mutex& Emulator::HistoryMutex(const TableReference& table) {
+std::mutex& SqlRuntime::HistoryMutex(const TableReference& table) {
   if (project_ids_.contains(table.project_id)) {
     SweepHistory(backend_, table.project_id);
   }
@@ -330,7 +330,8 @@ std::mutex& Emulator::HistoryMutex(const TableReference& table) {
   return *mutex;
 }
 
-std::unique_lock<std::mutex> Emulator::KeepVersion(Backend& backend, const TableReference& table) {
+std::unique_lock<std::mutex> SqlRuntime::KeepVersion(Backend& backend,
+                                                     const TableReference& table) {
   std::unique_lock<std::mutex> lock;
   if (!backend.InTransaction()) {
     lock = std::unique_lock(HistoryMutex(table));
@@ -365,7 +366,7 @@ void RejectReadOnlyWrite(const TableInfo& table) {
   }
 }
 
-void Emulator::DeleteTable(TableReference table) {
+void SqlRuntime::DeleteTable(TableReference table) {
   table.project_id = ResolveProject(table.project_id);
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});

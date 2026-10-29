@@ -9,19 +9,19 @@
 #include "src/backend_error.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
-#include "src/emulator.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/sql_runtime.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
 
-std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
+std::vector<std::string> SqlRuntime::ListDatasets(std::string project_id) {
   project_id = ResolveProject(project_id);
   return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
 }
 
-std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_id) {
+std::vector<DatasetListEntry> SqlRuntime::ListDatasetEntries(std::string project_id) {
   project_id = ResolveProject(project_id);
   std::vector<DatasetListEntry> entries;
   const QueryResult result = Execute(DatasetEntriesQuery(project_id));
@@ -35,7 +35,7 @@ std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_i
   return entries;
 }
 
-DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
+DatasetMetadata SqlRuntime::GetDataset(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
   if (result.rows.empty()) {
@@ -44,7 +44,7 @@ DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
   return ParseDatasetMetadata(result.rows.OptionalString(0, 1));
 }
 
-void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+void SqlRuntime::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
   dataset.project_id = ResolveProject(dataset.project_id);
   const std::vector<std::string> statements =
       CreateDatasetWrite({.dataset = dataset, .metadata = metadata}).metadata_statements;
@@ -59,7 +59,7 @@ void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& me
   }
 }
 
-void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+void SqlRuntime::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
@@ -70,7 +70,7 @@ void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& me
   }
 }
 
-void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
+void SqlRuntime::DeleteDataset(DatasetReference dataset, bool delete_contents) {
   // CASCADE drops expired relations too, and must not race the lazy expiration sweep.
   std::scoped_lock const lock(expiration_mutex_);
   dataset.project_id = ResolveProject(dataset.project_id);

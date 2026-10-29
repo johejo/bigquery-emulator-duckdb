@@ -27,8 +27,6 @@
 #include "src/googlesql_functions_duckdb/objectref_options.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
-#include "src/mysql_query.h"
-#include "src/postgres_scanner.h"
 #include "src/result_chunks.h"
 #include "src/result_rows.h"
 #include "src/statement_resources.h"
@@ -175,7 +173,8 @@ struct Backend::Database {
   Database(const std::optional<std::string>& session_user,
            const functions_duckdb::ObjectStorage& storage,
            const googlesql_geography::Options& geography,
-           const functions_duckdb::Options& functions, const BackendInitializer& initialize) {
+           const functions_duckdb::Options& functions, const BackendInitializer& initialize,
+           const DatabaseInitializer& initialize_database) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -209,9 +208,10 @@ struct Backend::Database {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
     RegisterBackendFunctions(handle.get(), session_user, storage, geography, functions, initialize);
-    RegisterPostgresScanner(handle.get());
-    RegisterMySqlScanner(handle.get());
     RegisterDuckPGQ(handle.get());
+    if (initialize_database) {
+      initialize_database(handle.get());
+    }
   }
 
   [[nodiscard]] Connection Connect() const {
@@ -252,8 +252,10 @@ Backend::CallConnection Backend::Connect() const {
 Backend::Backend(const std::optional<std::string>& session_user,
                  const functions_duckdb::ObjectStorage& storage,
                  const googlesql_geography::Options& geography,
-                 const functions_duckdb::Options& functions, const BackendInitializer& initialize)
-    : db_(std::make_shared<Database>(session_user, storage, geography, functions, initialize)) {}
+                 const functions_duckdb::Options& functions, const BackendInitializer& initialize,
+                 const DatabaseInitializer& initialize_database)
+    : db_(std::make_shared<Database>(session_user, storage, geography, functions, initialize,
+                                     initialize_database)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)
     : db_(std::move(database)), session_(std::make_unique<Session>(*db_)) {}

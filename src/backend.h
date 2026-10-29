@@ -40,7 +40,8 @@ class Backend {
       const functions_duckdb::ObjectStorage& storage = functions_duckdb::ObjectStorage(),
       const googlesql_geography::Options& geography = {.expand_bounding_box = true},
       const functions_duckdb::Options& functions = BigQueryFunctionOptions(),
-      const BackendInitializer& initialize = {});
+      const BackendInitializer& initialize = {},
+      const DatabaseInitializer& initialize_database = {});
   ~Backend();
 
   Backend(const Backend&) = delete;

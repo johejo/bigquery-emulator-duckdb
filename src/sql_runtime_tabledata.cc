@@ -16,11 +16,11 @@
 #include "src/backend_error.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
-#include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
+#include "src/sql_runtime.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -45,8 +45,8 @@ std::string RoundedInsertValue(const function_catalog::Catalog& functions, const
 
 }  // namespace
 
-QueryResult Emulator::ListTableData(TableReference table, int64_t start_index, int64_t max_results,
-                                    std::string_view selected_fields) {
+QueryResult SqlRuntime::ListTableData(TableReference table, int64_t start_index,
+                                      int64_t max_results, std::string_view selected_fields) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table);
   if (info.materialized) {
@@ -62,10 +62,10 @@ QueryResult Emulator::ListTableData(TableReference table, int64_t start_index, i
                  std::to_string(max_results) + " OFFSET " + std::to_string(start_index));
 }
 
-std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
-                                                    const std::vector<FieldSchema>& schema,
-                                                    const json& rows, int64_t storage_id,
-                                                    bool validate_only) {
+std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
+                                                      const std::vector<FieldSchema>& schema,
+                                                      const json& rows, int64_t storage_id,
+                                                      bool validate_only) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   if (info.view_query) {
@@ -125,9 +125,9 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
   }
 }
 
-std::vector<InsertError> Emulator::InsertTableData(TableReference table, const json& rows,
-                                                   bool skip_invalid_rows,
-                                                   bool ignore_unknown_values) {
+std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const json& rows,
+                                                     bool skip_invalid_rows,
+                                                     bool ignore_unknown_values) {
   table.project_id = ResolveProject(table.project_id);
   if (!rows.is_array()) {
     throw ApiError::Invalid("rows must be an array");

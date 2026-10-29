@@ -5,6 +5,6 @@ uninitMemberVarNoCtor
 # Range-for extends the lifetime of QueryResult when iterating its rows member.
 # Cppcheck incorrectly treats the rows of the temporary result as dangling.
 danglingTempReference:src/duckdb_table_source.cc
-danglingTempReference:src/emulator_datasets.cc
-danglingTempReference:src/emulator_routines.cc
-danglingTempReference:src/emulator_tables.cc
+danglingTempReference:src/sql_runtime_datasets.cc
+danglingTempReference:src/sql_runtime_routines.cc
+danglingTempReference:src/sql_runtime_tables.cc

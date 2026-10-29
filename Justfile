@@ -77,6 +77,14 @@ e2e *args:
 compliance *args:
     bazelisk test //:compliance_test {{ args }}
 
+# All transitive GCS/Storage paths, plus the separate Spanner SDK paths; no build needed.
+sql-runtime-deps *targets:
+    bash tools/sql-runtime-deps.sh report {{ targets }}
+
+# Reject transitive application/Storage dependencies from the supplied runtime roots.
+sql-runtime-deps-check *targets:
+    bash tools/sql-runtime-deps.sh check {{ targets }}
+
 # Summarizes the last `just compliance` run as Markdown, and fails when a shard did not finish or a
 # known failure passes.
 # Extra arguments go to tools/compliancesummary, such as -results FILE for each statement's outcome.
@@ -100,7 +108,11 @@ bigquery-answers-validate path=(justfile_directory() + "/tests/e2e/goclient/test
 run *args:
     bazelisk run //:bigquery-emulator-duckdb -- "$@"
 
-check: lint test e2e docs-check
+# Protect both compositions of the shared runtime.
+sql-runtime-core-deps-check:
+    just sql-runtime-deps-check //:sql_runtime //:compliance_test
+
+check: sql-runtime-core-deps-check lint test e2e docs-check
 
 # Snapshot new citations and localize references. Uses ADC, or DEVELOPERKNOWLEDGE_API_KEY when set.
 bigquery-docs-sync:

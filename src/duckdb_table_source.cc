@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -13,19 +12,16 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
-#include "src/external_query.h"
-#include "src/external_table.h"
+#include "src/external_table_provider.h"
 #include "src/field_schema.h"
-#include "src/gcs.h"
 #include "src/location.h"
-#include "src/mysql_query.h"
 #include "src/references.h"
 #include "src/routine.h"
-#include "src/spanner_query.h"
 #include "src/statement_resources.h"
 #include "src/table_comments.h"
 #include "src/table_history.h"
@@ -36,30 +32,16 @@ namespace bigquery_emulator_duckdb {
 
 namespace {
 
-// The location of the connection `key`, as ConnectionKey gives it: PROJECT.LOCATION.CONNECTION,
-// where only the project may have dots.
-std::optional<std::string> ConnectionLocation(const std::string& key) {
-  const size_t connection = key.rfind('.');
-  const size_t location = connection == std::string::npos || connection == 0
-                              ? std::string::npos
-                              : key.rfind('.', connection - 1);
-  if (location == std::string::npos) {
-    return std::nullopt;
-  }
-  return CanonicalLocation(key.substr(location + 1, connection - location - 1));
-}
-
 // Serves the analyzer the tables the emulator keeps in DuckDB. Each table, dataset, routine and
 // connection it finds counts as one the job uses, in `location` when it is set.
 class DuckDbTableSource : public TableSource {
  public:
   // `project_ids` maps each project's ID and number to its ID, as Emulator::ResolveProject does.
-  DuckDbTableSource(Backend& backend, ExternalConnections& connections, GcsClient gcs,
+  DuckDbTableSource(Backend& backend,
                     const std::unordered_map<std::string, std::string>& project_ids,
-                    JobLocation* location)
+                    JobLocation* location, std::unique_ptr<ExternalTableProvider> external)
       : backend_(backend),
-        connections_(connections),
-        gcs_(std::move(gcs)),
+        external_(std::move(external)),
         project_ids_(project_ids),
         location_(location) {}
 
@@ -96,7 +78,10 @@ class DuckDbTableSource : public TableSource {
     const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
     const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
     if (metadata.external_data) {
-      return GcsExternalRead(*metadata.external_data, TableSchema(backend_, table), gcs_);
+      if (!external_) {
+        throw ApiError::UnsupportedQuery("external table reads without an external provider");
+      }
+      return external_->Read(*metadata.external_data, TableSchema(backend_, table));
     }
     const auto query = TableReadQuery(backend_, table);
     return query ? std::optional<TableRead>(*query) : std::nullopt;
@@ -277,62 +262,10 @@ class DuckDbTableSource : public TableSource {
   absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(
       const std::string& key, const std::string& query, const std::string& options) override {
     // NOLINTEND(bugprone-easily-swappable-parameters)
-    const auto connection = connections_.conninfo.find(key);
-    if (connection == connections_.conninfo.end()) {
-      return absl::NotFoundError("Not found: Connection " + key);
+    if (!external_) {
+      return absl::UnimplementedError("EXTERNAL_QUERY without an external provider");
     }
-    if (connection->second == kCloudResourceConnection) {
-      return absl::InvalidArgumentError("Connection " + key +
-                                        " is not a Cloud SQL or Spanner connection");
-    }
-    if (const std::optional<std::string> location = ConnectionLocation(key); location.has_value()) {
-      ReferenceLocation("Connection " + key, *location);
-    }
-    const bool spanner = connection->second.starts_with("spanner://");
-    const bool mysql = connection->second.starts_with("mysql:");
-    absl::StatusOr<std::vector<FieldSchema>> columns =
-        [&]() -> absl::StatusOr<std::vector<FieldSchema>> {
-      if (spanner) {
-        return DescribeSpannerQuery(connection->second.substr(10), query, options);
-      }
-      const auto decimal_type = DecimalColumnType(options);
-      if (!decimal_type.ok()) {
-        return decimal_type.status();
-      }
-      if (mysql) {
-        return DescribeMySqlQuery(connection->second.substr(6), query, *decimal_type);
-      }
-      return DescribePostgresQuery(connection->second, query, *decimal_type);
-    }();
-    if (!columns.ok()) {
-      return columns;
-    }
-    // Registered once, when first queried rather than at startup, when the database may not
-    // be up yet. The shared backend registers it outside any session's transaction.
-    const std::scoped_lock lock(connections_.mutex);
-    if (!connections_.attached.contains(key)) {
-      try {
-        const std::string name = QuoteIdentifier(ExternalDatabaseName(key));
-        std::string read;
-        if (spanner) {
-          read = "bq_spanner_query(" + QuoteLiteral(connection->second.substr(10)) + ", sql)";
-        } else if (mysql) {
-          connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second.substr(6)) +
-                                       " AS " + name + " (TYPE mysql, READ_ONLY)");
-          read = "mysql_query(" + QuoteLiteral(ExternalDatabaseName(key)) + ", sql)";
-        } else {
-          connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second) + " AS " +
-                                       name + " (TYPE postgres, READ_ONLY)");
-          read = "postgres_query(" + QuoteLiteral(ExternalDatabaseName(key)) + ", sql)";
-        }
-        connections_.backend.Execute("CREATE MACRO memory.main." + name +
-                                     "(sql) AS TABLE SELECT * FROM " + read);
-      } catch (const BackendError& error) {
-        return absl::InvalidArgumentError(error.what());
-      }
-      connections_.attached.insert(key);
-    }
-    return columns;
+    return external_->DescribeQuery(key, query, options, *this);
   }
 
  private:
@@ -347,8 +280,7 @@ class DuckDbTableSource : public TableSource {
   }
 
   Backend& backend_;
-  ExternalConnections& connections_;
-  GcsClient gcs_;
+  std::unique_ptr<ExternalTableProvider> external_;
   const std::unordered_map<std::string, std::string>& project_ids_;
   JobLocation* location_;
   // DatasetLocation's answers, by project:dataset.
@@ -358,10 +290,9 @@ class DuckDbTableSource : public TableSource {
 }  // namespace
 
 std::unique_ptr<TableSource> NewDuckDbTableSource(
-    Backend& backend, ExternalConnections& connections, GcsClient gcs,
-    const std::unordered_map<std::string, std::string>& project_ids, JobLocation* location) {
-  return std::make_unique<DuckDbTableSource>(backend, connections, std::move(gcs), project_ids,
-                                             location);
+    Backend& backend, const std::unordered_map<std::string, std::string>& project_ids,
+    JobLocation* location, std::unique_ptr<ExternalTableProvider> external) {
+  return std::make_unique<DuckDbTableSource>(backend, project_ids, location, std::move(external));
 }
 
 }  // namespace bigquery_emulator_duckdb

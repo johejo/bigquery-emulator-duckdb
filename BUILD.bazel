@@ -663,7 +663,6 @@ cc_library(
     implementation_deps = [
         ":backend_error",
         ":duckdb_handle",
-        ":spanner_query",
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_collation_duckdb",
         "//src/googlesql_differential_privacy_duckdb",
@@ -893,8 +892,6 @@ cc_library(
         ":duckdb_sql",
         ":duckdb_types",
         ":duckpgq",
-        ":mysql_query",
-        ":postgres_scanner",
         ":result_chunks",
         ":storage_read_codec",
         ":vector_value",
@@ -948,7 +945,7 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
         ":field_schema",
-        ":gcs",
+        ":gcs_uri",
         ":references",
         ":table_metadata",
         "@nlohmann_json//:json",
@@ -1079,18 +1076,18 @@ cc_library(
 )
 
 cc_library(
-    name = "emulator",
+    name = "sql_runtime",
     srcs = [
-        "src/emulator.cc",
-        "src/emulator_datasets.cc",
-        "src/emulator_ddl.cc",
-        "src/emulator_jobs.cc",
-        "src/emulator_query.cc",
-        "src/emulator_routines.cc",
-        "src/emulator_tabledata.cc",
-        "src/emulator_tables.cc",
+        "src/sql_runtime.cc",
+        "src/sql_runtime_datasets.cc",
+        "src/sql_runtime_ddl.cc",
+        "src/sql_runtime_destination.cc",
+        "src/sql_runtime_query.cc",
+        "src/sql_runtime_routines.cc",
+        "src/sql_runtime_tabledata.cc",
+        "src/sql_runtime_tables.cc",
     ],
-    hdrs = ["src/emulator.h"],
+    hdrs = ["src/sql_runtime.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":analyzer",
@@ -1104,15 +1101,7 @@ cc_library(
         ":duckdb_sql",
         ":duckdb_table_source",
         ":emulator_functions",
-        ":extract",
-        ":extract_options",
-        ":file_read",
-        ":file_read_options",
-        ":job_options",
         ":language_options",
-        ":logging",
-        ":object_ref",
-        ":parquet_metadata",
         ":result_googlesql",
         ":result_value",
         ":routine_catalog",
@@ -1122,9 +1111,6 @@ cc_library(
         ":table_comments",
         ":table_history",
         ":table_path",
-        ":table_source",
-        ":temporary_files",
-        ":translated_statement",
         ":translator",
         ":type_mapping",
         "//src/function_catalog",
@@ -1145,10 +1131,9 @@ cc_library(
         ":backend",
         ":backend_initializer",
         ":builtin_function_options",
-        ":external_query",
+        ":external_table_provider",
         ":field_schema",
         ":function_options",
-        ":gcs",
         ":location",
         ":project",
         ":query_parameters",
@@ -1156,6 +1141,57 @@ cc_library(
         ":routine",
         ":system_variables",
         ":table_metadata",
+        ":table_source",
+        ":translated_statement",
+        "//src/googlesql_functions_duckdb:objectref_options",
+        "//src/googlesql_functions_duckdb:options",
+        "//src/googlesql_geography",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "emulator",
+    srcs = [
+        "src/emulator.cc",
+        "src/emulator_jobs.cc",
+    ],
+    hdrs = ["src/emulator.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":duckdb_catalog",
+        ":duckdb_sql",
+        ":extract",
+        ":extract_options",
+        ":file_read",
+        ":file_read_options",
+        ":gcs_uri",
+        ":job_options",
+        ":logging",
+        ":object_ref",
+        ":parquet_metadata",
+        ":result_googlesql",
+        ":service_backend",
+        ":service_table_provider",
+        ":table_metadata",
+        ":temporary_files",
+        ":translator",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googlesql//googlesql/public:value",
+    ],
+    deps = [
+        ":api_error",
+        ":backend",
+        ":backend_initializer",
+        ":builtin_function_options",
+        ":external_query",
+        ":field_schema",
+        ":function_options",
+        ":gcs",
+        ":location",
+        ":project",
+        ":references",
+        ":sql_runtime",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
         "@nlohmann_json//:json",
@@ -1163,7 +1199,7 @@ cc_library(
 )
 
 # Multi-statement queries, which take GoogleSQL's script executor and resolved AST; kept apart
-# from :emulator so that changes to the emulator do not rebuild them.
+# from :sql_runtime so that changes to the runtime do not rebuild them.
 cc_library(
     name = "script",
     srcs = ["src/script.cc"],
@@ -1245,12 +1281,21 @@ cc_library(
 )
 
 cc_library(
+    name = "gcs_uri",
+    srcs = ["src/gcs_uri.cc"],
+    hdrs = ["src/gcs_uri.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":api_error"],
+)
+
+cc_library(
     name = "gcs",
     srcs = ["src/gcs.cc"],
     hdrs = ["src/gcs.h"],
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":gcs_uri",
         "@google_cloud_cpp//:common",
         "@google_cloud_cpp//:oauth2",
         "@google_cloud_cpp//:storage",
@@ -1506,7 +1551,6 @@ cc_test(
     ],
     copts = ["-std=c++20"],
     data = _COMPLIANCE_KNOWN_ERRORS,
-    # curl builds with hidden symbols, which google-cloud-cpp's shared libraries cannot reference.
     linkstatic = True,
     shard_count = 32,
     tags = ["manual"],
@@ -1515,14 +1559,18 @@ cc_test(
         ":api_error",
         ":result_googlesql",
         ":result_value",
-        ":emulator",
+        ":sql_runtime",
         ":field_schema",
         ":language_options",
+        ":location",
+        ":project",
         ":query_parameters",
         ":references",
         ":type_mapping",
-        ":external_query",
+        ":backend",
+        ":external_table_provider",
         ":backend_initializer",
+        "//src/googlesql_functions_duckdb:objectref_options",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
         "@abseil-cpp//absl/log",
@@ -1627,24 +1675,74 @@ cc_library(
 )
 
 cc_library(
+    name = "external_table_provider",
+    hdrs = ["src/external_table_provider.h"],
+    deps = [
+        ":field_schema",
+        ":statement_resources",
+        ":table_metadata",
+        ":table_source",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "service_table_provider",
+    srcs = ["src/service_table_provider.cc"],
+    hdrs = ["src/service_table_provider.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":backend",
+        ":backend_error",
+        ":duckdb_sql",
+        ":external_table",
+        ":field_schema",
+        ":location",
+        ":mysql_query",
+        ":spanner_query",
+        ":statement_resources",
+        ":table_metadata",
+        ":table_source",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+    deps = [
+        ":external_query",
+        ":external_table_provider",
+        ":gcs",
+    ],
+)
+
+cc_library(
+    name = "service_backend",
+    srcs = ["src/service_backend.cc"],
+    hdrs = ["src/service_backend.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":mysql_query",
+        ":postgres_scanner",
+        ":spanner_query",
+    ],
+    deps = [
+        ":backend_initializer",
+        "//third_party/duckdb",
+    ],
+)
+
+cc_library(
     name = "duckdb_table_source",
     srcs = ["src/duckdb_table_source.cc"],
     hdrs = ["src/duckdb_table_source.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
         ":backend",
         ":backend_error",
         ":duckdb_catalog",
         ":duckdb_sql",
-        ":external_query",
-        ":external_table",
         ":field_schema",
-        ":gcs",
-        ":location",
-        ":mysql_query",
         ":references",
         ":routine",
-        ":spanner_query",
         ":statement_resources",
         ":table_comments",
         ":table_history",
@@ -1654,7 +1752,12 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@nlohmann_json//:json",
     ],
-    deps = [":gcs"],
+    deps = [
+        ":backend",
+        ":external_table_provider",
+        ":location",
+        ":table_source",
+    ],
 )
 
 # The types of the options the DDL handlers implement, which :ddl_options_catalog_test compares
@@ -1727,6 +1830,22 @@ cc_library(
 )
 
 cc_test(
+    name = "sql_runtime_test",
+    srcs = ["tests/sql_runtime_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":api_error",
+        ":backend",
+        ":location",
+        ":project",
+        ":sql_runtime",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "analyzer_declarations_test",
     srcs = ["tests/analyzer_declarations_test.cc"],
     copts = ["-std=c++20"],
@@ -1740,6 +1859,31 @@ cc_test(
         ":references",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "duckdb_table_source_test",
+    srcs = ["tests/duckdb_table_source_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":api_error",
+        ":backend",
+        ":duckdb_sql",
+        ":duckdb_table_source",
+        ":external_table_provider",
+        ":field_schema",
+        ":references",
+        ":statement_resources",
+        ":table_comments",
+        ":table_metadata",
+        ":table_source",
+        ":temporary_files",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
