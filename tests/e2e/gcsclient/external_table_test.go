@@ -86,11 +86,13 @@ func TestExternalParquet(t *testing.T) {
 	var contents atomic.Value
 	contents.Store(externalParquet(t, 1, 2))
 	var missing atomic.Bool
+	var downloads atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/storage/v1/b/bucket/o/data.parquet" || missing.Load() {
 			http.NotFound(w, r)
 			return
 		}
+		downloads.Add(1)
 		_, _ = w.Write(contents.Load().([]byte))
 	}))
 	defer server.Close()
@@ -117,7 +119,18 @@ func TestExternalParquet(t *testing.T) {
 	}
 	externalRows(t, client, "SELECT id FROM gcs.external ORDER BY id", []int64{1, 2})
 	contents.Store(externalParquet(t, 3))
+	before := downloads.Load()
 	externalRows(t, client, "SELECT a.id + b.id FROM gcs.external a CROSS JOIN gcs.external b", []int64{6})
+	if got := downloads.Load() - before; got != 1 {
+		t.Fatalf("self-join downloads = %d, want 1", got)
+	}
+	before = downloads.Load()
+	externalRows(t, client, `DECLARE total INT64 DEFAULT
+		(SELECT id FROM gcs.external) + (SELECT id FROM gcs.external);
+		SELECT total`, []int64{6})
+	if got := downloads.Load() - before; got != 1 {
+		t.Fatalf("script expression downloads = %d, want 1", got)
+	}
 	// A previously successful read must not hide a later source failure behind cached rows.
 	missing.Store(true)
 	if _, err := client.Query("SELECT * FROM gcs.external").Read(ctx); err == nil {
@@ -297,6 +310,51 @@ func externalQuery(ctx context.Context, query *bigquery.Query) error {
 	return status.Err()
 }
 
+// Explicit schemas let analysis and stored definitions resolve columns without
+// downloading data. Even rejected dry runs and views must not touch the source.
+func TestExternalParquetWithoutSourceAccess(t *testing.T) {
+	configure(t)
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		http.Error(w, "source must not be accessed", http.StatusForbidden)
+	}))
+	defer server.Close()
+	t.Setenv("STORAGE_EMULATOR_HOST", server.URL)
+	client := start(t)
+	ctx := t.Context()
+	if err := externalDDL(ctx, client, `CREATE EXTERNAL TABLE gcs.external (id INT64)
+		OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'])`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Dataset("gcs").Table("external").Metadata(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Invalid columns fail during analysis, before any source preparation.
+	if err := externalDDL(ctx, client, "SELECT missing_column FROM gcs.external"); err == nil || !strings.Contains(err.Error(), "Unrecognized name") {
+		t.Fatalf("analysis error: %v", err)
+	}
+	q := client.Query("SELECT id FROM gcs.external")
+	q.DryRun = true
+	job, err := q.Run(ctx)
+	if err == nil {
+		err = job.LastStatus().Err()
+	}
+	if err == nil || !strings.Contains(err.Error(), "Dry runs of resource-backed") {
+		t.Fatalf("external dry run: %v", err)
+	}
+	if err := externalDDL(ctx, client, "CREATE VIEW gcs.v AS SELECT id FROM gcs.external"); err == nil || !strings.Contains(err.Error(), "Resource-backed") {
+		t.Fatalf("stored resource-backed definition: %v", err)
+	}
+	// TVFs store the GoogleSQL body rather than a prepared reader.
+	if err := externalDDL(ctx, client, "CREATE TABLE FUNCTION gcs.f() AS SELECT id FROM gcs.external"); err != nil {
+		t.Fatal(err)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("source requests during analysis or definition = %d, want 0", got)
+	}
+}
+
 func TestExternalParquetWildcard(t *testing.T) {
 	configure(t)
 	one, two := externalParquet(t, 1), externalParquet(t, 2)
@@ -334,8 +392,4 @@ func TestExternalParquetWildcard(t *testing.T) {
 		t.Fatal(err)
 	}
 	externalRows(t, client, "SELECT id FROM gcs.multiple ORDER BY id", []int64{1, 2})
-	// A logical definition cannot borrow statement-owned downloads.
-	if err := externalDDL(ctx, client, "CREATE VIEW gcs.v AS SELECT * FROM gcs.external"); err == nil || !strings.Contains(err.Error(), "Resource-backed") {
-		t.Fatalf("stored resource-backed definition: %v", err)
-	}
 }
