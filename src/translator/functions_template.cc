@@ -55,10 +55,6 @@ Condition Mode(std::size_t argument, std::string_view rounding_mode) {
   return {.argument = argument, .rounding_mode = rounding_mode};
 }
 
-std::vector<Condition> NumericMode(std::string_view rounding_mode) {
-  return {Is(1, {TYPE_NUMERIC}), Mode(3, rounding_mode)};
-}
-
 Condition SubDay(std::size_t argument) {
   return Part(argument, {"hour", "minute", "second", "millisecond", "microsecond"});
 }
@@ -335,13 +331,6 @@ std::vector<Rule> RangeIntersect() {
               },
       },
   };
-}
-
-// DuckDB v2 binds DECIMAL precision before evaluating NULL arguments. Give the binder a
-// non-NULL precision, then propagate the original NULL as BigQuery does.
-std::string RoundWithDigits(std::string_view function) {
-  return "CASE WHEN $2 IS NULL THEN NULL ELSE " + std::string(function) +
-         "($1, CAST(coalesce($2, 0) AS INTEGER)) END";
 }
 
 // The values of a type the date arithmetic functions return, as DuckDB literals, and how a
@@ -622,6 +611,35 @@ std::vector<Rule> BigNumericRounding(std::string_view function, bool modes) {
         .arity = 3,
         .spelling = BigNumericCall(name + "_half_even", 1, 1),
         .conditions = {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_EVEN")},
+    });
+  }
+  return rules;
+}
+
+// ROUND and TRUNC of a NUMERIC with a number of digits, and with `modes` a rounding mode.
+// DuckDB's DECIMAL rounding requires constant digits, so GoogleSQL's takes them.
+std::vector<Rule> NumericRounding(std::string_view function, bool modes) {
+  const std::string call = std::string(function) + "($1, $2)";
+  std::vector<Rule> rules = {
+      {
+          .arity = 2,
+          .spelling = call,
+          .conditions = {Is(1, {TYPE_NUMERIC})},
+          .implementation = Implementation::kGoogleSQL,
+      },
+  };
+  if (modes) {
+    rules.push_back({
+        .arity = 3,
+        .spelling = call,
+        .conditions = {Is(1, {TYPE_NUMERIC}), Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")},
+        .implementation = Implementation::kGoogleSQL,
+    });
+    rules.push_back({
+        .arity = 3,
+        .spelling = std::string(function) + "_half_even($1, $2)",
+        .conditions = {Is(1, {TYPE_NUMERIC}), Mode(3, "ROUND_HALF_EVEN")},
+        .implementation = Implementation::kGoogleSQL,
     });
   }
   return rules;
@@ -1658,34 +1676,16 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           },
       },
 
-      // DuckDB's DECIMAL rounding requires constant digits. GoogleSQL handles NUMERIC's
-      // dynamic digits and rounding modes without losing decimal precision.
+      // Only NUMERIC and BIGNUMERIC take a rounding mode. DuckDB takes the digits as an INTEGER.
       {
           "ROUND",
           {
               .rules = Concat({
                   BigNumericRounding("bq_bignumeric_round", true),
+                  NumericRounding("bq_round_numeric", true),
                   {
                       {.arity = 1, .spelling = "round($1)"},
-                      {
-                          .arity = 2,
-                          .spelling = "bq_round_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {.arity = 2, .spelling = RoundWithDigits("round")},
-                      {
-                          .arity = 3,
-                          .spelling = "bq_round_numeric($1, $2)",
-                          .conditions = NumericMode("ROUND_HALF_AWAY_FROM_ZERO"),
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {
-                          .arity = 3,
-                          .spelling = "bq_round_numeric_half_even($1, $2)",
-                          .conditions = NumericMode("ROUND_HALF_EVEN"),
-                          .implementation = Implementation::kGoogleSQL,
-                      },
+                      {.arity = 2, .spelling = "round($1, CAST($2 AS INTEGER))"},
                   },
               }),
               .uses = {TypeUse::kBigNumeric},
@@ -1696,6 +1696,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           {
               .rules = Concat({
                   BigNumericRounding("bq_bignumeric_trunc", false),
+                  NumericRounding("bq_trunc_numeric", false),
                   {
                       {.arity = 1, .spelling = "trunc($1)"},
                       // DuckDB's DOUBLE scaling can round across an integer boundary before
@@ -1707,13 +1708,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                           .conditions = {Is(1, {TYPE_DOUBLE})},
                           .implementation = Implementation::kGoogleSQL,
                       },
-                      {
-                          .arity = 2,
-                          .spelling = "bq_trunc_numeric($1, $2)",
-                          .conditions = {Is(1, {TYPE_NUMERIC})},
-                          .implementation = Implementation::kGoogleSQL,
-                      },
-                      {.arity = 2, .spelling = RoundWithDigits("trunc")},
                   },
               }),
               .uses = {TypeUse::kBigNumeric},
