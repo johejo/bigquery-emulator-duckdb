@@ -212,3 +212,15 @@ cases:
           sourceFormat: CSV
           writeDisposition: WRITE_TRUNCATE
     expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "after_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: autodetect_empty_dataset_ci
+    template: replace
+    vars:
+      table_setup: '${table_empty}'
+      dataset_setup: '${dataset_ci}'
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          writeDisposition: WRITE_TRUNCATE
+          autodetect: true
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "string_field_2", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "string_field_2", "type": "STRING"}]}}, "before_load": {"defaultCollation": "", "numRows": "1", "schema": {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}]}}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}

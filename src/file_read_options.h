@@ -14,6 +14,8 @@ enum class DecimalTargetType : uint8_t { kNumeric, kBigNumeric, kString };
 struct CsvReadOptions {
   int skip_leading_rows = 0;
   std::string field_delimiter = ",";
+  // Whether a quoted empty value is NULL, as an unquoted one is, rather than an empty STRING.
+  bool quoted_nulls = true;
 };
 struct JsonReadOptions {};
 struct ParquetReadOptions {};

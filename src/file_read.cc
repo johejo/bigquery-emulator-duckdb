@@ -236,26 +236,6 @@ class NumericQuoter {
   std::string out_;
 };
 
-// The contents of the file at `path`, decompressed when it is gzip.
-std::string ReadMaybeGzip(const std::string& path) {
-  gzFile input = gzopen(path.c_str(), "rb");
-  if (input == nullptr) {
-    throw ApiError::Invalid("Could not read " + path);
-  }
-  std::string contents;
-  std::string buffer(1U << 16U, '\0');
-  int read = 0;
-  while ((read = gzread(input, buffer.data(), static_cast<unsigned>(buffer.size()))) > 0) {
-    contents.append(buffer, 0, static_cast<std::size_t>(read));
-  }
-  const bool ok = read == 0;
-  gzclose(input);
-  if (!ok) {
-    throw ApiError::Invalid("Could not read " + path);
-  }
-  return contents;
-}
-
 // `field` with each GEOGRAPHY in it, at any depth, a STRING: a load reads a GEOGRAPHY as its
 // text, which StoredValue converts.
 FieldSchema TextGeographies(FieldSchema field) {
@@ -462,6 +442,25 @@ std::string JsonValue(const std::string& name, const FieldSchema& field, int dep
 
 }  // namespace
 
+std::string ReadMaybeGzip(const std::string& path) {
+  gzFile input = gzopen(path.c_str(), "rb");
+  if (input == nullptr) {
+    throw ApiError::Invalid("Could not read " + path);
+  }
+  std::string contents;
+  std::string buffer(1U << 16U, '\0');
+  int read = 0;
+  while ((read = gzread(input, buffer.data(), static_cast<unsigned>(buffer.size()))) > 0) {
+    contents.append(buffer, 0, static_cast<std::size_t>(read));
+  }
+  const bool ok = read == 0;
+  gzclose(input);
+  if (!ok) {
+    throw ApiError::Invalid("Could not read " + path);
+  }
+  return contents;
+}
+
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
                                    bool list_inference) {
   ParquetSources sources;
@@ -641,6 +640,9 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     sql = "SELECT * FROM read_csv(" + files +
           ", header=false, skip=" + std::to_string(csv->skip_leading_rows) +
           ", delim=" + QuoteLiteral(csv->field_delimiter);
+    if (!csv->quoted_nulls) {
+      sql += ", allow_quoted_nulls=false";
+    }
     if (!schema.empty()) {
       sql += ", auto_detect=false";
       std::vector<std::string> columns;
