@@ -26,8 +26,7 @@ class QueryParameters {
 
   // Parses BigQuery's QueryParameter list. Throws ApiError when a parameter is malformed or
   // has a type the emulator does not support.
-  static QueryParameters Parse(const nlohmann::json& parameters,
-                               TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+  static QueryParameters Parse(const nlohmann::json& parameters, TimestampPrecision precision);
 
   [[nodiscard]] bool empty() const { return by_name_.empty() && by_position_.empty(); }
 

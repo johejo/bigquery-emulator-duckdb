@@ -95,7 +95,7 @@ class ProcedureValidator {
       if (declaration->type() != nullptr) {
         GOOGLESQL_ASSIGN_OR_RETURN(
             const auto resolved,
-            AnalyzeScriptType(Segment(*declaration->type()), catalog_, types_, {}));
+            AnalyzeScriptType(Segment(*declaration->type()), catalog_, types_, Settings()));
         type = resolved.type;
         parameters = resolved.type_params;
       }
@@ -207,7 +207,11 @@ class ProcedureValidator {
 
  private:
   [[nodiscard]] AnalyzerSettings Settings() const {
-    return {.default_project = "", .system_variables = &system_variables_};
+    return {
+        .default_project = "",
+        .system_variables = &system_variables_,
+        .timestamp_precision = catalog_.timestamp_precision(),
+    };
   }
 
   [[nodiscard]] googlesql::ScriptSegment Segment(const googlesql::ASTNode& node) const {
@@ -326,7 +330,9 @@ absl::Status CheckProcedure(const Routine& routine, const googlesql::ASTScript& 
                             RoutineCatalog& catalog, googlesql::TypeFactory& types) {
   const std::string body = routine.resource.at("definitionBody").get<std::string>();
   ProcedureValidator validator(body, catalog, types);
-  const auto signature = AnalyzeGoogleSql(RoutineStatement(routine), catalog, types);
+  const auto signature = AnalyzeGoogleSql(
+      RoutineStatement(routine), catalog, types,
+      {.default_project = "", .timestamp_precision = catalog.timestamp_precision()});
   const auto& create = *signature.statement().GetAs<googlesql::ResolvedCreateProcedureStmt>();
   for (int i = 0; i < create.argument_name_list_size(); ++i) {
     GOOGLESQL_RETURN_IF_ERROR(

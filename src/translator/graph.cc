@@ -274,7 +274,8 @@ std::optional<std::string> CreatePropertyGraph(
       for (const auto& property : element->property_definition_list()) {
         const auto column = Key(*property->expr(), table, false);
         const auto native_column = Key(*property->expr(), table, true);
-        if (!column || !native_column || !DuckDbType(property->expr()->type()) ||
+        if (!column || !native_column ||
+            !DuckDbType(property->expr()->type(), nullptr, scope.context.timestamp_precision) ||
             !property->options_list().empty() || property->is_measure() ||
             property->expr()->type_annotation_map() != nullptr) {
           return Unsupported(scope, "computed properties, measures or property options");

@@ -43,7 +43,7 @@ struct WithQuery {
 // What the whole statement's translation shares: its inputs, and what it records on the way.
 struct Context {
   const function_catalog::Catalog& functions;
-  TimestampPrecision timestamp_precision = TimestampPrecision::kMicroseconds;
+  TimestampPrecision timestamp_precision;
   const QueryParameters& parameters;
   const DefaultDataset& defaults;
   // DDL records what it creates, alters or drops in the statement itself, so that this header,

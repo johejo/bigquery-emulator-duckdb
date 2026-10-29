@@ -95,7 +95,8 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   };
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
-    if (!DuckDbType(column.type()) || !OnlyCollations(column.type_annotation_map())) {
+    if (!DuckDbType(column.type(), nullptr, scope.context.timestamp_precision) ||
+        !OnlyCollations(column.type_annotation_map())) {
       return Unsupported(scope, "column type " + column.type()->DebugString());
     }
     const std::string name =
@@ -289,7 +290,8 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   std::vector<const FieldSchema*> fields;
   for (const auto& column : insert.insert_column_list()) {
     const auto name = table_columns.find(column.column_id());
-    if (name == table_columns.end() || !DuckDbType(column.type()) ||
+    if (name == table_columns.end() ||
+        !DuckDbType(column.type(), nullptr, scope.context.timestamp_precision) ||
         !OnlyCollations(column.type_annotation_map())) {
       return std::nullopt;
     }

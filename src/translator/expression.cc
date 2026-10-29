@@ -127,7 +127,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
           "bq_timestamp_nanos_to_micros(CAST(" + sql + " AS bq_timestamp_nanos))";
       result = ConvertedCast(from, to, micros, safe);
       if (!result) {
-        const auto type = DuckDbType(to);
+        const auto type = DuckDbType(to, nullptr, context.timestamp_precision);
         if (type) {
           result = "CAST(" + micros + " AS " + *type + ")";
         }

@@ -33,6 +33,7 @@
 #include "src/field_schema.h"
 #include "src/parquet_metadata.h"
 #include "src/schema_sql.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -269,7 +270,8 @@ std::string ParquetType(const FieldSchema& field) {
     });
     type = "STRUCT(" + Join(fields, ", ") + ")";
   } else {
-    type = Checked(DuckDbColumnType(AsNullable(field)));
+    // Extract jobs come only from the REST API, which serves BigQuery's semantics.
+    type = Checked(DuckDbColumnType(AsNullable(field), TimestampPrecision::kMicroseconds));
   }
   return field.mode == FieldMode::kRepeated ? type + "[]" : type;
 }

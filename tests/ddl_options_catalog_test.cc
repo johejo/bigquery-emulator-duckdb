@@ -21,6 +21,7 @@
 #include "src/ddl_option_types.h"
 #include "src/field_schema.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -54,8 +55,12 @@ bool Applies(const json& context, const std::string& name) {
 std::string Problem(const json& catalog) {
   googlesql::TypeFactory factory;
   NoTables source;
-  BigQueryCatalog tables(source, &factory, "test", "d");
-  const auto settings = ScriptAnalyzerOptions({.default_project = "test", .default_dataset = "d"});
+  BigQueryCatalog tables(source, &factory, "test", "d", TimestampPrecision::kMicroseconds);
+  const auto settings = ScriptAnalyzerOptions({
+      .default_project = "test",
+      .default_dataset = "d",
+      .timestamp_precision = TimestampPrecision::kMicroseconds,
+  });
   if (!settings.ok()) {
     return settings.status().ToString();
   }

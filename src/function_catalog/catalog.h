@@ -28,7 +28,7 @@ struct ScalarCall {
   bool safe = false;
   // The project the query runs in, which connection IDs without one belong to.
   std::string_view project = {};
-  TimestampPrecision timestamp_precision = TimestampPrecision::kMicroseconds;
+  TimestampPrecision timestamp_precision;
 
   // Access resolved arguments and types without including the AST definitions in handlers.
   [[nodiscard]] const googlesql::ResolvedExpr& Argument(std::size_t i) const;
@@ -82,8 +82,7 @@ struct FunctionEntry {
 // The application assembles a catalog before passing it to the translator.
 class Catalog {
  public:
-  explicit Catalog(TimestampPrecision precision = TimestampPrecision::kMicroseconds)
-      : timestamp_precision_(precision) {}
+  explicit Catalog(TimestampPrecision precision) : timestamp_precision_(precision) {}
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
   void Add(std::string_view name, FunctionEntry entry);
   // Composition omits service-dependent forms whose backend capability is absent.

@@ -77,6 +77,7 @@ cc_library(
         "//:api_error",
         "//:httplib",
         "//:query_parameters",
+        "//:timestamp_precision",
         "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/status",
         "@googleapis//google/cloud/bigquery/v2:bigquery_cc_proto",

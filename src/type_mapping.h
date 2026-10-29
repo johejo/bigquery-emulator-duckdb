@@ -97,9 +97,9 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
 // the type BigNumericTypeName names. Structs use DuckDbStructFieldNames; STRUCT<> is a STRUCT
 // with the field kEmptyStruct, available only for query values, as is INTERVAL. A RANGE is a STRUCT
 // with the fields kRangeStart and kRangeEnd.
-std::optional<std::string> DuckDbType(
-    const googlesql::Type* type, const googlesql::TypeParameters* parameters = nullptr,
-    TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+std::optional<std::string> DuckDbType(const googlesql::Type* type,
+                                      const googlesql::TypeParameters* parameters,
+                                      TimestampPrecision precision);
 
 // The numeric type parameters in a schema, including nested fields. Include STRING/BYTES
 // lengths for default validation; storage omits them because DuckDB does not enforce them.
@@ -110,17 +110,17 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
 // GoogleSQL type and the precision and scale the schema gives. A GEOGRAPHY is stored as the BLOB
 // queries hold it as, under an alias of its own; see src/googlesql_geography_duckdb/codec.h.
 // Stored structs still require distinct nonempty field names.
-absl::StatusOr<std::string> DuckDbColumnType(
-    const FieldSchema& field, TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field,
+                                             TimestampPrecision precision);
 
 // The same storage mapping for a resolved SQL column definition.
-std::optional<std::string> DuckDbColumnType(
-    const googlesql::Type* type, const googlesql::TypeParameters* parameters = nullptr,
-    TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+std::optional<std::string> DuckDbColumnType(const googlesql::Type* type,
+                                            const googlesql::TypeParameters* parameters,
+                                            TimestampPrecision precision);
 
 // The DuckDB type of a query parameter described by a BigQuery TableFieldSchema: as
 // DuckDbColumnType, except that INTERVAL, a query value, is supported and GEOGRAPHY is not.
-absl::StatusOr<std::string> DuckDbParameterType(
-    const FieldSchema& field, TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field,
+                                                TimestampPrecision precision);
 
 }  // namespace bigquery_emulator_duckdb

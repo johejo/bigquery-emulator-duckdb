@@ -14,9 +14,13 @@ namespace bigquery_emulator_duckdb {
 inline constexpr char kBigQueryGroup[] = "BigQueryGoogleSQL";
 
 // The language settings shared by the catalog's built-in functions and the analyzer, so that a
-// statement is not rejected for a feature one of them was not told about.
-const googlesql::LanguageOptions& GoogleSqlLanguageOptions(
-    TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+// statement is not rejected for a feature one of them was not told about. TIMESTAMPs hold
+// microseconds, as in BigQuery; only resolution depends on that, which AnalyzerLanguageOptions
+// selects.
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
+
+// GoogleSqlLanguageOptions for analyzing statements whose TIMESTAMPs have `precision`.
+const googlesql::LanguageOptions& AnalyzerLanguageOptions(TimestampPrecision precision);
 
 // Whether `function` is a GoogleSQL built-in or a BigQuery function that GoogleSQL does not ship
 // and the catalog declares in its place, as opposed to a user-defined one.

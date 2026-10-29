@@ -11,7 +11,7 @@ bool IsBuiltinFunction(const googlesql::Function& function) {
   return function.IsGoogleSQLBuiltin() || function.GetGroup() == kBigQueryGroup;
 }
 
-const googlesql::LanguageOptions& GoogleSqlLanguageOptions(TimestampPrecision precision) {
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
   static const googlesql::LanguageOptions* const kLanguageOptions = [] {
     auto* options = new googlesql::LanguageOptions();
     // Some syntax BigQuery accepts is gated behind a language feature that the default options
@@ -67,12 +67,17 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions(TimestampPrecision pr
     options->SetSupportsAllStatementKinds();
     return options;
   }();
+  return *kLanguageOptions;
+}
+
+const googlesql::LanguageOptions& AnalyzerLanguageOptions(TimestampPrecision precision) {
   static const googlesql::LanguageOptions* const kNanosecondOptions = [] {
-    auto* options = new googlesql::LanguageOptions(*kLanguageOptions);
+    auto* options = new googlesql::LanguageOptions(GoogleSqlLanguageOptions());
     options->EnableLanguageFeature(googlesql::FEATURE_TIMESTAMP_NANOS);
     return options;
   }();
-  return precision == TimestampPrecision::kNanoseconds ? *kNanosecondOptions : *kLanguageOptions;
+  return precision == TimestampPrecision::kNanoseconds ? *kNanosecondOptions
+                                                       : GoogleSqlLanguageOptions();
 }
 
 }  // namespace bigquery_emulator_duckdb

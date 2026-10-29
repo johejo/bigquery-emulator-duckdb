@@ -32,6 +32,7 @@
 #include "src/routine.h"
 #include "src/server/routes.h"
 #include "src/table_metadata.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb::server {
 namespace {
@@ -279,7 +280,8 @@ QueryRequest ParseQueryConfiguration(const std::string& project_id, const Messag
   if (!parameters.empty()) {
     ABSL_VLOG(1) << "Query parameters: " << parameters.dump();
   }
-  request.parameters = QueryParameters::Parse(parameters);
+  // The server runs only BigQuery's semantics.
+  request.parameters = QueryParameters::Parse(parameters, TimestampPrecision::kMicroseconds);
   return request;
 }
 

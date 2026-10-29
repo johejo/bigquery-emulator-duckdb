@@ -16,6 +16,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/function_catalog/catalog.h"
 #include "src/location.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
@@ -201,7 +202,8 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
     }
     // The columns take BigQuery's types for the result, so the table reads back as the query's
     // schema rather than as whatever DuckDB computed.
-    if (const std::optional<std::string> columns = ColumnDefinitions(schema)) {
+    if (const std::optional<std::string> columns =
+            ColumnDefinitions(schema, functions_.timestamp_precision())) {
       statements.push_back(std::format("CREATE TABLE {} ({})", target, *columns));
     } else {
       statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table +

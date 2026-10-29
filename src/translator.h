@@ -58,7 +58,7 @@ std::optional<std::string> TranslateExpression(
 std::optional<QueryParameters> TranslateParameters(
     const std::variant<std::vector<googlesql::Value>, std::map<std::string, googlesql::Value>>&
         values,
-    std::string* unsupported, TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+    std::string* unsupported, TimestampPrecision precision);
 
 // `value`, the SQL of a column of `source` that a job appends to the existing column
 // `destination`, with the values of its ROUND_HALF_EVEN fields rounded to their scale as DML

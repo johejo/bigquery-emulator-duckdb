@@ -43,7 +43,7 @@ struct AnalyzerSettings {
   const googlesql::ScriptExecutor* script = nullptr;
   // Additional system variables owned by the emulator rather than ScriptExecutor.
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
-  TimestampPrecision timestamp_precision = TimestampPrecision::kMicroseconds;
+  TimestampPrecision timestamp_precision;
 };
 
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so
@@ -88,7 +88,7 @@ std::vector<std::string> ResultColumnNames(const googlesql::ResolvedQueryStmt& q
 // not parse or analyze. Array-cast errors use BigQuery's message and location format.
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
                                 googlesql::TypeFactory& type_factory,
-                                const AnalyzerSettings& settings = {});
+                                const AnalyzerSettings& settings);
 
 // BigQuery's error for a view or function definition that refers to a system variable, which
 // names only a temporary function.

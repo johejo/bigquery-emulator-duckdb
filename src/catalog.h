@@ -11,6 +11,7 @@
 #include "googlesql/public/catalog_wrapper.h"
 #include "googlesql/public/simple_catalog.h"
 #include "src/builtin_function_options.h"
+#include "src/timestamp_precision.h"
 
 namespace googlesql {
 class TableValuedFunction;
@@ -30,15 +31,19 @@ struct TemporaryTables;
 class BigQueryCatalog : public googlesql::CatalogWrapper {
  public:
   // `source`, `type_factory` and `temporary`, the temporary tables of the multi-statement query
-  // that the catalog analyzes a statement of, if any, must outlive the catalog.
+  // that the catalog analyzes a statement of, if any, must outlive the catalog. The catalog
+  // analyzes the views, routines and property graphs it resolves with `timestamp_precision`.
   BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                   std::string default_project, std::string default_dataset,
+                  TimestampPrecision timestamp_precision,
                   const TemporaryTables* temporary = nullptr,
                   const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds(),
                   FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
   ~BigQueryCatalog() override;
 
   [[nodiscard]] std::string FullName() const override { return "bigquery"; }
+
+  [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
 
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
                          const FindOptions& options) override;
@@ -73,6 +78,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   googlesql::TypeFactory* type_factory_;
   std::string default_project_;
   std::string default_dataset_;
+  TimestampPrecision timestamp_precision_;
   const TemporaryTables* temporary_;
   // Keyed by the normalized path. The analyzer holds on to the Table pointers it is handed,
   // so they must stay valid for as long as the catalog does.

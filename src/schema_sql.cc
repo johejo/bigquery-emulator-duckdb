@@ -211,7 +211,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
 }  // namespace
 
 std::string ToDuckDbType(const FieldSchema& field) {
-  absl::StatusOr<std::string> type = DuckDbColumnType(field);
+  absl::StatusOr<std::string> type = DuckDbColumnType(field, TimestampPrecision::kMicroseconds);
   if (!type.ok()) {
     throw ApiError::Invalid(std::string(type.status().message()));
   }
@@ -352,11 +352,12 @@ std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precis
          (field.mode == FieldMode::kRequired ? " NOT NULL" : "");
 }
 
-std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema) {
+std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema,
+                                             TimestampPrecision precision) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
     try {
-      columns.push_back(ColumnDefinition(field));
+      columns.push_back(ColumnDefinition(field, precision));
     } catch (const ApiError&) {
       return std::nullopt;
     }

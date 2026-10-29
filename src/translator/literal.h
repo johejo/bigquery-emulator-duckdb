@@ -13,8 +13,6 @@ namespace bigquery_emulator_duckdb::translator {
 
 // Literals, in literal.cc.
 
-std::optional<std::string> Literal(
-    const googlesql::Value& value,
-    TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+std::optional<std::string> Literal(const googlesql::Value& value, TimestampPrecision precision);
 
 }  // namespace bigquery_emulator_duckdb::translator

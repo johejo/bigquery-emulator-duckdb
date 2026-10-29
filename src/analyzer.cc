@@ -335,7 +335,7 @@ absl::Status CheckMaterializedView(const googlesql::ResolvedCreateMaterializedVi
 absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSettings& settings,
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
-  options.set_language(GoogleSqlLanguageOptions(settings.timestamp_precision));
+  options.set_language(AnalyzerLanguageOptions(settings.timestamp_precision));
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
   // SELECT WITH DIFFERENTIAL_PRIVACY aggregates each privacy unit's contributions first, and

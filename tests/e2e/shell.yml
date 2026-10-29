@@ -263,6 +263,42 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
           --semantics=googlesql -e 'SELECT CAST(x.r AS STRING) AS r FROM ds.t AS x'
     test: current.exit_code == 0 && current.stdout == '{"r":"[2020-01-01 00:00:00+00, UNBOUNDED)"}' + "\n"
+  # Column defaults, routine bodies and views are analyzed with nanosecond precision too.
+  semantics_nanosecond_definitions:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        CREATE SCHEMA ds;
+        CREATE TABLE ds.d (a INT64, t TIMESTAMP DEFAULT TIMESTAMP '1970-01-01 00:00:00.000000001+00');
+        INSERT ds.d (a) VALUES (1);
+        CREATE FUNCTION ds.f() AS (TIMESTAMP '1970-01-01 00:00:00.000000002+00');
+        CREATE VIEW ds.v AS SELECT TIMESTAMP '1970-01-01 00:00:00.000000003+00' AS t;
+        SELECT CAST(x.t AS STRING) AS d, CAST(ds.f() AS STRING) AS f,
+               (SELECT CAST(v.t AS STRING) FROM ds.v AS v) AS v
+        FROM ds.d AS x;
+    test: >-
+      current.exit_code == 0 && current.stdout ==
+      '{"d":"1970-01-01 00:00:00.000000001+00","f":"1970-01-01 00:00:00.000000002+00","v":"1970-01-01 00:00:00.000000003+00"}' + "\n"
+  semantics_nanosecond_procedure:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        CREATE SCHEMA ds;
+        CREATE PROCEDURE ds.p() BEGIN SELECT CAST(TIMESTAMP '1970-01-01 00:00:00.000000004+00' AS STRING) AS t; END;
+        CALL ds.p();
+    test: current.exit_code == 0 && current.stdout == '{"t":"1970-01-01 00:00:00.000000004+00"}' + "\n"
+  semantics_nanosecond_information_schema:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        CREATE SCHEMA ds;
+        CREATE TABLE ds.t (a INT64);
+        SELECT COUNT(*) AS n FROM ds.INFORMATION_SCHEMA.TABLES
+        WHERE creation_time > TIMESTAMP '2000-01-01 00:00:00+00';
+    test: current.exit_code == 0 && current.stdout == '{"n":"1"}' + "\n"
   semantics_invalid:
     exec:
       command: >-

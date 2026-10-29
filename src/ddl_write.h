@@ -55,9 +55,9 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 // `schema` to the final schema so its defaults can be regenerated with the new modes. An added
 // column takes the table's default rounding mode. Throws ApiError::Invalid for an action BigQuery
 // rejects.
-std::vector<std::string> AlterTableStatements(
-    const TableAlteration& alteration, std::vector<FieldSchema>& schema, TableMetadata metadata,
-    TimestampPrecision precision = TimestampPrecision::kMicroseconds);
+std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
+                                              std::vector<FieldSchema>& schema,
+                                              TableMetadata metadata, TimestampPrecision precision);
 
 // The statements that apply `alteration` to its dataset, whose metadata is `metadata` when it
 // runs. Throws ApiError::Invalid for labels BigQuery rejects.

@@ -28,6 +28,7 @@
 #include "src/storage_snapshot.h"
 #include "src/table_source.h"
 #include "src/temporary_files.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
 
@@ -65,9 +66,14 @@ std::string FileQuery(const std::string& path) {
 TranslatedStatement TranslateRead(const std::string& query, Preparation prepare) {
   FileSource source(std::move(prepare));
   googlesql::TypeFactory types;
-  BigQueryCatalog catalog(source, &types, "test", "d");
+  BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds);
   const auto analyzed =
-      AnalyzeGoogleSql(query, catalog, types, {.default_project = "test", .default_dataset = "d"});
+      AnalyzeGoogleSql(query, catalog, types,
+                       {
+                           .default_project = "test",
+                           .default_dataset = "d",
+                           .timestamp_precision = TimestampPrecision::kMicroseconds,
+                       });
   std::string unsupported;
   auto translation = TranslateStatement(
       EmulatorFunctionCatalog(BigQueryFunctionOptions()), analyzed.statement(), {},
@@ -181,10 +187,14 @@ TEST(StatementResourcesTest, ScalarExpressionKeepsItsOwnExecutionScope) {
       return FileQuery(path);
     });
     googlesql::TypeFactory types;
-    BigQueryCatalog catalog(source, &types, "test", "d");
+    BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds);
     const auto analyzed =
         AnalyzeScriptExpression("(SELECT value FROM t)", nullptr, nullptr, catalog, types,
-                                {.default_project = "test", .default_dataset = "d"});
+                                {
+                                    .default_project = "test",
+                                    .default_dataset = "d",
+                                    .timestamp_precision = TimestampPrecision::kMicroseconds,
+                                });
     ASSERT_TRUE(analyzed.ok()) << analyzed.status();
     const auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
     std::string unsupported;

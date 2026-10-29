@@ -25,12 +25,14 @@
 #include "src/information_schema.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                  std::string default_project, std::string default_dataset,
+                                 TimestampPrecision timestamp_precision,
                                  const TemporaryTables* temporary,
                                  const ExcludedFunctionIds& excluded_function_ids,
                                  FunctionDeclarations declarations)
@@ -41,6 +43,7 @@ BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* ty
       type_factory_(type_factory),
       default_project_(std::move(default_project)),
       default_dataset_(std::move(default_dataset)),
+      timestamp_precision_(timestamp_precision),
       temporary_(temporary) {}
 
 BigQueryCatalog::~BigQueryCatalog() = default;
@@ -72,8 +75,8 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
       *table = it->second.get();
       return absl::OkStatus();
     }
-    absl::StatusOr<std::unique_ptr<SqlTable>> view =
-        InformationSchemaView(parts, source_, type_factory_, default_project_, default_dataset_);
+    absl::StatusOr<std::unique_ptr<SqlTable>> view = InformationSchemaView(
+        parts, source_, type_factory_, default_project_, default_dataset_, timestamp_precision_);
     if (!view.ok()) {
       return view.status();
     }
