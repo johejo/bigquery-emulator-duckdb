@@ -22,6 +22,12 @@ types @all = @nonarray | ARRAY<@nonarray>
 types @orderable = @scalar | -GEOGRAPHY | -JSON
 types @numeric = INT64 | NUMERIC | BIGNUMERIC | FLOAT64
 types @text = STRING | BYTES
+# The specification's comparable exclusions. STRUCTs compare only for equality.
+# ARRAY isn't comparable, so neither is a STRUCT with an ARRAY field.
+types @comparable = @nonarray | -GEOGRAPHY | -JSON | -STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>
+types @range = RANGE<DATE> | RANGE<DATETIME> | RANGE<TIMESTAMP>
+# The SQL types listed under the specification's JSON encodings.
+types @json_encodable = @all | -GEOGRAPHY | -ARRAY<GEOGRAPHY>
 
 page hash_functions
 for $T in @text
@@ -95,6 +101,10 @@ note CONCAT Only same-type STRING and BYTES forms are enumerated; implicit conve
 note NORMALIZE Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.
 note NORMALIZE_AND_CASEFOLD Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.
 note EDIT_DISTANCE The optional named max_distance argument is not yet enumerated.
+for $T in STRING | INT64 | BOOL | NUMERIC | BIGNUMERIC | TIMESTAMP | TIME | DATE | DATETIME | ARRAY<STRING> | STRUCT<x INT64, label STRING>
+  CONTAINS_SUBSTR($T, literal STRING = 'b') -> BOOL
+end
+note CONTAINS_SUBSTR The listed column types are enumerated with representative ARRAY and STRUCT values; table references and the named json_scope argument are not yet enumerated.
 
 page net_functions
 NET.HOST(STRING = 'http://abc.xyz') -> STRING
@@ -124,6 +134,8 @@ for $T in @numeric
   GENERATE_ARRAY($T, $T[, $T]) -> ARRAY<$T>
 end
 note GENERATE_ARRAY Same-type numeric inputs are enumerated; mixed-type inputs are not yet enumerated.
+GENERATE_DATE_ARRAY(DATE, DATE[, literal INTERVAL = INTERVAL 1 DAY]) -> ARRAY<DATE>
+GENERATE_TIMESTAMP_ARRAY(TIMESTAMP, TIMESTAMP, literal INTERVAL = INTERVAL 1 HOUR) -> ARRAY<TIMESTAMP>
 
 page aggregate_functions
 STRING_AGG(STRING[, literal STRING = 'b']) -> STRING
@@ -140,6 +152,51 @@ for $T in @orderable
   MIN($T) -> $T
   MAX($T) -> $T
 end
+for $T in @all
+  COUNT($T) -> INT64
+  MAX_BY($T, INT64) -> $T
+  MIN_BY($T, INT64) -> $T
+end
+# BigQuery requires orderable ordering values (tests/e2e/goclient/testdata/scalars/known_bugs.txt).
+for $U in @orderable | -INT64
+  MAX_BY(INT64, $U) -> INT64
+  MIN_BY(INT64, $U) -> INT64
+end
+note COUNT COUNT(*) is not a typed form and is not enumerated.
+COUNTIF(BOOL) -> INT64
+LOGICAL_AND(BOOL) -> BOOL
+LOGICAL_OR(BOOL) -> BOOL
+BIT_AND(INT64) -> INT64
+BIT_OR(INT64) -> INT64
+BIT_XOR(INT64) -> INT64
+
+page approximate_aggregate_functions
+# GEOGRAPHY and JSON are left out with ARRAY, STRUCT and INTERVAL: BigQuery rejects them as
+# not groupable or orderable (scalars/aggregates.txt, scalars/known_bugs.txt). BigQuery rejects
+# RANGE values in APPROX_COUNT_DISTINCT, APPROX_TOP_COUNT and APPROX_TOP_SUM, and INTERVAL values
+# in the latter two, as tests/e2e/goclient/testdata/scalars/range.txt and approx_top_sum.txt show.
+for $T in @scalar | -INTERVAL | -GEOGRAPHY | -JSON | -@range
+  APPROX_COUNT_DISTINCT($T) -> INT64
+end
+for $T in @scalar | -INTERVAL | -GEOGRAPHY | -JSON
+  APPROX_QUANTILES($T, literal INT64 = 2) -> ARRAY<$T>
+end
+note APPROX_COUNT_DISTINCT BigQuery rejects GEOGRAPHY, JSON and RANGE values; they are not enumerated.
+note APPROX_QUANTILES BigQuery rejects GEOGRAPHY and JSON values; they are not enumerated.
+note APPROX_TOP_COUNT BigQuery rejects INTERVAL, RANGE, STRUCT and ARRAY values; they are not enumerated.
+note APPROX_TOP_SUM BigQuery rejects INTERVAL, RANGE, STRUCT and ARRAY values; they are not enumerated.
+# BigQuery rejects every STRUCT and ARRAY value (scalars/known_bugs.txt).
+for $T in @scalar | -INTERVAL | -GEOGRAPHY | -JSON | -@range
+  APPROX_TOP_COUNT($T, literal INT64 = 2) -> ARRAY<STRUCT<value $T, count INT64>>
+  APPROX_TOP_SUM($T, INT64, literal INT64 = 2) -> ARRAY<STRUCT<value $T, sum INT64>>
+end
+for $W in NUMERIC | BIGNUMERIC | FLOAT64
+  APPROX_TOP_SUM(STRING, $W, literal INT64 = 2) -> ARRAY<STRUCT<value STRING, sum $W>>
+end
+
+page bit_functions
+BIT_COUNT(INT64) -> INT64
+BIT_COUNT(BYTES) -> INT64
 
 page conditional_expressions
 for $T in @all
@@ -150,6 +207,11 @@ end
 note COALESCE Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
 note IFNULL Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
 note IF Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+# BigQuery rejects INTERVAL values, as tests/e2e/goclient/testdata/scalars/interval.txt shows.
+for $T in @comparable | -INTERVAL
+  NULLIF($T, $T) -> $T
+end
+note NULLIF Same-type comparable inputs are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertype combinations are not yet enumerated.
 
 page mathematical_functions
 for $T in @orderable
@@ -159,6 +221,17 @@ end
 note GREATEST Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
 note LEAST Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
 RAND() -> FLOAT64
+# BigQuery rejects RANGE values, as tests/e2e/goclient/testdata/scalars/range_bucket.txt shows.
+for $T in @orderable | -@range
+  RANGE_BUCKET($T, ARRAY<$T>) -> INT64
+end
+note RANGE_BUCKET Orderable scalar types except RANGE, which BigQuery rejects, are enumerated; STRUCT points are not enumerated.
+COSINE_DISTANCE(ARRAY<FLOAT64>, ARRAY<FLOAT64>) -> FLOAT64
+COSINE_DISTANCE(ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>, ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>) -> FLOAT64
+COSINE_DISTANCE(ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>, ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>) -> FLOAT64
+EUCLIDEAN_DISTANCE(ARRAY<FLOAT64>, ARRAY<FLOAT64>) -> FLOAT64
+EUCLIDEAN_DISTANCE(ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>, ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>) -> FLOAT64
+EUCLIDEAN_DISTANCE(ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>, ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>) -> FLOAT64
 for $T in @numeric
   # The generic sample 2 is outside these inverse functions' domains.
   ACOS($T = 1) -> FLOAT64
@@ -204,6 +277,9 @@ for $T in @numeric
 end
 
 page range-functions
+for $T in DATE | DATETIME | TIMESTAMP
+  GENERATE_RANGE_ARRAY(RANGE<$T>, INTERVAL[, BOOL]) -> ARRAY<RANGE<$T>>
+end
 RANGE(DATE, DATE = '2024-02-01') -> RANGE<DATE>
 RANGE(DATETIME, DATETIME = '2024-02-01 00:00:00') -> RANGE<DATETIME>
 RANGE(TIMESTAMP, TIMESTAMP = '2024-02-01 00:00:00+00') -> RANGE<TIMESTAMP>
@@ -215,3 +291,146 @@ for $T in DATE | DATETIME | TIMESTAMP
   RANGE_CONTAINS(RANGE<$T>, RANGE<$T>) -> BOOL
   RANGE_CONTAINS(RANGE<$T>, $T) -> BOOL
 end
+
+page date_functions
+CURRENT_DATE([STRING = 'America/Los_Angeles']) -> DATE
+DATE(INT64, INT64, INT64) -> DATE
+DATE(TIMESTAMP[, STRING = 'America/Los_Angeles']) -> DATE
+DATE(DATETIME) -> DATE
+DATE_ADD(DATE, literal INTERVAL = INTERVAL 2 DAY) -> DATE
+DATE_SUB(DATE, literal INTERVAL = INTERVAL 2 DAY) -> DATE
+# The specification's note gives DATE_DIFF(TIMESTAMP, TIMESTAMP, PART) as an example; BigQuery
+# also takes DATETIME values (tests/e2e/goclient/testdata/scalars/datetime.txt).
+for $T in DATE | DATETIME | TIMESTAMP
+  DATE_DIFF($T, $T, literal DATE_PART = DAY) -> INT64
+end
+DATE_FROM_UNIX_DATE(INT64) -> DATE
+DATE_TRUNC(DATE, literal DATE_PART = MONTH) -> DATE
+DATE_TRUNC(DATETIME, literal DATE_PART = MONTH) -> DATETIME
+DATE_TRUNC(TIMESTAMP, literal DATE_PART = MONTH[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+FORMAT_DATE(STRING = '%Y-%m-%d', DATE) -> STRING
+LAST_DAY(DATE[, literal DATE_PART = YEAR]) -> DATE
+note LAST_DAY The DATETIME form, documented with the datetime functions, is not yet enumerated.
+PARSE_DATE(STRING = '%Y-%m-%d', STRING = '2024-01-15') -> DATE
+UNIX_DATE(DATE) -> INT64
+
+page datetime_functions
+CURRENT_DATETIME([STRING = 'America/Los_Angeles']) -> DATETIME
+DATETIME(INT64, INT64, INT64, INT64, INT64, INT64) -> DATETIME
+DATETIME(DATE[, TIME]) -> DATETIME
+DATETIME(TIMESTAMP[, STRING = 'America/Los_Angeles']) -> DATETIME
+DATETIME_ADD(DATETIME, literal INTERVAL = INTERVAL 2 HOUR) -> DATETIME
+DATETIME_SUB(DATETIME, literal INTERVAL = INTERVAL 2 HOUR) -> DATETIME
+DATETIME_DIFF(DATETIME, DATETIME, literal DATE_PART = HOUR) -> INT64
+DATETIME_TRUNC(DATETIME, literal DATE_PART = HOUR) -> DATETIME
+DATETIME_TRUNC(TIMESTAMP, literal DATE_PART = HOUR[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+FORMAT_DATETIME(STRING = '%Y-%m-%d %H:%M:%S', DATETIME) -> STRING
+PARSE_DATETIME(STRING = '%Y-%m-%d %H:%M:%S', STRING = '2024-01-15 10:20:30') -> DATETIME
+
+page time_functions
+CURRENT_TIME([STRING = 'America/Los_Angeles']) -> TIME
+FORMAT_TIME(STRING = '%H:%M:%S', TIME) -> STRING
+PARSE_TIME(STRING = '%H:%M:%S', STRING = '10:20:30') -> TIME
+TIME(INT64, INT64, INT64) -> TIME
+TIME(TIMESTAMP[, STRING = 'America/Los_Angeles']) -> TIME
+TIME(DATETIME) -> TIME
+TIME_ADD(TIME, literal INTERVAL = INTERVAL 2 MINUTE) -> TIME
+TIME_SUB(TIME, literal INTERVAL = INTERVAL 2 MINUTE) -> TIME
+TIME_DIFF(TIME, TIME, literal DATE_PART = MINUTE) -> INT64
+TIME_TRUNC(TIME, literal DATE_PART = HOUR) -> TIME
+
+page timestamp_functions
+CURRENT_TIMESTAMP() -> TIMESTAMP
+FORMAT_TIMESTAMP(STRING = '%Y-%m-%d %H:%M:%S', TIMESTAMP[, STRING = 'America/Los_Angeles']) -> STRING
+PARSE_TIMESTAMP(STRING = '%Y-%m-%d %H:%M:%S', STRING = '2024-01-15 10:20:30'[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+# A string that names its time zone takes no time_zone argument.
+TIMESTAMP(STRING = '2024-01-15 10:20:30'[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+TIMESTAMP(DATE[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+TIMESTAMP(DATETIME[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+TIMESTAMP_ADD(TIMESTAMP, literal INTERVAL = INTERVAL 2 HOUR) -> TIMESTAMP
+TIMESTAMP_SUB(TIMESTAMP, literal INTERVAL = INTERVAL 2 HOUR) -> TIMESTAMP
+TIMESTAMP_DIFF(TIMESTAMP, TIMESTAMP, literal DATE_PART = HOUR) -> INT64
+TIMESTAMP_MICROS(INT64) -> TIMESTAMP
+TIMESTAMP_MILLIS(INT64) -> TIMESTAMP
+TIMESTAMP_SECONDS(INT64) -> TIMESTAMP
+TIMESTAMP_TRUNC(TIMESTAMP, literal DATE_PART = HOUR[, STRING = 'America/Los_Angeles']) -> TIMESTAMP
+TIMESTAMP_TRUNC(DATETIME, literal DATE_PART = HOUR) -> DATETIME
+UNIX_MICROS(TIMESTAMP) -> INT64
+UNIX_MILLIS(TIMESTAMP) -> INT64
+UNIX_SECONDS(TIMESTAMP) -> INT64
+STRING(TIMESTAMP[, STRING = 'America/Los_Angeles']) -> STRING
+note STRING The JSON form, documented with the JSON functions, is not yet enumerated.
+
+page interval_functions
+JUSTIFY_DAYS(INTERVAL) -> INTERVAL
+JUSTIFY_HOURS(INTERVAL) -> INTERVAL
+JUSTIFY_INTERVAL(INTERVAL) -> INTERVAL
+MAKE_INTERVAL([INT64[, INT64[, INT64[, INT64[, INT64[, INT64]]]]]]) -> INTERVAL
+note MAKE_INTERVAL Positional arguments are enumerated; named arguments are not yet enumerated.
+
+page conversion_functions
+PARSE_NUMERIC(STRING = '123.45') -> NUMERIC
+PARSE_BIGNUMERIC(STRING = '123.45') -> BIGNUMERIC
+
+page utility-functions
+GENERATE_UUID() -> STRING
+for $T in @all
+  TYPEOF($T) -> STRING
+end
+
+page json_functions
+BOOL(JSON = JSON 'true') -> BOOL
+INT64(JSON = JSON '2') -> INT64
+FLOAT64(JSON = JSON '2.5') -> FLOAT64
+note FLOAT64 The named wide_number_mode argument is not yet enumerated.
+LAX_BOOL(JSON) -> BOOL
+LAX_FLOAT64(JSON) -> FLOAT64
+LAX_INT64(JSON) -> INT64
+LAX_STRING(JSON) -> STRING
+JSON_TYPE(JSON) -> STRING
+JSON_FLATTEN(JSON) -> ARRAY<JSON>
+JSON_KEYS(JSON[, INT64]) -> ARRAY<STRING>
+note JSON_KEYS The named mode argument is not yet enumerated.
+PARSE_JSON(STRING = '{"a": [1, 2]}') -> JSON
+note PARSE_JSON The named wide_number_mode argument is not yet enumerated.
+# JSONPath arguments are sampled as literals.
+JSON_QUERY(STRING = '{"a": [1, 2]}', literal STRING = '$.a') -> STRING
+JSON_QUERY(JSON, literal STRING = '$.a') -> JSON
+JSON_EXTRACT(STRING = '{"a": [1, 2]}', literal STRING = '$.a') -> STRING
+JSON_EXTRACT(JSON, literal STRING = '$.a') -> JSON
+JSON_VALUE(STRING = '{"a": [1, 2]}'[, literal STRING = '$.a[0]']) -> STRING
+JSON_VALUE(JSON[, literal STRING = '$.a[0]']) -> STRING
+JSON_EXTRACT_SCALAR(STRING = '{"a": [1, 2]}'[, literal STRING = '$.a[0]']) -> STRING
+JSON_EXTRACT_SCALAR(JSON[, literal STRING = '$.a[0]']) -> STRING
+JSON_QUERY_ARRAY(STRING = '{"a": [1, 2]}'[, literal STRING = '$.a']) -> ARRAY<STRING>
+JSON_QUERY_ARRAY(JSON[, literal STRING = '$.a']) -> ARRAY<JSON>
+JSON_EXTRACT_ARRAY(STRING = '{"a": [1, 2]}'[, literal STRING = '$.a']) -> ARRAY<STRING>
+JSON_EXTRACT_ARRAY(JSON[, literal STRING = '$.a']) -> ARRAY<JSON>
+JSON_VALUE_ARRAY(STRING = '{"a": [1, 2]}'[, literal STRING = '$.a']) -> ARRAY<STRING>
+JSON_VALUE_ARRAY(JSON[, literal STRING = '$.a']) -> ARRAY<STRING>
+JSON_EXTRACT_STRING_ARRAY(STRING = '{"a": [1, 2]}'[, literal STRING = '$.a']) -> ARRAY<STRING>
+JSON_EXTRACT_STRING_ARRAY(JSON[, literal STRING = '$.a']) -> ARRAY<STRING>
+JSON_REMOVE(JSON, literal STRING = '$.a') -> JSON
+note JSON_REMOVE One path is enumerated; more paths are not yet enumerated.
+JSON_STRIP_NULLS(JSON[, literal STRING = '$.a']) -> JSON
+note JSON_STRIP_NULLS The named include_arrays and remove_empty arguments are not yet enumerated.
+JSON_ARRAY() -> JSON
+JSON_OBJECT() -> JSON
+for $T in @json_encodable
+  TO_JSON($T) -> JSON
+  TO_JSON_STRING($T[, BOOL]) -> STRING
+  JSON_ARRAY($T) -> JSON
+  JSON_OBJECT(STRING = 'b', $T) -> JSON
+  JSON_SET(JSON, literal STRING = '$.b', $T) -> JSON
+  JSON_ARRAY_APPEND(JSON, literal STRING = '$.a', $T) -> JSON
+  JSON_ARRAY_INSERT(JSON, literal STRING = '$.a[0]', $T) -> JSON
+end
+for $T in @nonarray | -GEOGRAPHY
+  JSON_OBJECT(ARRAY<STRING>, ARRAY<$T>) -> JSON
+end
+note TO_JSON The named stringify_wide_numbers argument is not yet enumerated.
+note JSON_ARRAY Arities zero and one are enumerated; more values are not yet enumerated.
+note JSON_OBJECT One key-value pair and one-element key and value arrays are enumerated; more pairs are not yet enumerated.
+note JSON_SET One path-value pair is enumerated; more pairs and the named create_if_missing argument are not yet enumerated.
+note JSON_ARRAY_APPEND One path-value pair is enumerated; more pairs and the named append_each_element argument are not yet enumerated.
+note JSON_ARRAY_INSERT One path-value pair is enumerated; more pairs and the named insert_each_element argument are not yet enumerated.

@@ -21,6 +21,7 @@ var (
 	signaturePattern = regexp.MustCompile(`^([A-Z][A-Z0-9_.]*)\((.*)\) -> (\S.*)$`)
 	variablePattern  = regexp.MustCompile(`\$[A-Z]+`)
 	listPattern      = regexp.MustCompile(`@[a-z_]+`)
+	numberedForm     = regexp.MustCompile(`^[0-9]+\. `)
 )
 
 type domainLine struct {
@@ -410,25 +411,37 @@ func (a arity) String() string {
 	return fmt.Sprintf("%d to %d", a.min, a.max)
 }
 
-// syntaxArities reads the code blocks of a section that start with a call to name. Only the
-// call's parentheses are read, so an aggregate's OVER clause is left out.
+// syntaxArities reads the calls to name that start the lines of a section's code blocks, such
+// as 1. DATETIME(...) in a numbered list of forms. Only the call's parentheses are read, so an
+// aggregate's OVER clause is left out. Blocks after the first bold label, such as
+// **Description**, are examples whose array literals aren't syntax notation.
 func syntaxArities(section, name string) ([]arity, error) {
 	var result []arity
+	section, _, _ = strings.Cut(section, "\n**")
 	blocks := strings.Split(section, "```")
 	for i := 1; i < len(blocks); i += 2 {
 		block := strings.TrimSpace(blocks[i])
-		if !strings.HasPrefix(block, name+"(") {
-			continue
+		for j := 0; j < len(block); {
+			line := block[j:]
+			if end := strings.IndexByte(line, '\n'); end >= 0 {
+				j += end + 1
+			} else {
+				j = len(block)
+			}
+			line = numberedForm.ReplaceAllString(line, "")
+			if !strings.HasPrefix(line, name+"(") {
+				continue
+			}
+			args, ok := callArguments(line[len(name):])
+			if !ok {
+				return nil, fmt.Errorf("unbalanced syntax for %s: %q", name, block)
+			}
+			a, err := syntaxArity(args)
+			if err != nil {
+				return nil, fmt.Errorf("syntax for %s: %w", name, err)
+			}
+			result = append(result, a)
 		}
-		args, ok := callArguments(block[len(name):])
-		if !ok {
-			return nil, fmt.Errorf("unbalanced syntax for %s: %q", name, block)
-		}
-		a, err := syntaxArity(args)
-		if err != nil {
-			return nil, fmt.Errorf("syntax for %s: %w", name, err)
-		}
-		result = append(result, a)
 	}
 	if len(result) == 0 {
 		return nil, fmt.Errorf("no syntax line for %s", name)
@@ -460,6 +473,7 @@ func callArguments(text string) (string, bool) {
 //   - Other brackets next to an argument, such as [ DISTINCT ] or [ WHERE ... ], are clauses.
 //   - ... repeats the arguments before it; an argument after it, as XN in X1,...,XN, names the
 //     last repetition.
+//   - An argument named as a pair, such as json_path_value_pair, is two arguments.
 func syntaxArity(text string) (arity, error) {
 	var result arity
 	add := func(n int) {
@@ -481,8 +495,12 @@ func syntaxArity(text string) (arity, error) {
 			return arity{}, fmt.Errorf("empty argument in %q", text)
 		}
 		if core != "" {
-			result.min++
-			add(1)
+			n := 1
+			if strings.HasSuffix(core, "_pair") {
+				n = 2
+			}
+			result.min += n
+			add(n)
 		}
 		for _, g := range groups {
 			rest, continues := strings.CutPrefix(g, ",")

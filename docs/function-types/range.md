@@ -6,12 +6,26 @@
 
 ## Functions
 
+- [GENERATE_RANGE_ARRAY](#generate_range_array)
 - [RANGE](#range)
 - [RANGE_CONTAINS](#range_contains)
 - [RANGE_END](#range_end)
 - [RANGE_INTERSECT](#range_intersect)
 - [RANGE_OVERLAPS](#range_overlaps)
 - [RANGE_START](#range_start)
+
+## GENERATE_RANGE_ARRAY
+
+Source: [GENERATE_RANGE_ARRAY](../../third_party/bigquery_docs/reference/standard-sql/range-functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `RANGE<DATE>, INTERVAL` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `RANGE<DATE>, INTERVAL, BOOL` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `RANGE<DATETIME>, INTERVAL` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `RANGE<DATETIME>, INTERVAL, BOOL` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `RANGE<TIMESTAMP>, INTERVAL` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `RANGE<TIMESTAMP>, INTERVAL, BOOL` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
 
 ## RANGE
 

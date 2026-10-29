@@ -14,6 +14,7 @@
 - [CODE_POINTS_TO_BYTES](#code_points_to_bytes)
 - [CODE_POINTS_TO_STRING](#code_points_to_string)
 - [CONCAT](#concat)
+- [CONTAINS_SUBSTR](#contains_substr)
 - [EDIT_DISTANCE](#edit_distance)
 - [ENDS_WITH](#ends_with)
 - [FROM_BASE32](#from_base32)
@@ -127,6 +128,26 @@ Only same-type STRING and BYTES forms are enumerated; implicit conversions to ST
 | `STRING, STRING` | `STRING` | Supported |  |
 | `BYTES` | `BYTES` | Supported |  |
 | `BYTES, BYTES` | `BYTES` | Supported |  |
+
+## CONTAINS_SUBSTR
+
+Source: [CONTAINS_SUBSTR](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+The listed column types are enumerated with representative ARRAY and STRUCT values; table references and the named json_scope argument are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `BOOL` | Supported |  |
+| `INT64, STRING` | `BOOL` | Supported |  |
+| `BOOL, STRING` | `BOOL` | Supported |  |
+| `NUMERIC, STRING` | `BOOL` | Supported |  |
+| `BIGNUMERIC, STRING` | `BOOL` | Supported |  |
+| `TIMESTAMP, STRING` | `BOOL` | Supported |  |
+| `TIME, STRING` | `BOOL` | Supported |  |
+| `DATE, STRING` | `BOOL` | Supported |  |
+| `DATETIME, STRING` | `BOOL` | Supported |  |
+| `ARRAY<STRING>, STRING` | `BOOL` | Supported |  |
+| `STRUCT<x INT64, label STRING>, STRING` | `BOOL` | Supported |  |
 
 ## EDIT_DISTANCE
 

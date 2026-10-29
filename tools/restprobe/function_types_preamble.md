@@ -29,6 +29,22 @@ documentation:
   same-type alternatives across scalar and container types.
 - [Range functions](../third_party/bigquery_docs/reference/standard-sql/range-functions.md):
   DATE, DATETIME and TIMESTAMP element types.
+- [Date](../third_party/bigquery_docs/reference/standard-sql/date_functions.md),
+  [datetime](../third_party/bigquery_docs/reference/standard-sql/datetime_functions.md),
+  [time](../third_party/bigquery_docs/reference/standard-sql/time_functions.md),
+  [timestamp](../third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md) and
+  [interval functions](../third_party/bigquery_docs/reference/standard-sql/interval_functions.md):
+  constructors, conversions, arithmetic, truncation, formatting and parsing, with optional time
+  zones.
+- [Approximate aggregates](../third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md),
+  [bit functions](../third_party/bigquery_docs/reference/standard-sql/bit_functions.md) and the
+  remaining typed [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md):
+  groupable values, less the types BigQuery rejects in end-to-end tests.
+- [JSON functions](../third_party/bigquery_docs/reference/standard-sql/json_functions.md):
+  JSON and JSON-formatted STRING inputs with literal JSONPaths, and JSON-encodable values.
+- [Conversion](../third_party/bigquery_docs/reference/standard-sql/conversion_functions.md) and
+  [utility functions](../third_party/bigquery_docs/reference/standard-sql/utility-functions.md):
+  PARSE_NUMERIC, PARSE_BIGNUMERIC, GENERATE_UUID and TYPEOF.
 
 Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
 Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
@@ -37,8 +53,9 @@ Functions without signatures are explicitly listed as **Not enumerated**. This i
 exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
-could select another overload. Syntax-like options such as rounding modes and SPLIT delimiters
-remain literals. A **Supported** row means the call runs and its REST result type matches the
+could select another overload. Syntax-like options such as rounding modes, SPLIT delimiters,
+JSONPaths, `INTERVAL` steps and date parts remain literals; `DATE_PART` names a date part
+keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
 documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
 valid sample, not every possible argument value. Rounding-mode calls use `ROUND_HALF_EVEN`.

@@ -349,6 +349,674 @@
       ]
     },
     {
+      "name": "APPROX_COUNT_DISTINCT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md",
+      "note": "BigQuery rejects GEOGRAPHY, JSON and RANGE values; they are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "APPROX_QUANTILES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md",
+      "note": "BigQuery rejects GEOGRAPHY and JSON values; they are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIME\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "APPROX_TOP_COUNT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md",
+      "note": "BigQuery rejects INTERVAL, RANGE, STRUCT and ARRAY values; they are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue INT64, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue NUMERIC, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue BIGNUMERIC, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue FLOAT64, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue BOOL, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue STRING, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue BYTES, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue DATE, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue DATETIME, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue TIME, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue TIMESTAMP, count INT64\u003e\u003e",
+          "samples": [
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "APPROX_TOP_SUM",
+      "source": "third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md",
+      "note": "BigQuery rejects INTERVAL, RANGE, STRUCT and ARRAY values; they are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue INT64, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue NUMERIC, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue BIGNUMERIC, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue FLOAT64, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue BOOL, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue STRING, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue BYTES, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue DATE, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue DATETIME, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue TIME, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue TIMESTAMP, sum INT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue STRING, sum NUMERIC\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue STRING, sum BIGNUMERIC\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cvalue STRING, sum FLOAT64\u003e\u003e",
+          "samples": [
+            "",
+            "",
+            "2"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
       "name": "ARRAY_AGG",
       "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
       "signatures": [
@@ -1889,6 +2557,75 @@
       ]
     },
     {
+      "name": "BIT_AND",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "BIT_COUNT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/bit_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "BIT_OR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "BIT_XOR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "BOOL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "JSON 'true'"
+          ]
+        }
+      ]
+    },
+    {
       "name": "BYTE_LENGTH",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -2617,6 +3354,167 @@
       ]
     },
     {
+      "name": "CONTAINS_SUBSTR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "note": "The listed column types are enumerated with representative ARRAY and STRUCT values; table references and the named json_scope argument are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INT64",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
       "name": "CORR",
       "source": "third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md",
       "signatures": [
@@ -2795,6 +3693,33 @@
       ]
     },
     {
+      "name": "COSINE_DISTANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cdimension INT64, magnitude FLOAT64\u003e\u003e",
+            "ARRAY\u003cSTRUCT\u003cdimension INT64, magnitude FLOAT64\u003e\u003e"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cdimension STRING, magnitude FLOAT64\u003e\u003e",
+            "ARRAY\u003cSTRUCT\u003cdimension STRING, magnitude FLOAT64\u003e\u003e"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "COT",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -2851,6 +3776,265 @@
             "FLOAT64"
           ],
           "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "COUNT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "note": "COUNT(*) is not a typed form and is not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "COUNTIF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "INT64"
         }
       ]
     },
@@ -3151,6 +4335,439 @@
       ]
     },
     {
+      "name": "CURRENT_DATE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "DATE",
+          "samples": [
+            "'America/Los_Angeles'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CURRENT_DATETIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "'America/Los_Angeles'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CURRENT_TIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "TIME",
+          "samples": [
+            "'America/Los_Angeles'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CURRENT_TIMESTAMP",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "DATE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "'America/Los_Angeles'"
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "DATETIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "TIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "'America/Los_Angeles'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATETIME_ADD",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATETIME",
+            "INTERVAL"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATETIME_DIFF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATETIME",
+            "DATETIME",
+            "DATE_PART"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATETIME_SUB",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATETIME",
+            "INTERVAL"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATETIME_TRUNC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATETIME",
+            "DATE_PART"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "DATE_PART"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "DATE_PART",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "HOUR",
+            "'America/Los_Angeles'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATE_ADD",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE",
+            "INTERVAL"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "INTERVAL 2 DAY"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATE_DIFF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE",
+            "DATE",
+            "DATE_PART"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "",
+            "DAY"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "DATETIME",
+            "DATE_PART"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "",
+            "DAY"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "TIMESTAMP",
+            "DATE_PART"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "",
+            "DAY"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATE_FROM_UNIX_DATE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "DATE"
+        }
+      ]
+    },
+    {
+      "name": "DATE_SUB",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE",
+            "INTERVAL"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "INTERVAL 2 DAY"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATE_TRUNC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE",
+            "DATE_PART"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "MONTH"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "DATE_PART"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "MONTH"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "DATE_PART"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "MONTH"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "DATE_PART",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "MONTH",
+            "'America/Los_Angeles'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
       "name": "DIV",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -3261,6 +4878,33 @@
       ]
     },
     {
+      "name": "EUCLIDEAN_DISTANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cdimension INT64, magnitude FLOAT64\u003e\u003e",
+            "ARRAY\u003cSTRUCT\u003cdimension INT64, magnitude FLOAT64\u003e\u003e"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cdimension STRING, magnitude FLOAT64\u003e\u003e",
+            "ARRAY\u003cSTRUCT\u003cdimension STRING, magnitude FLOAT64\u003e\u003e"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "EXP",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -3309,6 +4953,22 @@
       ]
     },
     {
+      "name": "FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "The named wide_number_mode argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "JSON '2.5'"
+          ]
+        }
+      ]
+    },
+    {
       "name": "FLOOR",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -3335,6 +4995,87 @@
             "FLOAT64"
           ],
           "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "FORMAT_DATE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "DATE"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'%Y-%m-%d'",
+            ""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FORMAT_DATETIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "DATETIME"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'%Y-%m-%d %H:%M:%S'",
+            ""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FORMAT_TIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "TIME"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'%H:%M:%S'",
+            ""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FORMAT_TIMESTAMP",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "TIMESTAMP"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'%Y-%m-%d %H:%M:%S'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'%Y-%m-%d %H:%M:%S'",
+            "",
+            "'America/Los_Angeles'"
+          ]
         }
       ]
     },
@@ -3447,6 +5188,118 @@
             "FLOAT64"
           ],
           "result": "ARRAY\u003cFLOAT64\u003e"
+        }
+      ]
+    },
+    {
+      "name": "GENERATE_DATE_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/array_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE",
+            "DATE"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "DATE",
+            "INTERVAL"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "",
+            "INTERVAL 1 DAY"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GENERATE_RANGE_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/range-functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INTERVAL"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INTERVAL",
+            "BOOL"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INTERVAL"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INTERVAL",
+            "BOOL"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INTERVAL"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INTERVAL",
+            "BOOL"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        }
+      ]
+    },
+    {
+      "name": "GENERATE_TIMESTAMP_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/array_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "TIMESTAMP",
+            "INTERVAL"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "",
+            "INTERVAL 1 HOUR"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GENERATE_UUID",
+      "source": "third_party/bigquery_docs/reference/standard-sql/utility-functions.md",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "STRING"
         }
       ]
     },
@@ -4458,6 +6311,21 @@
       ]
     },
     {
+      "name": "INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "INT64",
+          "samples": [
+            "JSON '2'"
+          ]
+        }
+      ]
+    },
+    {
       "name": "IS_INF",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -4514,6 +6382,3217 @@
             "FLOAT64"
           ],
           "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "JSON_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "Arities zero and one are enumerated; more values are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON"
+        }
+      ]
+    },
+    {
+      "name": "JSON_ARRAY_APPEND",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "One path-value pair is enumerated; more pairs and the named append_each_element argument are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "NUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BIGNUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "FLOAT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BOOL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BYTES"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "DATE"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "DATETIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "TIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "TIMESTAMP"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "INTERVAL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "JSON"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_ARRAY_INSERT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "One path-value pair is enumerated; more pairs and the named insert_each_element argument are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "NUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BIGNUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "FLOAT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BOOL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BYTES"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "DATE"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "DATETIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "TIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "TIMESTAMP"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "INTERVAL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "JSON"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a[0]'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_EXTRACT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_EXTRACT_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_EXTRACT_SCALAR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a[0]'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "'$.a[0]'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_EXTRACT_STRING_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_FLATTEN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        }
+      ]
+    },
+    {
+      "name": "JSON_KEYS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "The named mode argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        }
+      ]
+    },
+    {
+      "name": "JSON_OBJECT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "One key-value pair and one-element key and value arrays are enumerated; more pairs are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "NUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "BIGNUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "FLOAT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "BOOL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "BYTES"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "DATE"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "DATETIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "TIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "TIMESTAMP"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INTERVAL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "JSON"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'b'",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON"
+        }
+      ]
+    },
+    {
+      "name": "JSON_QUERY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_QUERY_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_REMOVE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "One path is enumerated; more paths are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_SET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "One path-value pair is enumerated; more pairs and the named create_if_missing argument are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "NUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BIGNUMERIC"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "FLOAT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BOOL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "BYTES"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "DATE"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "DATETIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "TIME"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "TIMESTAMP"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "INTERVAL"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "JSON"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.b'",
+            ""
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_STRIP_NULLS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "The named include_arrays and remove_empty arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_TYPE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "JSON_VALUE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a[0]'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "'$.a[0]'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSON_VALUE_ARRAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "'{\"a\": [1, 2]}'",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "'$.a'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JUSTIFY_DAYS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/interval_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        }
+      ]
+    },
+    {
+      "name": "JUSTIFY_HOURS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/interval_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        }
+      ]
+    },
+    {
+      "name": "JUSTIFY_INTERVAL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/interval_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        }
+      ]
+    },
+    {
+      "name": "LAST_DAY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "note": "The DATETIME form, documented with the datetime functions, is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "DATE_PART"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "YEAR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LAX_BOOL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "LAX_FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "LAX_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "LAX_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "STRING"
         }
       ]
     },
@@ -4960,6 +10039,30 @@
       ]
     },
     {
+      "name": "LOGICAL_AND",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "LOGICAL_OR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
       "name": "LOWER",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -5036,6 +10139,68 @@
             "BYTES"
           ],
           "result": "BYTES"
+        }
+      ]
+    },
+    {
+      "name": "MAKE_INTERVAL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/interval_functions.md",
+      "note": "Positional arguments are enumerated; named arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "INTERVAL"
         }
       ]
     },
@@ -5132,6 +10297,390 @@
             "RANGE\u003cTIMESTAMP\u003e"
           ],
           "result": "RANGE\u003cTIMESTAMP\u003e"
+        }
+      ]
+    },
+    {
+      "name": "MAX_BY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BOOL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "STRING"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BYTES"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "DATE"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "DATETIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "TIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "TIMESTAMP"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INTERVAL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "INT64"
         }
       ]
     },
@@ -5246,6 +10795,390 @@
             "RANGE\u003cTIMESTAMP\u003e"
           ],
           "result": "RANGE\u003cTIMESTAMP\u003e"
+        }
+      ]
+    },
+    {
+      "name": "MIN_BY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BOOL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "STRING"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BYTES"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "DATE"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "DATETIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "TIME"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "TIMESTAMP"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INTERVAL"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "INT64"
         }
       ]
     },
@@ -5496,6 +11429,125 @@
       ]
     },
     {
+      "name": "NULLIF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md",
+      "note": "Same-type comparable inputs are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertype combinations are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        }
+      ]
+    },
+    {
       "name": "OCTET_LENGTH",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -5510,6 +11562,133 @@
             "BYTES"
           ],
           "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "PARSE_BIGNUMERIC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/conversion_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "'123.45'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PARSE_DATE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "DATE",
+          "samples": [
+            "'%Y-%m-%d'",
+            "'2024-01-15'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PARSE_DATETIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "'%Y-%m-%d %H:%M:%S'",
+            "'2024-01-15 10:20:30'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PARSE_JSON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "The named wide_number_mode argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "JSON",
+          "samples": [
+            "'{\"a\": [1, 2]}'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PARSE_NUMERIC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/conversion_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "'123.45'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PARSE_TIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "TIME",
+          "samples": [
+            "'%H:%M:%S'",
+            "'10:20:30'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PARSE_TIMESTAMP",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "'%Y-%m-%d %H:%M:%S'",
+            "'2024-01-15 10:20:30'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "'%Y-%m-%d %H:%M:%S'",
+            "'2024-01-15 10:20:30'",
+            "'America/Los_Angeles'"
+          ]
         }
       ]
     },
@@ -5795,6 +11974,97 @@
             "",
             "'2024-02-01 00:00:00+00'"
           ]
+        }
+      ]
+    },
+    {
+      "name": "RANGE_BUCKET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "note": "Orderable scalar types except RANGE, which BigQuery rejects, are enumerated; STRUCT points are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "INT64"
         }
       ]
     },
@@ -7349,6 +13619,30 @@
       ]
     },
     {
+      "name": "STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "note": "The JSON form, documented with the JSON functions, is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "'America/Los_Angeles'"
+          ]
+        }
+      ]
+    },
+    {
       "name": "STRING_AGG",
       "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
       "note": "The delimiter is sampled as a literal; nonconstant delimiter expressions are not covered.",
@@ -7584,6 +13878,333 @@
       ]
     },
     {
+      "name": "TIME",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "'America/Los_Angeles'"
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "TIME"
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "'2024-01-15 10:20:30'"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "'2024-01-15 10:20:30'",
+            "'America/Los_Angeles'"
+          ]
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "'America/Los_Angeles'"
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "'America/Los_Angeles'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_ADD",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INTERVAL"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_DIFF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "TIMESTAMP",
+            "DATE_PART"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_MICROS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_MILLIS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_SECONDS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_SUB",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INTERVAL"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_TRUNC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "DATE_PART"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "DATE_PART",
+            "STRING"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "HOUR",
+            "'America/Los_Angeles'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "DATE_PART"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIME_ADD",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIME",
+            "INTERVAL"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "INTERVAL 2 MINUTE"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIME_DIFF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIME",
+            "TIME",
+            "DATE_PART"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "",
+            "MINUTE"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIME_SUB",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIME",
+            "INTERVAL"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "INTERVAL 2 MINUTE"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIME_TRUNC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIME",
+            "DATE_PART"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
       "name": "TO_BASE32",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -7632,6 +14253,741 @@
         {
           "arguments": [
             "BYTES"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "TO_JSON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "note": "The named stringify_wide_numbers argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "JSON"
+        }
+      ]
+    },
+    {
+      "name": "TO_JSON_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/json_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "BOOL"
           ],
           "result": "STRING"
         }
@@ -7744,12 +15100,306 @@
       ]
     },
     {
+      "name": "TYPEOF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/utility-functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "UNICODE",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
         {
           "arguments": [
             "STRING"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "UNIX_DATE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "UNIX_MICROS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "UNIX_MILLIS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "UNIX_SECONDS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP"
           ],
           "result": "INT64"
         }

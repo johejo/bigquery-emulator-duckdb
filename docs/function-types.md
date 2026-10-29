@@ -29,6 +29,22 @@ documentation:
   same-type alternatives across scalar and container types.
 - [Range functions](../third_party/bigquery_docs/reference/standard-sql/range-functions.md):
   DATE, DATETIME and TIMESTAMP element types.
+- [Date](../third_party/bigquery_docs/reference/standard-sql/date_functions.md),
+  [datetime](../third_party/bigquery_docs/reference/standard-sql/datetime_functions.md),
+  [time](../third_party/bigquery_docs/reference/standard-sql/time_functions.md),
+  [timestamp](../third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md) and
+  [interval functions](../third_party/bigquery_docs/reference/standard-sql/interval_functions.md):
+  constructors, conversions, arithmetic, truncation, formatting and parsing, with optional time
+  zones.
+- [Approximate aggregates](../third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md),
+  [bit functions](../third_party/bigquery_docs/reference/standard-sql/bit_functions.md) and the
+  remaining typed [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md):
+  groupable values, less the types BigQuery rejects in end-to-end tests.
+- [JSON functions](../third_party/bigquery_docs/reference/standard-sql/json_functions.md):
+  JSON and JSON-formatted STRING inputs with literal JSONPaths, and JSON-encodable values.
+- [Conversion](../third_party/bigquery_docs/reference/standard-sql/conversion_functions.md) and
+  [utility functions](../third_party/bigquery_docs/reference/standard-sql/utility-functions.md):
+  PARSE_NUMERIC, PARSE_BIGNUMERIC, GENERATE_UUID and TYPEOF.
 
 Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
 Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
@@ -37,8 +53,9 @@ Functions without signatures are explicitly listed as **Not enumerated**. This i
 exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
-could select another overload. Syntax-like options such as rounding modes and SPLIT delimiters
-remain literals. A **Supported** row means the call runs and its REST result type matches the
+could select another overload. Syntax-like options such as rounding modes, SPLIT delimiters,
+JSONPaths, `INTERVAL` steps and date parts remain literals; `DATE_PART` names a date part
+keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
 documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
 valid sample, not every possible argument value. Rounding-mode calls use `ROUND_HALF_EVEN`.
@@ -52,19 +69,29 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **146 of 407 functions**. The remaining **261** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **246 of 407 functions**. The remaining **161** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Details by domain
 
 - [aggregate](function-types/aggregate.md)
+- [approximate-aggregate](function-types/approximate-aggregate.md)
 - [array](function-types/array.md)
+- [bit](function-types/bit.md)
 - [conditional](function-types/conditional.md)
+- [conversion](function-types/conversion.md)
+- [date](function-types/date.md)
+- [datetime](function-types/datetime.md)
 - [hash](function-types/hash.md)
+- [interval](function-types/interval.md)
+- [json](function-types/json.md)
 - [mathematical](function-types/mathematical.md)
 - [net](function-types/net.md)
 - [range](function-types/range.md)
 - [statistical-aggregate](function-types/statistical-aggregate.md)
 - [string](function-types/string.md)
+- [time](function-types/time.md)
+- [timestamp](function-types/timestamp.md)
+- [utility](function-types/utility.md)
 
 ## Coverage
 
@@ -79,10 +106,10 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | `AGG` | 0 | Not enumerated |
 | [ANY_VALUE](function-types/aggregate.md#any_value) | 40 | Supported |
 | `APPENDS` | 0 | Not enumerated |
-| `APPROX_COUNT_DISTINCT` | 0 | Not enumerated |
-| `APPROX_QUANTILES` | 0 | Not enumerated |
-| `APPROX_TOP_COUNT` | 0 | Not enumerated |
-| `APPROX_TOP_SUM` | 0 | Not enumerated |
+| [APPROX_COUNT_DISTINCT](function-types/approximate-aggregate.md#approx_count_distinct) | 11 | Supported |
+| [APPROX_QUANTILES](function-types/approximate-aggregate.md#approx_quantiles) | 14 | Partial |
+| [APPROX_TOP_COUNT](function-types/approximate-aggregate.md#approx_top_count) | 11 | Supported |
+| [APPROX_TOP_SUM](function-types/approximate-aggregate.md#approx_top_sum) | 14 | Supported |
 | `ARRAY` | 0 | Not enumerated |
 | [ARRAY_AGG](function-types/aggregate.md#array_agg) | 20 | Supported |
 | [ARRAY_CONCAT](function-types/array.md#array_concat) | 40 | Supported |
@@ -101,11 +128,11 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [ATANH](function-types/mathematical.md#atanh) | 4 | Supported |
 | [AVG](function-types/aggregate.md#avg) | 5 | Supported |
 | `BAG_OF_WORDS` | 0 | Not enumerated |
-| `BIT_AND` | 0 | Not enumerated |
-| `BIT_COUNT` | 0 | Not enumerated |
-| `BIT_OR` | 0 | Not enumerated |
-| `BIT_XOR` | 0 | Not enumerated |
-| `BOOL` | 0 | Not enumerated |
+| [BIT_AND](function-types/aggregate.md#bit_and) | 1 | Supported |
+| [BIT_COUNT](function-types/bit.md#bit_count) | 2 | Supported |
+| [BIT_OR](function-types/aggregate.md#bit_or) | 1 | Supported |
+| [BIT_XOR](function-types/aggregate.md#bit_xor) | 1 | Supported |
+| [BOOL](function-types/json.md#bool) | 1 | Supported |
 | [BYTE_LENGTH](function-types/string.md#byte_length) | 2 | Supported |
 | `CASE` | 0 | Not enumerated |
 | `CAST` | 0 | Not enumerated |
@@ -121,37 +148,37 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [CODE_POINTS_TO_STRING](function-types/string.md#code_points_to_string) | 1 | Supported |
 | `COLLATE` | 0 | Not enumerated |
 | [CONCAT](function-types/string.md#concat) | 4 | Supported |
-| `CONTAINS_SUBSTR` | 0 | Not enumerated |
+| [CONTAINS_SUBSTR](function-types/string.md#contains_substr) | 11 | Supported |
 | [CORR](function-types/statistical-aggregate.md#corr) | 16 | Supported |
 | [COS](function-types/mathematical.md#cos) | 4 | Supported |
 | [COSH](function-types/mathematical.md#cosh) | 4 | Supported |
-| `COSINE_DISTANCE` | 0 | Not enumerated |
+| [COSINE_DISTANCE](function-types/mathematical.md#cosine_distance) | 3 | Supported |
 | [COT](function-types/mathematical.md#cot) | 4 | Supported |
 | [COTH](function-types/mathematical.md#coth) | 4 | Supported |
-| `COUNT` | 0 | Not enumerated |
-| `COUNTIF` | 0 | Not enumerated |
+| [COUNT](function-types/aggregate.md#count) | 40 | Partial |
+| [COUNTIF](function-types/aggregate.md#countif) | 1 | Supported |
 | [COVAR_POP](function-types/statistical-aggregate.md#covar_pop) | 16 | Supported |
 | [COVAR_SAMP](function-types/statistical-aggregate.md#covar_samp) | 16 | Supported |
 | [CSC](function-types/mathematical.md#csc) | 4 | Supported |
 | [CSCH](function-types/mathematical.md#csch) | 4 | Supported |
 | `CUME_DIST` | 0 | Not enumerated |
-| `CURRENT_DATE` | 0 | Not enumerated |
-| `CURRENT_DATETIME` | 0 | Not enumerated |
-| `CURRENT_TIME` | 0 | Not enumerated |
-| `CURRENT_TIMESTAMP` | 0 | Not enumerated |
-| `DATE` | 0 | Not enumerated |
-| `DATETIME` | 0 | Not enumerated |
-| `DATETIME_ADD` | 0 | Not enumerated |
+| [CURRENT_DATE](function-types/date.md#current_date) | 2 | Partial |
+| [CURRENT_DATETIME](function-types/datetime.md#current_datetime) | 2 | Partial |
+| [CURRENT_TIME](function-types/time.md#current_time) | 2 | Partial |
+| [CURRENT_TIMESTAMP](function-types/timestamp.md#current_timestamp) | 1 | Supported |
+| [DATE](function-types/date.md#date) | 4 | Supported |
+| [DATETIME](function-types/datetime.md#datetime) | 5 | Supported |
+| [DATETIME_ADD](function-types/datetime.md#datetime_add) | 1 | Supported |
 | `DATETIME_BUCKET` | 0 | Not enumerated |
-| `DATETIME_DIFF` | 0 | Not enumerated |
-| `DATETIME_SUB` | 0 | Not enumerated |
-| `DATETIME_TRUNC` | 0 | Not enumerated |
-| `DATE_ADD` | 0 | Not enumerated |
+| [DATETIME_DIFF](function-types/datetime.md#datetime_diff) | 1 | Supported |
+| [DATETIME_SUB](function-types/datetime.md#datetime_sub) | 1 | Supported |
+| [DATETIME_TRUNC](function-types/datetime.md#datetime_trunc) | 3 | Supported |
+| [DATE_ADD](function-types/date.md#date_add) | 1 | Supported |
 | `DATE_BUCKET` | 0 | Not enumerated |
-| `DATE_DIFF` | 0 | Not enumerated |
-| `DATE_FROM_UNIX_DATE` | 0 | Not enumerated |
-| `DATE_SUB` | 0 | Not enumerated |
-| `DATE_TRUNC` | 0 | Not enumerated |
+| [DATE_DIFF](function-types/date.md#date_diff) | 3 | Supported |
+| [DATE_FROM_UNIX_DATE](function-types/date.md#date_from_unix_date) | 1 | Supported |
+| [DATE_SUB](function-types/date.md#date_sub) | 1 | Supported |
+| [DATE_TRUNC](function-types/date.md#date_trunc) | 4 | Supported |
 | `DENSE_RANK` | 0 | Not enumerated |
 | `DESTINATION_NODE_ID` | 0 | Not enumerated |
 | `DETERMINISTIC_DECRYPT_BYTES` | 0 | Not enumerated |
@@ -166,29 +193,29 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | `ELEMENT_ID` | 0 | Not enumerated |
 | [ENDS_WITH](function-types/string.md#ends_with) | 2 | Supported |
 | `ERROR` | 0 | Not enumerated |
-| `EUCLIDEAN_DISTANCE` | 0 | Not enumerated |
+| [EUCLIDEAN_DISTANCE](function-types/mathematical.md#euclidean_distance) | 3 | Supported |
 | [EXP](function-types/mathematical.md#exp) | 4 | Supported |
 | `EXTERNAL_OBJECT_TRANSFORM` | 0 | Not enumerated |
 | `EXTERNAL_QUERY` | 0 | Not enumerated |
 | `EXTRACT` | 0 | Not enumerated |
 | [FARM_FINGERPRINT](function-types/hash.md#farm_fingerprint) | 2 | Supported |
 | `FIRST_VALUE` | 0 | Not enumerated |
-| `FLOAT64` | 0 | Not enumerated |
+| [FLOAT64](function-types/json.md#float64) | 1 | Supported |
 | [FLOOR](function-types/mathematical.md#floor) | 4 | Supported |
 | `FORMAT` | 0 | Not enumerated |
-| `FORMAT_DATE` | 0 | Not enumerated |
-| `FORMAT_DATETIME` | 0 | Not enumerated |
-| `FORMAT_TIME` | 0 | Not enumerated |
-| `FORMAT_TIMESTAMP` | 0 | Not enumerated |
+| [FORMAT_DATE](function-types/date.md#format_date) | 1 | Supported |
+| [FORMAT_DATETIME](function-types/datetime.md#format_datetime) | 1 | Supported |
+| [FORMAT_TIME](function-types/time.md#format_time) | 1 | Supported |
+| [FORMAT_TIMESTAMP](function-types/timestamp.md#format_timestamp) | 2 | Supported |
 | [FROM_BASE32](function-types/string.md#from_base32) | 1 | Supported |
 | [FROM_BASE64](function-types/string.md#from_base64) | 1 | Supported |
 | [FROM_HEX](function-types/string.md#from_hex) | 1 | Supported |
 | `GAP_FILL` | 0 | Not enumerated |
 | [GENERATE_ARRAY](function-types/array.md#generate_array) | 8 | Supported |
-| `GENERATE_DATE_ARRAY` | 0 | Not enumerated |
-| `GENERATE_RANGE_ARRAY` | 0 | Not enumerated |
-| `GENERATE_TIMESTAMP_ARRAY` | 0 | Not enumerated |
-| `GENERATE_UUID` | 0 | Not enumerated |
+| [GENERATE_DATE_ARRAY](function-types/array.md#generate_date_array) | 2 | Supported |
+| [GENERATE_RANGE_ARRAY](function-types/range.md#generate_range_array) | 6 | Supported |
+| [GENERATE_TIMESTAMP_ARRAY](function-types/array.md#generate_timestamp_array) | 1 | Supported |
+| [GENERATE_UUID](function-types/utility.md#generate_uuid) | 1 | Supported |
 | [GREATEST](function-types/mathematical.md#greatest) | 30 | Broken |
 | `GROUPING` | 0 | Not enumerated |
 | `HLL_COUNT.EXTRACT` | 0 | Not enumerated |
@@ -200,33 +227,33 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [IFNULL](function-types/conditional.md#ifnull) | 40 | Supported |
 | [INITCAP](function-types/string.md#initcap) | 2 | Supported |
 | [INSTR](function-types/string.md#instr) | 6 | Supported |
-| `INT64` | 0 | Not enumerated |
+| [INT64](function-types/json.md#int64) | 1 | Supported |
 | `IS_ACYCLIC` | 0 | Not enumerated |
 | [IS_INF](function-types/mathematical.md#is_inf) | 4 | Supported |
 | [IS_NAN](function-types/mathematical.md#is_nan) | 4 | Supported |
 | `IS_SIMPLE` | 0 | Not enumerated |
 | `IS_TRAIL` | 0 | Not enumerated |
-| `JSON_ARRAY` | 0 | Not enumerated |
-| `JSON_ARRAY_APPEND` | 0 | Not enumerated |
-| `JSON_ARRAY_INSERT` | 0 | Not enumerated |
-| `JSON_EXTRACT` | 0 | Not enumerated |
-| `JSON_EXTRACT_ARRAY` | 0 | Not enumerated |
-| `JSON_EXTRACT_SCALAR` | 0 | Not enumerated |
-| `JSON_EXTRACT_STRING_ARRAY` | 0 | Not enumerated |
-| `JSON_FLATTEN` | 0 | Not enumerated |
-| `JSON_KEYS` | 0 | Not enumerated |
-| `JSON_OBJECT` | 0 | Not enumerated |
-| `JSON_QUERY` | 0 | Not enumerated |
-| `JSON_QUERY_ARRAY` | 0 | Not enumerated |
-| `JSON_REMOVE` | 0 | Not enumerated |
-| `JSON_SET` | 0 | Not enumerated |
-| `JSON_STRIP_NULLS` | 0 | Not enumerated |
-| `JSON_TYPE` | 0 | Not enumerated |
-| `JSON_VALUE` | 0 | Not enumerated |
-| `JSON_VALUE_ARRAY` | 0 | Not enumerated |
-| `JUSTIFY_DAYS` | 0 | Not enumerated |
-| `JUSTIFY_HOURS` | 0 | Not enumerated |
-| `JUSTIFY_INTERVAL` | 0 | Not enumerated |
+| [JSON_ARRAY](function-types/json.md#json_array) | 39 | Supported |
+| [JSON_ARRAY_APPEND](function-types/json.md#json_array_append) | 38 | Supported |
+| [JSON_ARRAY_INSERT](function-types/json.md#json_array_insert) | 38 | Supported |
+| [JSON_EXTRACT](function-types/json.md#json_extract) | 2 | Supported |
+| [JSON_EXTRACT_ARRAY](function-types/json.md#json_extract_array) | 4 | Supported |
+| [JSON_EXTRACT_SCALAR](function-types/json.md#json_extract_scalar) | 4 | Supported |
+| [JSON_EXTRACT_STRING_ARRAY](function-types/json.md#json_extract_string_array) | 4 | Supported |
+| [JSON_FLATTEN](function-types/json.md#json_flatten) | 1 | Supported |
+| [JSON_KEYS](function-types/json.md#json_keys) | 2 | Supported |
+| [JSON_OBJECT](function-types/json.md#json_object) | 58 | Supported |
+| [JSON_QUERY](function-types/json.md#json_query) | 2 | Supported |
+| [JSON_QUERY_ARRAY](function-types/json.md#json_query_array) | 4 | Supported |
+| [JSON_REMOVE](function-types/json.md#json_remove) | 1 | Supported |
+| [JSON_SET](function-types/json.md#json_set) | 38 | Supported |
+| [JSON_STRIP_NULLS](function-types/json.md#json_strip_nulls) | 2 | Supported |
+| [JSON_TYPE](function-types/json.md#json_type) | 1 | Supported |
+| [JSON_VALUE](function-types/json.md#json_value) | 4 | Supported |
+| [JSON_VALUE_ARRAY](function-types/json.md#json_value_array) | 4 | Supported |
+| [JUSTIFY_DAYS](function-types/interval.md#justify_days) | 1 | Supported |
+| [JUSTIFY_HOURS](function-types/interval.md#justify_hours) | 1 | Supported |
+| [JUSTIFY_INTERVAL](function-types/interval.md#justify_interval) | 1 | Supported |
 | `KEYS.ADD_KEY_FROM_RAW_BYTES` | 0 | Not enumerated |
 | `KEYS.KEYSET_CHAIN` | 0 | Not enumerated |
 | `KEYS.KEYSET_FROM_JSON` | 0 | Not enumerated |
@@ -250,12 +277,12 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | `KLL_QUANTILES.MERGE_POINT_INT64` | 0 | Not enumerated |
 | `LABELS` | 0 | Not enumerated |
 | `LAG` | 0 | Not enumerated |
-| `LAST_DAY` | 0 | Not enumerated |
+| [LAST_DAY](function-types/date.md#last_day) | 2 | Supported |
 | `LAST_VALUE` | 0 | Not enumerated |
-| `LAX_BOOL` | 0 | Not enumerated |
-| `LAX_FLOAT64` | 0 | Not enumerated |
-| `LAX_INT64` | 0 | Not enumerated |
-| `LAX_STRING` | 0 | Not enumerated |
+| [LAX_BOOL](function-types/json.md#lax_bool) | 1 | Supported |
+| [LAX_FLOAT64](function-types/json.md#lax_float64) | 1 | Supported |
+| [LAX_INT64](function-types/json.md#lax_int64) | 1 | Supported |
+| [LAX_STRING](function-types/json.md#lax_string) | 1 | Supported |
 | `LEAD` | 0 | Not enumerated |
 | [LEAST](function-types/mathematical.md#least) | 30 | Broken |
 | [LEFT](function-types/string.md#left) | 2 | Supported |
@@ -263,17 +290,17 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [LN](function-types/mathematical.md#ln) | 4 | Supported |
 | [LOG](function-types/mathematical.md#log) | 20 | Supported |
 | [LOG10](function-types/mathematical.md#log10) | 4 | Supported |
-| `LOGICAL_AND` | 0 | Not enumerated |
-| `LOGICAL_OR` | 0 | Not enumerated |
+| [LOGICAL_AND](function-types/aggregate.md#logical_and) | 1 | Supported |
+| [LOGICAL_OR](function-types/aggregate.md#logical_or) | 1 | Supported |
 | [LOWER](function-types/string.md#lower) | 2 | Supported |
 | [LPAD](function-types/string.md#lpad) | 4 | Supported |
 | [LTRIM](function-types/string.md#ltrim) | 3 | Supported |
-| `MAKE_INTERVAL` | 0 | Not enumerated |
+| [MAKE_INTERVAL](function-types/interval.md#make_interval) | 7 | Supported |
 | [MAX](function-types/aggregate.md#max) | 15 | Supported |
-| `MAX_BY` | 0 | Not enumerated |
+| [MAX_BY](function-types/aggregate.md#max_by) | 54 | Supported |
 | [MD5](function-types/hash.md#md5) | 2 | Supported |
 | [MIN](function-types/aggregate.md#min) | 15 | Supported |
-| `MIN_BY` | 0 | Not enumerated |
+| [MIN_BY](function-types/aggregate.md#min_by) | 54 | Supported |
 | [MOD](function-types/mathematical.md#mod) | 9 | Supported |
 | [NET.HOST](function-types/net.md#nethost) | 1 | Supported |
 | [NET.IPV4_FROM_INT64](function-types/net.md#netipv4_from_int64) | 1 | Supported |
@@ -290,20 +317,20 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [NORMALIZE_AND_CASEFOLD](function-types/string.md#normalize_and_casefold) | 1 | Supported |
 | `NTH_VALUE` | 0 | Not enumerated |
 | `NTILE` | 0 | Not enumerated |
-| `NULLIF` | 0 | Not enumerated |
+| [NULLIF](function-types/conditional.md#nullif) | 16 | Supported |
 | `OBJ.FETCH_METADATA` | 0 | Not enumerated |
 | `OBJ.GET_ACCESS_URL` | 0 | Not enumerated |
 | `OBJ.GET_READ_URL` | 0 | Not enumerated |
 | `OBJ.LIST` | 0 | Not enumerated |
 | `OBJ.MAKE_REF` | 0 | Not enumerated |
 | [OCTET_LENGTH](function-types/string.md#octet_length) | 2 | Supported |
-| `PARSE_BIGNUMERIC` | 0 | Not enumerated |
-| `PARSE_DATE` | 0 | Not enumerated |
-| `PARSE_DATETIME` | 0 | Not enumerated |
-| `PARSE_JSON` | 0 | Not enumerated |
-| `PARSE_NUMERIC` | 0 | Not enumerated |
-| `PARSE_TIME` | 0 | Not enumerated |
-| `PARSE_TIMESTAMP` | 0 | Not enumerated |
+| [PARSE_BIGNUMERIC](function-types/conversion.md#parse_bignumeric) | 1 | Supported |
+| [PARSE_DATE](function-types/date.md#parse_date) | 1 | Supported |
+| [PARSE_DATETIME](function-types/datetime.md#parse_datetime) | 1 | Supported |
+| [PARSE_JSON](function-types/json.md#parse_json) | 1 | Supported |
+| [PARSE_NUMERIC](function-types/conversion.md#parse_numeric) | 1 | Supported |
+| [PARSE_TIME](function-types/time.md#parse_time) | 1 | Supported |
+| [PARSE_TIMESTAMP](function-types/timestamp.md#parse_timestamp) | 2 | Supported |
 | `PATH_FIRST` | 0 | Not enumerated |
 | `PATH_LAST` | 0 | Not enumerated |
 | `PATH_LENGTH` | 0 | Not enumerated |
@@ -314,7 +341,7 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [POWER](function-types/mathematical.md#power) | 16 | Supported |
 | [RAND](function-types/mathematical.md#rand) | 1 | Supported |
 | [RANGE](function-types/range.md#range) | 3 | Supported |
-| `RANGE_BUCKET` | 0 | Not enumerated |
+| [RANGE_BUCKET](function-types/mathematical.md#range_bucket) | 12 | Supported |
 | [RANGE_CONTAINS](function-types/range.md#range_contains) | 6 | Supported |
 | [RANGE_END](function-types/range.md#range_end) | 3 | Supported |
 | [RANGE_INTERSECT](function-types/range.md#range_intersect) | 3 | Supported |
@@ -363,7 +390,7 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [STDDEV](function-types/statistical-aggregate.md#stddev) | 4 | Supported |
 | [STDDEV_POP](function-types/statistical-aggregate.md#stddev_pop) | 4 | Supported |
 | [STDDEV_SAMP](function-types/statistical-aggregate.md#stddev_samp) | 4 | Supported |
-| `STRING` | 0 | Not enumerated |
+| [STRING](function-types/timestamp.md#string) | 2 | Supported |
 | [STRING_AGG](function-types/aggregate.md#string_agg) | 4 | Supported |
 | [STRPOS](function-types/string.md#strpos) | 2 | Supported |
 | `ST_ANGLE` | 0 | Not enumerated |
@@ -442,35 +469,35 @@ Type signatures are enumerated for **146 of 407 functions**. The remaining **261
 | [TANH](function-types/mathematical.md#tanh) | 4 | Supported |
 | `TEXT_ANALYZE` | 0 | Not enumerated |
 | `TF_IDF` | 0 | Not enumerated |
-| `TIME` | 0 | Not enumerated |
-| `TIMESTAMP` | 0 | Not enumerated |
-| `TIMESTAMP_ADD` | 0 | Not enumerated |
+| [TIME](function-types/time.md#time) | 4 | Supported |
+| [TIMESTAMP](function-types/timestamp.md#timestamp) | 6 | Supported |
+| [TIMESTAMP_ADD](function-types/timestamp.md#timestamp_add) | 1 | Supported |
 | `TIMESTAMP_BUCKET` | 0 | Not enumerated |
-| `TIMESTAMP_DIFF` | 0 | Not enumerated |
-| `TIMESTAMP_MICROS` | 0 | Not enumerated |
-| `TIMESTAMP_MILLIS` | 0 | Not enumerated |
-| `TIMESTAMP_SECONDS` | 0 | Not enumerated |
-| `TIMESTAMP_SUB` | 0 | Not enumerated |
-| `TIMESTAMP_TRUNC` | 0 | Not enumerated |
-| `TIME_ADD` | 0 | Not enumerated |
-| `TIME_DIFF` | 0 | Not enumerated |
-| `TIME_SUB` | 0 | Not enumerated |
-| `TIME_TRUNC` | 0 | Not enumerated |
+| [TIMESTAMP_DIFF](function-types/timestamp.md#timestamp_diff) | 1 | Supported |
+| [TIMESTAMP_MICROS](function-types/timestamp.md#timestamp_micros) | 1 | Supported |
+| [TIMESTAMP_MILLIS](function-types/timestamp.md#timestamp_millis) | 1 | Supported |
+| [TIMESTAMP_SECONDS](function-types/timestamp.md#timestamp_seconds) | 1 | Supported |
+| [TIMESTAMP_SUB](function-types/timestamp.md#timestamp_sub) | 1 | Supported |
+| [TIMESTAMP_TRUNC](function-types/timestamp.md#timestamp_trunc) | 3 | Supported |
+| [TIME_ADD](function-types/time.md#time_add) | 1 | Supported |
+| [TIME_DIFF](function-types/time.md#time_diff) | 1 | Supported |
+| [TIME_SUB](function-types/time.md#time_sub) | 1 | Supported |
+| [TIME_TRUNC](function-types/time.md#time_trunc) | 1 | Supported |
 | [TO_BASE32](function-types/string.md#to_base32) | 1 | Supported |
 | [TO_BASE64](function-types/string.md#to_base64) | 1 | Supported |
 | [TO_CODE_POINTS](function-types/string.md#to_code_points) | 2 | Supported |
 | [TO_HEX](function-types/string.md#to_hex) | 1 | Supported |
-| `TO_JSON` | 0 | Not enumerated |
-| `TO_JSON_STRING` | 0 | Not enumerated |
+| [TO_JSON](function-types/json.md#to_json) | 38 | Supported |
+| [TO_JSON_STRING](function-types/json.md#to_json_string) | 76 | Supported |
 | [TRANSLATE](function-types/string.md#translate) | 2 | Supported |
 | [TRIM](function-types/string.md#trim) | 3 | Supported |
 | [TRUNC](function-types/mathematical.md#trunc) | 8 | Supported |
-| `TYPEOF` | 0 | Not enumerated |
+| [TYPEOF](function-types/utility.md#typeof) | 40 | Supported |
 | [UNICODE](function-types/string.md#unicode) | 1 | Supported |
-| `UNIX_DATE` | 0 | Not enumerated |
-| `UNIX_MICROS` | 0 | Not enumerated |
-| `UNIX_MILLIS` | 0 | Not enumerated |
-| `UNIX_SECONDS` | 0 | Not enumerated |
+| [UNIX_DATE](function-types/date.md#unix_date) | 1 | Supported |
+| [UNIX_MICROS](function-types/timestamp.md#unix_micros) | 1 | Supported |
+| [UNIX_MILLIS](function-types/timestamp.md#unix_millis) | 1 | Supported |
+| [UNIX_SECONDS](function-types/timestamp.md#unix_seconds) | 1 | Supported |
 | [UPPER](function-types/string.md#upper) | 2 | Supported |
 | [VARIANCE](function-types/statistical-aggregate.md#variance) | 4 | Supported |
 | [VAR_POP](function-types/statistical-aggregate.md#var_pop) | 4 | Supported |

@@ -19,11 +19,13 @@
 - [CEILING](#ceiling)
 - [COS](#cos)
 - [COSH](#cosh)
+- [COSINE_DISTANCE](#cosine_distance)
 - [COT](#cot)
 - [COTH](#coth)
 - [CSC](#csc)
 - [CSCH](#csch)
 - [DIV](#div)
+- [EUCLIDEAN_DISTANCE](#euclidean_distance)
 - [EXP](#exp)
 - [FLOOR](#floor)
 - [GREATEST](#greatest)
@@ -38,6 +40,7 @@
 - [POW](#pow)
 - [POWER](#power)
 - [RAND](#rand)
+- [RANGE_BUCKET](#range_bucket)
 - [ROUND](#round)
 - [SAFE_ADD](#safe_add)
 - [SAFE_DIVIDE](#safe_divide)
@@ -209,6 +212,16 @@ Source: [COSH](../../third_party/bigquery_docs/reference/standard-sql/mathematic
 | `BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## COSINE_DISTANCE
+
+Source: [COSINE_DISTANCE](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<FLOAT64>, ARRAY<FLOAT64>` | `FLOAT64` | Supported |  |
+| `ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>, ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>` | `FLOAT64` | Supported |  |
+| `ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>, ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>` | `FLOAT64` | Supported |  |
+
 ## COT
 
 Source: [COT](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -268,6 +281,16 @@ Source: [DIV](../../third_party/bigquery_docs/reference/standard-sql/mathematica
 | `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, NUMERIC` | `BIGNUMERIC` | Supported |  |
 | `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+
+## EUCLIDEAN_DISTANCE
+
+Source: [EUCLIDEAN_DISTANCE](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<FLOAT64>, ARRAY<FLOAT64>` | `FLOAT64` | Supported |  |
+| `ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>, ARRAY<STRUCT<dimension INT64, magnitude FLOAT64>>` | `FLOAT64` | Supported |  |
+| `ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>, ARRAY<STRUCT<dimension STRING, magnitude FLOAT64>>` | `FLOAT64` | Supported |  |
 
 ## EXP
 
@@ -532,6 +555,27 @@ Source: [RAND](../../third_party/bigquery_docs/reference/standard-sql/mathematic
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
 | `` | `FLOAT64` | Supported |  |
+
+## RANGE_BUCKET
+
+Source: [RANGE_BUCKET](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+Orderable scalar types except RANGE, which BigQuery rejects, are enumerated; STRUCT points are not enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, ARRAY<INT64>` | `INT64` | Supported |  |
+| `NUMERIC, ARRAY<NUMERIC>` | `INT64` | Supported |  |
+| `BIGNUMERIC, ARRAY<BIGNUMERIC>` | `INT64` | Supported |  |
+| `FLOAT64, ARRAY<FLOAT64>` | `INT64` | Supported |  |
+| `BOOL, ARRAY<BOOL>` | `INT64` | Supported |  |
+| `STRING, ARRAY<STRING>` | `INT64` | Supported |  |
+| `BYTES, ARRAY<BYTES>` | `INT64` | Supported |  |
+| `DATE, ARRAY<DATE>` | `INT64` | Supported |  |
+| `DATETIME, ARRAY<DATETIME>` | `INT64` | Supported |  |
+| `TIME, ARRAY<TIME>` | `INT64` | Supported |  |
+| `TIMESTAMP, ARRAY<TIMESTAMP>` | `INT64` | Supported |  |
+| `INTERVAL, ARRAY<INTERVAL>` | `INT64` | Supported |  |
 
 ## ROUND
 

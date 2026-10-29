@@ -171,12 +171,19 @@ func TestSyntaxArity(t *testing.T) {
 		{"ARRAY_AGG(\n  [ DISTINCT ]\n  expression\n  [ { IGNORE | RESPECT } NULLS ]\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{1, 1}},
 		{"CORR(\n  X1, X2\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{2, 2}},
 		{"ANY_VALUE(\n  expression\n  [ HAVING { MAX | MIN } having_expression ]\n)", arity{1, 1}},
+		{"JSON_SET(\n  json_expr,\n  json_path_value_pair[, ...]\n  [, create_if_missing => { TRUE | FALSE } ]\n)", arity{3, -1}},
 	} {
 		name, _, _ := strings.Cut(c.syntax, "(")
 		got, err := syntaxArities("```\n"+c.syntax+"\n```\n", name)
 		if err != nil || len(got) != 1 || got[0] != c.want {
 			t.Errorf("%s: got %v, %v; want %v", name, got, err, c.want)
 		}
+	}
+	// Each line of a block can start a form, and examples after the description are not syntax.
+	section := "```\n1. TIME(hour, minute, second)\n2. TIME(timestamp, [time_zone])\n```\n\n" +
+		"**Description**\n\n```\nTIME(80, [])\n```\n"
+	if got, err := syntaxArities(section, "TIME"); err != nil || !slices.Equal(got, []arity{{3, 3}, {1, 2}}) {
+		t.Errorf("TIME: got %v, %v", got, err)
 	}
 	for _, syntax := range []string{"LPAD(a, , b)", "LPAD(a"} {
 		if _, err := syntaxArities("```\n"+syntax+"\n```\n", "LPAD"); err == nil {
