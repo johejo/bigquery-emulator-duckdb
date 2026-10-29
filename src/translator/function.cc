@@ -50,7 +50,7 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
                                       const googlesql::ResolvedFunctionCall& resolved,
                                       std::string_view name, const std::vector<std::string>& args,
                                       bool safe, std::string_view project,
-                                      const std::string& collation, TimestampPrecision precision) {
+                                      const Collation& collation, TimestampPrecision precision) {
   const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr) {
     return std::nullopt;
@@ -59,17 +59,22 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
     // Compare keys, but return the original first argument, evaluated only once.
     const std::string first = function_catalog::BoundComparison(0);
     const std::string second = function_catalog::BoundComparison(1);
-    return function_catalog::BindComparison(args, {0, 1},
-                                            "CASE WHEN " + CollationKey(first, collation) + " = " +
-                                                CollationKey(second, collation) +
-                                                " THEN NULL ELSE " + first + " END");
+    return function_catalog::BindComparison(
+        args, {0, 1},
+        "CASE WHEN " +
+            function_catalog::Equal(
+                resolved.argument_list(0)->type(),
+                CollationKey(first, collation, resolved.argument_list(0)->type()),
+                CollationKey(second, collation, resolved.argument_list(1)->type())) +
+            " THEN NULL ELSE " + first + " END");
   }
   if ((name == "GREATEST" || name == "LEAST") && !collation.empty()) {
     // NULL when any argument is, and otherwise the first argument whose key is the extremum.
     return "list_transform([[" + Join(args, ", ") +
            "]], lambda _ext: CASE WHEN list_count(_ext) < len(_ext) THEN NULL ELSE "
            "list_transform([list_transform(_ext, lambda _e: " +
-           CollationKey("_e", collation) + ")], lambda _keys: _ext[list_position(_keys, " +
+           CollationKey("_e", collation, resolved.argument_list(0)->type()) +
+           ")], lambda _keys: _ext[list_position(_keys, " +
            (name == "GREATEST" ? "list_max" : "list_min") + "(_keys))])[1] END)[1]";
   }
   ScalarCall call{
@@ -96,7 +101,7 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
     return entry->handler(call);
   }
   return functions.Translate(name, call.arguments, safe,
-                             functions.SupportsCollation(name) ? collation : "");
+                             functions.SupportsCollation(name) ? collation.specification : "");
 }
 
 // Functions that only carry or compare values can operate directly on epoch nanoseconds.
@@ -105,7 +110,7 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
 std::optional<std::string> Call(const Catalog& functions,
                                 const googlesql::ResolvedFunctionCall& resolved,
                                 std::string_view name, const std::vector<std::string>& args,
-                                bool safe, std::string_view project, const std::string& collation) {
+                                bool safe, std::string_view project, const Collation& collation) {
   if (functions.timestamp_precision() != TimestampPrecision::kNanoseconds ||
       functions.HasTypeUse(name, TypeUse::kCarries) ||
       functions.HasTypeUse(name, TypeUse::kCompares) ||
@@ -350,7 +355,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   }
   if (!collation->empty() && functions.HasTypeUse(name, TypeUse::kRejectsCollation)) {
     throw std::invalid_argument("Function '" + call.function()->Name() + "' with collation '" +
-                                *collation + "' is not supported.");
+                                collation->specification + "' is not supported.");
+  }
+  if (!collation->children.empty() &&
+      !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys) && name != "NULLIF" &&
+      name != "$CASE_WITH_VALUE") {
+    return Unsupported(scope, "function " + name + " with nested collation");
   }
   if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys) &&
       !functions.HasTypeUse(name, TypeUse::kSelectsCollationValues) &&
@@ -520,8 +530,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
         function == "$CASE_WITH_VALUE"
             ? i == 0 || (i % 2 == 1 && i + 1 < call.argument_list().size())
             : functions.HasTypeUse(function, TypeUse::kComparesCollationKeys);
-    if (argument->type()->IsString() && collation_operand) {
-      args.push_back(CollationKey(*sql, *collation));
+    if (collation_operand && !collation->empty()) {
+      args.push_back(CollationKey(*sql, *collation, argument->type()));
     } else if (compares_intervals && argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
     } else if (compares_intervals && keyed(argument->type(), i)) {

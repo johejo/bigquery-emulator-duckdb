@@ -415,21 +415,15 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   // Whether DISTINCT compares a column by keys: INTERVAL values by their lengths, and strings by
   // their collation keys under the column's collation, which the resolved AST does not record.
   bool keys = false;
-  std::vector<std::string> collations;
+  std::vector<Collation> collations;
   for (const auto& column : set.column_list()) {
-    if (distinct && column.type()->IsStruct()) {
-      const std::string name =
-          set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT       ? "UNION"
-          : set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT ? "INTERSECT"
-                                                                                     : "EXCEPT";
-      throw std::invalid_argument("Type STRUCT is not supported in " + name +
-                                  " DISTINCT operation");
-    }
-    if (distinct && column.type()->IsArray()) {
+    if (distinct && (column.type()->IsStruct() || column.type()->IsArray())) {
       const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT
                                    ? "UNION DISTINCT"
                                    : "INTERSECT DISTINCT or EXCEPT DISTINCT";
-      throw std::invalid_argument("Type ARRAY is not supported in " + name + " operation");
+      throw std::invalid_argument(std::string("Type ") +
+                                  (column.type()->IsStruct() ? "STRUCT" : "ARRAY") +
+                                  " is not supported in " + name + " operation");
     }
     collations.push_back(ColumnCollation(column.type_annotation_map()));
     keys = keys || column.type()->IsInterval() || !collations.back().empty();
@@ -454,8 +448,9 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   }
   // Each distinct row is the first input row of its keys, as BigQuery returns it.
   const auto key = [&](int i, const std::string& sql) {
-    return set.column_list(i).type()->IsInterval() ? IntervalKey(sql)
-                                                   : CollationKey(sql, collations.at(i));
+    return set.column_list(i).type()->IsInterval()
+               ? IntervalKey(sql)
+               : CollationKey(sql, collations.at(i), set.column_list(i).type());
   };
   std::vector<std::string> compared;
   std::vector<std::string> keyed;

@@ -366,10 +366,12 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
                relation->From() + "))";
       }
       if (subquery.in_expr()->type()->IsStruct()) {
-        return StructInArray(subquery.in_expr()->type(), *value, "ARRAY(" + select + ")");
+        return StructInArray(in_type, CollationKey(*value, *collation, in_type),
+                             "ARRAY(SELECT " + CollationKey(column->second, *collation, in_type) +
+                                 relation->From() + ")");
       }
-      return "(" + CollationKey(*value, *collation) + " IN (SELECT " +
-             CollationKey(column->second, *collation) + relation->From() + "))";
+      return "(" + CollationKey(*value, *collation, in_type) + " IN (SELECT " +
+             CollationKey(column->second, *collation, in_type) + relation->From() + "))";
     }
     default:
       return std::nullopt;
@@ -393,7 +395,7 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
   if (item.column_ref()->type()->IsInterval()) {
     column = IntervalKey(*column);
   }
-  column = CollationKey(*column, *collation);
+  column = CollationKey(*column, *collation, item.column_ref()->type());
   // BigQuery sorts NULL first for ASC and last for DESC, unlike DuckDB's ASC default.
   const bool nulls_first =
       item.null_order() == googlesql::ResolvedOrderByItem::NULLS_FIRST ||
