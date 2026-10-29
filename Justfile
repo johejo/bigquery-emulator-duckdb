@@ -77,6 +77,14 @@ e2e *args:
 compliance *args:
     bazelisk test //:compliance_test {{ args }}
 
+# All transitive GCS/Storage paths, plus the separate Spanner SDK paths; no build needed.
+sql-runtime-deps *targets:
+    bash tools/sql-runtime-deps.sh report {{ targets }}
+
+# Opt-in until runtime extraction finishes. Pass the core target and compliance target then.
+sql-runtime-deps-check *targets:
+    bash tools/sql-runtime-deps.sh check {{ targets }}
+
 # Summarizes the last `just compliance` run as Markdown, and fails when a shard did not finish or a
 # known failure passes.
 # Extra arguments go to tools/compliancesummary, such as -results FILE for each statement's outcome.

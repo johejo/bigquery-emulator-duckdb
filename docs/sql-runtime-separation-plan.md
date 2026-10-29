@@ -1,6 +1,9 @@
 # SQL runtime and external-service separation plan
 
-Status: proposed; no implementation steps completed.
+Status: step 1 completed; runtime extraction (steps 2–6) remains proposed.
+See the [boundary inventory and dependency checks](sql-runtime-separation-boundaries.md)
+for dependency paths, responsibility allocation, client coverage and the recorded
+compliance baseline.
 
 ## Goal
 
