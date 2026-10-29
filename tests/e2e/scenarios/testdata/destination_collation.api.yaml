@@ -5,7 +5,7 @@ version: 1
 # Source defaults are changed AFTER inserting rows, leaving the mixed column
 # collations fixed so table-default inheritance can be isolated from column copying.
 # Specification context (does not settle copy/query replacement behavior):
-# ../../../../../third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
 description: >-
   Copy and query destination creation/replacement: distinguish source table defaults,
   destination dataset defaults, existing destination defaults, and column collations.

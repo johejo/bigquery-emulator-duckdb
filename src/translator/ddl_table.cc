@@ -631,6 +631,8 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
   if (!description || !head || !target) {
     return std::nullopt;
   }
+  // BigQuery reports explicit modes for LIKE's columns, even if the source DDL omitted them.
+  SetModesGiven(description->schema);
   const auto columns = ColumnsSql(description->schema, scope);
   if (!columns) {
     return std::nullopt;

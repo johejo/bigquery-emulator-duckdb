@@ -218,11 +218,6 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
     // documents for new tables. As BigQuery answers, a replaced table keeps its default rounding
     // mode, and a copy job's new table takes no default
     // rounding mode, neither the source's nor the dataset's.
-    if ((restore || metadata.clone.has_value() || metadata.snapshot.has_value()) &&
-        (metadata.default_collation.has_value() || dataset.default_collation.has_value() ||
-         (existing.has_value() && existing->metadata.default_collation.has_value()))) {
-      throw ApiError::Unsupported("snapshot, clone or restore job involving a default collation");
-    }
     TableDefinition definition{
         .table = destination,
         .schema = schema,
@@ -235,6 +230,9 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
     if (existing.has_value() && restore) {
       definition.metadata = existing->metadata;
       definition.metadata.clone.reset();
+      if (metadata.default_collation.has_value()) {
+        definition.metadata.default_collation = metadata.default_collation;
+      }
     } else if (existing.has_value()) {
       definition.metadata.default_rounding_mode = existing->metadata.default_rounding_mode;
     } else if (copy) {

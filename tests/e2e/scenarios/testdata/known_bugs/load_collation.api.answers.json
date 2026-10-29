@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "cases": {
+    "autodetect_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "string_field_2",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "string_field_2",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    }
+  }
+}

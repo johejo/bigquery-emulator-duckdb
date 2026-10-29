@@ -1,0 +1,332 @@
+# Expectations are from the accompanying BigQuery answer sidecar.
+version: 1
+# Follow-up to scenarios/testdata/destination_collation.api.yaml. Do not infer these
+# answers from single-source COPY: multi-source and RESTORE may choose other defaults.
+description: >-
+  Default collation for multi-source COPY and SNAPSHOT/CLONE/RESTORE jobs.
+  Change source table defaults after creating mixed-collation columns, so schema
+  equality and table-default equality are independent. Inspect both sources (including
+  the actual snapshot used by RESTORE), destination metadata, rows and new columns.
+vars:
+  source_dataset: bqa_${run}_${case}_src
+  destination_dataset: bqa_${run}_${case}_dst
+  dataset_setup: ''
+  source_setup: ''
+  destination_setup: ''
+  operation: COPY
+  disposition: WRITE_EMPTY
+  source_table: first
+  copy_configuration:
+    copy:
+      '${source_key}': '${source_value}'
+      destinationTable: {projectId: '${project}', datasetId: '${destination_dataset}', tableId: destination}
+      operationType: '${operation}'
+      writeDisposition: '${disposition}'
+  source_key: sourceTables
+  source_value:
+    - {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+    - {projectId: '${project}', datasetId: '${source_dataset}', tableId: second}
+  set_both_ci: >-
+    ALTER TABLE `${project}.${source_dataset}.first` SET DEFAULT COLLATE 'und:ci';
+    ALTER TABLE `${project}.${source_dataset}.second` SET DEFAULT COLLATE 'und:ci';
+  set_both_empty: >-
+    ALTER TABLE `${project}.${source_dataset}.first` SET DEFAULT COLLATE '';
+    ALTER TABLE `${project}.${source_dataset}.second` SET DEFAULT COLLATE '';
+  dataset_ci: ALTER SCHEMA `${project}.${destination_dataset}` SET DEFAULT COLLATE 'und:ci';
+  dataset_empty: ALTER SCHEMA `${project}.${destination_dataset}` SET DEFAULT COLLATE '';
+  replace_ci: >-
+    CREATE TABLE `${project}.${destination_dataset}.destination` (old STRING) DEFAULT COLLATE 'und:ci';
+    INSERT `${project}.${destination_dataset}.destination` VALUES ('old');
+  replace_empty: >-
+    CREATE TABLE `${project}.${destination_dataset}.destination` (old STRING) DEFAULT COLLATE '';
+    INSERT `${project}.${destination_dataset}.destination` VALUES ('old');
+  snapshot_source: >-
+    CREATE SNAPSHOT TABLE `${project}.${source_dataset}.saved`
+    CLONE `${project}.${source_dataset}.first`;
+  after_query: >-
+    ALTER TABLE `${project}.${destination_dataset}.destination` ADD COLUMN added STRING;
+    SELECT value, binary, ci FROM `${project}.${destination_dataset}.destination` ORDER BY value;
+  recorded_schema_1: {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}, {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}], "name": "nested", "type": "RECORD"}, {"mode": "REPEATED", "name": "repeated", "type": "STRING"}, {"name": "added", "type": "STRING"}]}
+  recorded_schema_2: {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}, {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}], "name": "nested", "type": "RECORD"}, {"mode": "REPEATED", "name": "repeated", "type": "STRING"}]}
+  recorded_schema_3: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}], "mode": "NULLABLE", "name": "nested", "type": "RECORD"}, {"mode": "REPEATED", "name": "repeated", "type": "STRING"}]}
+  recorded_schema_4: {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}, {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}], "name": "nested", "type": "RECORD"}, {"mode": "REPEATED", "name": "repeated", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+  recorded_schema_5: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}], "mode": "NULLABLE", "name": "nested", "type": "RECORD"}, {"mode": "REPEATED", "name": "repeated", "type": "STRING"}, {"name": "added", "type": "STRING"}]}
+templates:
+  copy:
+    steps:
+      - name: source_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${source_dataset}'}
+            location: US
+      - name: destination_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${destination_dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              ${dataset_setup}
+              CREATE TABLE `${project}.${source_dataset}.first`
+                (value STRING, binary STRING COLLATE '', ci STRING COLLATE 'und:ci',
+                 nested STRUCT<value STRING, binary STRING COLLATE '', ci STRING COLLATE 'und:ci'>,
+                 repeated ARRAY<STRING>);
+              CREATE TABLE `${project}.${source_dataset}.second`
+                LIKE `${project}.${source_dataset}.first`;
+              INSERT `${project}.${source_dataset}.first` (value, binary, ci) VALUES ('first', 'A', 'A');
+              INSERT `${project}.${source_dataset}.second` (value, binary, ci) VALUES ('second', 'a', 'a');
+              ${source_setup}
+              ${destination_setup}
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors}
+      - name: first_source
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${source_dataset}/tables/${source_table}
+        observe: {defaultCollation: /body/defaultCollation, schema: /body/schema, type: /body/type}
+      - name: second_source
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${source_dataset}/tables/second
+        observe: {defaultCollation: /body/defaultCollation, schema: /body/schema}
+      - name: copy
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration: '${copy_configuration}'
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_copy
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: destination
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${destination_dataset}/tables/destination
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+          type: /body/type
+          numRows: /body/numRows
+      - name: add_and_read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${after_query}'
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors, rows: /body/rows}
+      - name: after_add
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${destination_dataset}/tables/destination
+        observe: {defaultCollation: /body/defaultCollation, schema: /body/schema}
+    cleanup:
+      - name: delete_destination_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${destination_dataset}?deleteContents=true
+      - name: delete_source_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${source_dataset}?deleteContents=true
+cases:
+  - name: multi_ci_dataset_empty
+    template: copy
+    vars: {source_setup: '${set_both_ci}', dataset_setup: '${dataset_empty}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: multi_empty_dataset_ci
+    template: copy
+    vars: {source_setup: '${set_both_empty}', dataset_setup: '${dataset_ci}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: multi_unassigned_dataset_ci
+    template: copy
+    vars: {dataset_setup: '${dataset_ci}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: multi_ci_then_empty
+    template: copy
+    vars:
+      source_setup: >-
+        ALTER TABLE `${project}.${source_dataset}.first` SET DEFAULT COLLATE 'und:ci';
+        ALTER TABLE `${project}.${source_dataset}.second` SET DEFAULT COLLATE '';
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: multi_empty_then_ci
+    template: copy
+    vars:
+      source_setup: >-
+        ALTER TABLE `${project}.${source_dataset}.first` SET DEFAULT COLLATE '';
+        ALTER TABLE `${project}.${source_dataset}.second` SET DEFAULT COLLATE 'und:ci';
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: multi_unassigned_then_empty
+    template: copy
+    vars:
+      source_setup: ALTER TABLE `${project}.${source_dataset}.second` SET DEFAULT COLLATE '';
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: multi_empty_then_unassigned
+    template: copy
+    vars:
+      source_setup: ALTER TABLE `${project}.${source_dataset}.first` SET DEFAULT COLLATE '';
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: multi_replace_ci_with_empty
+    template: copy
+    vars:
+      source_setup: '${set_both_empty}'
+      destination_setup: '${replace_ci}'
+      disposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_4}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: multi_replace_empty_with_ci
+    template: copy
+    vars:
+      source_setup: '${set_both_ci}'
+      destination_setup: '${replace_empty}'
+      disposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "", "numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: multi_append_keeps_destination
+    template: copy
+    vars:
+      source_setup: '${set_both_ci}'
+      destination_setup: >-
+        CREATE TABLE `${project}.${destination_dataset}.destination` LIKE `${project}.${source_dataset}.first`;
+        ALTER TABLE `${project}.${destination_dataset}.destination` SET DEFAULT COLLATE '';
+        INSERT `${project}.${destination_dataset}.destination` (value) VALUES ('old');
+      disposition: WRITE_APPEND
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "old"}, {"v": null}, {"v": null}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_5}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "", "numRows": "3", "schema": "${recorded_schema_3}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: multi_replace_ci_with_unassigned
+    template: copy
+    vars:
+      destination_setup: '${replace_ci}'
+      disposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}, {"f": [{"v": "second"}, {"v": "a"}, {"v": "a"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_4}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "2", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: snapshot_unassigned_dataset_ci
+    template: copy
+    vars:
+      operation: SNAPSHOT
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+      dataset_setup: '${dataset_ci}'
+      after_query: SELECT value, binary, ci FROM `${project}.${destination_dataset}.destination`;
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"schema": "${recorded_schema_2}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "1", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "first_source": {"schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: clone_unassigned_dataset_ci
+    template: copy
+    vars:
+      operation: CLONE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+      dataset_setup: '${dataset_ci}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: restore_unassigned_dataset_ci
+    template: copy
+    vars:
+      operation: RESTORE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: saved}
+      source_table: saved
+      source_setup: '${snapshot_source}'
+      dataset_setup: '${dataset_ci}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: restore_replace_ci_with_unassigned
+    template: copy
+    vars:
+      operation: RESTORE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: saved}
+      source_table: saved
+      source_setup: '${snapshot_source}'
+      destination_setup: '${replace_ci}'
+      disposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_4}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "fixture": {"jobComplete": true}, "second_source": {"schema": "${recorded_schema_3}"}}
+  - name: snapshot_ci_dataset_empty
+    template: copy
+    vars:
+      operation: SNAPSHOT
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+      source_setup: '${set_both_ci}'
+      dataset_setup: '${dataset_empty}'
+      # Snapshots are read-only; inspect metadata and rows without adding a column.
+      after_query: SELECT value, binary, ci FROM `${project}.${destination_dataset}.destination`;
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: snapshot_empty_dataset_ci
+    template: copy
+    vars:
+      operation: SNAPSHOT
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+      source_setup: '${set_both_empty}'
+      dataset_setup: '${dataset_ci}'
+      after_query: SELECT value, binary, ci FROM `${project}.${destination_dataset}.destination`;
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_2}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: clone_ci_dataset_empty
+    template: copy
+    vars:
+      operation: CLONE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+      source_setup: '${set_both_ci}'
+      dataset_setup: '${dataset_empty}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_4}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: clone_empty_dataset_ci
+    template: copy
+    vars:
+      operation: CLONE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: first}
+      source_setup: '${set_both_empty}'
+      dataset_setup: '${dataset_ci}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "TABLE"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: restore_ci_dataset_empty
+    template: copy
+    vars:
+      operation: RESTORE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: saved}
+      source_table: saved
+      source_setup: '${set_both_ci} ${snapshot_source}'
+      dataset_setup: '${dataset_empty}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_4}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
+  - name: restore_empty_dataset_ci
+    template: copy
+    vars:
+      operation: RESTORE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: saved}
+      source_table: saved
+      source_setup: '${set_both_empty} ${snapshot_source}'
+      dataset_setup: '${dataset_ci}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: restore_replace_ci_with_empty
+    template: copy
+    vars:
+      operation: RESTORE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: saved}
+      source_table: saved
+      source_setup: '${set_both_empty} ${snapshot_source}'
+      destination_setup: '${replace_ci}'
+      disposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "", "schema": "${recorded_schema_3}"}}
+  - name: restore_replace_empty_with_ci
+    template: copy
+    vars:
+      operation: RESTORE
+      source_key: sourceTable
+      source_value: {projectId: '${project}', datasetId: '${source_dataset}', tableId: saved}
+      source_table: saved
+      source_setup: '${set_both_ci} ${snapshot_source}'
+      destination_setup: '${replace_empty}'
+      disposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "first"}, {"v": "A"}, {"v": "A"}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_4}"}, "completed_copy": {"status": {"state": "DONE"}}, "destination": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}", "type": "TABLE"}, "first_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_2}", "type": "SNAPSHOT"}, "fixture": {"jobComplete": true}, "second_source": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}}
