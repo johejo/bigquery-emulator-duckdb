@@ -230,7 +230,7 @@ std::optional<Relation> DifferentialPrivacyAggregateScan(
     Check(epsilon.status());
     const auto bounds = Bounds(call, scope);
     const auto value = Expression(*call.argument_list(0), scope, input->columns);
-    const auto type = DuckDbType(call.type(), nullptr, scope.context.timestamp_precision);
+    const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
     const auto epsilon_sql =
         Literal(googlesql::Value::Double(*epsilon), scope.context.timestamp_precision);
     if (!bounds || !value || !type || !epsilon_sql) {

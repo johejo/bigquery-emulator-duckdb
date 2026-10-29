@@ -19,7 +19,7 @@
 namespace bigquery_emulator_duckdb::translator {
 
 std::optional<std::string> Literal(const googlesql::Value& value, TimestampPrecision precision) {
-  const auto type = DuckDbType(value.type(), nullptr, precision);
+  const auto type = DuckDbType(value.type(), precision);
   if (!type) {
     return std::nullopt;
   }

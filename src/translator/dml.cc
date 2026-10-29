@@ -95,7 +95,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   };
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
-    if (!DuckDbType(column.type(), nullptr, scope.context.timestamp_precision) ||
+    if (!DuckDbType(column.type(), scope.context.timestamp_precision) ||
         !OnlyCollations(column.type_annotation_map())) {
       return Unsupported(scope, "column type " + column.type()->DebugString());
     }
@@ -146,7 +146,7 @@ std::optional<std::string> UpdatedStruct(const std::string& original, const goog
   if (node.value) {
     return node.value;
   }
-  const auto sql_type = DuckDbType(type, nullptr, precision);
+  const auto sql_type = DuckDbType(type, precision);
   if (!sql_type) {
     return std::nullopt;
   }
@@ -291,7 +291,7 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   for (const auto& column : insert.insert_column_list()) {
     const auto name = table_columns.find(column.column_id());
     if (name == table_columns.end() ||
-        !DuckDbType(column.type(), nullptr, scope.context.timestamp_precision) ||
+        !DuckDbType(column.type(), scope.context.timestamp_precision) ||
         !OnlyCollations(column.type_annotation_map())) {
       return std::nullopt;
     }

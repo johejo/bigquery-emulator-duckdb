@@ -568,10 +568,8 @@ std::string DuckDbRange(std::string_view start, std::string_view end, std::strin
       QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd));
 }
 
-std::optional<std::string> DuckDbType(const googlesql::Type* type,
-                                      const googlesql::TypeParameters* parameters,
-                                      TimestampPrecision precision) {
-  return MapToDuckDb(type, parameters, TypeUse::kQuery, precision);
+std::optional<std::string> DuckDbType(const googlesql::Type* type, TimestampPrecision precision) {
+  return MapToDuckDb(type, nullptr, TypeUse::kQuery, precision);
 }
 
 bool HasTimestamp(const googlesql::Type* type, bool range_bounds) {

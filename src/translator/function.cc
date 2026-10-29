@@ -326,8 +326,7 @@ std::optional<std::string> ExternalCall(const googlesql::ResolvedFunctionCall& c
         HasTimestamp(argument->type(), false)) {
       return Unsupported(scope, "nanosecond TIMESTAMP argument of an external-language UDF");
     }
-    const auto duckdb_type =
-        DuckDbType(argument->type(), nullptr, scope.context.timestamp_precision);
+    const auto duckdb_type = DuckDbType(argument->type(), scope.context.timestamp_precision);
     if (!sql || !duckdb_type) {
       return std::nullopt;
     }

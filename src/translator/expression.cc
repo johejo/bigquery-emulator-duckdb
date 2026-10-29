@@ -127,7 +127,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
           "bq_timestamp_nanos_to_micros(CAST(" + sql + " AS bq_timestamp_nanos))";
       result = ConvertedCast(from, to, micros, safe);
       if (!result) {
-        const auto type = DuckDbType(to, nullptr, context.timestamp_precision);
+        const auto type = DuckDbType(to, context.timestamp_precision);
         if (type) {
           result = "CAST(" + micros + " AS " + *type + ")";
         }
@@ -261,7 +261,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     if (const auto converted = ConvertedCast(from, to, sql, safe)) {
       return converted;
     }
-    const auto type = DuckDbType(to, nullptr, context.timestamp_precision);
+    const auto type = DuckDbType(to, context.timestamp_precision);
     return type ? std::optional<std::string>(std::string(safe ? "TRY_CAST(" : "CAST(") + sql +
                                              " AS " + *type + ")")
                 : std::nullopt;
@@ -420,7 +420,7 @@ Scope Nested(const Scope& scope, const Columns& columns) {
 
 std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const Scope& scope,
                                       const Columns& columns) {
-  const auto type = DuckDbType(expr.type(), nullptr, scope.context.timestamp_precision);
+  const auto type = DuckDbType(expr.type(), scope.context.timestamp_precision);
   if (!type || !OnlyCollations(expr.type_annotation_map())) {
     return Unsupported(scope, "type " + expr.type()->DebugString());
   }
