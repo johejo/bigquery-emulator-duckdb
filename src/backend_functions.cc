@@ -28,7 +28,6 @@
 #include "src/googlesql_hll_duckdb/hll.h"
 #include "src/googlesql_text_analysis_duckdb/text_analysis.h"
 #include "src/kll_duckdb/kll.h"
-#include "src/spanner_query.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -88,7 +87,6 @@ void RegisterBackendFunctions(duckdb_database database,
     throw BackendError("DuckDB failed to connect");
   }
   RegisterSessionUser(connection.get(), session_user);
-  RegisterSpannerQuery(connection.get());
   functions_duckdb::RegisterBigNumericFunctions(connection.get(), functions);
   functions_duckdb::RegisterMathFunctions(connection.get(), functions);
   functions_duckdb::RegisterStringFunctions(connection.get(), functions);

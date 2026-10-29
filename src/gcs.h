@@ -1,7 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -9,13 +8,6 @@
 #include <vector>
 
 namespace bigquery_emulator_duckdb {
-
-// The position of the wildcard in the gs:// URI `uri`, or npos when it has none. Loads and
-// extracts alike allow one `*`, in the object name. Throws ApiError for a malformed URI, a
-// wildcard in the bucket name or more than one wildcard.
-// third_party/bigquery_docs/batch-loading-data.md
-// third_party/bigquery_docs/exporting-data.md
-size_t FindGcsWildcard(const std::string& uri);
 
 // The metadata of a GCS object version.
 struct GcsObjectMetadata {

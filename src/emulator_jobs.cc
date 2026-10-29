@@ -33,6 +33,7 @@
 #include "src/file_read.h"
 #include "src/file_read_options.h"
 #include "src/gcs.h"
+#include "src/gcs_uri.h"
 #include "src/job_options.h"
 #include "src/location.h"
 #include "src/logging.h"

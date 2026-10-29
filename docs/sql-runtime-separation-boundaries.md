@@ -54,6 +54,48 @@ The separate Spanner subgraph has these outgoing edges:
 alone cannot isolate these adapters. `BackendInitializer` is an existing composition
 boundary for application registration; service-independent builtin registration stays shared.
 
+## Implemented boundaries after steps 2–3
+
+The dependency tables above are the original baseline, not the current graph.
+`table_comments` now uses `gcs_uri` for pure URI validation; acquisition uses the same
+implementation, with unchanged parsing rules and errors. Nearby metadata/schema/catalog
+helpers have no remaining direct acquisition includes.
+
+`duckdb_table_source` accepts an optional owned `ExternalTableProvider` and keeps the
+single native catalog/analyzer path. `service_table_provider`, constructed by
+`Emulator::NewTableSource`, implements GCS reads and external connection discovery.
+It borrows the application's one `ExternalConnections` registry, preserving its lock
+and shared-backend registration outside session transactions. Its deferred GCS reads
+own copies of the metadata, schema and client rather than borrowing the provider.
+Native sources without a provider reject external operations explicitly.
+
+`service_backend` composes Spanner registration through `BackendInitializer` and
+PostgreSQL/MySQL scanner loading through `DatabaseInitializer`. Native backend defaults
+and common builtin function registration no longer depend on concrete connectors.
+The application still constructs these adapters for production, including shell use.
+ObjectRef acquisition remains in `Emulator` until step 4.
+
+The following check now passes:
+
+```sh
+just sql-runtime-deps-check //:backend //:duckdb_table_source \\
+  //:duckdb_catalog //:table_comments
+bazelisk query 'somepath(set(//:backend //:duckdb_table_source), set(//:external_query //:mysql_query //:postgres_scanner //:spanner_query))'
+```
+
+The second command returns an empty graph, checking connector isolation separately
+from Storage isolation. Compliance still depends on the application, so its final
+assertion is not enabled yet. Ownership/missing-provider tests live in
+`tests/duckdb_table_source_test.cc`; production behavior remains covered by the existing
+client tests below, without copying their SQL into unit tests.
+
+Validation on Darwin arm64: `just fmt` and `just check` passed, including the existing
+external-table, external-query, ObjectRef, load/extract, shell and Storage client tests.
+The focused `array_functions_test` compliance run also passed; its 173 per-statement
+outcomes match `sql-runtime-separation-baseline.tsv` exactly (153 pass, 6 known failure,
+14 unsupported). Full compliance and final runtime/compliance link isolation remain
+for the driver extraction steps.
+
 ## Responsibility and mutable-state allocation
 
 “Runtime” below means the future shared SQL runtime; “application” means the

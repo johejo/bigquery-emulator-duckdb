@@ -26,6 +26,7 @@
 #include "src/googlesql_geography/options.h"
 #include "src/object_ref.h"
 #include "src/project.h"
+#include "src/service_backend.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
 
@@ -73,7 +74,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
               .has_connection =
                   [this](const std::string& key) { return connections_.conninfo.contains(key); },
           },
-          geography, functions, initialize),
+          geography, functions, ServiceBackendInitializer(initialize), InitializeServiceDatabase),
       functions_(EmulatorFunctionCatalog(functions)),
       excluded_function_ids_(std::move(excluded_function_ids)),
       declarations_(declarations),

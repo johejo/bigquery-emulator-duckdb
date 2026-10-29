@@ -663,7 +663,6 @@ cc_library(
     implementation_deps = [
         ":backend_error",
         ":duckdb_handle",
-        ":spanner_query",
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_collation_duckdb",
         "//src/googlesql_differential_privacy_duckdb",
@@ -893,8 +892,6 @@ cc_library(
         ":duckdb_sql",
         ":duckdb_types",
         ":duckpgq",
-        ":mysql_query",
-        ":postgres_scanner",
         ":result_chunks",
         ":storage_read_codec",
         ":vector_value",
@@ -948,7 +945,7 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
         ":field_schema",
-        ":gcs",
+        ":gcs_uri",
         ":references",
         ":table_metadata",
         "@nlohmann_json//:json",
@@ -1108,6 +1105,7 @@ cc_library(
         ":extract_options",
         ":file_read",
         ":file_read_options",
+        ":gcs_uri",
         ":job_options",
         ":language_options",
         ":logging",
@@ -1118,6 +1116,8 @@ cc_library(
         ":routine_catalog",
         ":schema_sql",
         ":script",
+        ":service_backend",
+        ":service_table_provider",
         ":statement_resources",
         ":table_comments",
         ":table_history",
@@ -1245,12 +1245,21 @@ cc_library(
 )
 
 cc_library(
+    name = "gcs_uri",
+    srcs = ["src/gcs_uri.cc"],
+    hdrs = ["src/gcs_uri.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":api_error"],
+)
+
+cc_library(
     name = "gcs",
     srcs = ["src/gcs.cc"],
     hdrs = ["src/gcs.h"],
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":gcs_uri",
         "@google_cloud_cpp//:common",
         "@google_cloud_cpp//:oauth2",
         "@google_cloud_cpp//:storage",
@@ -1627,24 +1636,74 @@ cc_library(
 )
 
 cc_library(
+    name = "external_table_provider",
+    hdrs = ["src/external_table_provider.h"],
+    deps = [
+        ":field_schema",
+        ":statement_resources",
+        ":table_metadata",
+        ":table_source",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "service_table_provider",
+    srcs = ["src/service_table_provider.cc"],
+    hdrs = ["src/service_table_provider.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":backend",
+        ":backend_error",
+        ":duckdb_sql",
+        ":external_table",
+        ":field_schema",
+        ":location",
+        ":mysql_query",
+        ":spanner_query",
+        ":statement_resources",
+        ":table_metadata",
+        ":table_source",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+    deps = [
+        ":external_query",
+        ":external_table_provider",
+        ":gcs",
+    ],
+)
+
+cc_library(
+    name = "service_backend",
+    srcs = ["src/service_backend.cc"],
+    hdrs = ["src/service_backend.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":mysql_query",
+        ":postgres_scanner",
+        ":spanner_query",
+    ],
+    deps = [
+        ":backend_initializer",
+        "//third_party/duckdb",
+    ],
+)
+
+cc_library(
     name = "duckdb_table_source",
     srcs = ["src/duckdb_table_source.cc"],
     hdrs = ["src/duckdb_table_source.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
         ":backend",
         ":backend_error",
         ":duckdb_catalog",
         ":duckdb_sql",
-        ":external_query",
-        ":external_table",
         ":field_schema",
-        ":gcs",
-        ":location",
-        ":mysql_query",
         ":references",
         ":routine",
-        ":spanner_query",
         ":statement_resources",
         ":table_comments",
         ":table_history",
@@ -1654,7 +1713,12 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@nlohmann_json//:json",
     ],
-    deps = [":gcs"],
+    deps = [
+        ":backend",
+        ":external_table_provider",
+        ":location",
+        ":table_source",
+    ],
 )
 
 # The types of the options the DDL handlers implement, which :ddl_options_catalog_test compares
@@ -1740,6 +1804,31 @@ cc_test(
         ":references",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "duckdb_table_source_test",
+    srcs = ["tests/duckdb_table_source_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":api_error",
+        ":backend",
+        ":duckdb_sql",
+        ":duckdb_table_source",
+        ":external_table_provider",
+        ":field_schema",
+        ":references",
+        ":statement_resources",
+        ":table_comments",
+        ":table_metadata",
+        ":table_source",
+        ":temporary_files",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],

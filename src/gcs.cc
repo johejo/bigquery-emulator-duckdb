@@ -19,6 +19,7 @@
 #include "google/cloud/storage/options.h"
 #include "google/cloud/storage/well_known_parameters.h"
 #include "src/api_error.h"
+#include "src/gcs_uri.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -26,23 +27,6 @@ namespace cloud = google::cloud;
 namespace storage = cloud::storage;
 
 namespace {
-
-struct ObjectUri {
-  std::string bucket;
-  std::string object;
-};
-
-ObjectUri ParseUri(const std::string& uri) {
-  const size_t slash = uri.find('/', 5);
-  if (!uri.starts_with("gs://") || slash == std::string::npos || slash == 5 ||
-      slash + 1 == uri.size()) {
-    throw ApiError::Invalid("Invalid GCS URI: " + uri);
-  }
-  if (uri.substr(5, slash - 5).find('*') != std::string::npos) {
-    throw ApiError::Invalid("Wildcard is not allowed in a bucket name: " + uri);
-  }
-  return {.bucket = uri.substr(5, slash - 5), .object = uri.substr(slash + 1)};
-}
 
 struct Endpoint {
   std::string url;
@@ -73,14 +57,6 @@ Endpoint EndpointFromEnvironment() {
 }
 
 }  // namespace
-
-size_t FindGcsWildcard(const std::string& uri) {
-  const size_t wildcard = uri.find('*', uri.size() - ParseUri(uri).object.size());
-  if (wildcard != std::string::npos && uri.find('*', wildcard + 1) != std::string::npos) {
-    throw ApiError::Invalid("Only one wildcard is allowed in a GCS URI: " + uri);
-  }
-  return wildcard;
-}
 
 struct GcsClient::Impl {
   Impl(std::string endpoint, bool emulator)
@@ -133,7 +109,7 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
   if (FindGcsWildcard(uri) == std::string::npos) {
     return {uri};
   }
-  const auto [bucket, object] = ParseUri(uri);
+  const auto [bucket, object] = ParseGcsUri(uri);
   const size_t wildcard = object.find('*');
   const std::string prefix = object.substr(0, wildcard);
   const std::string suffix = object.substr(wildcard + 1);
@@ -167,7 +143,7 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
 }
 
 GcsObjectMetadata GcsClient::Metadata(const std::string& uri) {
-  const auto [bucket, object] = ParseUri(uri);
+  const auto [bucket, object] = ParseGcsUri(uri);
   storage::Client client = impl_->client();
   const auto metadata = client.GetObjectMetadata(bucket, object);
   if (!metadata) {
@@ -186,7 +162,7 @@ GcsObjectMetadata GcsClient::Metadata(const std::string& uri) {
 }
 
 void GcsClient::Download(const std::string& uri, const std::filesystem::path& output) {
-  const auto [bucket, object] = ParseUri(uri);
+  const auto [bucket, object] = ParseGcsUri(uri);
   // SDK copies share the connection pool. Concurrent calls on the same Client instance
   // are not guaranteed to work, so each download uses its own lightweight copy.
   storage::Client client = impl_->client();
@@ -205,7 +181,7 @@ void GcsClient::Download(const std::string& uri, const std::filesystem::path& ou
 }
 
 void GcsClient::Upload(const std::filesystem::path& input, const std::string& uri) {
-  const auto [bucket, object] = ParseUri(uri);
+  const auto [bucket, object] = ParseGcsUri(uri);
   storage::Client client = impl_->client();
   const auto metadata = client.UploadFile(input.string(), bucket, object);
   if (!metadata) {

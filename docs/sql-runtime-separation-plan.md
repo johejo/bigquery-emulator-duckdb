@@ -1,6 +1,6 @@
 # SQL runtime and external-service separation plan
 
-Status: step 1 completed; runtime extraction (steps 2–6) remains proposed.
+Status: steps 1–3 completed; shared runtime extraction (steps 4–6) remains proposed.
 See the [boundary inventory and dependency checks](sql-runtime-separation-boundaries.md)
 for dependency paths, responsibility allocation, client coverage and the recorded
 compliance baseline.
@@ -20,7 +20,7 @@ features. Compliance composes the same runtime without those features.
 Names below describe responsibilities, not final class or target names. Keep each
 step buildable and independently reviewable; do not create a second SQL executor.
 
-## Current coupling
+## Original coupling
 
 - `compliance_test` uses `Emulator` for dataset/table preparation and `RunQuery`.
 - `Emulator` owns `GcsClient`, configures ObjectRef metadata-fetch callbacks and
@@ -106,6 +106,14 @@ validate or store external-table metadata. Existing client tests remain unchange
 
 Completion: the native table source can be constructed without GCS or connection
 adapters; production composition still supports all currently supported external reads.
+
+Implemented by `ExternalTableProvider`, supplied to `NewDuckDbTableSource` only by
+application composition. `service_table_provider` owns GCS preparation and external
+connection discovery/registration; `service_backend` supplies connector registration
+through backend initializers. `gcs_uri` shares SDK-independent URI validation between
+metadata and acquisition. The `backend`, `duckdb_table_source`, `duckdb_catalog` and
+`table_comments` targets pass `just sql-runtime-deps-check`; compliance still links the
+application facade until step 5.
 
 ## 4. Extract the shared SQL runtime and move application orchestration outward
 

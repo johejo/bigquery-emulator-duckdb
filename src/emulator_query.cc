@@ -45,6 +45,7 @@
 #include "src/result_value.h"
 #include "src/routine_catalog.h"
 #include "src/script.h"
+#include "src/service_table_provider.h"
 #include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
 #include "src/table_source.h"
@@ -340,7 +341,8 @@ std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool exp
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
-  return NewDuckDbTableSource(backend, connections_, gcs_client_, project_ids_, location);
+  return NewDuckDbTableSource(backend, project_ids_, location,
+                              NewServiceTableProvider(connections_, gcs_client_));
 }
 
 QueryResult Emulator::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }

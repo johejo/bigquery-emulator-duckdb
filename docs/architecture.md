@@ -182,6 +182,21 @@ GCS-backed metadata fetch, and [connection_id.cc](../src/connection_id.cc) norma
 for both ObjectRef and external queries. [backend_functions.cc](../src/backend_functions.cc)
 assembles registration of these common function libraries. Application-specific registrations
 are supplied through a [`BackendInitializer`](../src/backend_initializer.h).
+[`service_backend`](../src/service_backend.cc) composes Spanner query registration with
+that initializer and loads PostgreSQL/MySQL scanners through `DatabaseInitializer`.
+A native `Backend` does not register external connectors by default.
+
+[`DuckDbTableSource`](../src/duckdb_table_source.cc) owns native catalog resolution,
+project aliases, location tracking, time travel, numeric-storage conversion and write
+restrictions. The application supplies an
+[`ExternalTableProvider`](../src/external_table_provider.h) for external operations;
+[`service_table_provider`](../src/service_table_provider.cc) prepares GCS reads and
+discovers/registers external connections, using the shared connection registry and
+backend outside script transactions. Without a provider, external reads fail rather
+than reading native placeholder tables. GCS read definitions retain metadata, schema
+and the client by value; analysis does not stage files, and `StatementResources` keeps
+staged files alive through result or Storage snapshot consumption. Metadata URI
+validation uses [`gcs_uri`](../src/gcs_uri.cc), which has no service SDK dependency.
 
 HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
 the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.
