@@ -471,7 +471,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  },
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
              }),
 
       Define("KLL_QUANTILES.INIT_INT64", {KllInit(true)}, {.uses = kKllUses}),
