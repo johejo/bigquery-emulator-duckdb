@@ -97,8 +97,9 @@ reference sql:
     bazelisk run @googlesql//googlesql/tools/execute_query -- --product_mode=external {{ quote(sql) }}
 
 # Collects SQL, REST and gRPC answers on BigQuery; for maintainers only, since requests can be billed.
+# Scenarios that put objects in Cloud Storage write them to the bucket BQANSWERS_BUCKET names.
 bigquery-answers project path=(justfile_directory() + "/tests/e2e/goclient/testdata/unverified"):
-    go run ./tools/bqanswers {{ quote(project) }} {{ quote(path) }}
+    go run ./tools/bqanswers -bucket {{ quote(env("BQANSWERS_BUCKET", "")) }} {{ quote(project) }} {{ quote(path) }}
 
 # Checks SQL case formats and API scenarios without authentication, requests or modifying answers.
 bigquery-answers-validate path=(justfile_directory() + "/tests/e2e/goclient/testdata/unverified"):

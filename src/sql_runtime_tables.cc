@@ -118,10 +118,29 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
   return info;
 }
 
-TableInfo SqlRuntime::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
+std::vector<FieldSchema> SqlRuntime::DetectExternalSchema(const GcsExternalData& definition) {
+  if (!external_tables_) {
+    throw ApiError::Unsupported("external tables without an explicit schema");
+  }
+  std::vector<FieldSchema> schema = external_tables_(backend_)->DetectSchema(definition);
+  SetModesGiven(schema);
+  return schema;
+}
+
+TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema> schema,
                                   const TableMetadata& metadata) {
-  std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
+  // Read the sources before holding the mutex, after the checks that fail without them.
+  if (metadata.external_data && schema.empty()) {
+    GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+    if (RelationComment(backend_, "duckdb_tables()", "table_name", table) ||
+        ViewComment(backend_, table)) {
+      throw ApiError::Duplicate("Already Exists: Table " + table.project_id + ":" +
+                                table.dataset_id + "." + table.table_id);
+    }
+    schema = DetectExternalSchema(*metadata.external_data);
+  }
+  std::scoped_lock const lock(expiration_mutex_);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   ExpireTables(backend_, expiration_mutex_,

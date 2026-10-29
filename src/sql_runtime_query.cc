@@ -43,6 +43,7 @@
 #include "src/references.h"
 #include "src/result_value.h"
 #include "src/routine_catalog.h"
+#include "src/schema_sql.h"
 #include "src/script.h"
 #include "src/sql_runtime.h"
 #include "src/statement_resources.h"
@@ -703,6 +704,27 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
   }
   CheckDdlTarget(translation);
   CheckRelationTarget(backend, translation);
+  if (const auto& table = translation.table;
+      table && table->metadata.external_data && table->schema.empty()) {
+    // IF NOT EXISTS keeps what is there without reading the sources.
+    if (table->if_not_exists &&
+        (RelationComment(backend, "duckdb_tables()", "table_name", table->table) ||
+         ViewComment(backend, table->table))) {
+      return {};
+    }
+    TranslatedStatement detected = translation;
+    detected.table->schema = DetectExternalSchema(*table->metadata.external_data);
+    // tables.get reports a table that CREATE EXTERNAL TABLE detects the schema of as autodetected.
+    detected.table->metadata.external_data->autodetect = true;
+    const auto columns =
+        ColumnDefinitions(detected.table->schema, functions_.timestamp_precision());
+    if (!columns) {
+      throw ApiError::Unsupported("the detected schema of external table " +
+                                  TableName(table->table));
+    }
+    detected.sql += " (" + *columns + ")";
+    return RunStatement(detected, setup, null_arrays, session, location);
+  }
   if (translation.ddl_target_routine) {
     const auto source = NewTableSource(&backend, false);
     const auto previous = source->FindRoutine(*translation.ddl_target_routine);

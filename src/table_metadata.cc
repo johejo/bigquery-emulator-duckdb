@@ -569,10 +569,17 @@ TableMetadata TableMetadataFromJson(const json& table) {
     }
     metadata.external_data.emplace();
     if (config.contains("autodetect")) {
-      if (config["autodetect"] != false) {
-        throw ApiError::Unsupported("external table schema autodetection");
+      if (!config["autodetect"].is_boolean()) {
+        throw ApiError::Invalid("externalDataConfiguration.autodetect must be a boolean");
       }
-      metadata.external_data->autodetect = false;
+      // Without a schema, a Parquet table takes the one its sources have either way.
+      const auto given = [](const json& resource) {
+        return resource.contains("schema") && !resource["schema"].is_null();
+      };
+      if (config["autodetect"] == true && (given(table) || given(config))) {
+        throw ApiError::Unsupported("external table schema autodetection with a schema");
+      }
+      metadata.external_data->autodetect = config["autodetect"].get<bool>();
     }
     for (const auto& uri : uris) {
       if (!uri.is_string() || !uri.get_ref<const std::string&>().starts_with("gs://")) {

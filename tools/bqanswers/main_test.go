@@ -162,7 +162,7 @@ func TestValidateYAMLWithoutCredentials(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := run("project", path, true, time.Second); err != nil {
+	if err := run("project", path, "", true, time.Second); err != nil {
 		t.Fatal(err)
 	}
 }

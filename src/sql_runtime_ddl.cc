@@ -59,18 +59,44 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
   if (translation.statement_type == "DROP_MATERIALIZED_VIEW" && comment.has_value()) {
     throw ApiError::InvalidQuery("A materialized view was expected: " + TableName(*target));
   }
+  // DROP EXTERNAL TABLE drops only an external table, even with IF EXISTS.
+  const bool drops_external = translation.statement_type == "DROP_EXTERNAL_TABLE";
+  if (drops_external && view_comment) {
+    throw ApiError::Invalid("Cannot drop " + TableName(*target) + " which has type " +
+                            (materialized ? "MATERIALIZED_VIEW" : "VIEW") +
+                            ". An external table was expected.");
+  }
   if (!comment.has_value()) {
+    // The translation of DROP EXTERNAL TABLE IF EXISTS keeps its IF EXISTS.
+    if (drops_external && !translation.sql.starts_with("DROP TABLE IF EXISTS ")) {
+      throw ApiError::NotFound("Not found: External table " + TableName(*target));
+    }
     return;
   }
   const bool external = CommentMetadata(*comment).external_data.has_value();
+  const bool snapshot = CommentMetadata(*comment).snapshot.has_value();
+  if (drops_external && !external) {
+    throw ApiError::Invalid("Cannot drop " + TableName(*target) + " which has type " +
+                            (snapshot ? "SNAPSHOT" : "TABLE") +
+                            ". An external table was expected.");
+  }
   if (external && translation.altered_table) {
     throw ApiError::Unsupported("ALTER TABLE on external tables");
   }
-  if (translation.replaces &&
-      (external || (translation.table && translation.table->metadata.external_data))) {
-    throw ApiError::Unsupported("replacing an external table or replacing a table with one");
+  const bool creates_external = translation.table && translation.table->metadata.external_data;
+  if (translation.replaces && external && !creates_external) {
+    throw ApiError::Invalid(TableName(*target) +
+                            " is not allowed for this operation because it currently has type "
+                            "EXTERNAL.");
   }
-  const bool snapshot = CommentMetadata(*comment).snapshot.has_value();
+  if (translation.replaces && !external && !snapshot && creates_external) {
+    throw ApiError::Invalid(TableName(*target) +
+                            " is not allowed for this operation because it is currently a TABLE.");
+  }
+  if (translation.statement_type == "DROP_SNAPSHOT_TABLE" && external) {
+    throw ApiError::Invalid("Cannot drop " + TableName(*target) +
+                            " which has type EXTERNAL TABLE. A snapshot was expected.");
+  }
   if (translation.statement_type == "DROP_SNAPSHOT_TABLE" && !snapshot) {
     throw ApiError::InvalidQuery("Invalid value: Cannot drop " + TableName(*target) +
                                  " which has type TABLE. A snapshot was expected.");

@@ -46,6 +46,7 @@ type Step struct {
 	ExpectFailure bool              `json:"expectFailure,omitempty"`
 	REST          *RESTRequest      `json:"rest,omitempty"`
 	GRPC          *GRPCRequest      `json:"grpc,omitempty"`
+	GCS           *GCSRequest       `json:"gcs,omitempty"`
 	Bind          map[string]string `json:"bind,omitempty"`
 	Observe       map[string]string `json:"observe,omitempty"`
 	// Poll only GET requests: retrying a mutation could duplicate jobs or writes.
@@ -61,6 +62,15 @@ type RESTRequest struct {
 	Upload *string `json:"upload,omitempty"`
 	// UploadBase64 carries binary media, such as Parquet, without UTF-8 conversion.
 	UploadBase64 *string `json:"uploadBase64,omitempty"`
+}
+
+// GCSRequest writes or deletes an object of the bucket ${bucket}, such as an external table's
+// source. Only these two methods exist, so a case cannot read or list what else the bucket holds.
+type GCSRequest struct {
+	Method string `json:"method"`
+	Object string `json:"object"`
+	// Base64 is the object's contents for PUT, decoded after variable expansion.
+	Base64 *string `json:"base64,omitempty"`
 }
 
 type GRPCRequest struct {
@@ -270,7 +280,7 @@ func (file *File) validate() error {
 				}
 			}
 		}
-		vars := map[string]any{"project": "project", "run": "run", "case": c.Name}
+		vars := map[string]any{"project": "project", "run": "run", "case": c.Name, "bucket": "bucket"}
 		for key, value := range file.Vars {
 			vars[key] = value
 		}
@@ -284,10 +294,23 @@ func (file *File) validate() error {
 				return fmt.Errorf("%s: empty or duplicate step name %q", c.Name, step.Name)
 			}
 			stepNames[step.Name] = true
-			if (step.REST == nil) == (step.GRPC == nil) {
-				return fmt.Errorf("%s/%s: specify exactly one of rest and grpc", c.Name, step.Name)
+			kinds := 0
+			for _, present := range []bool{step.REST != nil, step.GRPC != nil, step.GCS != nil} {
+				if present {
+					kinds++
+				}
 			}
-			if step.REST != nil {
+			if kinds != 1 {
+				return fmt.Errorf("%s/%s: specify exactly one of rest, grpc and gcs", c.Name, step.Name)
+			}
+			if step.GCS != nil {
+				if err := checkGCS(*step.GCS); err != nil {
+					return fmt.Errorf("%s/%s: %w", c.Name, step.Name, err)
+				}
+				if len(step.Until) != 0 {
+					return fmt.Errorf("%s/%s: until requires a REST GET", c.Name, step.Name)
+				}
+			} else if step.REST != nil {
 				if step.REST.Method == "" || !strings.HasPrefix(step.REST.Path, "/") || strings.HasPrefix(step.REST.Path, "//") {
 					return fmt.Errorf("%s/%s: REST requires a method and an absolute path", c.Name, step.Name)
 				}
@@ -309,7 +332,7 @@ func (file *File) validate() error {
 					return fmt.Errorf("%s/%s: invalid request count", c.Name, step.Name)
 				}
 			}
-			for _, request := range []any{step.REST, step.GRPC, step.Until} {
+			for _, request := range []any{step.REST, step.GRPC, step.GCS, step.Until} {
 				if err := checkReferences(request, vars, nil); err != nil {
 					return fmt.Errorf("%s/%s: %w", c.Name, step.Name, err)
 				}
@@ -401,13 +424,36 @@ func checkReferences(value any, vars map[string]any, stack []string) error {
 	return nil
 }
 
-func reservedVariable(name string) bool { return name == "project" || name == "run" || name == "case" }
+func reservedVariable(name string) bool {
+	return name == "project" || name == "run" || name == "case" || name == "bucket"
+}
+
+func checkGCS(request GCSRequest) error {
+	if request.Object == "" || strings.HasPrefix(request.Object, "/") {
+		return errors.New("gcs requires a relative object name")
+	}
+	switch request.Method {
+	case "PUT":
+		if request.Base64 == nil {
+			return errors.New("gcs PUT requires base64 contents")
+		}
+	case "DELETE":
+		if request.Base64 != nil {
+			return errors.New("gcs DELETE takes no contents")
+		}
+	default:
+		return fmt.Errorf("gcs method must be PUT or DELETE, not %q", request.Method)
+	}
+	return nil
+}
 
 func answered(answer json.RawMessage) bool {
 	return len(answer) != 0 && !bytes.Equal(bytes.TrimSpace(answer), []byte("null"))
 }
 
-func Collect(ctx context.Context, path, project, run string, timeout time.Duration, call Call) error {
+// Collect runs each unanswered case of the file at `path`. `bucket` is the Cloud Storage bucket
+// that gcs steps write to and ${bucket} names; a case that uses it fails when it is empty.
+func Collect(ctx context.Context, path, project, run, bucket string, timeout time.Duration, call Call) error {
 	if timeout <= 0 {
 		return errors.New("scenario timeout must be positive")
 	}
@@ -426,7 +472,7 @@ func Collect(ctx context.Context, path, project, run string, timeout time.Durati
 		if answered(c.Answer) {
 			continue
 		}
-		vars := file.variables(*c, project, run)
+		vars := file.variables(*c, project, run, bucket)
 		resolved, err := file.resolveCase(*c)
 		if err != nil {
 			return err
@@ -578,7 +624,7 @@ func execute(ctx context.Context, c Case, vars map[string]any, timeout time.Dura
 		cancel()
 		if err == nil && response.Failed {
 			missing := false
-			if step.REST != nil && step.REST.Method == "DELETE" {
+			if (step.REST != nil && step.REST.Method == "DELETE") || (step.GCS != nil && step.GCS.Method == "DELETE") {
 				code, _, _ := pointer(response.Value, "/status")
 				encoded, _ := json.Marshal(code)
 				missing = string(encoded) == "404"

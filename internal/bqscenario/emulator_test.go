@@ -27,7 +27,7 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = process.Stop() })
-	transport := NewEmulatorTransport(process.URL, process.GRPC)
+	transport := NewEmulatorTransport(process.URL, process.GRPC, "")
 	t.Cleanup(func() { _ = transport.Close() })
 	paths, err := filepath.Glob("testdata/*.api.*")
 	if err != nil {
@@ -42,7 +42,7 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 		if err := os.WriteFile(path, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if err := Collect(t.Context(), path, "test", "smoke", 20*time.Second, transport.Call); err != nil {
+		if err := Collect(t.Context(), path, "test", "smoke", "", 20*time.Second, transport.Call); err != nil {
 			t.Fatal(err)
 		}
 		file, err := Read(path)
@@ -52,7 +52,7 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 
 		if isYAML(path) {
 			for _, c := range file.Cases {
-				if err := file.Verify(t.Context(), c, "test", "verify", 20*time.Second, transport.Call); err != nil {
+				if err := file.Verify(t.Context(), c, "test", "verify", "", 20*time.Second, transport.Call); err != nil {
 					t.Fatal(err)
 				}
 			}

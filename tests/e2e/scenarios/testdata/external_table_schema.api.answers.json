@@ -1,0 +1,953 @@
+{
+  "cases": {
+    "api_autodetect": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "INT64"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRING"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "DATE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "n"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "NUMERIC"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ts"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "TIMESTAMP"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/api_autodetect/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200,
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/api_autodetect/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s5rfwap3udv2nbrpb2g6smeloe_api_autodetect.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/api_autodetect/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "api_detected": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "INT64"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRING"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "DATE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "n"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "NUMERIC"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ts"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "TIMESTAMP"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/api_detected/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200,
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/api_detected/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s5rfwap3udv2nbrpb2g6smeloe_api_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/api_detected/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_detected": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "INT64"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRING"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "DATE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "n"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "NUMERIC"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ts"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "TIMESTAMP"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "schema": {},
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/ddl_detected/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s5rfwap3udv2nbrpb2g6smeloe_ddl_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/ddl_detected/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "drop_external": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "get": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: Table johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external.t",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: Table johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external.t",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
+        },
+        "statement": {
+          "jobComplete": true,
+          "status": 200
+        }
+      }
+    },
+    "drop_external_if_exists_table": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_if_exists_table.t which has type TABLE. An external table was expected.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_if_exists_table.t which has type TABLE. An external table was expected.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "drop_external_missing": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: External table johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_missing.t",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: External table johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_missing.t",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
+        }
+      }
+    },
+    "drop_external_statement_type": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "job": {
+          "ddlOperationPerformed": "DROP",
+          "ddlTargetTable": "t",
+          "statementType": "DROP_EXTERNAL_TABLE"
+        }
+      }
+    },
+    "drop_external_table": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_table.t which has type TABLE. An external table was expected.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_table.t which has type TABLE. An external table was expected.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "drop_external_view": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_view.t which has type VIEW. An external table was expected.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_external_view.t which has type VIEW. An external table was expected.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "drop_snapshot_external": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_snapshot_external.t which has type EXTERNAL TABLE. A snapshot was expected.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot drop johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_snapshot_external.t which has type EXTERNAL TABLE. A snapshot was expected.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "drop_table_external": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "get": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: Table johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_table_external.t",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: Table johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_drop_table_external.t",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
+        },
+        "statement": {
+          "jobComplete": true,
+          "status": 200
+        }
+      }
+    },
+    "if_not_exists_external": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/if_not_exists_external/x.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200,
+          "type": "EXTERNAL"
+        },
+        "statement": {
+          "jobComplete": true,
+          "status": 200
+        }
+      }
+    },
+    "last_file": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/last_file/y.parquet",
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/last_file/x.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200,
+          "type": "EXTERNAL"
+        },
+        "statement": {
+          "jobComplete": true,
+          "status": 200
+        }
+      }
+    },
+    "replace_external": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s5rfwap3udv2nbrpb2g6smeloe/replace_external/y.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200,
+          "type": "EXTERNAL"
+        },
+        "statement": {
+          "jobComplete": true,
+          "status": 200
+        }
+      }
+    },
+    "replace_external_with_table": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_replace_external_with_table.t is not allowed for this operation because it currently has type EXTERNAL.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_replace_external_with_table.t is not allowed for this operation because it currently has type EXTERNAL.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "replace_table_with_external": {
+      "project": "johejo-sandbox",
+      "run": "s5rfwap3udv2nbrpb2g6smeloe",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_replace_table_with_external.t is not allowed for this operation because it is currently a TABLE.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "johejo-sandbox:bqa_s5rfwap3udv2nbrpb2g6smeloe_replace_table_with_external.t is not allowed for this operation because it is currently a TABLE.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  },
+  "version": 1
+}

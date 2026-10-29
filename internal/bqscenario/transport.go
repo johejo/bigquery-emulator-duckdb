@@ -39,6 +39,8 @@ type Transport struct {
 	Collecting   bool
 	client       *http.Client
 	RESTEndpoint string
+	// GCSEndpoint is the Cloud Storage JSON API, which gcs steps use for ${bucket}.
+	GCSEndpoint  string
 	GRPCEndpoint string
 	GRPCOptions  []grpc.DialOption
 	connection   *grpc.ClientConn
@@ -58,6 +60,7 @@ func NewTransport(token string) *Transport {
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 		RESTEndpoint: "https://bigquery.googleapis.com",
+		GCSEndpoint:  "https://storage.googleapis.com",
 		GRPCEndpoint: "bigquerystorage.googleapis.com:443",
 		GRPCOptions: []grpc.DialOption{
 			grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})),
@@ -77,6 +80,9 @@ func (transport *Transport) Close() error {
 func (transport *Transport) Call(ctx context.Context, step Step, vars map[string]any) (Response, error) {
 	if step.REST != nil {
 		return transport.rest(ctx, *step.REST, vars)
+	}
+	if step.GCS != nil {
+		return transport.gcs(ctx, *step.GCS, vars)
 	}
 	return transport.rpc(ctx, *step.GRPC, vars)
 }
@@ -173,7 +179,12 @@ func (transport *Transport) rest(ctx context.Context, original RESTRequest, vars
 	if transport.token != "" {
 		post.Header.Set("Authorization", "Bearer "+transport.token)
 	}
-	response, err := transport.client.Do(post)
+	return transport.do(post)
+}
+
+// do sends an HTTP request and returns its status and JSON body.
+func (transport *Transport) do(request *http.Request) (Response, error) {
+	response, err := transport.client.Do(request)
 	if err != nil {
 		return Response{}, err
 	}
@@ -193,6 +204,54 @@ func (transport *Transport) rest(ctx context.Context, original RESTRequest, vars
 		Value:  map[string]any{"status": response.StatusCode, "body": value},
 		Failed: response.StatusCode < 200 || response.StatusCode >= 300,
 	}, nil
+}
+
+// gcs uploads or deletes one object of ${bucket} through the Cloud Storage JSON API.
+func (transport *Transport) gcs(ctx context.Context, original GCSRequest, vars map[string]any) (Response, error) {
+	request, err := expandedRequest(original, vars)
+	if err != nil {
+		return Response{}, err
+	}
+	bucket, ok := vars["bucket"].(string)
+	if !ok || bucket == "" {
+		return Response{}, errors.New("gcs steps require a bucket")
+	}
+	if transport.GCSEndpoint == "" {
+		return Response{}, errors.New("no Cloud Storage endpoint is configured")
+	}
+	var body io.Reader
+	var target string
+	switch request.Method {
+	case http.MethodPut:
+		if request.Base64 == nil {
+			return Response{}, errors.New("gcs PUT requires base64 contents")
+		}
+		media, err := base64.StdEncoding.DecodeString(*request.Base64)
+		if err != nil {
+			return Response{}, fmt.Errorf("base64: %w", err)
+		}
+		body = bytes.NewReader(media)
+		target = fmt.Sprintf("%s/upload/storage/v1/b/%s/o?uploadType=media&name=%s", transport.GCSEndpoint,
+			url.PathEscape(bucket), url.QueryEscape(request.Object))
+	case http.MethodDelete:
+		target = fmt.Sprintf("%s/storage/v1/b/%s/o/%s", transport.GCSEndpoint, url.PathEscape(bucket),
+			url.PathEscape(request.Object))
+	default:
+		return Response{}, fmt.Errorf("unsupported gcs method %q", request.Method)
+	}
+	method := request.Method
+	if method == http.MethodPut {
+		method = http.MethodPost
+	}
+	call, err := http.NewRequestWithContext(ctx, method, target, body)
+	if err != nil {
+		return Response{}, err
+	}
+	call.Header.Set("Content-Type", "application/octet-stream")
+	if transport.token != "" {
+		call.Header.Set("Authorization", "Bearer "+transport.token)
+	}
+	return transport.do(call)
 }
 
 func storageMethod(name string) (protoreflect.MethodDescriptor, error) {
@@ -333,11 +392,13 @@ func (transport *Transport) rpc(ctx context.Context, original GRPCRequest, vars 
 	return Response{Value: value, Failed: rpcErr != nil}, nil
 }
 
-// NewEmulatorTransport sends requests without credentials to local E2E endpoints.
-func NewEmulatorTransport(restEndpoint, grpcEndpoint string) *Transport {
+// NewEmulatorTransport sends requests without credentials to local E2E endpoints: REST and gRPC
+// to an emulator, and gcs steps to `gcsEndpoint`, such as a fake GCS server, unless it is empty.
+func NewEmulatorTransport(restEndpoint, grpcEndpoint, gcsEndpoint string) *Transport {
 	transport := NewTransport("")
 	transport.Collecting = false
 	transport.RESTEndpoint = restEndpoint
+	transport.GCSEndpoint = gcsEndpoint
 	transport.GRPCEndpoint = grpcEndpoint
 	transport.GRPCOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(129 * 1024 * 1024))}
 	return transport

@@ -49,6 +49,10 @@ class ServiceTableProvider : public ExternalTableProvider {
     return GcsExternalRead(std::move(definition), std::move(schema), gcs_);
   }
 
+  std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition) override {
+    return DetectGcsExternalSchema(definition, gcs_);
+  }
+
   // NOLINTBEGIN(bugprone-easily-swappable-parameters): a connection and its query options.
   absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& key,
                                                          const std::string& query,

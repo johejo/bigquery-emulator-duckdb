@@ -3,7 +3,8 @@
 // index and domain pages under OUTPUT_DIR. Each SQL, DDL option and API
 // probe starts a fresh emulator from the binary that -emulator names, so that probes neither see
 // nor disturb each other's data; function calls share a few emulators and their graph fixture. Probes
-// run in parallel.
+// run in parallel. A local Cloud Storage server serves a small Parquet file as every object, so
+// that external tables can read their sources.
 //
 //	restprobe -emulator BINARY sql FEATURES_FILE
 //	restprobe -emulator BINARY options CATALOG
@@ -105,8 +106,9 @@ func main() {
 	}
 	flag.Parse()
 	args := flag.Args()
-	var err error
+	err := serveStorage()
 	switch {
+	case err != nil:
 	case *check && (len(args) == 0 || args[0] != "function-types"):
 		err = fmt.Errorf("-check is only supported for function-types")
 	case *binary != "" && len(args) == 2 && args[0] == "sql":

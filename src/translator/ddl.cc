@@ -33,7 +33,10 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
     return "DROP PROPERTY GRAPH " + DuckPGQName(parts);
   }
   const bool is_schema = object_type == "SCHEMA";
-  if (object_type != "TABLE" && object_type != "VIEW" && !is_schema) {
+  // An external table is a DuckDB table; DROP EXTERNAL TABLE drops only external tables, which
+  // the emulator checks when it runs.
+  const bool external = object_type == "EXTERNAL TABLE";
+  if (object_type != "TABLE" && object_type != "VIEW" && !is_schema && !external) {
     return Unsupported(scope, "DROP " + object_type);
   }
   const auto path =
@@ -41,7 +44,8 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
   if (!path) {
     return std::nullopt;
   }
-  std::string sql = "DROP " + object_type + (drop.is_if_exists() ? " IF EXISTS " : " ") + *path;
+  std::string sql = "DROP " + std::string(external ? "TABLE" : object_type) +
+                    (drop.is_if_exists() ? " IF EXISTS " : " ") + *path;
   switch (drop.drop_mode()) {
     case googlesql::ResolvedDropStmt::CASCADE:
       return sql + " CASCADE";

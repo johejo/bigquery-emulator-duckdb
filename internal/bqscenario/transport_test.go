@@ -99,6 +99,48 @@ func TestRESTScenarioUploadAndResponse(t *testing.T) {
 	}
 }
 
+func TestGCSScenarioUploadAndDelete(t *testing.T) {
+	var uploaded []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer token" {
+			t.Error("missing authorization")
+		}
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/upload/storage/v1/b/bucket/o":
+			if r.URL.Query().Get("uploadType") != "media" || r.URL.Query().Get("name") != "run/a b.parquet" {
+				t.Errorf("URL = %s", r.URL)
+			}
+			uploaded, _ = io.ReadAll(r.Body)
+			_, _ = io.WriteString(w, `{"name":"run/a b.parquet"}`)
+		case r.Method == http.MethodDelete && r.URL.EscapedPath() == "/storage/v1/b/bucket/o/run%2Fa%20b.parquet":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("%s %s", r.Method, r.URL)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	transport := NewTransport("token")
+	transport.GCSEndpoint = server.URL
+	vars := map[string]any{"bucket": "bucket", "run": "run", "media": base64.StdEncoding.EncodeToString([]byte("PAR1\x00\xff"))}
+	media := "${media}"
+	response, err := transport.Call(t.Context(), Step{GCS: &GCSRequest{Method: "PUT", Object: "${run}/a b.parquet", Base64: &media}}, vars)
+	if err != nil || response.Failed {
+		t.Fatalf("upload = %+v, %v", response, err)
+	}
+	if string(uploaded) != "PAR1\x00\xff" {
+		t.Fatalf("uploaded = %q", uploaded)
+	}
+	response, err = transport.Call(t.Context(), Step{GCS: &GCSRequest{Method: "DELETE", Object: "${run}/a b.parquet"}}, vars)
+	if err != nil || response.Failed {
+		t.Fatalf("delete = %+v, %v", response, err)
+	}
+	delete(vars, "bucket")
+	if _, err := transport.Call(t.Context(), Step{GCS: &GCSRequest{Method: "DELETE", Object: "o"}}, vars); err == nil {
+		t.Fatal("gcs step without a bucket succeeded")
+	}
+}
+
 func TestRESTScenarioInvalidUpload(t *testing.T) {
 	invalid, valid := "not base64!", "UEFSMQ=="
 	for _, request := range []RESTRequest{
