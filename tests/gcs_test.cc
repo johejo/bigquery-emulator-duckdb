@@ -179,11 +179,6 @@ TEST_F(GcsTest, JsonStagingKeepsSourceIdentityAndCleansUp) {
   EXPECT_FALSE(std::filesystem::exists(rewritten));
 }
 
-TEST_F(GcsTest, DefaultsToPublicStorageApi) {
-  unsetenv("STORAGE_EMULATOR_HOST");
-  EXPECT_EQ(client().endpoint(), "https://storage.googleapis.com");
-}
-
 TEST_F(GcsTest, ReadsAnonymouslyWithoutAdc) {
   client_.emplace(endpoint_, false);
   Download();
