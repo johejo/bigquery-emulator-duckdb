@@ -358,6 +358,13 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     }
     if (existing.has_value() && !appends) {
       const auto info = GetTable(load.destination_table, /*include_row_count=*/false);
+      const auto dataset = GetDataset({
+          .project_id = load.destination_table.project_id,
+          .dataset_id = load.destination_table.dataset_id,
+      });
+      if (info.metadata.default_collation.has_value() || dataset.default_collation.has_value()) {
+        throw ApiError::Unsupported("load replacement involving a default collation");
+      }
       auto inherited = written;
       ApplyDefaultRoundingMode(inherited, info.metadata.default_rounding_mode);
       // BigQuery keeps an unchanged schema, including its modes. A changed schema is replaced
@@ -441,6 +448,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
       }
       CheckCopySource(copy, source, table.metadata);
+      if (copy.source_tables.size() > 1 && table.metadata.default_collation.has_value()) {
+        throw ApiError::Unsupported("copying several source tables with a default collation");
+      }
       if (!table.metadata.resource_tags.empty()) {
         throw ApiError::Unsupported("copy jobs from tables with tags");
       }
@@ -480,6 +490,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     // table's, while an appended table keeps its own and a copy of several tables takes none.
     const bool keyed = copy.source_tables.size() == 1 && !source_metadata.primary_key.empty();
     TableMetadata metadata;
+    metadata.default_collation = source_metadata.default_collation;
     if (copy.operation != CopyOperation::kCopy || keyed) {
       bool exists = true;
       try {

@@ -217,10 +217,11 @@ is listed in [sql.md](sql.md#collation) and [functions.md](functions.md). `und:c
 GoogleSQL's collator, ICU's root locale at secondary strength, whose Unicode data can order
 some strings differently from BigQuery's.
 
-Tables, views and query destination tables keep their columns' collations. Table and dataset
-default collations are supported through DDL and REST. Copy jobs involving a default collation,
-job replacement of a destination with a default collation, default collations on views, and
-materialized views with collated columns remain unsupported.
+Table and dataset default collations are supported through DDL and REST, single-source copy
+jobs, and query destination creation and replacement. Multi-source copies with source table
+default collations, snapshot/clone/restore jobs involving default collations, load replacement
+involving a table or dataset default collation, default collations on views, and materialized
+views with collated columns remain unsupported.
 
 ### RANGE values
 

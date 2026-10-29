@@ -1,0 +1,918 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run vznpv2dvzlrkv3nddc2mqd5x2y.
+# Job inheritance differs from CREATE TABLE / CTAS; retain the answer sidecar as provenance.
+# In particular, keep absent defaults and explicit empty defaults distinguishable.
+# Source defaults are changed AFTER inserting rows, leaving the mixed column
+# collations fixed so table-default inheritance can be isolated from column copying.
+# Specification context (does not settle copy/query replacement behavior):
+# ../../../../../third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+description: >-
+  Copy and query destination creation/replacement: distinguish source table defaults,
+  destination dataset defaults, existing destination defaults, and column collations.
+  Read metadata before and after adding a column to exercise the resulting default.
+vars:
+  source_dataset: bqa_${run}_${case}_src
+  destination_dataset: bqa_${run}_${case}_dst
+  dataset_default: ''
+  source_default: ''
+  destination_setup: ''
+  disposition: WRITE_EMPTY
+  copy_configuration:
+    copy:
+      sourceTable: {projectId: '${project}', datasetId: '${source_dataset}', tableId: source}
+      destinationTable: {projectId: '${project}', datasetId: '${destination_dataset}', tableId: destination}
+      writeDisposition: '${disposition}'
+  query_configuration:
+    query:
+      query: SELECT * FROM `${project}.${source_dataset}.source`
+      useLegacySql: false
+      destinationTable: {projectId: '${project}', datasetId: '${destination_dataset}', tableId: destination}
+      writeDisposition: '${disposition}'
+  replace_unassigned: >-
+    CREATE TABLE `${project}.${destination_dataset}.destination` (old_value STRING);
+    INSERT `${project}.${destination_dataset}.destination` VALUES ('old');
+  replace_ci: >-
+    CREATE TABLE `${project}.${destination_dataset}.destination` (old_value STRING) DEFAULT COLLATE 'und:ci';
+    INSERT `${project}.${destination_dataset}.destination` VALUES ('old');
+  replace_empty: >-
+    CREATE TABLE `${project}.${destination_dataset}.destination` (old_value STRING) DEFAULT COLLATE '';
+    INSERT `${project}.${destination_dataset}.destination` VALUES ('old');
+  set_source_ci: ALTER TABLE `${project}.${source_dataset}.source` SET DEFAULT COLLATE 'und:ci';
+  set_source_empty: ALTER TABLE `${project}.${source_dataset}.source` SET DEFAULT COLLATE '';
+  copied_after_add:
+    fields:
+    - name: unassigned
+      type: STRING
+    - collation: ""
+      name: binary
+      type: STRING
+    - collation: und:ci
+      name: ci
+      type: STRING
+    - fields:
+      - name: unassigned
+        type: STRING
+      - collation: ""
+        name: binary
+        type: STRING
+      - collation: und:ci
+        name: ci
+        type: STRING
+      name: nested
+      type: RECORD
+    - mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - collation: ""
+      mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+    - name: added
+      type: STRING
+  source_schema:
+    fields:
+    - name: unassigned
+      type: STRING
+    - collation: ""
+      name: binary
+      type: STRING
+    - collation: und:ci
+      name: ci
+      type: STRING
+    - fields:
+      - name: unassigned
+        type: STRING
+      - collation: ""
+        name: binary
+        type: STRING
+      - collation: und:ci
+        name: ci
+        type: STRING
+      name: nested
+      type: RECORD
+    - mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - collation: ""
+      mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+  copied_after_add_ci:
+    fields:
+    - name: unassigned
+      type: STRING
+    - collation: ""
+      name: binary
+      type: STRING
+    - collation: und:ci
+      name: ci
+      type: STRING
+    - fields:
+      - name: unassigned
+        type: STRING
+      - collation: ""
+        name: binary
+        type: STRING
+      - collation: und:ci
+        name: ci
+        type: STRING
+      name: nested
+      type: RECORD
+    - mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - collation: ""
+      mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+    - collation: und:ci
+      name: added
+      type: STRING
+  query_ci_after_add:
+    fields:
+    - collation: und:ci
+      mode: NULLABLE
+      name: unassigned
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: binary
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: ci
+      type: STRING
+    - fields:
+      - collation: und:ci
+        mode: NULLABLE
+        name: unassigned
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: binary
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: ci
+        type: STRING
+      mode: NULLABLE
+      name: nested
+      type: RECORD
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+    - collation: und:ci
+      name: added
+      type: STRING
+  query_ci_schema:
+    fields:
+    - collation: und:ci
+      mode: NULLABLE
+      name: unassigned
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: binary
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: ci
+      type: STRING
+    - fields:
+      - collation: und:ci
+        mode: NULLABLE
+        name: unassigned
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: binary
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: ci
+        type: STRING
+      mode: NULLABLE
+      name: nested
+      type: RECORD
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+  query_after_add:
+    fields:
+    - mode: NULLABLE
+      name: unassigned
+      type: STRING
+    - mode: NULLABLE
+      name: binary
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: ci
+      type: STRING
+    - fields:
+      - mode: NULLABLE
+        name: unassigned
+        type: STRING
+      - mode: NULLABLE
+        name: binary
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: ci
+        type: STRING
+      mode: NULLABLE
+      name: nested
+      type: RECORD
+    - mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+    - name: added
+      type: STRING
+  query_schema:
+    fields:
+    - mode: NULLABLE
+      name: unassigned
+      type: STRING
+    - mode: NULLABLE
+      name: binary
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: ci
+      type: STRING
+    - fields:
+      - mode: NULLABLE
+        name: unassigned
+        type: STRING
+      - mode: NULLABLE
+        name: binary
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: ci
+        type: STRING
+      mode: NULLABLE
+      name: nested
+      type: RECORD
+    - mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+  query_after_add_ci:
+    fields:
+    - mode: NULLABLE
+      name: unassigned
+      type: STRING
+    - mode: NULLABLE
+      name: binary
+      type: STRING
+    - collation: und:ci
+      mode: NULLABLE
+      name: ci
+      type: STRING
+    - fields:
+      - mode: NULLABLE
+        name: unassigned
+        type: STRING
+      - mode: NULLABLE
+        name: binary
+        type: STRING
+      - collation: und:ci
+        mode: NULLABLE
+        name: ci
+        type: STRING
+      mode: NULLABLE
+      name: nested
+      type: RECORD
+    - mode: REPEATED
+      name: repeated_unassigned
+      type: STRING
+    - mode: REPEATED
+      name: repeated_binary
+      type: STRING
+    - collation: und:ci
+      mode: REPEATED
+      name: repeated_ci
+      type: STRING
+    - collation: und:ci
+      name: added
+      type: STRING
+templates:
+  destination:
+    steps:
+      - name: setup_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                useLegacySql: false
+                query: >-
+                  CREATE SCHEMA `${project}.${source_dataset}` OPTIONS(location = 'US');
+                  CREATE SCHEMA `${project}.${destination_dataset}` ${dataset_default} OPTIONS(location = 'US');
+                  CREATE TABLE `${project}.${source_dataset}.source` (
+                    unassigned STRING,
+                    binary STRING COLLATE '',
+                    ci STRING COLLATE 'und:ci',
+                    nested STRUCT<unassigned STRING, binary STRING COLLATE '', ci STRING COLLATE 'und:ci'>,
+                    repeated_unassigned ARRAY<STRING>,
+                    repeated_binary ARRAY<STRING COLLATE ''>,
+                    repeated_ci ARRAY<STRING COLLATE 'und:ci'>
+                  );
+                  INSERT `${project}.${source_dataset}.source`
+                  VALUES ('a', 'a', 'a', STRUCT('a', 'a', 'a'), ['a'], ['a'], ['a']);
+                  ${source_default}
+                  ${destination_setup}
+        bind: {setup_job: /body/jobReference/jobId}
+      - name: setup
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/jobs/${setup_job}?location=US'}
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: source
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/datasets/${source_dataset}/tables/source'}
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+      - name: dataset
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/datasets/${destination_dataset}'}
+        observe: {defaultCollation: /body/defaultCollation}
+      - name: write_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration: '${configuration}'
+        bind: {write_job: /body/jobReference/jobId}
+        observe: {error: /body/error}
+      - name: write
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/jobs/${write_job}?location=US'}
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: destination
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/datasets/${destination_dataset}/tables/destination'}
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+          numRows: /body/numRows
+      - name: add_column_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                useLegacySql: false
+                query: ALTER TABLE `${project}.${destination_dataset}.destination` ADD COLUMN added STRING
+        bind: {add_column_job: /body/jobReference/jobId}
+      - name: add_column
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/jobs/${add_column_job}?location=US'}
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: after_add
+        rest: {method: GET, path: '/bigquery/v2/projects/${project}/datasets/${destination_dataset}/tables/destination'}
+        observe:
+          defaultCollation: /body/defaultCollation
+          schema: /body/schema
+    cleanup:
+      - name: delete_destination_dataset
+        rest: {method: DELETE, path: '/bigquery/v2/projects/${project}/datasets/${destination_dataset}?deleteContents=true'}
+      - name: delete_source_dataset
+        rest: {method: DELETE, path: '/bigquery/v2/projects/${project}/datasets/${source_dataset}?deleteContents=true'}
+cases:
+  - name: copy_create_no_defaults
+    template: destination
+    vars: {configuration: '${copy_configuration}'}
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        schema: ${copied_after_add}
+      dataset: {}
+      destination:
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_create_source_ci
+    template: destination
+    vars: {configuration: '${copy_configuration}', source_default: '${set_source_ci}'}
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${copied_after_add_ci}
+      dataset: {}
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_create_dataset_ci
+    template: destination
+    vars: {configuration: '${copy_configuration}', dataset_default: "DEFAULT COLLATE 'und:ci'"}
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        schema: ${copied_after_add}
+      dataset:
+        defaultCollation: und:ci
+      destination:
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_create_source_empty_dataset_ci
+    template: destination
+    vars:
+      configuration: '${copy_configuration}'
+      source_default: '${set_source_empty}'
+      dataset_default: "DEFAULT COLLATE 'und:ci'"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: ""
+        schema: ${copied_after_add}
+      dataset:
+        defaultCollation: und:ci
+      destination:
+        defaultCollation: ""
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: ""
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_create_source_ci_dataset_empty
+    template: destination
+    vars:
+      configuration: '${copy_configuration}'
+      source_default: '${set_source_ci}'
+      dataset_default: "DEFAULT COLLATE ''"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${copied_after_add_ci}
+      dataset:
+        defaultCollation: ""
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_replace_source_ci_existing_none_dataset_none
+    template: destination
+    vars:
+      configuration: '${copy_configuration}'
+      disposition: WRITE_TRUNCATE
+      source_default: '${set_source_ci}'
+      destination_setup: '${replace_unassigned}'
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${copied_after_add_ci}
+      dataset: {}
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_replace_source_ci_existing_empty_dataset_ci
+    template: destination
+    vars:
+      configuration: '${copy_configuration}'
+      disposition: WRITE_TRUNCATE
+      source_default: '${set_source_ci}'
+      destination_setup: '${replace_empty}'
+      dataset_default: "DEFAULT COLLATE 'und:ci'"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${copied_after_add_ci}
+      dataset:
+        defaultCollation: und:ci
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_replace_source_none_existing_ci_dataset_empty
+    template: destination
+    vars:
+      configuration: '${copy_configuration}'
+      disposition: WRITE_TRUNCATE
+      destination_setup: '${replace_ci}'
+      dataset_default: "DEFAULT COLLATE ''"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${copied_after_add_ci}
+      dataset:
+        defaultCollation: ""
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: copy_replace_source_empty_existing_ci_dataset_none
+    template: destination
+    vars:
+      configuration: '${copy_configuration}'
+      disposition: WRITE_TRUNCATE
+      source_default: '${set_source_empty}'
+      destination_setup: '${replace_ci}'
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: ""
+        schema: ${copied_after_add}
+      dataset: {}
+      destination:
+        defaultCollation: ""
+        numRows: "1"
+        schema: ${source_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: ""
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_create_no_defaults
+    template: destination
+    vars: {configuration: '${query_configuration}'}
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        schema: ${query_after_add}
+      dataset: {}
+      destination:
+        numRows: "1"
+        schema: ${query_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_create_source_ci
+    template: destination
+    vars: {configuration: '${query_configuration}', source_default: '${set_source_ci}'}
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        schema: ${query_after_add}
+      dataset: {}
+      destination:
+        numRows: "1"
+        schema: ${query_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_create_dataset_ci
+    template: destination
+    vars: {configuration: '${query_configuration}', dataset_default: "DEFAULT COLLATE 'und:ci'"}
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${query_ci_after_add}
+      dataset:
+        defaultCollation: und:ci
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${query_ci_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_create_source_empty_dataset_ci
+    template: destination
+    vars:
+      configuration: '${query_configuration}'
+      source_default: '${set_source_empty}'
+      dataset_default: "DEFAULT COLLATE 'und:ci'"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${query_ci_after_add}
+      dataset:
+        defaultCollation: und:ci
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${query_ci_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: ""
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_create_source_ci_dataset_empty
+    template: destination
+    vars:
+      configuration: '${query_configuration}'
+      source_default: '${set_source_ci}'
+      dataset_default: "DEFAULT COLLATE ''"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: ""
+        schema: ${query_after_add}
+      dataset:
+        defaultCollation: ""
+      destination:
+        defaultCollation: ""
+        numRows: "1"
+        schema: ${query_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_replace_source_ci_existing_none_dataset_none
+    template: destination
+    vars:
+      configuration: '${query_configuration}'
+      disposition: WRITE_TRUNCATE
+      source_default: '${set_source_ci}'
+      destination_setup: '${replace_unassigned}'
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        schema: ${query_after_add}
+      dataset: {}
+      destination:
+        numRows: "1"
+        schema: ${query_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_replace_source_ci_existing_empty_dataset_ci
+    template: destination
+    vars:
+      configuration: '${query_configuration}'
+      disposition: WRITE_TRUNCATE
+      source_default: '${set_source_ci}'
+      destination_setup: '${replace_empty}'
+      dataset_default: "DEFAULT COLLATE 'und:ci'"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${query_ci_after_add}
+      dataset:
+        defaultCollation: und:ci
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${query_ci_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: und:ci
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_replace_source_none_existing_ci_dataset_empty
+    template: destination
+    vars:
+      configuration: '${query_configuration}'
+      disposition: WRITE_TRUNCATE
+      destination_setup: '${replace_ci}'
+      dataset_default: "DEFAULT COLLATE ''"
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: ""
+        schema: ${query_after_add}
+      dataset:
+        defaultCollation: ""
+      destination:
+        defaultCollation: ""
+        numRows: "1"
+        schema: ${query_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
+  - name: query_replace_source_empty_existing_ci_dataset_none
+    template: destination
+    vars:
+      configuration: '${query_configuration}'
+      disposition: WRITE_TRUNCATE
+      source_default: '${set_source_empty}'
+      destination_setup: '${replace_ci}'
+    expect:
+      add_column:
+        status:
+          state: DONE
+      after_add:
+        defaultCollation: und:ci
+        schema: ${query_after_add_ci}
+      dataset: {}
+      destination:
+        defaultCollation: und:ci
+        numRows: "1"
+        schema: ${query_schema}
+      setup:
+        status:
+          state: DONE
+      source:
+        defaultCollation: ""
+        schema: ${source_schema}
+      write:
+        status:
+          state: DONE
+      write_job: {}
