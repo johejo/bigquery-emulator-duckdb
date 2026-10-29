@@ -35,10 +35,9 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // analyzes the views, routines and property graphs it resolves with `timestamp_precision`.
   BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                   std::string default_project, std::string default_dataset,
-                  TimestampPrecision timestamp_precision,
-                  const TemporaryTables* temporary = nullptr,
-                  const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds(),
-                  FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
+                  TimestampPrecision timestamp_precision, const TemporaryTables* temporary,
+                  const ExcludedFunctionIds& excluded_function_ids,
+                  FunctionDeclarations declarations);
   ~BigQueryCatalog() override;
 
   [[nodiscard]] std::string FullName() const override { return "bigquery"; }

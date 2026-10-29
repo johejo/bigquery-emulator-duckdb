@@ -37,9 +37,9 @@ class RoutineCatalog : public BigQueryCatalog {
   // `source`, `type_factory` and `temporary` must outlive the catalog, as for BigQueryCatalog.
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                  std::string default_project, std::string default_dataset,
-                 TimestampPrecision timestamp_precision, const TemporaryTables* temporary = nullptr,
-                 const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds(),
-                 FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
+                 TimestampPrecision timestamp_precision, const TemporaryTables* temporary,
+                 const ExcludedFunctionIds& excluded_function_ids,
+                 FunctionDeclarations declarations);
   ~RoutineCatalog() override;
 
   absl::Status FindFunction(const absl::Span<const std::string>& path,
