@@ -22,7 +22,7 @@ Source: [CURRENT_DATETIME](../../third_party/bigquery_docs/reference/standard-sq
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
 | `` | `DATETIME` | Supported |  |
-| `STRING` | `DATETIME` | Unsupported | function CURRENT_DATETIME |
+| `STRING` | `DATETIME` | Supported |  |
 
 ## DATETIME
 

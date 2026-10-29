@@ -1146,13 +1146,26 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)",
                  },
              }),
-      Define("CURRENT_DATE", {{.arity = 0, .spelling = "CURRENT_DATE"}}),
-      Define("CURRENT_TIME", {{.arity = 0, .spelling = "CURRENT_TIME"}}),
+      // A time zone argument takes the civil time of the statement's timestamp there.
+      Define("CURRENT_DATE",
+             {
+                 {.arity = 0, .spelling = "CURRENT_DATE"},
+                 {
+                     .arity = 1,
+                     .spelling = "CAST(bq_timestamp_to_datetime_in(CURRENT_TIMESTAMP, $1) AS DATE)",
+                 },
+             }),
+      Define("CURRENT_TIME",
+             {
+                 {.arity = 0, .spelling = "CURRENT_TIME"},
+                 {.arity = 1, .spelling = "bq_timestamp_to_time_in(CURRENT_TIMESTAMP, $1)"},
+             }),
       Define("CURRENT_TIMESTAMP", {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}),
 
       Define("CURRENT_DATETIME",
              {
                  {.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"},
+                 {.arity = 1, .spelling = "bq_timestamp_to_datetime_in(CURRENT_TIMESTAMP, $1)"},
              }),
       // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
 

@@ -162,9 +162,9 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [CSC](function-types/mathematical.md#csc) | 4 | Supported |
 | [CSCH](function-types/mathematical.md#csch) | 4 | Supported |
 | `CUME_DIST` | 0 | Not enumerated |
-| [CURRENT_DATE](function-types/date.md#current_date) | 2 | Partial |
-| [CURRENT_DATETIME](function-types/datetime.md#current_datetime) | 2 | Partial |
-| [CURRENT_TIME](function-types/time.md#current_time) | 2 | Partial |
+| [CURRENT_DATE](function-types/date.md#current_date) | 2 | Supported |
+| [CURRENT_DATETIME](function-types/datetime.md#current_datetime) | 2 | Supported |
+| [CURRENT_TIME](function-types/time.md#current_time) | 2 | Supported |
 | [CURRENT_TIMESTAMP](function-types/timestamp.md#current_timestamp) | 1 | Supported |
 | [DATE](function-types/date.md#date) | 4 | Supported |
 | [DATETIME](function-types/datetime.md#datetime) | 5 | Supported |
