@@ -9,9 +9,11 @@
 //
 // A directory processes each *.txt, *.api.yaml, *.api.yml and *.api.json file. API scenarios can use REST, multipart
 // uploads and BigQuery Storage gRPC; see README.md in this directory. -validate checks SQL case formats and API scenarios
-// without authenticating or sending requests.
+// without authenticating or sending requests. -bucket names the Cloud Storage bucket that scenario gcs
+// steps write to, which the authenticated account must be able to write; cases that use it fail
+// without it.
 //
-//	bqanswers [-validate] [-timeout 2m] PROJECT FILE_OR_DIRECTORY
+//	bqanswers [-validate] [-timeout 2m] [-bucket BUCKET] PROJECT FILE_OR_DIRECTORY
 package main
 
 import (
@@ -98,12 +100,13 @@ func parseAnswer(body io.Reader) (string, error) {
 func main() {
 	validate := flag.Bool("validate", false, "validate SQL case formats and API scenarios without authentication or requests")
 	timeout := flag.Duration("timeout", 2*time.Minute, "deadline for each scenario step, including polling")
+	bucket := flag.String("bucket", "", "Cloud Storage bucket for scenario gcs steps")
 	flag.Parse()
 	if flag.NArg() != 2 || *timeout <= 0 {
-		fmt.Fprintln(os.Stderr, "usage: bqanswers [-validate] [-timeout 2m] PROJECT FILE_OR_DIRECTORY")
+		fmt.Fprintln(os.Stderr, "usage: bqanswers [-validate] [-timeout 2m] [-bucket BUCKET] PROJECT FILE_OR_DIRECTORY")
 		os.Exit(2)
 	}
-	if err := run(flag.Arg(0), flag.Arg(1), *validate, *timeout); err != nil {
+	if err := run(flag.Arg(0), flag.Arg(1), *bucket, *validate, *timeout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -132,7 +135,7 @@ func caseFiles(path string) ([]string, error) {
 	return paths, nil
 }
 
-func run(project, path string, validate bool, timeout time.Duration) error {
+func run(project, path, bucket string, validate bool, timeout time.Duration) error {
 	paths, err := caseFiles(path)
 	if err != nil {
 		return err
@@ -170,7 +173,7 @@ func run(project, path string, validate bool, timeout time.Duration) error {
 		defer cancel()
 		return answer(queryCtx, accessToken, project, sql, parameters)
 	}, func(file string) error {
-		return bqscenario.Collect(ctx, file, project, strings.ToLower(rand.Text()), timeout, transport.Call)
+		return bqscenario.Collect(ctx, file, project, strings.ToLower(rand.Text()), bucket, timeout, transport.Call)
 	})
 }
 

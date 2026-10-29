@@ -150,7 +150,8 @@ start with a letter and contain only letters, digits and underscores. Each step 
 ```
 
 `${project}` is the CLI project, `${run}` is a fresh random identifier for the file's execution,
-and `${case}` is the case name. These names are reserved. File and case `vars` supply other
+`${case}` is the case name, and `${bucket}` is the Cloud Storage bucket of `gcs` steps. These
+names are reserved. File and case `vars` supply other
 values, with case variables taking precedence. Values can refer to other variables. A whole
 JSON value `${schema}` preserves an object's, array's or number's type; substitutions within a
 string accept scalar values. Object keys also expand variables and must remain strings;
@@ -200,6 +201,23 @@ retried. The default deadline is two minutes per step, including polling. It can
 `go run ./tools/bqanswers -timeout 5m PROJECT PATH`. Include the dataset/job location in requests
 where BigQuery requires it. `jobs.query` cases should request a sufficient `timeoutMs` and observe
 `jobComplete`; a query that does not finish needs a separate jobs.getQueryResults polling step.
+
+## Cloud Storage
+
+A `gcs` step writes or deletes one object of `${bucket}`, such as the source of an external
+table. `PUT` uploads the standard base64 `base64` contents after variable expansion; `DELETE`
+takes none. Put objects under `${run}/` and delete them in `cleanup`, where a missing object is
+not a failure:
+
+```yaml
+- name: source
+  gcs: {method: PUT, object: "${run}/${case}.parquet", base64: "${parquet}"}
+```
+
+Collection requires `-bucket BUCKET` (`BQANSWERS_BUCKET` for `just bigquery-answers`), a bucket the
+authenticated account can write, in the location of the scenario's datasets. Cases that use
+`${bucket}` fail without it. End-to-end verification uses the fake GCS server's `scenarios`
+bucket.
 
 ## gRPC
 

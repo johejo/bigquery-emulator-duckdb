@@ -24,7 +24,7 @@ func TestValidateSQLWithoutCredentials(t *testing.T) {
 			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if err := run("unused", path, true, time.Second); err != nil {
+			if err := run("unused", path, "", true, time.Second); err != nil {
 				t.Fatal(err)
 			}
 			got, err := os.ReadFile(path)
@@ -63,7 +63,7 @@ func TestRejectMalformedSQLCases(t *testing.T) {
 			}
 			// Both validation and collection must reject the file before invoking gcloud.
 			for _, validate := range []bool{true, false} {
-				if err := run("unused", path, validate, time.Second); err == nil || !strings.Contains(err.Error(), path+tc.want) {
+				if err := run("unused", path, "", validate, time.Second); err == nil || !strings.Contains(err.Error(), path+tc.want) {
 					t.Fatalf("validate=%v: got %v, want %s", validate, err, path+tc.want)
 				}
 			}

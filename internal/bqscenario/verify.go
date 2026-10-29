@@ -36,8 +36,12 @@ func decodeJSON(data []byte, value any) error {
 	return nil
 }
 
-func (file *File) variables(c Case, project, run string) map[string]any {
+func (file *File) variables(c Case, project, run, bucket string) map[string]any {
 	vars := map[string]any{"project": project, "run": run, "case": c.Name}
+	// Leave ${bucket} unknown without a bucket, so a case that needs one fails before it runs.
+	if bucket != "" {
+		vars["bucket"] = bucket
+	}
 	for key, value := range file.Vars {
 		vars[key] = value
 	}
@@ -51,7 +55,7 @@ func (file *File) variables(c Case, project, run string) map[string]any {
 // may run different cases in parallel, using a separate transport for each case.
 // Expectations compare the complete selected observation, including missing/null
 // distinctions and array order. Answer provenance is never an assertion.
-func (file *File) Verify(ctx context.Context, c Case, project, run string, timeout time.Duration, call Call) error {
+func (file *File) Verify(ctx context.Context, c Case, project, run, bucket string, timeout time.Duration, call Call) error {
 	if timeout <= 0 {
 		return errors.New("scenario timeout must be positive")
 	}
@@ -66,7 +70,7 @@ func (file *File) Verify(ctx context.Context, c Case, project, run string, timeo
 	if err != nil {
 		return err
 	}
-	vars := file.variables(c, project, run)
+	vars := file.variables(c, project, run, bucket)
 	got, runErr, cleanupErr := execute(ctx, c, vars, timeout, call)
 	if runErr != nil {
 		return errors.Join(runErr, cleanupErr)

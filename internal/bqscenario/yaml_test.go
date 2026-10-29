@@ -70,7 +70,7 @@ func TestYAMLPrecisionAndMultiline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := expandedRequest(*c.Steps[0].REST, file.variables(c, "test", "run"))
+	request, err := expandedRequest(*c.Steps[0].REST, file.variables(c, "test", "run", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestYAMLPrecisionAndMultiline(t *testing.T) {
 
 func TestYAMLCollectionSidecarResumeAndVerify(t *testing.T) {
 	path := yamlFixturePath(t, yamlFixture)
-	if err := Collect(t.Context(), path, "project", "run", time.Second, fixtureCall); err != nil {
+	if err := Collect(t.Context(), path, "project", "run", "", time.Second, fixtureCall); err != nil {
 		t.Fatal(err)
 	}
 	original, err := os.ReadFile(path)
@@ -96,7 +96,7 @@ func TestYAMLCollectionSidecarResumeAndVerify(t *testing.T) {
 	if err != nil || !strings.Contains(string(data), "9007199254740993") || !strings.Contains(string(data), `"project": "project"`) {
 		t.Fatalf("sidecar: %s, %v", data, err)
 	}
-	if err := Collect(t.Context(), path, "project", "newrun", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
+	if err := Collect(t.Context(), path, "project", "newrun", "", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
 		t.Fatal("answered case replayed")
 		return Response{}, nil
 	}); err != nil {
@@ -109,7 +109,7 @@ func TestYAMLCollectionSidecarResumeAndVerify(t *testing.T) {
 	if len(file.Cases[0].Answer) != 0 {
 		t.Fatal("verification loaded a collected answer")
 	}
-	if err := file.Verify(t.Context(), file.Cases[0], "local", "localrun", time.Second, fixtureCall); err != nil {
+	if err := file.Verify(t.Context(), file.Cases[0], "local", "localrun", "", time.Second, fixtureCall); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := os.ReadFile(AnswersPath(path))
@@ -131,13 +131,13 @@ func TestVerifyMismatchAndCleanup(t *testing.T) {
 	} {
 		c := file.Cases[0]
 		c.Expect = json.RawMessage(want)
-		if err := file.Verify(t.Context(), c, "p", "r", time.Second, fixtureCall); err == nil {
+		if err := file.Verify(t.Context(), c, "p", "r", "", time.Second, fixtureCall); err == nil {
 			t.Fatal("mismatched expectation accepted")
 		} else if _, ok := err.(*MismatchError); !ok {
 			t.Fatalf("completed mismatch has type %T: %v", err, err)
 		}
 		cleaned := false
-		err := file.Verify(t.Context(), c, "p", "r", time.Second, func(ctx context.Context, step Step, vars map[string]any) (Response, error) {
+		err := file.Verify(t.Context(), c, "p", "r", "", time.Second, func(ctx context.Context, step Step, vars map[string]any) (Response, error) {
 			if step.Name == "delete" {
 				cleaned = true
 				return Response{}, failure
@@ -153,7 +153,7 @@ func TestVerifyMismatchAndCleanup(t *testing.T) {
 	}
 	c := file.Cases[0]
 	c.Expect = nil
-	if err := file.Verify(t.Context(), c, "p", "r", time.Second, fixtureCall); err == nil {
+	if err := file.Verify(t.Context(), c, "p", "r", "", time.Second, fixtureCall); err == nil {
 		t.Fatal("missing expectation accepted")
 	}
 }
@@ -201,10 +201,10 @@ cases:
 		}
 		return Response{Value: map[string]any{"status": 200}}, nil
 	}
-	if err := file.Verify(t.Context(), file.Cases[0], "p", "r", time.Second, call); err != nil {
+	if err := file.Verify(t.Context(), file.Cases[0], "p", "r", "", time.Second, call); err != nil {
 		t.Fatal(err)
 	}
-	if err := file.Verify(t.Context(), file.Cases[0], "p", "r", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
+	if err := file.Verify(t.Context(), file.Cases[0], "p", "r", "", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
 		return Response{Value: map[string]any{"status": 200}}, nil
 	}); err == nil {
 		t.Fatal("unexpected success accepted")
@@ -230,7 +230,7 @@ func TestInvalidSidecarDoesNotAffectVerification(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := file.Verify(t.Context(), file.Cases[0], "p", "r", time.Second, fixtureCall); err != nil {
+		if err := file.Verify(t.Context(), file.Cases[0], "p", "r", "", time.Second, fixtureCall); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -50,13 +50,18 @@ func testScenarios(t *testing.T, pattern string, knownBug bool) {
 			for _, c := range file.Cases {
 				t.Run(c.Name, func(t *testing.T) {
 					t.Parallel()
-					transport := bqscenario.NewEmulatorTransport(endpoint, os.Getenv("BQ_EMULATOR_GRPC"))
+					gcs := os.Getenv("STORAGE_EMULATOR_HOST")
+					if gcs != "" && !strings.Contains(gcs, "://") {
+						gcs = "http://" + gcs
+					}
+					transport := bqscenario.NewEmulatorTransport(endpoint, os.Getenv("BQ_EMULATOR_GRPC"), gcs)
 					t.Cleanup(func() {
 						if err := transport.Close(); err != nil {
 							t.Error(err)
 						}
 					})
-					err := file.Verify(t.Context(), c, project, strings.ToLower(rand.Text()), 2*time.Minute, transport.Call)
+					// tests/e2e/gcs seeds the fake GCS server with this bucket.
+					err := file.Verify(t.Context(), c, project, strings.ToLower(rand.Text()), "scenarios", 2*time.Minute, transport.Call)
 					if knownBug {
 						if err == nil {
 							t.Fatal("known bug now passes; move this case to testdata/")

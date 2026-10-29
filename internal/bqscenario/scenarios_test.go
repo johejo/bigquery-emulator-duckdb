@@ -108,7 +108,7 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 		}
 		return Response{Value: map[string]any{"body": map[string]any{"resource": "captured", "null": nil, "number": json.Number("9007199254740993")}}}, nil
 	}
-	err := Collect(t.Context(), path, "project", "run", time.Second, call)
+	err := Collect(t.Context(), path, "project", "run", "", time.Second, call)
 	if !errors.Is(err, failure) {
 		t.Fatalf("error = %v", err)
 	}
@@ -146,7 +146,7 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 		t.Fatalf("file permissions: %v, %v", info, err)
 	}
 	calls = nil
-	if err := Collect(t.Context(), path, "project", "newrun", time.Second, func(_ context.Context, step Step, vars map[string]any) (Response, error) {
+	if err := Collect(t.Context(), path, "project", "newrun", "", time.Second, func(_ context.Context, step Step, vars map[string]any) (Response, error) {
 		calls = append(calls, vars["case"].(string)+"/"+step.Name)
 		return Response{Value: map[string]any{}}, nil
 	}); err != nil {
@@ -163,7 +163,7 @@ func TestScenarioCleanupAfterCancellation(t *testing.T) {
 	path := writeScenarioFixture(t, File{Version: 1, Cases: []Case{{Name: "cancel", Steps: []Step{observe}, Cleanup: []Step{restStep("cleanup")}}}})
 	ctx, cancel := context.WithCancel(t.Context())
 	cleaned := false
-	err := Collect(ctx, path, "project", "run", time.Second, func(ctx context.Context, step Step, _ map[string]any) (Response, error) {
+	err := Collect(ctx, path, "project", "run", "", time.Second, func(ctx context.Context, step Step, _ map[string]any) (Response, error) {
 		if step.Name == "observe" {
 			cancel()
 			return Response{}, ctx.Err()
@@ -191,6 +191,20 @@ func TestScenarioRejectsInvalidFilesBeforeCalls(t *testing.T) {
 		},
 		func(f *File) { f.Cases[0].Steps[0].REST.Path = "https://another-host/" },
 		func(f *File) { f.Cases[0].Vars = map[string]any{"project": "override"} },
+		func(f *File) { f.Cases[0].Vars = map[string]any{"bucket": "override"} },
+		func(f *File) { f.Cases[0].Steps[0].GCS = &GCSRequest{Method: "DELETE", Object: "o"} },
+		func(f *File) {
+			f.Cases[0].Steps[0].REST = nil
+			f.Cases[0].Steps[0].GCS = &GCSRequest{Method: "PUT", Object: "o"}
+		},
+		func(f *File) {
+			f.Cases[0].Steps[0].REST = nil
+			f.Cases[0].Steps[0].GCS = &GCSRequest{Method: "GET", Object: "o"}
+		},
+		func(f *File) {
+			f.Cases[0].Steps[0].REST = nil
+			f.Cases[0].Steps[0].GCS = &GCSRequest{Method: "DELETE", Object: "/o"}
+		},
 	} {
 		step := observe
 		step.Observe = map[string]string{"response": ""}
@@ -198,7 +212,7 @@ func TestScenarioRejectsInvalidFilesBeforeCalls(t *testing.T) {
 		file := File{Version: 1, Cases: []Case{{Name: "test", Steps: []Step{step}}}}
 		mutate(&file)
 		path := writeScenarioFixture(t, file)
-		if err := Collect(t.Context(), path, "p", "r", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
+		if err := Collect(t.Context(), path, "p", "r", "", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
 			t.Fatal("request sent for invalid file")
 			return Response{}, nil
 		}); err == nil {
@@ -236,7 +250,7 @@ func TestScenarioTemplateAndValidation(t *testing.T) {
 	if _, err := Read(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := Collect(t.Context(), path, "project", "run", time.Second, func(_ context.Context, step Step, vars map[string]any) (Response, error) {
+	if err := Collect(t.Context(), path, "project", "run", "", time.Second, func(_ context.Context, step Step, vars map[string]any) (Response, error) {
 		if step.Name == "observe" && vars["captured"] != "bound" {
 			t.Fatalf("binding = %v", vars)
 		}
@@ -277,7 +291,7 @@ func TestCleanupFailureKeepsAnswer(t *testing.T) {
 		cleanup := restStep("delete")
 		cleanup.REST.Method = "DELETE"
 		path := writeScenarioFixture(t, File{Version: 1, Cases: []Case{{Name: "cleanup", Steps: []Step{step}, Cleanup: []Step{cleanup}}}})
-		err := Collect(t.Context(), path, "p", "run", time.Second, func(_ context.Context, step Step, _ map[string]any) (Response, error) {
+		err := Collect(t.Context(), path, "p", "run", "", time.Second, func(_ context.Context, step Step, _ map[string]any) (Response, error) {
 			if step.Name == "delete" {
 				return Response{Failed: true, Value: map[string]any{"status": code}}, nil
 			}
