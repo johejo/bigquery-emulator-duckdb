@@ -92,6 +92,20 @@ absl::StatusOr<std::string> SortKey(std::string_view value, std::string_view spe
   return std::string(key);
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): collation first, then SQL operands.
+absl::StatusOr<bool> Like(std::string_view specification, std::string_view value,
+                          std::string_view pattern, bool bigquery) {
+  GOOGLESQL_RETURN_IF_ERROR(CheckSpecification(specification, bigquery));
+  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::GoogleSqlCollator* collator,
+                             FindCollator(specification));
+  // Observed BigQuery accepts unescaped underscores under und:ci, unlike the error
+  // example in third_party/bigquery_docs/reference/standard-sql/operators.md.
+  // GoogleSQL's compliance data still uses the implementation that rejects them.
+  return bigquery
+             ? googlesql::functions::LikeUtf8WithCollationAllowUnderscore(value, pattern, *collator)
+             : googlesql::functions::LikeUtf8WithCollation(value, pattern, *collator);
+}
+
 absl::StatusOr<bool> StartsWith(std::string_view specification, std::string_view value,
                                 std::string_view substring, bool bigquery) {
   return Evaluate<bool>(specification, bigquery, googlesql::functions::StartsWithUtf8WithCollation,

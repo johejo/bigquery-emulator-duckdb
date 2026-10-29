@@ -1,0 +1,88 @@
+# Collated LIKE examples and semantics from
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+SELECT COLLATE('Foo', 'und:ci') LIKE COLLATE('%foo%', 'und:ci')
+=> "true"
+
+SELECT 'Foo' LIKE COLLATE('%foo%', 'und:ci')
+=> "true"
+
+SELECT COLLATE('Foo', 'und:ci') NOT LIKE '%foo%'
+=> "false"
+
+SELECT COLLATE('Foo_', 'und:ci') LIKE COLLATE('%foo\\_%', 'und:ci')
+=> "true"
+
+# Recorded BigQuery answer: unescaped underscores match under und:ci, contrary to
+# the error example in third_party/bigquery_docs/reference/standard-sql/operators.md.
+SELECT COLLATE('Foo', 'und:ci') LIKE '%f_o%'
+=> "true"
+
+SELECT COLLATE('Foo', 'und:ci') LIKE COLLATE('%foo%', 'binary')
+=> error:
+
+SELECT COLLATE('MASSE', 'und:ci') LIKE '%Maße%'
+=> "false"
+
+SELECT COLLATE('\u3042', 'und:ci') LIKE COLLATE('%\u30A2%', 'und:ci')
+=> "true"
+
+SELECT COLLATE('\u0061\u030A', 'und:ci') LIKE '%\u00C5%'
+=> "true"
+
+SELECT COLLATE('\u0083', 'und:ci') LIKE ''
+=> "true"
+
+# No wildcards compares whole strings under the operation's collation.
+SELECT COLLATE('Foo', 'und:ci') LIKE 'foo'
+=> "true"
+
+SELECT COLLATE('MASSE', 'und:ci') LIKE 'Maße'
+=> "false"
+
+SELECT COLLATE('', 'und:ci') LIKE '%'
+=> "true"
+
+# Quantified LIKE propagates the operation's collation to every comparison.
+SELECT COLLATE('a', 'und:ci') LIKE ALL ('a', 'A')
+=> "true"
+
+SELECT 'a' LIKE ALL (COLLATE('a', 'und:ci'), 'A')
+=> "true"
+
+SELECT 'a' LIKE ALL ('%A%', COLLATE('a', 'und:ci'))
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') LIKE ANY ('B', 'A')
+=> "true"
+
+SELECT COLLATE('a', 'und:ci') LIKE SOME ('B', 'C')
+=> "false"
+
+# Escaped wildcard examples from GoogleSQL compliance/functions_testlib_like.cc,
+# GetFunctionTestsLikeWithCollation.
+SELECT COLLATE('%barfoobar', 'und:ci') LIKE r'\%BarFoo%'
+=> "true"
+
+SELECT COLLATE('barfoobar', 'und:ci') LIKE r'\_Foo%'
+=> "false"
+
+# Removing the collation restores binary LIKE.
+SELECT COLLATE(COLLATE('Foo', 'und:ci'), '') LIKE '%foo%'
+=> "false"
+
+# Recorded BigQuery answers: a collated NULL value propagates NULL, but a literal
+# NULL pattern is rejected. The NULL value differs from the plain LIKE error
+# example in third_party/bigquery_docs/reference/standard-sql/operators.md.
+SELECT COLLATE(NULL, 'und:ci') LIKE 'a%'
+=> null
+
+SELECT COLLATE('a', 'und:ci') LIKE NULL
+=> error:
+
+SELECT COLLATE('a', 'und:ci') LIKE CONCAT('a', CHR(92))
+=> error: LIKE pattern ends with a backslash which is not allowed: a\
+
+# Conditional expressions do not evaluate a failing LIKE branch.
+SELECT IF(FALSE, COLLATE('a', 'und:ci') LIKE CONCAT('a', CHR(92)), TRUE)
+=> "true"
