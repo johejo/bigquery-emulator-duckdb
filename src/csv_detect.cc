@@ -94,7 +94,7 @@ std::vector<Record> ParseRecords(std::string_view contents, char delimiter,
 }
 
 // The delimiter that splits the first record into the most fields: a comma, pipe or tab, which
-// BigQuery detects. Of a comma and a pipe that split it into as many, BigQuery picks the pipe.
+// BigQuery detects. Of those that split it into as many, BigQuery picks a tab, then a pipe.
 char DetectDelimiter(std::string_view contents) {
   constexpr std::array kCandidates = {',', '|', '\t'};
   std::array<size_t, kCandidates.size()> counts{};
@@ -107,10 +107,6 @@ char DetectDelimiter(std::string_view contents) {
     return ',';
   }
   if (counts.at(2) == most) {
-    if (counts.at(0) == most || counts.at(1) == most) {
-      throw ApiError::Unsupported(
-          "detecting the delimiter of CSV data that tabs and another delimiter split alike");
-    }
     return '\t';
   }
   return counts.at(1) == most ? '|' : ',';
@@ -385,8 +381,9 @@ Typed Classify(const Cell& cell) {
 // Checks the characters of a column name taken from a header as BigQuery does with its default
 // character map: of the characters flexible column names do not support
 // (third_party/bigquery_docs/schemas.md), it checks every name before other rules.
+// BigQuery rejects a tab too, but keeps spaces, even leading and trailing ones.
 void CheckHeaderCharacters(const std::string& name) {
-  if (name.find_first_of("!\"$()*,./;?@[\\]^`{}~") != std::string::npos) {
+  if (name.find_first_of("!\"$()*,./;?@[\\]^`{}~\t") != std::string::npos) {
     throw ApiError::InvalidQuery(
         std::format("Field name '{}' is not supported by the current character map. Please "
                     "change your field name or use character map V2 to let the system modify "
@@ -397,10 +394,9 @@ void CheckHeaderCharacters(const std::string& name) {
 
 // Checks the other rules for a column name taken from a header.
 void CheckHeaderName(const std::string& name) {
-  // The documentation allows whitespace in flexible column names but says auto-detection
-  // replaces spaces with underscores.
-  if (name.find_first_of(" \t\n\r\f\v") != std::string::npos) {
-    throw ApiError::Unsupported("detecting a CSV header name with whitespace");
+  // How BigQuery treats other whitespace is not known.
+  if (name.find_first_of("\f\v") != std::string::npos) {
+    throw ApiError::Unsupported("detecting a CSV header name with a form feed or vertical tab");
   }
   const std::string upper = ToUpperAscii(name);
   for (const std::string_view prefix : {
