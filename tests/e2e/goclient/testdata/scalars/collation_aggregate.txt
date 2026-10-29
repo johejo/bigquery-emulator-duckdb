@@ -1,5 +1,5 @@
-# Collated MIN, MAX, COUNT(DISTINCT), GREATEST and LEAST compare strings as the collation does and
-# return the original values:
+# Collated MIN, MAX, COUNT(DISTINCT), ARRAY_AGG(DISTINCT), STRING_AGG(DISTINCT), GREATEST and
+# LEAST compare strings as the collation does and return the original values:
 # third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
 
 SELECT MAX(x) FROM UNNEST([COLLATE('a', 'und:ci'), 'B']) AS x
@@ -105,3 +105,60 @@ SELECT ARRAY(
 SELECT ARRAY_AGG(y HAVING MAX x ORDER BY y)
 FROM UNNEST([STRUCT(COLLATE('b', 'und:ci') AS x, 1 AS y), ('B', 2), ('a', 3)])
 => error: Unsupported having modifier in the aggregate function array_agg.
+
+# BigQuery's answers: DISTINCT in STRING_AGG and ARRAY_AGG compares collated strings as the
+# collation does and keeps the first of equal values.
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+=> "a,b"
+
+SELECT ARRAY_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+=> [{"v":"a"},{"v":"b"}]
+
+# BigQuery's answers: a descending order, and LIMIT, keep the first of equal values too.
+SELECT STRING_AGG(DISTINCT x ORDER BY x DESC) FROM UNNEST(['b', COLLATE('a', 'und:ci'), 'B', 'A']) AS x
+=> "b,a"
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x LIMIT 1) FROM UNNEST(['A', COLLATE('a', 'und:ci'), 'b']) AS x
+=> "A"
+
+SELECT ARRAY_AGG(DISTINCT x ORDER BY x LIMIT 1) FROM UNNEST(['B', COLLATE('b', 'und:ci'), 'a']) AS x
+=> [{"v":"a"}]
+
+SELECT ARRAY_LENGTH(ARRAY_AGG(DISTINCT x)) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b', 'B']) AS x
+=> "2"
+
+SELECT STRING_AGG(DISTINCT x) FROM UNNEST([COLLATE('A', 'und:ci'), 'a']) AS x
+=> "A"
+
+SELECT STRING_AGG(DISTINCT x, '-' ORDER BY x) FROM UNNEST([COLLATE('a', 'und:ci'), 'b', 'A']) AS x
+=> "a-b"
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'a', NULL, 'A']) AS x
+=> "a"
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), NULL]) AS x
+=> null
+
+SELECT ARRAY_AGG(DISTINCT x IGNORE NULLS ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'B', 'b']) AS x
+=> [{"v":"B"}]
+
+SELECT ARRAY_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE(NULL, 'und:ci'), 'b']) AS x
+=> error: Array cannot have a null element; error in writing field f0_
+
+SELECT STRING_AGG(DISTINCT x ORDER BY x) FROM UNNEST([COLLATE('Å', 'und:ci'), 'å', '', 'a']) AS x
+=> ",a,Å"
+
+# CONCAT keeps the collation of its argument.
+SELECT STRING_AGG(DISTINCT CONCAT(x, 'z') ORDER BY CONCAT(x, 'z')) FROM UNNEST([COLLATE('a', 'und:ci'), 'A', 'b']) AS x
+=> "az,bz"
+
+# BigQuery answers "A,b" for a collated column with the rows ('B'), ('a'), ('b'), ('A'), whose
+# order a table does not keep, so UPPER leaves out which of equal values it returns.
+CREATE TEMP TABLE t (x STRING COLLATE 'und:ci');
+INSERT t (x) VALUES ('B'), ('a'), ('b'), ('A');
+SELECT UPPER(STRING_AGG(DISTINCT x ORDER BY x)) FROM t
+=> "A,B"
+
+# BigQuery's answer: unlike COUNT and SUM, ARRAY_AGG takes no DISTINCT with OVER.
+SELECT ARRAY(SELECT ARRAY_TO_STRING(ARRAY_AGG(DISTINCT x) OVER (), ',') FROM UNNEST([COLLATE('a', 'und:ci'), 'A']) AS x)
+=> error: Analytic function array_agg does not support DISTINCT.

@@ -177,6 +177,13 @@ constexpr char kIntervalAvg[] = "bq_interval_avg";
 constexpr char kIntervalSumDistinct[] = "bq_interval_sum_distinct";
 constexpr char kIntervalAvgDistinct[] = "bq_interval_avg_distinct";
 
+// STRING_AGG of the list of distinct values that bq_collation_distinct returns.
+std::string JoinStrings(const std::string& sql, const std::vector<std::string>& arguments,
+                        const std::string& /*tail*/) {
+  return "list_aggr(" + sql + ", 'string_agg', " +
+         (arguments.size() > 1 ? arguments.at(1) : "','") + ")";
+}
+
 std::string IntervalDistinct(const std::string& sql, const std::vector<std::string>& /*arguments*/,
                              const std::string& /*tail*/) {
   return "bq_interval_distinct(" + sql + ")";
@@ -434,10 +441,22 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .limit = kSlice,
                      .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
                  },
+                 {
+                     .function = "list",
+                     .nulls = kFilter,
+                     .distinct = AggregateRule::Distinct::kRequired,
+                     .limit = kSliceFinished,
+                     .collated = true,
+                 },
                  {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses =
+                     {
+                         TypeUse::kAggregatesRange,
+                         TypeUse::kBigNumeric,
+                         TypeUse::kRejectsAnalyticDistinct,
+                     },
              }),
       // ARRAY_CONCAT_AGG skips NULL arrays.
 
@@ -582,6 +601,14 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
 
       Define("STRING_AGG",
              {
+                 {
+                     .function = "list",
+                     .distinct = AggregateRule::Distinct::kRequired,
+                     .limit = kSliceFinished,
+                     .skip_nulls = true,
+                     .collated = true,
+                     .finish = JoinStrings,
+                 },
                  {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
                  {
                      .function = "string_agg",
@@ -591,6 +618,9 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .limit = kJoin,
                      .finish = Unhex,
                  },
+             },
+             {
+                 .uses = {TypeUse::kRejectsAnalyticDistinct},
              }),
       // COUNT counts only TRUE after converting FALSE and NULL to NULL, and returns 0
       // for empty inputs and window frames. DISTINCT still counts TRUE at most once.
@@ -598,21 +628,25 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       Define("COUNTIF",
              {
                  {.function = "count", .arguments = kCountIfArguments},
-             }),
-      Define("LOGICAL_AND", {{.function = "bool_and"}}),
-      Define("LOGICAL_OR", {{.function = "bool_or"}}),
-      Define("BIT_AND", {{.function = "bit_and"}}),
-      Define("BIT_OR", {{.function = "bit_or"}}),
-      Define("BIT_XOR", {{.function = "bit_xor"}}),
+             },
+             {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("LOGICAL_AND", {{.function = "bool_and"}},
+             {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("LOGICAL_OR", {{.function = "bool_or"}},
+             {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("BIT_AND", {{.function = "bit_and"}}, {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("BIT_OR", {{.function = "bit_or"}}, {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("BIT_XOR", {{.function = "bit_xor"}}, {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
 
       Define("STDDEV", kStddevSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
+      // GoogleSQL resolves STDDEV to STDDEV_SAMP, so calls of both find this definition.
       Define("STDDEV_SAMP", kStddevSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("STDDEV_POP",
@@ -621,17 +655,18 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "stddev_pop"},
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("VARIANCE", kVarSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
+      // GoogleSQL resolves VARIANCE to VAR_SAMP, so calls of both find this definition.
       Define("VAR_SAMP", kVarSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("VAR_POP",
@@ -640,7 +675,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "var_pop"},
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("CORR",
