@@ -2038,13 +2038,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "SAFE.ROUND of a NUMERIC fails rather than returning NULL when rounding overflows"
-  label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999"
-  label: "code:safe_error_mode__safe_round_NUMERIC_99999999999999999999999999999.999999999"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "Large FLOAT64 values become NULL as NUMERIC or lose precision under SAFE_CAST"
   label: "code:SafeCastTo_NUMERIC_FLOAT64_1@844674407370955e19"
