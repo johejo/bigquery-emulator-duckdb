@@ -247,10 +247,9 @@ bool TruncDigits(double value, int64_t digits, bool early_positive_zero, double*
   return fn::TruncDecimal(value, digits, out, error);
 }
 
-// NUMERIC keeps its decimal precision for both modes, including nonconstant digits.
-template <fn::RoundingMode kMode>
-bool RoundNumericWithMode(googlesql::NumericValue in, int64_t digits, googlesql::NumericValue* out,
-                          absl::Status* error) {
+// ROUND with a rounding mode.
+template <typename T, fn::RoundingMode kMode>
+bool RoundWithMode(T in, int64_t digits, T* out, absl::Status* error) {
   return fn::RoundDecimalWithRoundingMode(in, digits, kMode, out, error);
 }
 
@@ -287,7 +286,7 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
   const std::vector<duckdb_logical_type> with_digits = {type.get(), digits.get()};
   Register(connection, "bq_round_numeric", with_digits, type.get(), Apply<fn::RoundDecimal<T>>);
   Register(connection, "bq_round_numeric_half_even", with_digits, type.get(),
-           Apply<RoundNumericWithMode<fn::RoundingMode::ROUND_HALF_EVEN>>);
+           Apply<RoundWithMode<T, fn::ROUND_HALF_EVEN>>);
   Register(connection, "bq_trunc_numeric", with_digits, type.get(), Apply<fn::TruncDecimal<T>>);
 }
 

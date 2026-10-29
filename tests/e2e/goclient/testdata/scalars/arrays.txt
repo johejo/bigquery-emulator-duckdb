@@ -74,6 +74,14 @@ SELECT ROUND(1.25, 1)
 SELECT ROUND(-2.5)
 => "-3.0"
 
+# Mathematical functions return NULL for a NULL argument:
+# third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+SELECT ROUND(x, CAST(NULL AS INT64)) FROM UNNEST([1.25]) x
+=> null
+
+SELECT ROUND(x, digits) FROM UNNEST([STRUCT(1.25 AS x, CAST(NULL AS INT64) AS digits)])
+=> null
+
 SELECT ROUND(NUMERIC '2.5', 0, 'ROUND_HALF_EVEN') = NUMERIC '2'
 => "true"
 
