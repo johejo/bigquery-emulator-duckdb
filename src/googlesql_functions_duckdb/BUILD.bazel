@@ -344,4 +344,5 @@ cc_library(
     name = "options",
     hdrs = ["options.h"],
     visibility = ["//:__pkg__"],
+    deps = ["//src/googlesql_collation:options"],
 )

@@ -100,7 +100,7 @@ void RegisterBackendFunctions(duckdb_database database,
   functions_duckdb::RegisterCastFunctions(connection.get());
   functions_duckdb::RegisterJsonFunctions(connection.get(), functions);
   functions_duckdb::RegisterContainsSubstr(connection.get());
-  collation_duckdb::RegisterCollationFunctions(connection.get(), functions.bigquery_collations);
+  collation_duckdb::RegisterCollationFunctions(connection.get(), functions.collation);
   functions_duckdb::RegisterIntervalFunctions(connection.get());
   functions_duckdb::RegisterRangeFunctions(connection.get());
   // GEOGRAPHY behavior is selected by the caller, above the DuckDB adapter.

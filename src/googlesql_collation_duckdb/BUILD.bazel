@@ -19,6 +19,7 @@ cc_library(
     linkstatic = True,
     visibility = ["//:__pkg__"],
     deps = [
+        "//src/googlesql_collation:options",
         "//third_party/duckdb",
     ],
 )
