@@ -16,7 +16,8 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .rounding_early_positive_zero = true,
       .json_strict_numbers = true,
       .json_preserve_negative_zero = true,
-      .collation = {.und_ci_only = true, .like_unescaped_underscore = true},
+      .collate_und_ci_only = true,
+      .collation = {.like_unescaped_underscore = true},
   };
 }
 

@@ -50,9 +50,8 @@ absl::StatusOr<const googlesql::GoogleSqlCollator*> FindCollator(std::string_vie
 }
 
 template <typename Result, typename Function, typename... Args>
-absl::StatusOr<Result> Evaluate(std::string_view specification, bool und_ci_only, Function function,
+absl::StatusOr<Result> Evaluate(std::string_view specification, Function function,
                                 const Args&... args) {
-  GOOGLESQL_RETURN_IF_ERROR(CheckSpecification(specification, und_ci_only));
   GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::GoogleSqlCollator* collator,
                              FindCollator(specification));
   Result result;
@@ -65,21 +64,15 @@ absl::StatusOr<Result> Evaluate(std::string_view specification, bool und_ci_only
 
 }  // namespace
 
-absl::Status CheckSpecification(std::string_view specification, bool und_ci_only) {
+absl::Status CheckSpecification(std::string_view specification) {
   if (specification.empty()) {
     return absl::OkStatus();
-  }
-  if (und_ci_only && specification != "und:ci") {
-    return absl::InvalidArgumentError("Collation '" + std::string(specification) +
-                                      "' in collate function is not supported.");
   }
   return FindCollator(specification).status();
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a value before its collation, as in SQL.
-absl::StatusOr<std::string> SortKey(std::string_view value, std::string_view specification,
-                                    bool und_ci_only) {
-  GOOGLESQL_RETURN_IF_ERROR(CheckSpecification(specification, und_ci_only));
+absl::StatusOr<std::string> SortKey(std::string_view value, std::string_view specification) {
   if (specification.empty()) {
     return std::string(value);
   }
@@ -96,7 +89,6 @@ absl::StatusOr<std::string> SortKey(std::string_view value, std::string_view spe
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): collation first, then SQL operands.
 absl::StatusOr<bool> Like(std::string_view specification, std::string_view value,
                           std::string_view pattern, const Options& options) {
-  GOOGLESQL_RETURN_IF_ERROR(CheckSpecification(specification, options.und_ci_only));
   GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::GoogleSqlCollator* collator,
                              FindCollator(specification));
   return options.like_unescaped_underscore
@@ -105,40 +97,36 @@ absl::StatusOr<bool> Like(std::string_view specification, std::string_view value
 }
 
 absl::StatusOr<bool> StartsWith(std::string_view specification, std::string_view value,
-                                std::string_view substring, bool und_ci_only) {
-  return Evaluate<bool>(specification, und_ci_only,
-                        googlesql::functions::StartsWithUtf8WithCollation, value, substring);
+                                std::string_view substring) {
+  return Evaluate<bool>(specification, googlesql::functions::StartsWithUtf8WithCollation, value,
+                        substring);
 }
 
 absl::StatusOr<bool> EndsWith(std::string_view specification, std::string_view value,
-                              std::string_view substring, bool und_ci_only) {
-  return Evaluate<bool>(specification, und_ci_only, googlesql::functions::EndsWithUtf8WithCollation,
-                        value, substring);
+                              std::string_view substring) {
+  return Evaluate<bool>(specification, googlesql::functions::EndsWithUtf8WithCollation, value,
+                        substring);
 }
 
 absl::StatusOr<int64_t> Instr(std::string_view specification, std::string_view value,
-                              std::string_view substring, int64_t position, int64_t occurrence,
-                              bool und_ci_only) {
-  return Evaluate<int64_t>(specification, und_ci_only,
-                           googlesql::functions::StrPosOccurrenceUtf8WithCollation, value,
-                           substring, position, occurrence);
+                              std::string_view substring, int64_t position, int64_t occurrence) {
+  return Evaluate<int64_t>(specification, googlesql::functions::StrPosOccurrenceUtf8WithCollation,
+                           value, substring, position, occurrence);
 }
 
 absl::StatusOr<std::string> Replace(std::string_view specification, std::string_view value,
-                                    std::string_view old_substring, std::string_view new_substring,
-                                    bool und_ci_only) {
-  return Evaluate<std::string>(specification, und_ci_only,
-                               googlesql::functions::ReplaceUtf8WithCollation, value, old_substring,
-                               new_substring);
+                                    std::string_view old_substring,
+                                    std::string_view new_substring) {
+  return Evaluate<std::string>(specification, googlesql::functions::ReplaceUtf8WithCollation, value,
+                               old_substring, new_substring);
 }
 
 absl::StatusOr<std::vector<std::string>> Split(std::string_view specification,
-                                               std::string_view value, std::string_view delimiter,
-                                               bool und_ci_only) {
+                                               std::string_view value, std::string_view delimiter) {
   GOOGLESQL_ASSIGN_OR_RETURN(
-      auto parts, Evaluate<std::vector<absl::string_view>>(
-                      specification, und_ci_only, googlesql::functions::SplitUtf8WithCollation,
-                      value, delimiter));
+      auto parts,
+      Evaluate<std::vector<absl::string_view>>(
+          specification, googlesql::functions::SplitUtf8WithCollation, value, delimiter));
   return std::vector<std::string>(parts.begin(), parts.end());
 }
 

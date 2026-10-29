@@ -6,8 +6,8 @@
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
 
-// Which of BigQuery's differences from GoogleSQL the backend functions adapt. Defaults keep
-// GoogleSQL's behavior; each registration passes its function only the choices it reads.
+// Which of BigQuery's differences from GoogleSQL the functions and their translations adapt.
+// Defaults keep GoogleSQL's behavior; each registration reads only the choices it needs.
 struct Options {
   // CHR(0) is an empty string.
   bool chr_zero_is_empty = false;
@@ -27,6 +27,8 @@ struct Options {
   // of a negative zero.
   bool json_strict_numbers = false;
   bool json_preserve_negative_zero = false;
+  // The translator restricts COLLATE specifications to und:ci and the empty specification.
+  bool collate_und_ci_only = false;
   googlesql_collation::Options collation;
 
   std::strong_ordering operator<=>(const Options&) const = default;

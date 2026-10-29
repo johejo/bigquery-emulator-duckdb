@@ -99,7 +99,11 @@ function handlers, keeping query translation independent of the builtin function
 [emulator_functions.cc](../src/emulator_functions.cc) assembles the application's catalog from
 [builtin definitions](../src/translator/functions.cc) and feature providers, one for each choice
 of the backend functions' options, so that BigQuery's and GoogleSQL's semantics can translate
-differently. The emulator and function probe use this same composition.
+differently. The application registers COLLATE's handler here, keeping the translator independent
+of the collation library. It checks the literal specification during translation, before DuckDB can
+prune an expression or skip its evaluation; BigQuery's catalog takes only `und:ci` and the empty
+specification, while GoogleSQL's takes the collator's specifications. The emulator and function
+probe use this same composition.
 [backend_functions.cc](../src/backend_functions.cc) registers the executable implementations with
 DuckDB at the same application layer. The translator and common catalog do not depend on the
 feature adapters' function-registration targets.

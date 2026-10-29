@@ -46,7 +46,7 @@ enum class Translation : std::uint8_t {
   kRenamed,
   // DuckDB SQL templates, chosen by the arguments.
   kRules,
-  // Code in src/translator/handlers.cc.
+  // A scalar handler supplied when assembling the catalog.
   kHandler,
   // Another function with the SAFE. prefix, as SAFE_ADD is SAFE.$ADD.
   kSafe,
