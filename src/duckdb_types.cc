@@ -197,6 +197,32 @@ std::string UnsupportedDuckDbType(duckdb_logical_type type) {
   }
 }
 
+bool HasOtherTimestampPrecision(duckdb_logical_type type, TimestampPrecision precision) {
+  if (IsTimestampNanos(type)) {
+    return precision != TimestampPrecision::kNanoseconds;
+  }
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
+      return precision != TimestampPrecision::kMicroseconds;
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY:
+      return HasOtherTimestampPrecision(ElementType(type).get(), precision);
+    case DUCKDB_TYPE_STRUCT:
+      if (IsRange(type)) {
+        return false;
+      }
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType const child(duckdb_struct_type_child_type(type, i));
+        if (HasOtherTimestampPrecision(child.get(), precision)) {
+          return true;
+        }
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
 std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_logical_type type) {
   return ReadNumericStorage(sql, type, 0);
 }

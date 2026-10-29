@@ -231,6 +231,38 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --duckdb \
           -e 'SELECT bq_timestamp_nanos_text(t) AS t FROM test.ds.t'
     test: current.exit_code == 0 && current.stdout == '{"t":"1969-12-31 23:59:59.999999999+00"}' + "\n"
+  # A table keeps the TIMESTAMP precision of the semantics that created it.
+  semantics_rejects_stored_nanoseconds:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          --semantics=googlesql -e "CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT [STRUCT(TIMESTAMP '2020-01-01 00:00:00+00' AS t)] AS a"
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          -e 'SELECT COUNT(*) AS n FROM ds.t'
+    test: current.exit_code == 1 && current.stderr contains "Column a holds nanosecond TIMESTAMP values"
+  semantics_rejects_stored_microseconds:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          -e "CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT TIMESTAMP '2020-01-01 00:00:00+00' AS t"
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          --semantics=googlesql -e 'SELECT COUNT(*) AS n FROM ds.t'
+    test: current.exit_code == 1 && current.stderr contains "Column t holds microsecond TIMESTAMP values"
+  # RANGE bounds keep microseconds under either semantics.
+  semantics_reads_stored_timestamp_range:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          -e "CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT RANGE(TIMESTAMP '2020-01-01 00:00:00+00', NULL) AS r"
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          --semantics=googlesql -e 'SELECT CAST(x.r AS STRING) AS r FROM ds.t AS x'
+    test: current.exit_code == 0 && current.stdout == '{"r":"[2020-01-01 00:00:00+00, UNBOUNDED)"}' + "\n"
   semantics_invalid:
     exec:
       command: >-
