@@ -1,0 +1,34 @@
+# BigQuery's mathematical function documentation specifies FLOAT64 for every CBRT input.
+# Source: third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+# UNNEST also checks runtime inputs rather than only analyzer-folded literals.
+
+SELECT TYPEOF(CBRT(x)) FROM UNNEST([8]) x
+=> "FLOAT64"
+
+SELECT TYPEOF(CBRT(x)) FROM UNNEST([NUMERIC '8']) x
+=> "FLOAT64"
+
+SELECT TYPEOF(CBRT(x)) FROM UNNEST([BIGNUMERIC '8']) x
+=> "FLOAT64"
+
+SELECT TYPEOF(CBRT(x)) FROM UNNEST([8.0]) x
+=> "FLOAT64"
+
+# Round the documented example to avoid depending on floating-point rounding and JSON spelling.
+SELECT CAST(CBRT(x) AS INT64) FROM UNNEST([NUMERIC '27']) x
+=> "3"
+
+SELECT CAST(CBRT(x) AS INT64) FROM UNNEST([BIGNUMERIC '27']) x
+=> "3"
+
+SELECT CBRT(x) FROM UNNEST([CAST(NULL AS NUMERIC)]) x
+=> null
+
+SELECT SAFE.CBRT(x) FROM UNNEST([CAST(NULL AS BIGNUMERIC)]) x
+=> null
+
+SELECT CAST(CBRT(x) AS INT64) FROM UNNEST([NUMERIC '0']) x
+=> "0"
+
+SELECT CAST(SAFE.CBRT(x) AS INT64) FROM UNNEST([BIGNUMERIC '0']) x
+=> "0"

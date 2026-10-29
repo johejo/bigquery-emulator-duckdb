@@ -164,8 +164,8 @@ Source: [CBRT](../../third_party/bigquery_docs/reference/standard-sql/mathematic
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
 | `INT64` | `FLOAT64` | Supported |  |
-| `NUMERIC` | `FLOAT64` | Broken | return type NUMERIC, documented FLOAT64 |
-| `BIGNUMERIC` | `FLOAT64` | Broken | return type BIGNUMERIC, documented FLOAT64 |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
 ## CEIL

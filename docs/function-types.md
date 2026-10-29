@@ -136,7 +136,7 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [BYTE_LENGTH](function-types/string.md#byte_length) | 2 | Supported |
 | `CASE` | 0 | Not enumerated |
 | `CAST` | 0 | Not enumerated |
-| [CBRT](function-types/mathematical.md#cbrt) | 4 | Broken |
+| [CBRT](function-types/mathematical.md#cbrt) | 4 | Supported |
 | [CEIL](function-types/mathematical.md#ceil) | 4 | Supported |
 | [CEILING](function-types/mathematical.md#ceiling) | 4 | Supported |
 | `CHANGES` | 0 | Not enumerated |
