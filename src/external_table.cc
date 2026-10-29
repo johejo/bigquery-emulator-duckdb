@@ -52,7 +52,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       for (const auto& field : schema) {
         const auto* column = columns.Child(field.name);
         if (column == nullptr || !Matches(*column, field.type)) {
-          throw ApiError::Unsupported("external Parquet source schema for column " + field.name);
+          throw ApiError::Unsupported(std::string("external Parquet source schema for column ") +
+                                      field.name);
         }
       }
     }
