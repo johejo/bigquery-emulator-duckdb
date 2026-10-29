@@ -220,10 +220,11 @@ absl::Status GenerateArray(T start, T end, T step, bool extended_limit, std::vec
                                                                                   out);
 }
 
-// BigQuery returns positive zero at DecimalRounding's early zero exits, unlike
-// GoogleSQL's copysign(0, value). Match those exits, not every zero result:
-// subnormal truncation, zero inputs and digits == 0 still preserve the sign.
-bool TruncDigits(double value, int64_t digits, bool early_positive_zero, double* out,
+// ROUND or TRUNC with digits. BigQuery returns positive zero at DecimalRounding's early zero
+// exits, unlike GoogleSQL's copysign(0, value). Match those exits, not every zero result:
+// subnormal results, zero inputs and digits == 0 still preserve the sign.
+template <bool (*kFunction)(double, int64_t, double*, absl::Status*)>
+bool RoundDigits(double value, int64_t digits, bool early_positive_zero, double* out,
                  absl::Status* error) {
   if (early_positive_zero && value != 0.0 && std::isfinite(value) && digits != 0) {
     constexpr int kMaxExponent = std::numeric_limits<double>::max_exponent10;
@@ -244,7 +245,7 @@ bool TruncDigits(double value, int64_t digits, bool early_positive_zero, double*
       }
     }
   }
-  return fn::TruncDecimal(value, digits, out, error);
+  return kFunction(value, digits, out, error);
 }
 
 // ROUND with a rounding mode.
@@ -314,8 +315,12 @@ std::span<const function_catalog::NamedDefinition<Rule>> TrigonometricFunctions(
 void RegisterMathFunctions(duckdb_connection connection, const Options& options) {
   Register(connection, "bq_checked_integer", {kBigint, kBigint, kVarchar, kVarchar}, kBigint,
            CheckedInteger, /*nulls=*/false);
+  RegisterWithContext(connection, "bq_round_digits", {kDouble, kBigint}, kDouble,
+                      ApplyWithContext<RoundDigits<fn::RoundDecimal<double>>>,
+                      options.rounding_early_positive_zero);
   RegisterWithContext(connection, "bq_trunc_digits", {kDouble, kBigint}, kDouble,
-                      ApplyWithContext<TruncDigits>, options.trunc_early_positive_zero);
+                      ApplyWithContext<RoundDigits<fn::TruncDecimal<double>>>,
+                      options.rounding_early_positive_zero);
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
            {"bq_sqrt", Apply<fn::Sqrt<double>>},

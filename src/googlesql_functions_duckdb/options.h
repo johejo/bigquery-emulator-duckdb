@@ -19,8 +19,8 @@ struct Options {
   bool unpadded_iso_year = false;
   // GENERATE_ARRAY and GENERATE_DATE_ARRAY exceed GoogleSQL's 16,000-element limit.
   bool extended_array_limits = false;
-  // FLOAT64 TRUNC returns positive zero at its early zero exits.
-  bool trunc_early_positive_zero = false;
+  // FLOAT64 ROUND and TRUNC with digits return positive zero at their early zero exits.
+  bool rounding_early_positive_zero = false;
   // JSON_ARRAY_APPEND and JSON_ARRAY_INSERT reject numbers they would round, and keep the sign
   // of a negative zero.
   bool json_strict_numbers = false;

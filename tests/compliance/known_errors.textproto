@@ -848,7 +848,6 @@ known_errors {
   label: "code:ArraySum_ARRAY<FLOAT64>_<-1@79769_fka48YXkpZ4_08, NULL>"
   label: "code:ArraySum_ARRAY<FLOAT64>_<1@797693_GfHVLeBf_2w_157e@308>"
   label: "code:ArraySum_ARRAY<FLOAT64>_<1@797693_T8J8HAmbqYA_08, NULL>"
-  label: "code:round_FLOAT64_1@6e308_INT64_-308"
 }
 
 known_errors {
@@ -2040,18 +2039,9 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "ROUND differs at FLOAT64 rounding boundaries and overflows on large finite values"
-  label: "code:round_FLOAT64_3@1415925_INT64_-9223372036854775808"
-  label: "code:round_FLOAT64_3@1415925_INT64_9223372036854775807"
+  reason: "SAFE.ROUND of a NUMERIC fails rather than returning NULL when rounding overflows"
   label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999"
   label: "code:safe_error_mode__safe_round_NUMERIC_99999999999999999999999999999.999999999"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ROUND differs at FLOAT64 rounding boundaries and overflows on large finite values"
-  label: "code:round_FLOAT64_1@2345_INT64_3"
-  label: "code:safe_error_mode__safe_round_FLOAT64_1@6e308_INT64_-308"
 }
 
 known_errors {

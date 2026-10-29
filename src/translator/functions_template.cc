@@ -1676,7 +1676,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           },
       },
 
-      // Only NUMERIC and BIGNUMERIC take a rounding mode. DuckDB takes the digits as an INTEGER.
+      // Only NUMERIC and BIGNUMERIC take a rounding mode.
       {
           "ROUND",
           {
@@ -1685,7 +1685,14 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   NumericRounding("bq_round_numeric", true),
                   {
                       {.arity = 1, .spelling = "round($1)"},
-                      {.arity = 2, .spelling = "round($1, CAST($2 AS INTEGER))"},
+                      // DuckDB takes the digits as an INTEGER, and returns a value whose rounding
+                      // overflows unchanged rather than failing. GoogleSQL takes any INT64 digits.
+                      {
+                          .arity = 2,
+                          .spelling = "bq_round_digits($1, $2)",
+                          .conditions = {Is(1, {TYPE_DOUBLE})},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
                   },
               }),
               .uses = {TypeUse::kBigNumeric},

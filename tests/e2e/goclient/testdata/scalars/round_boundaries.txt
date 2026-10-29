@@ -1,0 +1,70 @@
+# Expected values: BigQuery answers recorded from unverified/round.txt.
+
+SELECT ROUND(x, 3000000000) FROM UNNEST([1.5]) x
+=> "1.5"
+
+SELECT ROUND(x, -3000000000) FROM UNNEST([1.5]) x
+=> "0.0"
+
+SELECT ROUND(x, 9223372036854775807) FROM UNNEST([3.1415925]) x
+=> "3.1415925"
+
+SELECT ROUND(x, -9223372036854775808) FROM UNNEST([3.1415925]) x
+=> "0.0"
+
+SELECT ROUND(x, 40000) FROM UNNEST([1.0]) x
+=> "1.0"
+
+SELECT ROUND(x, -40000) FROM UNNEST([1.0]) x
+=> "0.0"
+
+SELECT ROUND(x, -309) FROM UNNEST([1.6e308]) x
+=> "0.0"
+
+SELECT ROUND(x, 308) FROM UNNEST([1.6e308]) x
+=> "1.6E308"
+
+SELECT ROUND(x, 324) FROM UNNEST([4.94065645841247e-324]) x
+=> "4.9E-324"
+
+SELECT ROUND(x, 323) FROM UNNEST([4.94065645841247e-324]) x
+=> "0.0"
+
+SELECT ROUND(x, 3) FROM UNNEST([1.2345]) x
+=> "1.234"
+
+SELECT ROUND(x, 6) FROM UNNEST([75.736617999999993]) x
+=> "75.736618"
+
+SELECT ROUND(x, 5) FROM UNNEST([0.01207]) x
+=> "0.01207"
+
+SELECT ROUND(x, 2) FROM UNNEST([CAST('inf' AS FLOAT64)]) x
+=> "Infinity"
+
+SELECT ROUND(x, -2) FROM UNNEST([CAST('nan' AS FLOAT64)]) x
+=> "NaN"
+
+# BigQuery returns positive zero at GoogleSQL's early zero exit, as TRUNC does, and keeps the
+# sign with zero digits and where a value rounds to zero past that exit, below 2^-6 at one digit.
+
+SELECT ROUND(x, 0) FROM UNNEST([-0.1]) x
+=> "-0.0"
+
+SELECT ROUND(x, -1) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT ROUND(x, -400) FROM UNNEST([-1.0]) x
+=> "0.0"
+
+SELECT ROUND(x, 1) FROM UNNEST([-0.01]) x
+=> "0.0"
+
+SELECT ROUND(x, 2) FROM UNNEST([-1e-100]) x
+=> "0.0"
+
+SELECT ROUND(x, 1) FROM UNNEST([-0.03]) x
+=> "-0.0"
+
+SELECT ROUND(x, 1) FROM UNNEST([-0.04]) x
+=> "-0.0"
