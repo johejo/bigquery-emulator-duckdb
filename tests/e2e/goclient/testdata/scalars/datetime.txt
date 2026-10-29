@@ -91,6 +91,11 @@ SELECT DATE_DIFF(DATE '2024-03-01', DATE '2024-01-01', DAY)
 SELECT DATE_DIFF(DATE '2024-01-01', DATE '2024-03-01', MONTH)
 => "-2"
 
+# DATETIME arguments, which the specification doesn't name. Source: BigQuery's answers to
+# unverified/function_types.txt.
+SELECT DATE_DIFF(DATETIME '2024-01-15 23:00:00', DATETIME '2024-01-14 01:00:00', DAY)
+=> "1"
+
 SELECT CAST(DATE_TRUNC(DATE '2024-05-17', MONTH) AS STRING)
 => "2024-05-01"
 

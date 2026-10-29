@@ -294,3 +294,11 @@ SELECT STRING_AGG(x LIMIT 0) FROM UNNEST(ARRAY<STRING>[]) AS x
 
 SELECT STRING_AGG(x, b':' LIMIT 0) FROM UNNEST([b'a', b'b']) AS x
 => null
+
+# GEOGRAPHY values, which the specification doesn't exclude. Source: BigQuery's answers to
+# unverified/function_types.txt.
+SELECT APPROX_COUNT_DISTINCT(g) FROM UNNEST([ST_GEOGPOINT(1, 2), ST_GEOGPOINT(1, 2)]) AS g
+=> error contains: The argument to APPROX_COUNT_DISTINCT must support grouping; Type GEOGRAPHY does not
+
+SELECT ARRAY_LENGTH(APPROX_QUANTILES(g, 2)) FROM UNNEST([ST_GEOGPOINT(1, 2)]) AS g
+=> error contains: Argument 1 to APPROX_QUANTILES must support ordering; Type GEOGRAPHY does not

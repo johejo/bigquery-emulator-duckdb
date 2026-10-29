@@ -14,6 +14,8 @@
 - [ARRAY_SLICE](#array_slice)
 - [ARRAY_TO_STRING](#array_to_string)
 - [GENERATE_ARRAY](#generate_array)
+- [GENERATE_DATE_ARRAY](#generate_date_array)
+- [GENERATE_TIMESTAMP_ARRAY](#generate_timestamp_array)
 
 ## ARRAY_CONCAT
 
@@ -224,3 +226,20 @@ Same-type numeric inputs are enumerated; mixed-type inputs are not yet enumerate
 | `BIGNUMERIC, BIGNUMERIC, BIGNUMERIC` | `ARRAY<BIGNUMERIC>` | Supported |  |
 | `FLOAT64, FLOAT64` | `ARRAY<FLOAT64>` | Supported |  |
 | `FLOAT64, FLOAT64, FLOAT64` | `ARRAY<FLOAT64>` | Supported |  |
+
+## GENERATE_DATE_ARRAY
+
+Source: [GENERATE_DATE_ARRAY](../../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `DATE, DATE` | `ARRAY<DATE>` | Supported |  |
+| `DATE, DATE, INTERVAL` | `ARRAY<DATE>` | Supported |  |
+
+## GENERATE_TIMESTAMP_ARRAY
+
+Source: [GENERATE_TIMESTAMP_ARRAY](../../third_party/bigquery_docs/reference/standard-sql/array_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `TIMESTAMP, TIMESTAMP, INTERVAL` | `ARRAY<TIMESTAMP>` | Supported |  |

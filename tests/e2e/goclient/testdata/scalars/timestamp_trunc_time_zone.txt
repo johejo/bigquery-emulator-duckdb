@@ -81,3 +81,20 @@ SELECT CAST(TIMESTAMP_TRUNC(TIMESTAMP '2024-01-01 12:00:00+00', DAY, z) AS STRIN
 # A literal unknown time zone.
 SELECT CAST(TIMESTAMP_TRUNC(TIMESTAMP '2024-01-01 12:00:00+00', DAY, 'Invalid/Zone') AS STRING)
 => error: Invalid time zone: Invalid/Zone
+
+# A time zone that isn't a constant. Source: BigQuery's answers to unverified/function_types.txt.
+SELECT CAST(DATE_TRUNC(ts, MONTH, tz) AS STRING)
+FROM (SELECT TIMESTAMP '2024-01-15 10:20:30+00' AS ts, 'America/Los_Angeles' AS tz)
+=> "2024-01-01 08:00:00+00"
+
+SELECT CAST(TIMESTAMP_TRUNC(ts, HOUR, tz) AS STRING)
+FROM (SELECT TIMESTAMP '2024-01-15 10:20:30+00' AS ts, 'Asia/Kolkata' AS tz)
+=> "2024-01-15 09:30:00+00"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M', ts, tz)
+FROM (SELECT TIMESTAMP '2024-01-15 10:20:30+00' AS ts, 'America/Los_Angeles' AS tz)
+=> "2024-01-15 02:20"
+
+SELECT CAST(TIMESTAMP(s, tz) AS STRING)
+FROM (SELECT '2024-01-15 10:20:30' AS s, 'America/Los_Angeles' AS tz)
+=> "2024-01-15 18:20:30+00"

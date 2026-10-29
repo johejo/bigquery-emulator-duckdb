@@ -9,6 +9,7 @@
 - [COALESCE](#coalesce)
 - [IF](#if)
 - [IFNULL](#ifnull)
+- [NULLIF](#nullif)
 
 ## COALESCE
 
@@ -196,3 +197,28 @@ Same-type alternatives are enumerated; mixed-type supertype combinations are not
 | `ARRAY<STRUCT<x INT64, label STRING>>, ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
 | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
 | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+
+## NULLIF
+
+Source: [NULLIF](../../third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md).
+
+Same-type comparable inputs are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertype combinations are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL, BOOL` | `BOOL` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `DATE, DATE` | `DATE` | Supported |  |
+| `DATETIME, DATETIME` | `DATETIME` | Supported |  |
+| `TIME, TIME` | `TIME` | Supported |  |
+| `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `STRUCT<x INT64, label STRING>, STRUCT<x INT64, label STRING>` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>, STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |

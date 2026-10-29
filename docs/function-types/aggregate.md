@@ -10,8 +10,17 @@
 - [ARRAY_AGG](#array_agg)
 - [ARRAY_CONCAT_AGG](#array_concat_agg)
 - [AVG](#avg)
+- [BIT_AND](#bit_and)
+- [BIT_OR](#bit_or)
+- [BIT_XOR](#bit_xor)
+- [COUNT](#count)
+- [COUNTIF](#countif)
+- [LOGICAL_AND](#logical_and)
+- [LOGICAL_OR](#logical_or)
 - [MAX](#max)
+- [MAX_BY](#max_by)
 - [MIN](#min)
+- [MIN_BY](#min_by)
 - [STRING_AGG](#string_agg)
 - [SUM](#sum)
 
@@ -128,6 +137,103 @@ Source: [AVG](../../third_party/bigquery_docs/reference/standard-sql/aggregate_f
 | `FLOAT64` | `FLOAT64` | Supported |  |
 | `INTERVAL` | `INTERVAL` | Supported |  |
 
+## BIT_AND
+
+Source: [BIT_AND](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+
+## BIT_OR
+
+Source: [BIT_OR](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+
+## BIT_XOR
+
+Source: [BIT_XOR](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+
+## COUNT
+
+Source: [COUNT](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+COUNT(*) is not a typed form and is not enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `INT64` | Supported |  |
+| `BIGNUMERIC` | `INT64` | Supported |  |
+| `FLOAT64` | `INT64` | Supported |  |
+| `BOOL` | `INT64` | Supported |  |
+| `STRING` | `INT64` | Supported |  |
+| `BYTES` | `INT64` | Supported |  |
+| `DATE` | `INT64` | Supported |  |
+| `DATETIME` | `INT64` | Supported |  |
+| `TIME` | `INT64` | Supported |  |
+| `TIMESTAMP` | `INT64` | Supported |  |
+| `INTERVAL` | `INT64` | Supported |  |
+| `GEOGRAPHY` | `INT64` | Supported |  |
+| `JSON` | `INT64` | Supported |  |
+| `RANGE<DATE>` | `INT64` | Supported |  |
+| `RANGE<DATETIME>` | `INT64` | Supported |  |
+| `RANGE<TIMESTAMP>` | `INT64` | Supported |  |
+| `STRUCT<x INT64, label STRING>` | `INT64` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | `INT64` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | `INT64` | Supported |  |
+| `ARRAY<INT64>` | `INT64` | Supported |  |
+| `ARRAY<NUMERIC>` | `INT64` | Supported |  |
+| `ARRAY<BIGNUMERIC>` | `INT64` | Supported |  |
+| `ARRAY<FLOAT64>` | `INT64` | Supported |  |
+| `ARRAY<BOOL>` | `INT64` | Supported |  |
+| `ARRAY<STRING>` | `INT64` | Supported |  |
+| `ARRAY<BYTES>` | `INT64` | Supported |  |
+| `ARRAY<DATE>` | `INT64` | Supported |  |
+| `ARRAY<DATETIME>` | `INT64` | Supported |  |
+| `ARRAY<TIME>` | `INT64` | Supported |  |
+| `ARRAY<TIMESTAMP>` | `INT64` | Supported |  |
+| `ARRAY<INTERVAL>` | `INT64` | Unsupported | aggregate or analytic function COUNT with INTERVAL |
+| `ARRAY<GEOGRAPHY>` | `INT64` | Supported |  |
+| `ARRAY<JSON>` | `INT64` | Supported |  |
+| `ARRAY<RANGE<DATE>>` | `INT64` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `INT64` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `INT64` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>` | `INT64` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `INT64` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `INT64` | Supported |  |
+
+## COUNTIF
+
+Source: [COUNTIF](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BOOL` | `INT64` | Supported |  |
+
+## LOGICAL_AND
+
+Source: [LOGICAL_AND](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BOOL` | `BOOL` | Supported |  |
+
+## LOGICAL_OR
+
+Source: [LOGICAL_OR](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BOOL` | `BOOL` | Supported |  |
+
 ## MAX
 
 Source: [MAX](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
@@ -150,6 +256,67 @@ Source: [MAX](../../third_party/bigquery_docs/reference/standard-sql/aggregate_f
 | `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
 | `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
 
+## MAX_BY
+
+Source: [MAX_BY](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC, INT64` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `BOOL, INT64` | `BOOL` | Supported |  |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+| `DATE, INT64` | `DATE` | Supported |  |
+| `DATETIME, INT64` | `DATETIME` | Supported |  |
+| `TIME, INT64` | `TIME` | Supported |  |
+| `TIMESTAMP, INT64` | `TIMESTAMP` | Supported |  |
+| `INTERVAL, INT64` | `INTERVAL` | Supported |  |
+| `GEOGRAPHY, INT64` | `GEOGRAPHY` | Supported |  |
+| `JSON, INT64` | `JSON` | Supported |  |
+| `RANGE<DATE>, INT64` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>, INT64` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>, INT64` | `RANGE<TIMESTAMP>` | Supported |  |
+| `STRUCT<x INT64, label STRING>, INT64` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>, INT64` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>, INT64` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `ARRAY<INT64>, INT64` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>, INT64` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>, INT64` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>, INT64` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>, INT64` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>, INT64` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>, INT64` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>, INT64` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>, INT64` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>, INT64` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>, INT64` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>, INT64` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>, INT64` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>, INT64` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>, INT64` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>, INT64` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>, INT64` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>, INT64` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, INT64` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, INT64` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+| `INT64, NUMERIC` | `INT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `INT64` | Supported |  |
+| `INT64, FLOAT64` | `INT64` | Supported |  |
+| `INT64, BOOL` | `INT64` | Supported |  |
+| `INT64, STRING` | `INT64` | Supported |  |
+| `INT64, BYTES` | `INT64` | Supported |  |
+| `INT64, DATE` | `INT64` | Supported |  |
+| `INT64, DATETIME` | `INT64` | Supported |  |
+| `INT64, TIME` | `INT64` | Supported |  |
+| `INT64, TIMESTAMP` | `INT64` | Supported |  |
+| `INT64, INTERVAL` | `INT64` | Supported |  |
+| `INT64, RANGE<DATE>` | `INT64` | Supported |  |
+| `INT64, RANGE<DATETIME>` | `INT64` | Supported |  |
+| `INT64, RANGE<TIMESTAMP>` | `INT64` | Supported |  |
+
 ## MIN
 
 Source: [MIN](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
@@ -171,6 +338,67 @@ Source: [MIN](../../third_party/bigquery_docs/reference/standard-sql/aggregate_f
 | `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
 | `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
 | `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+
+## MIN_BY
+
+Source: [MIN_BY](../../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC, INT64` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC, INT64` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `BOOL, INT64` | `BOOL` | Supported |  |
+| `STRING, INT64` | `STRING` | Supported |  |
+| `BYTES, INT64` | `BYTES` | Supported |  |
+| `DATE, INT64` | `DATE` | Supported |  |
+| `DATETIME, INT64` | `DATETIME` | Supported |  |
+| `TIME, INT64` | `TIME` | Supported |  |
+| `TIMESTAMP, INT64` | `TIMESTAMP` | Supported |  |
+| `INTERVAL, INT64` | `INTERVAL` | Supported |  |
+| `GEOGRAPHY, INT64` | `GEOGRAPHY` | Supported |  |
+| `JSON, INT64` | `JSON` | Supported |  |
+| `RANGE<DATE>, INT64` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>, INT64` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>, INT64` | `RANGE<TIMESTAMP>` | Supported |  |
+| `STRUCT<x INT64, label STRING>, INT64` | `STRUCT<x INT64, label STRING>` | Supported |  |
+| `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>, INT64` | `STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>` | Supported |  |
+| `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>, INT64` | `STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>` | Supported |  |
+| `ARRAY<INT64>, INT64` | `ARRAY<INT64>` | Supported |  |
+| `ARRAY<NUMERIC>, INT64` | `ARRAY<NUMERIC>` | Supported |  |
+| `ARRAY<BIGNUMERIC>, INT64` | `ARRAY<BIGNUMERIC>` | Supported |  |
+| `ARRAY<FLOAT64>, INT64` | `ARRAY<FLOAT64>` | Supported |  |
+| `ARRAY<BOOL>, INT64` | `ARRAY<BOOL>` | Supported |  |
+| `ARRAY<STRING>, INT64` | `ARRAY<STRING>` | Supported |  |
+| `ARRAY<BYTES>, INT64` | `ARRAY<BYTES>` | Supported |  |
+| `ARRAY<DATE>, INT64` | `ARRAY<DATE>` | Supported |  |
+| `ARRAY<DATETIME>, INT64` | `ARRAY<DATETIME>` | Supported |  |
+| `ARRAY<TIME>, INT64` | `ARRAY<TIME>` | Supported |  |
+| `ARRAY<TIMESTAMP>, INT64` | `ARRAY<TIMESTAMP>` | Supported |  |
+| `ARRAY<INTERVAL>, INT64` | `ARRAY<INTERVAL>` | Supported |  |
+| `ARRAY<GEOGRAPHY>, INT64` | `ARRAY<GEOGRAPHY>` | Supported |  |
+| `ARRAY<JSON>, INT64` | `ARRAY<JSON>` | Supported |  |
+| `ARRAY<RANGE<DATE>>, INT64` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>, INT64` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>, INT64` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
+| `ARRAY<STRUCT<x INT64, label STRING>>, INT64` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
+| `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>, INT64` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>, INT64` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
+| `INT64, NUMERIC` | `INT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `INT64` | Supported |  |
+| `INT64, FLOAT64` | `INT64` | Supported |  |
+| `INT64, BOOL` | `INT64` | Supported |  |
+| `INT64, STRING` | `INT64` | Supported |  |
+| `INT64, BYTES` | `INT64` | Supported |  |
+| `INT64, DATE` | `INT64` | Supported |  |
+| `INT64, DATETIME` | `INT64` | Supported |  |
+| `INT64, TIME` | `INT64` | Supported |  |
+| `INT64, TIMESTAMP` | `INT64` | Supported |  |
+| `INT64, INTERVAL` | `INT64` | Supported |  |
+| `INT64, RANGE<DATE>` | `INT64` | Supported |  |
+| `INT64, RANGE<DATETIME>` | `INT64` | Supported |  |
+| `INT64, RANGE<TIMESTAMP>` | `INT64` | Supported |  |
 
 ## STRING_AGG
 
