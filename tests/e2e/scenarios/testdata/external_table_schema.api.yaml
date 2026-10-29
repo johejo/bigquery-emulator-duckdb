@@ -1,0 +1,307 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run s5rfwap3udv2nbrpb2g6smeloe, with sources in
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. jobs.get's
+# ddlOperationPerformed, which the emulator reports for no DDL statement, is left out of
+# drop_external_statement_type, as is the empty schema of ddl_detected's jobs.query response,
+# which the emulator leaves out of DDL responses (see known_bugs/collation.api.yaml).
+description: >-
+  Schema detection of Parquet external tables, CREATE OR REPLACE EXTERNAL TABLE and DROP EXTERNAL
+  TABLE, with sources in a Cloud Storage bucket.
+# Detection cases settle what the Parquet conversions of
+# [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
+# leave open for external tables: the mode a REQUIRED or OPTIONAL Parquet column takes, whether
+# NUMERIC takes the DECIMAL's precision and scale, whether tables.get reports modes and autodetect,
+# the DDL INFORMATION_SCHEMA records, and which file of several gives the schema. The
+# [DDL reference](third_party/bigquery_docs/reference/standard-sql/data-definition-language.md)
+# gives the DROP EXTERNAL TABLE error only as a template.
+# Fixtures were written with arrow-go v18.8.0's Parquet writer, uncompressed, without statistics or
+# dictionaries, and base64-encoded without newlines:
+# - types: one row of id INT64 REQUIRED = 1; s BYTE_ARRAY (STRING) OPTIONAL = 'a'; d INT32 (DATE)
+#   REQUIRED = 2024-01-02; n INT32 (DECIMAL(9, 2)) OPTIONAL = 1.25; ts INT64 (TIMESTAMP(MICROS,
+#   isAdjustedToUTC)) OPTIONAL = 2024-01-02 03:04:05.000006 UTC.
+# - x and y: one row of an OPTIONAL INT64 column x or y = 1.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  types_parquet: UEFSMRUAFRAVECwVAhUAFQYVBhwAAAABAAAAAAAAABUAFRYVFiwVAhUAFQYVBhwAAAACAAAAAgEBAAAAYRUAFQgVCCwVAhUAFQYVBhwAAAAMTQAAFQAVFBUULBUCFQAVBhUGHAAAAAIAAAACAX0AAAAVABUcFRwsFQIVABUGFQYcAAAAAgAAAAIBRtNNwO0NBgAVBBlsSAZzY2hlbWEVCgAVBCUAGAJpZAAVDCUCGAFzJQBMHAAAABUCJQAYAWQlDExsAAAAFQIlAhgBbiUKFQQVEixcFQQVEgAAABUEJQIYAnRzJRRMjBEcLAAAAAAAFgIZHBlcJggcFQQZJQAGGRgCaWQVABYCFjYWNiYISRwVABUAFQIAAAAmPhwVDBklAAYZGAFzFQAWAhY8FjwmPkkcFQAVABUCAAAAJnocFQIZJQAGGRgBZBUAFgIWLhYuJnpJHBUAFQAVAgAAACaoARwVAhklAAYZGAFuFQAWAhY6FjomqAFJHBUAFQAVAgAAACbiARwVBBklAAYZGAJ0cxUAFgIWQhZCJuIBSRwVABUAFQIAAAAWnAIWAiYIFpwCFAAAKBBhcnJvdy1nbyB2MTguOC4wGVwcAAAcAAAcAAAcAAAcAAAARQEAAFBBUjE=
+  x_parquet: UEFSMRUAFRwVHCwVAhUAFQYVBhwAAAACAAAAAgEBAAAAAAAAABUEGSxIBnNjaGVtYRUCABUEJQIYAXgAFgIZHBkcJggcFQQZJQAGGRgBeBUAFgIWQhZCJghJHBUAFQAVAgAAABZCFgImCBZCFAAAKBBhcnJvdy1nbyB2MTguOC4wGRwcAAAAYgAAAFBBUjE=
+  y_parquet: UEFSMRUAFRwVHCwVAhUAFQYVBhwAAAACAAAAAgEBAAAAAAAAABUEGSxIBnNjaGVtYRUCABUEJQIYAXkAFgIZHBkcJggcFQQZJQAGGRgBeRUAFgIWQhZCJghJHBUAFQAVAgAAABZCFgImCBZCFAAAKBBhcnJvdy1nbyB2MTguOC4wGRwcAAAAYgAAAFBBUjE=
+  external_ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])
+templates:
+  detected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/types.parquet', base64: '${types_parquet}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/${create_resource}
+          body: ${create_body}
+        observe:
+          status: /status
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+          errors: /body/errors
+          error: /body/error/message
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: columns
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT column_name, is_nullable, data_type FROM `${project}.${dataset}.INFORMATION_SCHEMA.COLUMNS` WHERE table_name = 't' ORDER BY ordinal_position
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT * FROM `${project}.${dataset}.t`
+        observe:
+          errors: /body/errors
+          schema: /body/schema
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/types.parquet'}
+  statements:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: x
+        gcs: {method: PUT, object: '${run}/${case}/x.parquet', base64: '${x_parquet}'}
+      - name: y
+        gcs: {method: PUT, object: '${run}/${case}/y.parquet', base64: '${y_parquet}'}
+      - name: setup
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${setup}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${statement}
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+          jobComplete: /body/jobComplete
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_x
+        gcs: {method: DELETE, object: '${run}/${case}/x.parquet'}
+      - name: delete_y
+        gcs: {method: DELETE, object: '${run}/${case}/y.parquet'}
+cases:
+  - name: ddl_detected
+    template: detected
+    vars:
+      create_resource: queries
+      create_body:
+        useLegacySql: false
+        location: US
+        timeoutMs: 200000
+        query: ${external_ddl}
+    expect: {"columns": {"rows": [{"f": [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}]}, {"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRING"}]}, {"f": [{"v": "d"}, {"v": "NO"}, {"v": "DATE"}]}, {"f": [{"v": "n"}, {"v": "YES"}, {"v": "NUMERIC"}]}, {"f": [{"v": "ts"}, {"v": "YES"}, {"v": "TIMESTAMP"}]}]}, "create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}, "type": "EXTERNAL"}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"${prefix}/types.parquet\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "2024-01-02"}, {"v": "1.25"}, {"v": "1.704164645000006E9"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}}}
+  - name: api_detected
+    template: detected
+    vars:
+      create_resource: datasets/${dataset}/tables
+      create_body:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/types.parquet']
+    expect: {"columns": {"rows": [{"f": [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}]}, {"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRING"}]}, {"f": [{"v": "d"}, {"v": "NO"}, {"v": "DATE"}]}, {"f": [{"v": "n"}, {"v": "YES"}, {"v": "NUMERIC"}]}, {"f": [{"v": "ts"}, {"v": "YES"}, {"v": "TIMESTAMP"}]}]}, "create": {"external": {"sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}, "status": 200, "type": "EXTERNAL"}, "get": {"external": {"sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}, "type": "EXTERNAL"}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"${prefix}/types.parquet\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "2024-01-02"}, {"v": "1.25"}, {"v": "1.704164645000006E9"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}}}
+  - name: api_autodetect
+    template: detected
+    vars:
+      create_resource: datasets/${dataset}/tables
+      create_body:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/types.parquet']
+          autodetect: true
+    expect: {"columns": {"rows": [{"f": [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}]}, {"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRING"}]}, {"f": [{"v": "d"}, {"v": "NO"}, {"v": "DATE"}]}, {"f": [{"v": "n"}, {"v": "YES"}, {"v": "NUMERIC"}]}, {"f": [{"v": "ts"}, {"v": "YES"}, {"v": "TIMESTAMP"}]}]}, "create": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}, "status": 200, "type": "EXTERNAL"}, "get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}, "type": "EXTERNAL"}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"${prefix}/types.parquet\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "2024-01-02"}, {"v": "1.25"}, {"v": "1.704164645000006E9"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}}}
+  # The load documentation takes the alphabetically last file; x.parquet sorts before y.parquet.
+  - name: last_file
+    template: statements
+    vars:
+      setup: SELECT 1
+      statement: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/y.parquet', '${prefix}/x.parquet'])
+    expect: {"get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/y.parquet", "${prefix}/x.parquet"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}]}, "status": 200, "type": "EXTERNAL"}, "statement": {"jobComplete": true, "status": 200}}
+  - name: replace_external
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      statement: CREATE OR REPLACE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/y.parquet'])
+    expect: {"get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/y.parquet"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}]}, "status": 200, "type": "EXTERNAL"}, "statement": {"jobComplete": true, "status": 200}}
+  - name: replace_table_with_external
+    template: statements
+    vars:
+      setup: CREATE TABLE `${project}.${dataset}.t` (x INT64)
+      statement: CREATE OR REPLACE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/y.parquet'])
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "${project}:${dataset}.t is not allowed for this operation because it is currently a TABLE.", "reason": "invalid"}], "message": "${project}:${dataset}.t is not allowed for this operation because it is currently a TABLE.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: replace_external_with_table
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      statement: CREATE OR REPLACE TABLE `${project}.${dataset}.t` (y INT64)
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "${project}:${dataset}.t is not allowed for this operation because it currently has type EXTERNAL.", "reason": "invalid"}], "message": "${project}:${dataset}.t is not allowed for this operation because it currently has type EXTERNAL.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: if_not_exists_external
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      statement: CREATE EXTERNAL TABLE IF NOT EXISTS `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/y.parquet'])
+    expect: {"get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/x.parquet"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200, "type": "EXTERNAL"}, "statement": {"jobComplete": true, "status": 200}}
+  - name: drop_external
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      statement: DROP EXTERNAL TABLE `${project}.${dataset}.t`
+    expect: {"get": {"error": {"body": {"error": {"code": 404, "errors": [{"domain": "global", "message": "Not found: Table ${project}:${dataset}.t", "reason": "notFound"}], "message": "Not found: Table ${project}:${dataset}.t", "status": "NOT_FOUND"}}, "status": 404}}, "statement": {"jobComplete": true, "status": 200}}
+  - name: drop_external_table
+    template: statements
+    vars:
+      setup: CREATE TABLE `${project}.${dataset}.t` (x INT64)
+      statement: DROP EXTERNAL TABLE `${project}.${dataset}.t`
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Cannot drop ${project}:${dataset}.t which has type TABLE. An external table was expected.", "reason": "invalid"}], "message": "Cannot drop ${project}:${dataset}.t which has type TABLE. An external table was expected.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: drop_external_view
+    template: statements
+    vars:
+      setup: CREATE VIEW `${project}.${dataset}.t` AS SELECT 1 AS x
+      statement: DROP EXTERNAL TABLE `${project}.${dataset}.t`
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Cannot drop ${project}:${dataset}.t which has type VIEW. An external table was expected.", "reason": "invalid"}], "message": "Cannot drop ${project}:${dataset}.t which has type VIEW. An external table was expected.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: drop_external_if_exists_table
+    template: statements
+    vars:
+      setup: CREATE TABLE `${project}.${dataset}.t` (x INT64)
+      statement: DROP EXTERNAL TABLE IF EXISTS `${project}.${dataset}.t`
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Cannot drop ${project}:${dataset}.t which has type TABLE. An external table was expected.", "reason": "invalid"}], "message": "Cannot drop ${project}:${dataset}.t which has type TABLE. An external table was expected.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: drop_external_missing
+    template: statements
+    vars:
+      setup: SELECT 1
+      statement: DROP EXTERNAL TABLE `${project}.${dataset}.t`
+    expect: {"statement": {"error": {"body": {"error": {"code": 404, "errors": [{"domain": "global", "message": "Not found: External table ${project}:${dataset}.t", "reason": "notFound"}], "message": "Not found: External table ${project}:${dataset}.t", "status": "NOT_FOUND"}}, "status": 404}}}
+  - name: drop_table_external
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      statement: DROP TABLE `${project}.${dataset}.t`
+    expect: {"get": {"error": {"body": {"error": {"code": 404, "errors": [{"domain": "global", "message": "Not found: Table ${project}:${dataset}.t", "reason": "notFound"}], "message": "Not found: Table ${project}:${dataset}.t", "status": "NOT_FOUND"}}, "status": 404}}, "statement": {"jobComplete": true, "status": 200}}
+  - name: drop_snapshot_external
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      statement: DROP SNAPSHOT TABLE `${project}.${dataset}.t`
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Cannot drop ${project}:${dataset}.t which has type EXTERNAL TABLE. A snapshot was expected.", "reason": "invalid"}], "message": "Cannot drop ${project}:${dataset}.t which has type EXTERNAL TABLE. A snapshot was expected.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  # jobs.get reports the statementType that jobs.query omits.
+  - name: drop_external_statement_type
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: setup
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (x INT64) OPTIONS (format = 'PARQUET', uris = ['${prefix}/x.parquet'])
+      - name: drop
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: DROP EXTERNAL TABLE `${project}.${dataset}.t`
+        bind: {job: /body/jobReference/jobId}
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          statementType: /body/statistics/query/statementType
+          ddlTargetTable: /body/statistics/query/ddlTargetTable/tableId
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect: {"job": {"ddlTargetTable": "t", "statementType": "DROP_EXTERNAL_TABLE"}}

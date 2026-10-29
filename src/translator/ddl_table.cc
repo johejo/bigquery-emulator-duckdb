@@ -939,7 +939,7 @@ std::optional<std::string> CreateExternalTable(
       create.collation_name() != nullptr) {
     return Unsupported(scope, "this CREATE EXTERNAL TABLE clause");
   }
-  const auto head = CreateTableHead(create, scope);
+  auto head = CreateTableHead(create, scope);
   const auto target = scope.context.statement.ddl_target_table;
   auto metadata =
       OptionsMetadata(create.option_list(), DdlOptionContext::kCreateExternalTable, scope);
@@ -964,8 +964,10 @@ std::optional<std::string> CreateExternalTable(
     CheckFieldNames(*field, field->name);
     table.schema.push_back(std::move(*field));
   }
+  // The runtime detects the columns of a table that declares none from its sources and adds them.
   if (table.schema.empty()) {
-    return Unsupported(scope, "external tables without an explicit schema");
+    scope.context.statement.table = std::move(table);
+    return head;
   }
   const auto columns = ColumnsSql(table.schema, scope);
   if (!columns) {

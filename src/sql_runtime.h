@@ -181,7 +181,8 @@ class SqlRuntime {
   std::vector<TableListEntry> ListTableEntries(DatasetReference dataset);
   TableInfo GetTable(TableReference table, bool include_row_count = true, bool expire = true);
   // Return the mutation result before another request can expire the relation.
-  TableInfo CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
+  // An external table created without a schema takes the one its sources have.
+  TableInfo CreateTable(TableReference table, std::vector<FieldSchema> schema,
                         const TableMetadata& metadata = {});
   TableInfo CreateView(TableReference table, const nlohmann::json& definition,
                        const TableMetadata& metadata, bool materialized = false);
@@ -266,7 +267,8 @@ class SqlRuntime {
   // Rejects DDL targets in DuckDB's internal schemas.
   static void CheckDdlTarget(const TranslatedStatement& translation);
   // Rejects DDL that would change a table snapshot, as `backend` sees it, other than DROP SNAPSHOT
-  // TABLE, and rejects DROP or replacement of a materialized view with a different object type.
+  // TABLE, and rejects DROP or replacement of a materialized view or an external table with a
+  // different object type.
   static void CheckRelationTarget(Backend& backend, const TranslatedStatement& translation);
   // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
   // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
@@ -281,6 +283,9 @@ class SqlRuntime {
   std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true,
                                               JobLocation* location = nullptr);
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
+  // The schema BigQuery detects from the sources of an external table created without one, with
+  // the mode of each field given. Throws ApiError::Unsupported without an external table provider.
+  std::vector<FieldSchema> DetectExternalSchema(const GcsExternalData& definition);
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,

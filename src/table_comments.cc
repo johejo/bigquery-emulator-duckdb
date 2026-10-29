@@ -98,11 +98,14 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
       throw ApiError::Unsupported("external table storage options");
     }
     const auto unsupported = std::ranges::find_if(schema, [](const FieldSchema& field) {
-      return field.mode != FieldMode::kNullable || field.max_length || field.precision ||
+      // The types and modes that external Parquet reads detect for scalar columns.
+      return field.mode == FieldMode::kRepeated || field.max_length || field.precision ||
              field.scale || field.collation || !field.default_value_expression.empty() ||
              (field.type != FieldType::kInteger && field.type != FieldType::kString &&
               field.type != FieldType::kBoolean && field.type != FieldType::kFloat &&
-              field.type != FieldType::kBytes);
+              field.type != FieldType::kBytes && field.type != FieldType::kNumeric &&
+              field.type != FieldType::kDate && field.type != FieldType::kTime &&
+              field.type != FieldType::kTimestamp);
     });
     if (unsupported != schema.end()) {
       throw ApiError::Unsupported("this external table column definition: " + unsupported->name);

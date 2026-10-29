@@ -129,6 +129,14 @@
       "updateTime": "2026-10-21T21:01:01Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet",
+      "file": "third_party/bigquery_docs/loading-data-cloud-storage-parquet.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet",
+      "title": "Load Parquet data from Cloud Storage",
+      "sha256": "6f1df87d71e8e948cadd851243a3571ff814eb8891b1cfe5eae8c6afab20191e",
+      "updateTime": "2026-10-27T13:28:26Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/locations",
       "file": "third_party/bigquery_docs/locations.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/locations",

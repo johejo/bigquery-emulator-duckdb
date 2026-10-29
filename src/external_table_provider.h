@@ -18,6 +18,9 @@ class ExternalTableProvider {
  public:
   virtual ~ExternalTableProvider() = default;
   virtual TableRead Read(GcsExternalData definition, std::vector<FieldSchema> schema) = 0;
+  // The schema of an external table created without one, read from its sources when it is
+  // created, as BigQuery detects it. Throws ApiError.
+  virtual std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition) = 0;
   virtual absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& key,
                                                                  const std::string& query,
                                                                  const std::string& options,

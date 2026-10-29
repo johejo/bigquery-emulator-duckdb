@@ -38,7 +38,8 @@ struct ViewDefinition {
 // The table a CREATE TABLE [AS SELECT] defines, whose BigQuery schema the emulator records with
 // it: the declared types, NOT NULL as REQUIRED, type parameters, defaults and descriptions, and
 // the description, friendly name and labels its OPTIONS give. CREATE TABLE COPY and CLONE also
-// fill it with the rows of `rows_from`.
+// fill it with the rows of `rows_from`. A CREATE EXTERNAL TABLE without columns has an empty
+// schema and SQL without a column list, which the runtime completes from its sources.
 struct TableDefinition {
   TableReference table;
   std::vector<FieldSchema> schema = {};

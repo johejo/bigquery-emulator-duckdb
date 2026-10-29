@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 0 | 4 | 0 |
 | [Queries](#queries) | 34 | 2 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 22 | 10 | 1 |
+| [DDL](#ddl) | 23 | 10 | 0 |
 | [Collation](#collation) | 14 | 0 | 1 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
@@ -111,9 +111,9 @@ rejected.
 | `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE CLONE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE SNAPSHOT TABLE` | Supported | See [Table snapshots](compatibility.md#table-snapshots). |
-| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: external tables other than PARQUET; external tables without an explicit schema. |
+| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: external tables other than PARQUET. |
 | `DROP TABLE` | Supported |  |
-| `DROP EXTERNAL TABLE` | Unsupported |  |
+| `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |
 | `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ALTER TABLE on external tables. |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1. |

@@ -204,7 +204,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     const auto type = ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
-    return type == "PROPERTY GRAPH" ? "DROP_PROPERTY_GRAPH" : "DROP_" + type;
+    return type == "PROPERTY GRAPH"   ? "DROP_PROPERTY_GRAPH"
+           : type == "EXTERNAL TABLE" ? "DROP_EXTERNAL_TABLE"
+                                      : "DROP_" + type;
   }
   if (statement.Is<googlesql::ResolvedDropMaterializedViewStmt>()) {
     return "DROP_MATERIALIZED_VIEW";

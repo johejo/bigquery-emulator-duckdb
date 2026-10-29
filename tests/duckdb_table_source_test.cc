@@ -68,6 +68,10 @@ class StagedProvider : public ExternalTableProvider {
     };
   }
 
+  std::vector<FieldSchema> DetectSchema(const GcsExternalData& /*definition*/) override {
+    return {};
+  }
+
   absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& /*key*/,
                                                          const std::string& /*query*/,
                                                          const std::string& /*options*/,
