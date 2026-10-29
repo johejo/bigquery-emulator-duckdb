@@ -10,6 +10,7 @@ DuckDB prunes, so such a query succeeds where BigQuery fails.
 
 Checking COLLATE's literal specification in the translator would fail every such query as BigQuery
 does, and the backend functions would no longer take `googlesql_collation::Options::und_ci_only`.
-The translator does not know whether it runs with BigQuery's or GoogleSQL's semantics
-(`--semantics`, and the compliance tests, which take other specifications such as `und:cs`), so
-that choice has to reach it first; `EmulatorFunctionCatalog()` is shared by both.
+`EmulatorFunctionCatalog()` assembles a catalog for each `functions_duckdb::Options`, the same
+choice the backend functions take, so COLLATE's registration can read it there: BigQuery's
+semantics take only `und:ci`, while `--semantics googlesql` and the compliance tests take other
+specifications such as `und:cs`.

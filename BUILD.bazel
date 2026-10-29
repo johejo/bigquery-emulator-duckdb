@@ -596,6 +596,7 @@ cc_library(
         "//src/googlesql_geography_duckdb",
         "//src/translator:functions",
     ],
+    deps = ["//src/googlesql_functions_duckdb:options"],
 )
 
 cc_library(
@@ -1124,6 +1125,7 @@ cc_library(
         ":translated_statement",
         ":translator",
         ":type_mapping",
+        "//src/function_catalog",
         "//src/translator:literal",
         "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/status",
@@ -1171,7 +1173,6 @@ cc_library(
         ":catalog",
         ":default_dataset",
         ":duckdb_sql",
-        ":emulator_functions",
         ":field_schema",
         ":javascript_function",
         ":language_options",
@@ -1218,6 +1219,7 @@ cc_library(
         ":backend",
         ":builtin_function_options",
         ":query_parameters",
+        "//src/function_catalog",
     ],
 )
 
@@ -1386,6 +1388,7 @@ cc_binary(
         ":catalog",
         ":emulator_functions",
         ":field_schema",
+        ":function_options",
         ":language_options",
         ":table_source",
         "//src/function_catalog",
@@ -1755,6 +1758,7 @@ cc_test(
         ":field_schema",
         ":file_read",
         ":file_read_options",
+        ":function_options",
         ":references",
         ":result_rows",
         ":statement_resources",

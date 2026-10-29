@@ -38,6 +38,7 @@
 #include "src/emulator_functions.h"
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_options.h"
 #include "src/language_options.h"
 #include "src/table_source.h"
 
@@ -426,7 +427,8 @@ std::string Implementation(const std::string& name, const function_catalog::Func
     return "Table function";
   }
   if (name == "CASE") {
-    return function_catalog::Describe(*EmulatorFunctionCatalog().Find("$CASE_NO_VALUE"));
+    return function_catalog::Describe(
+        *EmulatorFunctionCatalog(BigQueryFunctionOptions()).Find("$CASE_NO_VALUE"));
   }
   if (name == "CAST" || name == "SAFE_CAST" || name == "ARRAY") {
     return "DuckDB SQL, in code";
@@ -482,8 +484,10 @@ int Main(int argc, char** argv) {
     const std::vector<std::string> path = absl::StrSplit(name, '.');
     const bool known = catalog.FindFunction(path, &function).ok();
     // Functions spelled as syntax, such as EXTRACT, are operators such as $EXTRACT.
-    const function_catalog::FunctionEntry* entry = EmulatorFunctionCatalog().Find(
-        known ? absl::AsciiStrToUpper(function->FullName(/*include_group=*/false)) : "$" + name);
+    const function_catalog::FunctionEntry* entry =
+        EmulatorFunctionCatalog(BigQueryFunctionOptions())
+            .Find(known ? absl::AsciiStrToUpper(function->FullName(/*include_group=*/false))
+                        : "$" + name);
     const googlesql::TableValuedFunction* table_function = nullptr;
     // RANGE_SESSIONIZE and EXTERNAL_QUERY have scan translators rather than scalar registry
     // entries.

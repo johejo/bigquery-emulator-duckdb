@@ -20,6 +20,7 @@
 #include "src/builtin_function_options.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/emulator_functions.h"
 #include "src/external_query.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
@@ -73,6 +74,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                   [this](const std::string& key) { return connections_.conninfo.contains(key); },
           },
           geography, functions, initialize),
+      functions_(EmulatorFunctionCatalog(functions)),
       excluded_function_ids_(std::move(excluded_function_ids)),
       declarations_(declarations),
       has_session_user_(session_user.has_value()),
