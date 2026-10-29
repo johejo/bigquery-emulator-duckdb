@@ -112,7 +112,8 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
-    const auto type = DuckDbType(output->column().type());
+    const auto type =
+        DuckDbType(output->column().type(), nullptr, scope.context.timestamp_precision);
     if (column == relation->columns.end() || !type) {
       return std::nullopt;
     }

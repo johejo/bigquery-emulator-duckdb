@@ -139,6 +139,18 @@ probe use this same composition.
 DuckDB at the same application layer. The translator and common catalog do not depend on the
 feature adapters' function-registration targets.
 
+`TimestampPrecision` travels with that catalog, the analyzer, parameter translation and result
+conversion. BigQuery mode uses `TIMESTAMPTZ`; GoogleSQL mode uses signed Unix nanoseconds in
+`HUGEINT`, aliased as `bq_timestamp_nanos`. DuckDB's `TIMESTAMP_NS` cannot cover years 0001–9999.
+The [shared codec](../src/timestamp_nanos.h) checks that range, parses and formats through GoogleSQL,
+and decodes result vectors. The [DuckDB adapter](../src/googlesql_functions_duckdb/timestamp.h)
+registers the alias and thin UDFs for formatting and exact microsecond conversion. Carrying and
+comparing functions operate on the integers directly; other scalar calls cross the microsecond
+adapter, which rejects a remainder instead of truncating it. Timestamp range bounds retain their
+microsecond representation and use the same exact adapter. Query and write boundaries restore
+aliases recursively from resolved types, since integer operations can discard them. A bare
+`HUGEINT` is not inferred to be a timestamp.
+
 Geography's DuckDB adapter declares backend registrations and the SQL functions that call them
 together. Both `RegisterGeographyFunctions` and the application's catalog composition consume
 those definitions, including aliases and overloads that share an implementation. The adapter

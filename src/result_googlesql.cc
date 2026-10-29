@@ -10,6 +10,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
+#include "absl/time/time.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/common/internal_value.h"
@@ -26,6 +27,7 @@
 #include "src/interval.h"
 #include "src/result_chunks.h"
 #include "src/result_rows.h"
+#include "src/timestamp_nanos.h"
 #include "src/vector_value.h"
 
 namespace bigquery_emulator_duckdb {
@@ -182,6 +184,12 @@ absl::StatusOr<googlesql::Value> ToGoogleSqlValue(duckdb_vector vector, duckdb_l
       }
       break;
     case googlesql::TYPE_TIMESTAMP:
+      if (id == DUCKDB_TYPE_HUGEINT) {
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            const absl::Time time,
+            TimestampFromNanos(TimestampNanosInteger(VectorElement<duckdb_hugeint>(vector, row))));
+        return googlesql::Value::Timestamp(time);
+      }
       if (id == DUCKDB_TYPE_TIMESTAMP_TZ) {
         const int64_t micros = VectorElement<duckdb_timestamp>(vector, row).micros;
         if (googlesql::functions::IsValidTimestamp(micros, googlesql::functions::kMicroseconds)) {

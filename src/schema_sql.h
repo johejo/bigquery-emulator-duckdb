@@ -8,6 +8,7 @@
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -18,7 +19,8 @@ namespace bigquery_emulator_duckdb {
 std::string ToDuckDbType(const FieldSchema& field);
 
 // A DuckDB column definition for `field`, which enforces REQUIRED as BigQuery does.
-std::string ColumnDefinition(const FieldSchema& field);
+std::string ColumnDefinition(const FieldSchema& field,
+                             TimestampPrecision precision = TimestampPrecision::kMicroseconds);
 
 // Column definitions for a table that holds `schema`, or nullopt when a type has no column
 // type of its own in the emulator.

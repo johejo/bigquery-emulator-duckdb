@@ -11,6 +11,7 @@
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
 #include "src/system_variables.h"
+#include "src/timestamp_precision.h"
 
 namespace googlesql {
 class AnalyzerOptions;
@@ -42,6 +43,7 @@ struct AnalyzerSettings {
   const googlesql::ScriptExecutor* script = nullptr;
   // Additional system variables owned by the emulator rather than ScriptExecutor.
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
+  TimestampPrecision timestamp_precision = TimestampPrecision::kMicroseconds;
 };
 
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so

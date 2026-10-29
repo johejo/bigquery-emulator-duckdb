@@ -57,6 +57,7 @@
 #include "src/result_googlesql.h"
 #include "src/result_value.h"
 #include "src/sql_runtime.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -123,7 +124,7 @@ absl::StatusOr<std::string> ScalarText(const Value& value) {
       return text;
     case googlesql::TYPE_TIMESTAMP:
       GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::ConvertTimestampToString(
-          value.ToUnixPicos().ToAbslTime(), googlesql::functions::kMicroseconds, "UTC", &text));
+          value.ToUnixPicos().ToAbslTime(), googlesql::functions::kNanoseconds, "UTC", &text));
       return text;
     case googlesql::TYPE_DATETIME:
       GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::ConvertDatetimeToString(
@@ -182,7 +183,7 @@ absl::StatusOr<QueryParameters> ToQueryParameters(const std::map<std::string, Va
                     {"parameterValue", std::move(parameter_value)}});
   }
   try {
-    return QueryParameters::Parse(list);
+    return QueryParameters::Parse(list, TimestampPrecision::kNanoseconds);
   } catch (const ApiError& error) {
     return absl::UnimplementedError(error.what());
   }
@@ -422,7 +423,8 @@ class EmulatorTestDriver : public googlesql::TestDriver {
         "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, BackendInitializer{},
         functions_duckdb::ObjectStorage{}, DatabaseInitializer{},
         std::function<std::unique_ptr<ExternalTableProvider>(Backend&)>{},
-        googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{},
+        googlesql_geography::Options{.expand_bounding_box = true},
+        functions_duckdb::Options{.timestamp_precision = TimestampPrecision::kNanoseconds},
         ExcludedFunctionIds{}, FunctionDeclarations::kGoogleSQL);
     runtime_->CreateDataset(DatasetReference{kProject, kDataset});
   }

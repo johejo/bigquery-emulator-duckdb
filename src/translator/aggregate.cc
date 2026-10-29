@@ -671,7 +671,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
                          IntervalKey(key->expr()->type(), column) + " ORDER BY q._rn) AS " +
                          ColumnName(id));
       }
-      const auto type = DuckDbType(key->expr()->type());
+      const auto type = DuckDbType(key->expr()->type(), nullptr, scope.context.timestamp_precision);
       if (!type) {
         return std::nullopt;
       }
@@ -833,7 +833,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   }
   for (const auto& computed : aggregate.aggregate_list()) {
     const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
-    const auto type = DuckDbType(computed->expr()->type());
+    const auto type =
+        DuckDbType(computed->expr()->type(), nullptr, scope.context.timestamp_precision);
     if (!computed->expr()->Is<googlesql::ResolvedAggregateFunctionCall>() || !type) {
       return std::nullopt;
     }
@@ -959,7 +960,7 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         throw std::invalid_argument("Analytic function " + call->function()->Name() +
                                     " does not support DISTINCT.");
       }
-      const auto type = DuckDbType(call->type());
+      const auto type = DuckDbType(call->type(), nullptr, scope.context.timestamp_precision);
       const auto over = Window(*group, call->window_frame(), scope, input_columns);
       if (!type || !over) {
         return std::nullopt;

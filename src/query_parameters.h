@@ -7,6 +7,7 @@
 
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -25,7 +26,8 @@ class QueryParameters {
 
   // Parses BigQuery's QueryParameter list. Throws ApiError when a parameter is malformed or
   // has a type the emulator does not support.
-  static QueryParameters Parse(const nlohmann::json& parameters);
+  static QueryParameters Parse(const nlohmann::json& parameters,
+                               TimestampPrecision precision = TimestampPrecision::kMicroseconds);
 
   [[nodiscard]] bool empty() const { return by_name_.empty() && by_position_.empty(); }
 

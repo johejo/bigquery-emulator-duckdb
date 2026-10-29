@@ -743,7 +743,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return QueryParameters();
     }
     std::string unsupported;
-    std::optional<QueryParameters> parameters = TranslateParameters(*values, &unsupported);
+    std::optional<QueryParameters> parameters =
+        TranslateParameters(*values, &unsupported, settings.timestamp_precision);
     if (!parameters.has_value()) {
       return Unsupported(unsupported);
     }
@@ -972,6 +973,7 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = &variables,
+      .timestamp_precision = host.functions().timestamp_precision(),
   };
   for (const FieldSchema& field : parameters.named_types()) {
     absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);

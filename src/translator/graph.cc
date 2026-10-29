@@ -423,7 +423,8 @@ std::optional<Relation> FlatGraphPath(
           QuoteIdentifier("g" + std::to_string(column.column_id()) + "_" + property.name);
       const googlesql::GraphPropertyDefinition* definition = nullptr;
       if (!element_table->FindPropertyDefinitionByName(property.name, definition).ok()) {
-        const auto type = DuckDbType(property.value_type);
+        const auto type =
+            DuckDbType(property.value_type, nullptr, scope.context.timestamp_precision);
         if (!type) {
           return Unsupported(scope, "graph property type");
         }
@@ -436,10 +437,11 @@ std::optional<Relation> FlatGraphPath(
         return Unsupported(scope, "graph properties other than columns");
       }
       const auto* source = (*value)->GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
-      outputs.push_back(std::format(
-          "{} AS {}",
-          StoredColumn(variable + "." + QuoteIdentifier(source->Name()), source->GetType()),
-          output));
+      outputs.push_back(
+          std::format("{} AS {}",
+                      StoredColumn(variable + "." + QuoteIdentifier(source->Name()),
+                                   source->GetType(), scope.context.timestamp_precision),
+                      output));
       fields.push_back(std::format("{} := q.{}", name, output));
     }
     if (fields.empty()) {
@@ -460,7 +462,8 @@ std::optional<Relation> FlatGraphPath(
       const auto* target = is_edge ? path_type->edge_type() : path_type->node_type();
       std::vector<std::string> path_properties;
       for (const auto& property : target->property_types()) {
-        const auto property_type = DuckDbType(property.value_type);
+        const auto property_type =
+            DuckDbType(property.value_type, nullptr, scope.context.timestamp_precision);
         if (!property_type) {
           return Unsupported(scope, "graph path property type");
         }
@@ -482,8 +485,10 @@ std::optional<Relation> FlatGraphPath(
     result.columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
   }
   if (path_type != nullptr) {
-    const auto node_type = DuckDbType(path_type->node_type());
-    const auto edge_type = DuckDbType(path_type->edge_type());
+    const auto node_type =
+        DuckDbType(path_type->node_type(), nullptr, scope.context.timestamp_precision);
+    const auto edge_type =
+        DuckDbType(path_type->edge_type(), nullptr, scope.context.timestamp_precision);
     if (!node_type || !edge_type) {
       return Unsupported(scope, "graph path element type");
     }
@@ -754,8 +759,10 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
       if (scope.property_graph == nullptr || !scope.property_graph->GetNodeTables(tables).ok()) {
         return Unsupported(scope, "graph nodes for zero repetitions");
       }
-      const auto head_type = DuckDbType(path.head().type());
-      const auto tail_type = DuckDbType(path.tail().type());
+      const auto head_type =
+          DuckDbType(path.head().type(), nullptr, scope.context.timestamp_precision);
+      const auto tail_type =
+          DuckDbType(path.tail().type(), nullptr, scope.context.timestamp_precision);
       if (!head_type || !tail_type) {
         return Unsupported(scope, "graph endpoint types");
       }
@@ -783,7 +790,8 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
             "q._graph_edges",
         };
         for (const auto& group : path.group_variable_list()) {
-          const auto type = DuckDbType(group->array().type());
+          const auto type =
+              DuckDbType(group->array().type(), nullptr, scope.context.timestamp_precision);
           if (!type) {
             return Unsupported(scope, "graph group variable type");
           }
@@ -822,7 +830,7 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
   }
   if (path.path() != nullptr) {
     const auto& column = path.path()->column();
-    const auto type = DuckDbType(column.type());
+    const auto type = DuckDbType(column.type(), nullptr, scope.context.timestamp_precision);
     if (!type) {
       return Unsupported(scope, "graph path type");
     }

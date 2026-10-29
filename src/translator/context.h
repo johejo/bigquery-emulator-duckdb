@@ -13,6 +13,7 @@
 #include "src/query_parameters.h"
 #include "src/statement_resources.h"
 #include "src/system_variables.h"
+#include "src/timestamp_precision.h"
 
 namespace googlesql {
 class PropertyGraph;
@@ -42,6 +43,7 @@ struct WithQuery {
 // What the whole statement's translation shares: its inputs, and what it records on the way.
 struct Context {
   const function_catalog::Catalog& functions;
+  TimestampPrecision timestamp_precision = TimestampPrecision::kMicroseconds;
   const QueryParameters& parameters;
   const DefaultDataset& defaults;
   // DDL records what it creates, alters or drops in the statement itself, so that this header,

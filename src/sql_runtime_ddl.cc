@@ -11,6 +11,7 @@
 #include "src/backend.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
+#include "src/function_catalog/catalog.h"
 #include "src/location.h"
 #include "src/references.h"
 #include "src/sql_runtime.h"
@@ -128,7 +129,8 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     }
     auto schema = TableSchema(backend_, table);
     const TableMetadata metadata = CommentMetadata(*comment);
-    auto statements = AlterTableStatements(*alteration, schema, metadata);
+    auto statements =
+        AlterTableStatements(*alteration, schema, metadata, functions_.timestamp_precision());
     TableReference destination = table;
     bool discards_history = false;
     for (const auto& action : alteration->actions) {

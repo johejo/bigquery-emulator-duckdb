@@ -175,6 +175,62 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
       stdin: *semantics
     test: current.exit_code == 0 && current.stdout == '{"chr":"1","bounds":"unexpanded"}' + "\n"
+  # GoogleSQL's nanosecond precision spans the full TIMESTAMP range, not TIMESTAMP_NS's
+  # 1677–2262 interval. These epoch values are -1ns and +1ns.
+  semantics_nanosecond_values:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        SELECT TIMESTAMP '1969-12-31 23:59:59.999999999+00' AS before_epoch,
+               TIMESTAMP '1970-01-01 00:00:00.000000001+00' AS after_epoch,
+               TIMESTAMP '0001-01-01 00:00:00+00' AS first,
+               TIMESTAMP '9999-12-31 23:59:59.999999999+00' AS last;
+    test: >-
+      current.exit_code == 0 && current.stdout ==
+      '{"before_epoch":"1969-12-31 23:59:59.999999999+00","after_epoch":"1970-01-01 00:00:00.000000001+00","first":"0001-01-01 00:00:00+00","last":"9999-12-31 23:59:59.999999999+00"}' + "\n"
+  semantics_nanosecond_comparisons:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        WITH timestamps AS (
+          SELECT t FROM UNNEST([TIMESTAMP '1970-01-01 00:00:00.000000001+00',
+                                TIMESTAMP '1970-01-01 00:00:00.000000002+00',
+                                TIMESTAMP '1970-01-01 00:00:00.000000001+00']) AS t)
+        SELECT COUNT(DISTINCT t) AS n,
+               CAST(MIN(t) AS STRING) AS first, CAST(MAX(t) AS STRING) AS last
+        FROM timestamps;
+    test: >-
+      current.exit_code == 0 && current.stdout ==
+      '{"n":"2","first":"1970-01-01 00:00:00.000000001+00","last":"1970-01-01 00:00:00.000000002+00"}' + "\n"
+  semantics_nanosecond_short_circuit:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        SELECT IF(TRUE, TIMESTAMP '1970-01-01 00:00:00.000000001+00',
+                       TIMESTAMP_ADD(TIMESTAMP '1970-01-01 00:00:00.000000001+00',
+                                     INTERVAL 1 SECOND)) AS t;
+    test: current.exit_code == 0 && current.stdout == '{"t":"1970-01-01 00:00:00.000000001+00"}' + "\n"
+  # Until an operation has a nanosecond implementation, its adapter must not truncate.
+  semantics_nanosecond_operation_rejects:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        SELECT TIMESTAMP_ADD(TIMESTAMP '1970-01-01 00:00:00.000000001+00', INTERVAL 1 SECOND);
+    test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "nanosecond TIMESTAMP precision"
+  duckdb_reads_stored_nanoseconds:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          --semantics=googlesql -e "CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT TIMESTAMP '1969-12-31 23:59:59.999999999+00' AS t"
+        "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --duckdb \
+          -e 'SELECT bq_timestamp_nanos_text(t) AS t FROM test.ds.t'
+    test: current.exit_code == 0 && current.stdout == '{"t":"1969-12-31 23:59:59.999999999+00"}' + "\n"
   semantics_invalid:
     exec:
       command: >-

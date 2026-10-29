@@ -24,6 +24,7 @@
 #include "src/duckdb_types.h"
 #include "src/interval.h"
 #include "src/result_chunks.h"
+#include "src/timestamp_nanos.h"
 #include "src/vector_value.h"
 
 namespace bigquery_emulator_duckdb {
@@ -174,6 +175,14 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
   }
   if (IsRange(type)) {
     return json{{"v", RangeText(vector, type, row, encoding.timestamps)}};
+  }
+  if (IsTimestampNanos(type)) {
+    const auto text =
+        TimestampNanosText(TimestampNanosInteger(VectorElement<duckdb_hugeint>(vector, row)));
+    if (!text.ok()) {
+      throw BackendError(std::string(text.status().message()));
+    }
+    return json{{"v", *text}};
   }
   json value;
   switch (duckdb_get_type_id(type)) {

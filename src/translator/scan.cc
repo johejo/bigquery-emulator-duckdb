@@ -32,6 +32,7 @@
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 #include "src/translator/aggregate.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
@@ -758,7 +759,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
       projections.push_back(
           StoredColumn(
               QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()),
-              column.type()) +
+              column.type(), scope.context.timestamp_precision) +
           " AS " + alias);
       result.columns.emplace(column.column_id(), "q." + alias);
     }
@@ -906,11 +907,12 @@ std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& s
   return result;
 }
 
-std::string StoredColumn(const std::string& column, const googlesql::Type* type) {
+std::string StoredColumn(const std::string& column, const googlesql::Type* type,
+                         TimestampPrecision precision) {
   if (!HasBigNumeric(type) && !HasGeography(type)) {
     return column;
   }
-  return "CAST(" + column + " AS " + DuckDbType(type).value_or("") + ")";
+  return "CAST(" + column + " AS " + DuckDbType(type, nullptr, precision).value_or("") + ")";
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

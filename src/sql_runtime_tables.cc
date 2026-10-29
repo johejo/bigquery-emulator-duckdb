@@ -21,6 +21,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/function_catalog/catalog.h"
 #include "src/location.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
@@ -126,7 +127,9 @@ TableInfo SqlRuntime::CreateTable(TableReference table, const std::vector<FieldS
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   std::vector<std::string> columns;
-  std::ranges::transform(schema, std::back_inserter(columns), ColumnDefinition);
+  std::ranges::transform(schema, std::back_inserter(columns), [this](const FieldSchema& field) {
+    return ColumnDefinition(field, functions_.timestamp_precision());
+  });
   DdlWrite write = CreateTableWrite(
       TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);
   auto defaults = schema;

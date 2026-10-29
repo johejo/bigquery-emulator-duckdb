@@ -873,47 +873,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "A TIMESTAMP with nanoseconds, which BigQuery lacks, is truncated to microseconds"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_6gq1hDQAvPY_00, NULL>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_9-hQ8xKgpgs_00, NULL>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_B8VYF_rgJEk_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_DjITAVNHWk4_00, NULL>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_Wa2-O3ll7Pc_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_aNYbm6XahcU_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_yyS0estFsOE_48562@00>_TIMESTAMP_<1970-01-_XiepjyLkS_M_48561@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_yyS0estFsOE_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<1970-01-_z1rzwUP7Pu4_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayFindAll_ARRAY<TIMESTAMP>_<NULL, 19_PF5zcTdyopg_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_2QQ-jA0Ip0A_48561@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_6gq1hDQAvPY_00, NULL>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_B8VYF_rgJEk_48562@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_XPBuNWKxB78_00, NULL>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_bk-i7ag141c_00, NULL>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_iogQqHV_lG0_48563@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_tiZQmljDXrs_48562@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<1970-01-_yyS0estFsOE_48562@00>"
-  label: "code:ArrayMax_ARRAY<TIMESTAMP>_<NULL, 19__6ld0SzCEvQ_48562@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_6gq1hDQAvPY_00, NULL>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_B8VYF_rgJEk_48562@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_OkaSThaYJ5g_48563@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_QEKx4FeqN20_00, NULL>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_dDsfcInXT7I_00, NULL>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_iogQqHV_lG0_48563@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_kju7IdQMx_I_48562@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<1970-01-_tiZQmljDXrs_48562@00>"
-  label: "code:ArrayMin_ARRAY<TIMESTAMP>_<NULL, 19__6ld0SzCEvQ_48562@00>"
-  label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_DjITAVNHWk4_00, NULL>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_Wa2-O3ll7Pc_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_yyS0estFsOE_48562@00>_TIMESTAMP_<1970-01-_XiepjyLkS_M_48561@00>"
-  label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_yyS0estFsOE_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_z1rzwUP7Pu4_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-  label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<NULL, 19_PF5zcTdyopg_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "The test's prepare_database creates what the emulator does not, such as a value table, a SQL function, a table-valued function, a measure or a property graph, so the statement fails to resolve"
   label: "aggregate_filter_test:filter_inside_templated_tvf"

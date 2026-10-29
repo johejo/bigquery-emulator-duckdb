@@ -11,6 +11,9 @@
 
 namespace bigquery_emulator_duckdb {
 
+// An alias marks explicit nanosecond TIMESTAMPs; resolved types restore it at query boundaries.
+bool IsTimestampNanos(duckdb_logical_type type);
+
 // Whether the DuckDB `type` is the STRUCT that keeps a RANGE.
 bool IsRange(duckdb_logical_type type);
 

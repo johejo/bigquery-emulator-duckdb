@@ -12,12 +12,14 @@
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/language_options.h"
+#include "src/timestamp_nanos.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
-std::optional<std::string> Literal(const googlesql::Value& value) {
-  const auto type = DuckDbType(value.type());
+std::optional<std::string> Literal(const googlesql::Value& value, TimestampPrecision precision) {
+  const auto type = DuckDbType(value.type(), nullptr, precision);
   if (!type) {
     return std::nullopt;
   }
@@ -27,6 +29,8 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   std::string literal;
   if (value.is_null()) {
     literal = "NULL";
+  } else if (value.type()->IsTimestamp() && precision == TimestampPrecision::kNanoseconds) {
+    return TimestampNanosSql(value.ToUnixPicos().ToAbslTime());
   } else if (value.type()->IsInterval()) {
     const auto& interval = value.interval_value();
     if (interval.get_nano_fractions() != 0) {
@@ -38,12 +42,17 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
     std::vector<std::string> bounds;
     for (const auto& [bound, unbounded] :
          {std::pair{&value.start(), "-infinity"}, std::pair{&value.end(), "infinity"}}) {
-      const auto sql =
-          bound->is_null() ? std::optional<std::string>(QuoteLiteral(unbounded)) : Literal(*bound);
+      const auto sql = bound->is_null() ? std::optional<std::string>(QuoteLiteral(unbounded))
+                                        : Literal(*bound, precision);
       if (!sql) {
         return std::nullopt;
       }
-      bounds.push_back(*sql);
+      if (!bound->is_null() && bound->type()->IsTimestamp() &&
+          precision == TimestampPrecision::kNanoseconds) {
+        bounds.push_back("bq_timestamp_nanos_to_micros(" + *sql + ")");
+      } else {
+        bounds.push_back(*sql);
+      }
     }
     literal = "struct_pack(" + QuoteIdentifier(kRangeStart) + " := " + bounds.at(0) + ", " +
               QuoteIdentifier(kRangeEnd) + " := " + bounds.at(1) + ")";
@@ -54,7 +63,7 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   } else if (value.type()->IsArray()) {
     std::vector<std::string> elements;
     for (int i = 0; i < value.num_elements(); ++i) {
-      const auto sql = Literal(value.element(i));
+      const auto sql = Literal(value.element(i), precision);
       if (!sql) {
         return std::nullopt;
       }
@@ -65,7 +74,7 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
     const auto names = DuckDbStructFieldNames(value.type()->AsStruct());
     std::vector<std::string> fields;
     for (int i = 0; i < value.num_fields(); ++i) {
-      const auto sql = Literal(value.field(i));
+      const auto sql = Literal(value.field(i), precision);
       if (!sql) {
         return std::nullopt;
       }

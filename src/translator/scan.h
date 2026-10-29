@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "src/timestamp_precision.h"
 #include "src/translator/context.h"
 
 namespace googlesql {
@@ -27,6 +28,7 @@ std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& sc
 // typed. A BIGNUMERIC(P, S) column, at any depth, has a DuckDB type of its own, which DuckDB
 // casts to BIGNUM but not to another BIGNUMERIC(P, S) column's type. A GEOGRAPHY column also has
 // a type of its own, which DuckDB casts to BLOB.
-std::string StoredColumn(const std::string& column, const googlesql::Type* type);
+std::string StoredColumn(const std::string& column, const googlesql::Type* type,
+                         TimestampPrecision precision);
 
 }  // namespace bigquery_emulator_duckdb::translator

@@ -3,6 +3,7 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -10,7 +11,7 @@ bool IsBuiltinFunction(const googlesql::Function& function) {
   return function.IsGoogleSQLBuiltin() || function.GetGroup() == kBigQueryGroup;
 }
 
-const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions(TimestampPrecision precision) {
   static const googlesql::LanguageOptions* const kLanguageOptions = [] {
     auto* options = new googlesql::LanguageOptions();
     // Some syntax BigQuery accepts is gated behind a language feature that the default options
@@ -66,7 +67,12 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     options->SetSupportsAllStatementKinds();
     return options;
   }();
-  return *kLanguageOptions;
+  static const googlesql::LanguageOptions* const kNanosecondOptions = [] {
+    auto* options = new googlesql::LanguageOptions(*kLanguageOptions);
+    options->EnableLanguageFeature(googlesql::FEATURE_TIMESTAMP_NANOS);
+    return options;
+  }();
+  return precision == TimestampPrecision::kNanoseconds ? *kNanosecondOptions : *kLanguageOptions;
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -175,7 +175,7 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   if (!parameters) {
     return std::nullopt;
   }
-  auto type = DuckDbColumnType(column.type(), &*parameters);
+  auto type = DuckDbColumnType(column.type(), &*parameters, scope.context.timestamp_precision);
   if (!type) {
     return Unsupported(scope, "column type " + column.type()->DebugString());
   }
@@ -583,7 +583,8 @@ std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
 std::optional<std::string> ColumnsSql(const std::vector<FieldSchema>& schema, const Scope& scope) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
-    const absl::StatusOr<std::string> type = DuckDbColumnType(field);
+    const absl::StatusOr<std::string> type =
+        DuckDbColumnType(field, scope.context.timestamp_precision);
     if (!type.ok()) {
       return Unsupported(scope, type.status().message());
     }
@@ -1097,7 +1098,8 @@ std::optional<std::string> CreateTableAsSelect(
     }
     std::optional<std::string> type;
     if (like) {
-      const auto inherited_type = DuckDbColumnType(table.schema.at(i));
+      const auto inherited_type =
+          DuckDbColumnType(table.schema.at(i), scope.context.timestamp_precision);
       if (!inherited_type.ok()) {
         return Unsupported(scope, inherited_type.status().message());
       }

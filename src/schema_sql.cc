@@ -20,6 +20,7 @@
 #include "src/field_schema.h"
 #include "src/interval_sql.h"
 #include "src/references.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -342,8 +343,12 @@ std::string ReadColumns(const std::vector<FieldSchema>& schema, bool selected) {
   return Join(columns, ", ");
 }
 
-std::string ColumnDefinition(const FieldSchema& field) {
-  return QuoteIdentifier(field.name) + " " + ToDuckDbType(field) +
+std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision) {
+  const auto type = DuckDbColumnType(field, precision);
+  if (!type.ok()) {
+    throw ApiError::Invalid(std::string(type.status().message()));
+  }
+  return QuoteIdentifier(field.name) + " " + *type +
          (field.mode == FieldMode::kRequired ? " NOT NULL" : "");
 }
 

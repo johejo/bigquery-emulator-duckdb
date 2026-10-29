@@ -434,6 +434,7 @@ TranslatedStatement SqlRuntime::Translate(
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = system_variables,
+      .timestamp_precision = functions_.timestamp_precision(),
   };
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {

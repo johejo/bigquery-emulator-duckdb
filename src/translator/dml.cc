@@ -17,6 +17,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
@@ -100,7 +101,8 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
     const std::string name =
         QuoteIdentifier(table.table()->GetColumn(table.column_index_list(i))->Name());
     target.names.emplace(column.column_id(), name);
-    target.columns.emplace(column.column_id(), StoredColumn("_t." + name, column.type()));
+    target.columns.emplace(column.column_id(), StoredColumn("_t." + name, column.type(),
+                                                            scope.context.timestamp_precision));
     target.column_types.emplace(column.column_id(), column.type());
     target.fields.emplace(column.column_id(),
                           ColumnField(table.table(), table.column_index_list(i)));
@@ -139,11 +141,11 @@ struct UpdateNode {
 // The new value of a struct `original` of `type` whose fields `node` assigns: the struct rebuilt
 // from its assigned and original fields. Setting a field of a NULL struct is an error.
 std::optional<std::string> UpdatedStruct(const std::string& original, const googlesql::Type* type,
-                                         const UpdateNode& node) {
+                                         const UpdateNode& node, TimestampPrecision precision) {
   if (node.value) {
     return node.value;
   }
-  const auto sql_type = DuckDbType(type);
+  const auto sql_type = DuckDbType(type, nullptr, precision);
   if (!sql_type) {
     return std::nullopt;
   }
@@ -152,7 +154,7 @@ std::optional<std::string> UpdatedStruct(const std::string& original, const goog
     const auto& field = type->AsStruct()->field(i);
     std::string value = "struct_extract_at(" + original + ", " + std::to_string(i + 1) + ")";
     if (const auto child = node.fields.find(i); child != node.fields.end()) {
-      const auto sql = UpdatedStruct(value, field.type, child->second);
+      const auto sql = UpdatedStruct(value, field.type, child->second, precision);
       if (!sql) {
         return std::nullopt;
       }
@@ -226,8 +228,8 @@ std::optional<std::string> UpdateItems(
   }
   std::vector<std::string> assignments;
   for (const int id : order) {
-    const auto value =
-        UpdatedStruct(target.columns.at(id), target.column_types.at(id), nodes.at(id));
+    const auto value = UpdatedStruct(target.columns.at(id), target.column_types.at(id),
+                                     nodes.at(id), scope.context.timestamp_precision);
     if (!value) {
       return std::nullopt;
     }
@@ -533,8 +535,8 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
     // Whole rows also cover identical target rows without relying on an unshadowed rowid.
     Target matched_target = *target;
     for (const auto& [id, name] : target->names) {
-      matched_target.columns.at(id) =
-          StoredColumn("_t._bq_row." + name, target->column_types.at(id));
+      matched_target.columns.at(id) = StoredColumn(
+          "_t._bq_row." + name, target->column_types.at(id), scope.context.timestamp_precision);
     }
     const Scope matched_scope = DmlScope(scope, matched_target);
     Columns matched_columns = matched_target.columns;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "src/timestamp_precision.h"
+
 namespace googlesql {
 class Function;
 class LanguageOptions;
@@ -13,7 +15,8 @@ inline constexpr char kBigQueryGroup[] = "BigQueryGoogleSQL";
 
 // The language settings shared by the catalog's built-in functions and the analyzer, so that a
 // statement is not rejected for a feature one of them was not told about.
-const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions(
+    TimestampPrecision precision = TimestampPrecision::kMicroseconds);
 
 // Whether `function` is a GoogleSQL built-in or a BigQuery function that GoogleSQL does not ship
 // and the catalog declares in its place, as opposed to a user-defined one.

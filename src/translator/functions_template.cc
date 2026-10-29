@@ -1242,6 +1242,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
              {
                  .uses =
                      {
+                         TypeUse::kCarries,
                          TypeUse::kBuildsOrReadsInterval,
                          TypeUse::kBuildsOrReadsRange,
                          TypeUse::kBuildsOrReadsGeography,

@@ -23,6 +23,7 @@
 #include "src/googlesql_functions_duckdb/percentile.h"
 #include "src/googlesql_functions_duckdb/range.h"
 #include "src/googlesql_functions_duckdb/string.h"
+#include "src/googlesql_functions_duckdb/timestamp.h"
 #include "src/googlesql_geography/options.h"
 #include "src/googlesql_geography_duckdb/geography.h"
 #include "src/googlesql_hll_duckdb/hll.h"
@@ -94,6 +95,7 @@ void RegisterBackendFunctions(duckdb_database database,
   hll_duckdb::RegisterHllCountFunctions(connection.get());
   kll_duckdb::RegisterKllFunctions(connection.get());
   differential_privacy_duckdb::RegisterDifferentialPrivacyFunctions(connection.get());
+  functions_duckdb::RegisterTimestampNanosFunctions(connection.get());
   functions_duckdb::RegisterDatetimeFunctions(connection.get(), functions);
   functions_duckdb::RegisterCastFunctions(connection.get());
   functions_duckdb::RegisterJsonFunctions(connection.get(), functions);
