@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -107,5 +108,46 @@ func TestProseTypeConstraints(t *testing.T) {
 func TestProseDomainsRequireSavedSources(t *testing.T) {
 	if _, err := proseDomains(t.TempDir()); err == nil {
 		t.Fatal("accepted missing source snapshots")
+	}
+}
+
+func TestExpandDomainsSyntax(t *testing.T) {
+	root := filepath.Join("..", "..", "third_party", "bigquery_docs")
+	got, err := expandDomains(root, `
+types @a = STRING | STRUCT<x INT64, y BYTES>
+types @b = @a | ARRAY<@a> | -STRING | -ARRAY<STRUCT<x INT64, y BYTES>>
+page string_functions
+for $T in @b
+  LPAD($T, INT64[, literal $T = 'x, [y]']) -> $T
+end
+note LPAD n
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []functioncoverage.Signature{
+		{Arguments: []string{"STRUCT<x INT64, y BYTES>", "INT64"}, Result: "STRUCT<x INT64, y BYTES>"},
+		{Arguments: []string{"STRUCT<x INT64, y BYTES>", "INT64", "STRUCT<x INT64, y BYTES>"}, Result: "STRUCT<x INT64, y BYTES>", Samples: []string{"", "", "'x, [y]'"}, LiteralArguments: []int{2}},
+		{Arguments: []string{"ARRAY<STRING>", "INT64"}, Result: "ARRAY<STRING>"},
+		{Arguments: []string{"ARRAY<STRING>", "INT64", "ARRAY<STRING>"}, Result: "ARRAY<STRING>", Samples: []string{"", "", "'x, [y]'"}, LiteralArguments: []int{2}},
+	}
+	if len(got) != 1 || got[0].Note != "n" || !reflect.DeepEqual(got[0].Signatures, want) {
+		t.Fatalf("expanded: %#v", got)
+	}
+	for _, text := range []string{
+		"page string_functions\nLPAD($T) -> STRING",
+		"page string_functions\nfor $T in STRING\nLPAD($T) -> $T",
+		"page string_functions\nend",
+		"types @a = STRING | -BYTES",
+		"page string_functions\nfor $T in @missing\nend",
+		"page string_functions\nLPAD(STRING[, INT64], INT64) -> STRING",
+		"page string_functions\nLPAD(STRING, , INT64) -> STRING",
+		"page string_functions\nNOT_DOCUMENTED(STRING) -> STRING",
+		"page string_functions\nLPAD(STRING) -> STRING\npage hash_functions\nLPAD(BYTES) -> BYTES",
+		"note LPAD n",
+	} {
+		if _, err := expandDomains(root, text); err == nil {
+			t.Errorf("accepted %q", text)
+		}
 	}
 }

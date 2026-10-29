@@ -1,0 +1,217 @@
+# Reviewed expansions of prose type domains in the saved specification, not signatures discovered
+# from the emulator. Each signature's function must have a section in its page.
+#
+#   page PAGE                          names the page under reference/standard-sql of later signatures
+#   types @NAME = ITEM | ITEM...       names a list of types; an ITEM can use another list, such as
+#                                      ARRAY<@NAME>, and -ITEM removes one
+#   for $VAR in ITEM | ITEM... / end   repeats the lines in between with $VAR replaced by each type
+#   NAME(ARGS) -> RESULT               a signature; [, ARG] is optional, `literal TYPE` keeps the
+#                                      argument a literal, and TYPE = SAMPLE replaces its sample
+#   note NAME TEXT                     documents what the function's expansion leaves out
+#
+# A function's signatures keep the order in which these lines produce them.
+
+# ARRAY/STRUCT domains are necessarily representative: nested structural types have infinitely
+# many shapes. Cover ordinary scalar families and nested fields; graph and MEASURE values need
+# fixtures and are not included in these domains.
+types @scalar = INT64 | NUMERIC | BIGNUMERIC | FLOAT64 | BOOL | STRING | BYTES | DATE | DATETIME | TIME | TIMESTAMP | INTERVAL | GEOGRAPHY | JSON | RANGE<DATE> | RANGE<DATETIME> | RANGE<TIMESTAMP>
+types @struct = STRUCT<x INT64, label STRING> | STRUCT<n NUMERIC, nested STRUCT<flag BOOL>> | STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>
+types @nonarray = @scalar | @struct
+types @all = @nonarray | ARRAY<@nonarray>
+# The specification's orderable-type exclusions.
+types @orderable = @scalar | -GEOGRAPHY | -JSON
+types @numeric = INT64 | NUMERIC | BIGNUMERIC | FLOAT64
+types @text = STRING | BYTES
+
+page hash_functions
+for $T in @text
+  FARM_FINGERPRINT($T) -> INT64
+  MD5($T) -> BYTES
+  SHA1($T) -> BYTES
+  SHA256($T) -> BYTES
+  SHA512($T) -> BYTES
+end
+
+page string_functions
+for $T in @text
+  ASCII($T) -> INT64
+  BYTE_LENGTH($T) -> INT64
+  OCTET_LENGTH($T) -> INT64
+  LENGTH($T) -> INT64
+  TO_CODE_POINTS($T) -> ARRAY<INT64>
+  LOWER($T) -> $T
+  UPPER($T) -> $T
+  REVERSE($T) -> $T
+  LEFT($T, INT64) -> $T
+  RIGHT($T, INT64) -> $T
+  REPEAT($T, INT64) -> $T
+  ENDS_WITH($T, $T) -> BOOL
+  STARTS_WITH($T, $T) -> BOOL
+  REGEXP_CONTAINS($T, $T) -> BOOL
+  STRPOS($T, $T) -> INT64
+  REPLACE($T, $T, $T) -> $T
+  TRANSLATE($T, $T, $T) -> $T
+  REGEXP_REPLACE($T, $T, $T) -> $T
+  REGEXP_EXTRACT_ALL($T, $T) -> ARRAY<$T>
+  SUBSTR($T, INT64[, INT64]) -> $T
+  SUBSTRING($T, INT64[, INT64]) -> $T
+  LPAD($T, INT64[, $T]) -> $T
+  RPAD($T, INT64[, $T]) -> $T
+  INSTR($T, $T[, INT64[, INT64]]) -> INT64
+  REGEXP_EXTRACT($T, $T[, INT64[, INT64]]) -> $T
+  REGEXP_SUBSTR($T, $T[, INT64[, INT64]]) -> $T
+  # occurrence_position is 0 or 1, not the generic INT64 sample.
+  REGEXP_INSTR($T, $T[, INT64[, INT64[, INT64 = 1]]]) -> INT64
+  CONCAT($T[, $T]) -> $T
+  EDIT_DISTANCE($T, $T) -> INT64
+end
+# BYTES requires the characters to remove and the delimiter.
+TRIM(STRING[, STRING]) -> STRING
+TRIM(BYTES, BYTES) -> BYTES
+LTRIM(STRING[, STRING]) -> STRING
+LTRIM(BYTES, BYTES) -> BYTES
+RTRIM(STRING[, STRING]) -> STRING
+RTRIM(BYTES, BYTES) -> BYTES
+SPLIT(STRING[, literal STRING = 'b']) -> ARRAY<STRING>
+SPLIT(BYTES, literal BYTES = b'b') -> ARRAY<BYTES>
+CHAR_LENGTH(STRING) -> INT64
+CHARACTER_LENGTH(STRING) -> INT64
+UNICODE(STRING) -> INT64
+CHR(INT64) -> STRING
+CODE_POINTS_TO_BYTES(ARRAY<INT64>) -> BYTES
+CODE_POINTS_TO_STRING(ARRAY<INT64>) -> STRING
+TO_BASE32(BYTES) -> STRING
+TO_BASE64(BYTES) -> STRING
+TO_HEX(BYTES) -> STRING
+SAFE_CONVERT_BYTES_TO_STRING(BYTES) -> STRING
+FROM_BASE32(STRING = 'MFRGGZDF74======') -> BYTES
+FROM_BASE64(STRING = '/+A=') -> BYTES
+FROM_HEX(STRING = '00010203aaeeefff') -> BYTES
+INITCAP(STRING[, STRING]) -> STRING
+NORMALIZE(STRING) -> STRING
+NORMALIZE_AND_CASEFOLD(STRING) -> STRING
+SOUNDEX(STRING) -> STRING
+note CONCAT Only same-type STRING and BYTES forms are enumerated; implicit conversions to STRING are not yet enumerated.
+note NORMALIZE Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.
+note NORMALIZE_AND_CASEFOLD Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.
+note EDIT_DISTANCE The optional named max_distance argument is not yet enumerated.
+
+page net_functions
+NET.HOST(STRING = 'http://abc.xyz') -> STRING
+NET.PUBLIC_SUFFIX(STRING = 'http://abc.xyz') -> STRING
+NET.REG_DOMAIN(STRING = 'http://abc.xyz') -> STRING
+NET.IP_FROM_STRING(STRING = '48.49.50.51') -> BYTES
+NET.SAFE_IP_FROM_STRING(STRING = '48.49.50.51') -> BYTES
+NET.IP_NET_MASK(INT64 = 4, INT64 = 20) -> BYTES
+NET.IP_TO_STRING(BYTES = b'0123') -> STRING
+NET.IP_TRUNC(BYTES = b'0123', INT64 = 24) -> BYTES
+NET.IPV4_FROM_INT64(INT64) -> BYTES
+NET.IPV4_TO_INT64(BYTES = b'0123') -> INT64
+
+page array_functions
+for $T in @text
+  ARRAY_TO_STRING(ARRAY<$T>, $T[, $T]) -> $T
+end
+for $T in @nonarray
+  ARRAY_FIRST(ARRAY<$T>) -> $T
+  ARRAY_LAST(ARRAY<$T>) -> $T
+  ARRAY_LENGTH(ARRAY<$T>) -> INT64
+  ARRAY_REVERSE(ARRAY<$T>) -> ARRAY<$T>
+  ARRAY_CONCAT(ARRAY<$T>[, ARRAY<$T>]) -> ARRAY<$T>
+  ARRAY_SLICE(ARRAY<$T>, INT64, INT64) -> ARRAY<$T>
+end
+for $T in @numeric
+  GENERATE_ARRAY($T, $T[, $T]) -> ARRAY<$T>
+end
+note GENERATE_ARRAY Same-type numeric inputs are enumerated; mixed-type inputs are not yet enumerated.
+
+page aggregate_functions
+STRING_AGG(STRING[, literal STRING = 'b']) -> STRING
+STRING_AGG(BYTES[, literal BYTES = b'b']) -> BYTES
+note STRING_AGG The delimiter is sampled as a literal; nonconstant delimiter expressions are not covered.
+for $T in @nonarray
+  ARRAY_AGG($T) -> ARRAY<$T>
+  ARRAY_CONCAT_AGG(ARRAY<$T>) -> ARRAY<$T>
+end
+for $T in @all
+  ANY_VALUE($T) -> $T
+end
+for $T in @orderable
+  MIN($T) -> $T
+  MAX($T) -> $T
+end
+
+page conditional_expressions
+for $T in @all
+  COALESCE($T[, $T]) -> $T
+  IFNULL($T, $T) -> $T
+  IF(BOOL, $T, $T) -> $T
+end
+note COALESCE Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+note IFNULL Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+note IF Same-type alternatives are enumerated; mixed-type supertype combinations are not yet enumerated.
+
+page mathematical_functions
+for $T in @orderable
+  GREATEST($T[, $T]) -> $T
+  LEAST($T[, $T]) -> $T
+end
+note GREATEST Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+note LEAST Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+RAND() -> FLOAT64
+for $T in @numeric
+  # The generic sample 2 is outside these inverse functions' domains.
+  ACOS($T = 1) -> FLOAT64
+  ACOSH($T) -> FLOAT64
+  ASIN($T = 1) -> FLOAT64
+  ASINH($T) -> FLOAT64
+  ATAN($T) -> FLOAT64
+  ATANH($T = 0) -> FLOAT64
+  CBRT($T) -> FLOAT64
+  COS($T) -> FLOAT64
+  COSH($T) -> FLOAT64
+  COT($T) -> FLOAT64
+  COTH($T) -> FLOAT64
+  CSC($T) -> FLOAT64
+  CSCH($T) -> FLOAT64
+  SEC($T) -> FLOAT64
+  SECH($T) -> FLOAT64
+  SIN($T) -> FLOAT64
+  SINH($T) -> FLOAT64
+  TAN($T) -> FLOAT64
+  TANH($T) -> FLOAT64
+  IS_INF($T) -> BOOL
+  IS_NAN($T) -> BOOL
+  for $U in @numeric
+    ATAN2($T, $U) -> FLOAT64
+    IEEE_DIVIDE($T, $U) -> FLOAT64
+  end
+end
+
+page statistical_aggregate_functions
+for $T in @numeric
+  STDDEV($T) -> FLOAT64
+  STDDEV_POP($T) -> FLOAT64
+  STDDEV_SAMP($T) -> FLOAT64
+  VAR_POP($T) -> FLOAT64
+  VAR_SAMP($T) -> FLOAT64
+  VARIANCE($T) -> FLOAT64
+  for $U in @numeric
+    CORR($T, $U) -> FLOAT64
+    COVAR_POP($T, $U) -> FLOAT64
+    COVAR_SAMP($T, $U) -> FLOAT64
+  end
+end
+
+page range-functions
+RANGE(DATE, DATE = '2024-02-01') -> RANGE<DATE>
+RANGE(DATETIME, DATETIME = '2024-02-01 00:00:00') -> RANGE<DATETIME>
+RANGE(TIMESTAMP, TIMESTAMP = '2024-02-01 00:00:00+00') -> RANGE<TIMESTAMP>
+for $T in DATE | DATETIME | TIMESTAMP
+  RANGE_START(RANGE<$T>) -> $T
+  RANGE_END(RANGE<$T>) -> $T
+  RANGE_INTERSECT(RANGE<$T>, RANGE<$T>) -> RANGE<$T>
+  RANGE_OVERLAPS(RANGE<$T>, RANGE<$T>) -> BOOL
+  RANGE_CONTAINS(RANGE<$T>, RANGE<$T>) -> BOOL
+  RANGE_CONTAINS(RANGE<$T>, $T) -> BOOL
+end
