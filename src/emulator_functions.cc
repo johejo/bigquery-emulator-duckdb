@@ -3,15 +3,49 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <stdexcept>
+#include <string>
 
+#include "absl/status/status.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
+#include "src/googlesql_collation/collation.h"
 #include "src/googlesql_functions_duckdb/math.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography_duckdb/functions.h"
 #include "src/translator/functions.h"
 
 namespace bigquery_emulator_duckdb {
+namespace {
+
+// A collation is a type annotation, which GoogleSQL propagates to the operations that use
+// it; the value is the string itself, once the literal specification is checked.
+template <bool UndCiOnly>
+std::optional<std::string> Collate(const function_catalog::ScalarCall& call) {
+  if (call.arguments.size() != 2) {
+    return std::nullopt;
+  }
+  const auto specification = function_catalog::StringLiteral(call.Argument(1));
+  if (!specification) {
+    return std::nullopt;
+  }
+  if constexpr (UndCiOnly) {
+    if (!specification->empty() && *specification != "und:ci") {
+      throw std::invalid_argument("Collation '" + *specification +
+                                  "' in collate function is not supported.");
+    }
+  } else {
+    const absl::Status status = googlesql_collation::CheckSpecification(*specification);
+    if (!status.ok()) {
+      throw std::invalid_argument(std::string(status.message()));
+    }
+  }
+  return call.arguments.at(0).sql;
+}
+
+}  // namespace
 
 // Assembly is expensive; cache each choice of options. Lookups are thread-safe.
 const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb::Options& options) {
@@ -23,7 +57,13 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
     return *functions;
   }
   functions = std::make_unique<function_catalog::Catalog>();
-  translator::AddBuiltinFunctions(*functions, options.collate_und_ci_only);
+  translator::AddBuiltinFunctions(*functions);
+  functions->Add("COLLATE",
+                 {
+                     .translation = function_catalog::Translation::kHandler,
+                     .implementations = {function_catalog::Implementation::kSQLInCode},
+                     .handler = options.collate_und_ci_only ? Collate<true> : Collate<false>,
+                 });
   for (const auto& [name, definition] : functions_duckdb::TrigonometricFunctions()) {
     functions->AddRules(name, definition, function_catalog::Implementation::kGoogleSQL);
   }

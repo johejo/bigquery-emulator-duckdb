@@ -379,12 +379,7 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
 
 }  // namespace
 
-void AddBuiltinFunctions(function_catalog::Catalog& functions, bool collate_und_ci_only) {
-  functions.Add("COLLATE", {
-                               .translation = Translation::kHandler,
-                               .implementations = {Implementation::kSQLInCode},
-                               .handler = collate_und_ci_only ? CollateUndCiOnly : Collate,
-                           });
+void AddBuiltinFunctions(function_catalog::Catalog& functions) {
   for (const auto& [name, definition] : StaticTemplateRules()) {
     functions.AddRules(name, definition, Implementation::kSQL);
   }
