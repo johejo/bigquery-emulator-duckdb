@@ -36,7 +36,11 @@ Loads and extracts also accept local paths. Their limits are:
   single-field group that DuckDB reads as its field, including a LIST without
   `parquetOptions.enableListInference`.
 - Query and load jobs cannot partition or cluster their destination table. Loads reject
-  `destinationTableProperties` and replacement of an existing table with `autodetect`.
+  `destinationTableProperties`, and replacement of an existing table with `autodetect` for
+  formats other than CSV.
+- CSV schema detection, which a load also performs when neither it nor its destination gives a
+  schema, takes one file and considers each of its rows. It rejects header names
+  with whitespace, and data that tabs and another delimiter split into as many fields.
 - Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns.
   BIGNUMERIC Parquet output uses `DECIMAL(76, 38)` with `BYTE_ARRAY` rather than
   `FIXED_LEN_BYTE_ARRAY`.

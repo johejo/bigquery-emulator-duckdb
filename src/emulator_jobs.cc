@@ -20,6 +20,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/csv_detect.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
@@ -80,6 +81,31 @@ void ReadUnrounded(std::vector<FieldSchema>& schema, const std::vector<FieldSche
     }
     ReadUnrounded(field.fields, column->fields);
   }
+}
+
+// The columns of `detected` that a CSV load with schema auto-detection appends to a table of
+// `existing` columns, which BigQuery matches by name. As BigQuery answers, it rejects a column
+// the table lacks or holds as another type.
+std::vector<FieldSchema> AppendedColumns(
+    const TableReference& table,
+    std::vector<FieldSchema> detected,  // NOLINT(bugprone-easily-swappable-parameters)
+    const std::vector<FieldSchema>& existing) {
+  const std::string mismatch =
+      std::format("Provided Schema does not match Table {}.", TableName(table));
+  for (FieldSchema& field : detected) {
+    const auto column = FindField(existing, field.name);
+    if (column == existing.end()) {
+      throw ApiError::Invalid(
+          std::format("{} Cannot add fields (field: {})", mismatch, field.name));
+    }
+    if (column->type != field.type) {
+      throw ApiError::Invalid(std::format("{} Field {} has changed type from {} to {}", mismatch,
+                                          column->name, FieldTypeName(column->type),
+                                          FieldTypeName(field.type)));
+    }
+    field = *column;
+  }
+  return detected;
 }
 
 // An omitted decimal scale and an explicit zero name the same load type.
@@ -299,8 +325,12 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     }
     const bool appends =
         existing.has_value() && load.write_disposition != WriteDisposition::kWriteTruncate;
+    const bool autodetect = config.value("autodetect", false);
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
-    if (requested_schema.empty() && existing.has_value()) {
+    // Without autodetect, a load into an existing table reads it with the table's schema.
+    const bool detects_csv = format == FileFormat::kCsv && requested_schema.empty() &&
+                             (autodetect || !existing.has_value());
+    if (requested_schema.empty() && existing.has_value() && !detects_csv) {
       requested_schema = *existing;
     }
     const LoadOptions options = ParseLoadOptions(format, config);
@@ -313,6 +343,22 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       };
     } else if (std::holds_alternative<JsonLoadOptions>(options)) {
       read_options = JsonReadOptions{};
+    }
+    if (detects_csv) {
+      const auto& csv = std::get<CsvLoadOptions>(options);
+      DetectedCsv detected = DetectCsv(
+          sources, config.contains("fieldDelimiter") ? csv.field_delimiter : "",
+          config.contains("skipLeadingRows") ? std::optional(csv.skip_leading_rows) : std::nullopt,
+          downloads);
+      if (detected.schema.empty()) {
+        throw ApiError::InvalidQuery("There are no column descriptions provided for table " +
+                                     load.destination_table.table_id);
+      }
+      sources = std::move(detected.sources);
+      requested_schema =
+          appends ? AppendedColumns(load.destination_table, std::move(detected.schema), *existing)
+                  : std::move(detected.schema);
+      read_options = CsvReadOptions{.quoted_nulls = false};
     }
     ParquetColumn parquet;
     if (std::holds_alternative<JsonLoadOptions>(options)) {
@@ -364,15 +410,17 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
           .project_id = load.destination_table.project_id,
           .dataset_id = load.destination_table.dataset_id,
       });
-      if (config.value("autodetect", false)) {
+      if (autodetect && format != FileFormat::kCsv) {
         throw ApiError::Unsupported("load replacement with autodetect");
       }
       auto inherited = written;
       ApplyDefaultRoundingMode(inherited, info.metadata.default_rounding_mode);
       ApplyDefaultCollation(inherited, dataset.default_collation);
       // BigQuery keeps an unchanged schema, including its modes. A changed schema is replaced
-      // as a whole with the load schema, without inheriting the retained table default.
-      if (SameSchema(NormalizeLoadScales(inherited), NormalizeLoadScales(info.schema))) {
+      // as a whole with the load schema, without inheriting the retained table default. A
+      // detected schema replaces the table's even when it matches.
+      if (!detects_csv &&
+          SameSchema(NormalizeLoadScales(inherited), NormalizeLoadScales(info.schema))) {
         written = info.schema;
       } else {
         SetModesGiven(written);

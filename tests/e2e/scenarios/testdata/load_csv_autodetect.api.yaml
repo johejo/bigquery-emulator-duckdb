@@ -1,0 +1,728 @@
+# Expectations are from the accompanying BigQuery answer sidecar.
+version: 1
+# third_party/bigquery_docs/loading-data-cloud-storage-csv.md describes CSV schema
+# auto-detection only in outline: header inference, generic names "such as string_field_1",
+# detected delimiters and the types autodetection does not detect. These cases check the
+# names, types, modes, values and errors it produces. Rejections observe the error's reason
+# and, where it holds no generated name or row count, its message.
+description: >-
+  CSV schema auto-detection in load jobs: header inference with and without skipLeadingRows,
+  generic and header-derived column names, inferred types and their boundaries, delimiters,
+  empty and quoted values, and autodetected loads that replace or append to an existing table.
+  Use multipart CSV uploads to avoid GCS prerequisites.
+vars:
+  dataset: bqa_${run}_${case}
+  fixture: SELECT 1;
+  load_configuration:
+    load:
+      destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+      sourceFormat: CSV
+      autodetect: true
+templates:
+  detect:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${fixture}'
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration: '${load_configuration}'
+          upload: '${csv}'
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status, outputRows: /body/statistics/load/outputRows}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe: {schema: /body/schema, numRows: /body/numRows}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT * FROM `${project}.${dataset}.destination` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors, rows: /body/rows}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${fixture}'
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration: '${load_configuration}'
+          upload: '${csv}'
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {reason: /body/status/errorResult/reason, message: /body/status/errorResult/message}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected_reason:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${fixture}'
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration: '${load_configuration}'
+          upload: '${csv}'
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {reason: /body/status/errorResult/reason}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  append_rejected:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${fixture}'
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration: '${load_configuration}'
+          upload: '${csv}'
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {reason: /body/status/errorResult/reason, message: /body/status/errorResult/message}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe: {schema: /body/schema, numRows: /body/numRows}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT * FROM `${project}.${dataset}.destination` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors, rows: /body/rows}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  # Generic names.
+  - name: generic_names_strings
+    template: detect
+    vars: {csv: "new,A,A\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_2", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}]}]}}
+  - name: generic_names_by_type
+    template: detect
+    vars:
+      csv: "1,1.5,true,2024-01-02,2024-01-02 03:04:05,2024-01-02 03:04:05Z,03:04:05,x\n"
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "double_field_1", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "bool_field_2", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "date_field_3", "type": "DATE"}, {"mode": "NULLABLE", "name": "timestamp_field_4", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "timestamp_field_5", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "time_field_6", "type": "TIME"}, {"mode": "NULLABLE", "name": "string_field_7", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "1.5"}, {"v": "true"}, {"v": "2024-01-02"}, {"v": "1.704164645E9"}, {"v": "1.704164645E9"}, {"v": "03:04:05"}, {"v": "x"}]}]}}
+  - name: generic_names_many_rows
+    template: detect
+    vars: {csv: "1,x\n2,y\n3,z\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "3"}, "table": {"numRows": "3", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "x"}]}, {"f": [{"v": "2"}, {"v": "y"}]}, {"f": [{"v": "3"}, {"v": "z"}]}]}}
+
+  # Header inference without skipLeadingRows.
+  - name: header_detected
+    template: detect
+    vars: {csv: "name,age\nx,1\ny,2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "age", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "1"}]}, {"f": [{"v": "y"}, {"v": "2"}]}]}}
+  - name: header_all_strings
+    template: detect
+    vars: {csv: "name,city\nx,y\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "city", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "true"}]}]}}
+  - name: header_only_row
+    template: detect
+    vars: {csv: "name,age\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "name"}, {"v": "age"}]}]}}
+  - name: header_first_row_has_number
+    template: detect
+    vars: {csv: "name,1\nx,2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "int64_field_1", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "name"}, {"v": "1"}]}, {"f": [{"v": "x"}, {"v": "2"}]}]}}
+  - name: header_partial_strings
+    template: detect
+    vars: {csv: "name,city\nx,1\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "city", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "1"}]}]}}
+  - name: header_spaces_punctuation
+    template: rejected
+    vars: {csv: "first name,a-b.c,x/y,  padded  \n1,2,3,4\n"}
+    expect: {"completed_load": {"reason": "invalidQuery", "message": "Field name 'a-b.c' is not supported by the current character map. Please change your field name or use character map V2 to let the system modify the field names."}}
+  - name: header_leading_digit
+    template: detect
+    vars: {csv: "1st,2nd\n1,2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "1st", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "2nd", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}]}}
+  - name: header_unicode
+    template: detect
+    vars: {csv: "名前,café\n1,2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "名前", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "café", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}]}}
+  - name: header_duplicate_names
+    template: rejected
+    vars: {csv: "a,a,A\n1,2,3\n"}
+    expect: {"completed_load": {"reason": "invalidQuery", "message": "Duplicated field name 'a'"}}
+  - name: header_empty_name
+    template: detect
+    vars: {csv: "a,,c\n1,2,3\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "int64_field_1", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "c", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}, {"v": "3"}]}]}}
+  - name: header_reserved_prefix
+    template: rejected
+    vars: {csv: "_TABLE_x,_FILE_y,_PARTITIONTIME\n1,2,3\n"}
+    expect: {"completed_load": {"reason": "invalid", "message": "Invalid field name \"_TABLE_x\". Field names are not allowed to start with the (case-insensitive) prefixes _PARTITION, _TABLE_, _FILE_, _ROW_TIMESTAMP, __ROOT__, _COLIDENTIFIER, and __DREMEL_PK_MERGED_STRUCT_"}}
+  - name: header_quoted
+    template: rejected
+    vars: {csv: "\"a,b\",\"c\"\"d\"\n1,2\n"}
+    expect: {"completed_load": {"reason": "invalidQuery", "message": "Field name 'a,b' is not supported by the current character map. Please change your field name or use character map V2 to let the system modify the field names."}}
+
+  # Header inference with skipLeadingRows.
+  - name: skip_zero_header_like
+    template: detect
+    vars:
+      csv: "name,age\nx,1\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          skipLeadingRows: 0
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "name"}, {"v": "age"}]}, {"f": [{"v": "x"}, {"v": "1"}]}]}}
+  - name: skip_one_header
+    template: detect
+    vars:
+      csv: "name,age\nx,1\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          skipLeadingRows: 1
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "age", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "1"}]}]}}
+  - name: skip_one_all_strings
+    template: detect
+    vars:
+      csv: "name,city\nx,y\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          skipLeadingRows: 1
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "city", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "true"}]}]}}
+  - name: skip_one_numeric_row
+    template: detect
+    vars:
+      csv: "1,2\n3,4\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          skipLeadingRows: 1
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "int64_field_1", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "3"}, {"v": "4"}]}]}}
+  - name: skip_two_header_second
+    template: detect
+    vars:
+      csv: "junk,junk\nname,age\nx,1\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          skipLeadingRows: 2
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "age", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "1"}]}]}}
+  - name: skip_all_rows
+    template: detect
+    vars:
+      csv: "name,age\nx,1\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          skipLeadingRows: 2
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "0"}, "table": {"numRows": "0", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "int64_field_1", "type": "INTEGER"}]}}, "read": {"jobComplete": true}}
+
+  # INT64 and FLOAT64.
+  - name: int64_forms
+    template: detect
+    vars: {csv: "1\n-2\n+3\n007\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "4"}, "table": {"numRows": "4", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "-2"}]}, {"f": [{"v": "1"}]}, {"f": [{"v": "3"}]}, {"f": [{"v": "7"}]}]}}
+  - name: int64_bounds
+    template: detect
+    vars: {csv: "9223372036854775807\n-9223372036854775808\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "-9223372036854775808"}]}, {"f": [{"v": "9223372036854775807"}]}]}}
+  - name: int64_overflow
+    template: detect
+    vars: {csv: "9223372036854775807\n9223372036854775808\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "9.223372036854776E18"}]}, {"f": [{"v": "9.223372036854776E18"}]}]}}
+  - name: int64_whitespace
+    template: detect
+    vars: {csv: " 1\n2 \n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}]}}
+  - name: int64_thousands_separator
+    template: detect
+    vars: {csv: "\"1,000\"\n2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1000"}]}, {"f": [{"v": "2"}]}]}}
+  - name: float64_forms
+    template: detect
+    vars: {csv: "1.5\n1e3\n-0.25\n.5\n5.\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "5"}, "table": {"numRows": "5", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "-0.25"}]}, {"f": [{"v": "0.5"}]}, {"f": [{"v": "1.5"}]}, {"f": [{"v": "1000.0"}]}, {"f": [{"v": "5.0"}]}]}}
+  - name: float64_special
+    template: detect
+    vars: {csv: "NaN\ninf\n-Infinity\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "3"}, "table": {"numRows": "3", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "-Infinity"}]}, {"f": [{"v": "Infinity"}]}, {"f": [{"v": "NaN"}]}]}}
+  - name: float64_precision
+    template: detect
+    vars: {csv: "0.1234567890123456789\n123456789012345678901234567890\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "0.12345678901234568"}]}, {"f": [{"v": "1.2345678901234568E29"}]}]}}
+  - name: int64_and_float64
+    template: detect
+    vars: {csv: "1\n2.5\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.0"}]}, {"f": [{"v": "2.5"}]}]}}
+  - name: int64_and_string
+    template: detect
+    vars: {csv: "1\nx\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "x"}]}]}}
+  - name: epoch_seconds
+    template: detect
+    vars: {csv: "1534680695\n1.534680695e12\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.534680695E12"}]}, {"f": [{"v": "1.534680695E9"}]}]}}
+  - name: hex_number
+    template: detect
+    vars: {csv: "0x1F\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "double_field_0", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "31.0"}]}]}}
+
+  # BOOL.
+  - name: bool_true_false
+    template: detect
+    vars: {csv: "true\nFALSE\nTrue\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "3"}, "table": {"numRows": "3", "schema": {"fields": [{"mode": "NULLABLE", "name": "bool_field_0", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "false"}]}, {"f": [{"v": "true"}]}, {"f": [{"v": "true"}]}]}}
+  - name: bool_t_f
+    template: detect
+    vars: {csv: "t\nF\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "bool_field_0", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "false"}]}, {"f": [{"v": "true"}]}]}}
+  - name: bool_yes_no
+    template: detect
+    vars: {csv: "yes\nNo\ny\nN\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "4"}, "table": {"numRows": "4", "schema": {"fields": [{"mode": "NULLABLE", "name": "bool_field_0", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "false"}]}, {"f": [{"v": "false"}]}, {"f": [{"v": "true"}]}, {"f": [{"v": "true"}]}]}}
+  - name: bool_zero_one
+    template: detect
+    vars: {csv: "0\n1\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "0"}]}, {"f": [{"v": "1"}]}]}}
+  - name: bool_and_int64
+    template: detect
+    vars: {csv: "true\n1\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "true", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}]}]}}
+  - name: bool_mixed_pairs
+    template: detect
+    vars: {csv: "true\nyes\nf\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "3"}, "table": {"numRows": "3", "schema": {"fields": [{"mode": "NULLABLE", "name": "bool_field_0", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "false"}]}, {"f": [{"v": "true"}]}, {"f": [{"v": "true"}]}]}}
+
+  # DATE, DATETIME, TIMESTAMP and TIME.
+  - name: date_forms
+    template: detect
+    vars: {csv: "2024-01-02\n0001-01-01\n9999-12-31\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "3"}, "table": {"numRows": "3", "schema": {"fields": [{"mode": "NULLABLE", "name": "date_field_0", "type": "DATE"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "0001-01-01"}]}, {"f": [{"v": "2024-01-02"}]}, {"f": [{"v": "9999-12-31"}]}]}}
+  - name: date_slash
+    template: detect
+    vars: {csv: "2024/01/02\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "date_field_0", "type": "DATE"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "2024-01-02"}]}]}}
+  - name: date_unpadded
+    template: detect
+    vars: {csv: "2024-1-2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "date_field_0", "type": "DATE"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "2024-01-02"}]}]}}
+  - name: date_invalid_day
+    template: detect
+    vars: {csv: "2024-02-30\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "2024-02-30"}]}]}}
+  - name: datetime_forms
+    template: detect
+    vars: {csv: "2024-01-02 03:04:05\n2024-01-02T03:04:05.123456\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645123456E9"}]}, {"f": [{"v": "1.704164645E9"}]}]}}
+  - name: datetime_minutes
+    template: detect
+    vars: {csv: "2024-01-02 03:04\n2024-01-02T03:04\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.70416464E9"}]}, {"f": [{"v": "1.70416464E9"}]}]}}
+  - name: datetime_nanoseconds
+    template: detect
+    vars: {csv: "2024-01-02 03:04:05.123456789\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645123456E9"}]}]}}
+  - name: datetime_slash
+    template: detect
+    vars: {csv: "2024/01/02 03:04:05\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645E9"}]}]}}
+  - name: timestamp_zones
+    template: detect
+    vars:
+      csv: "2024-01-02 03:04:05Z\n2024-01-02T03:04:05+09:00\n2024-01-02 03:04:05 UTC\n2024-01-02T03:04:05.220 -05:00\n"
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "4"}, "table": {"numRows": "4", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704132245E9"}]}, {"f": [{"v": "1.704164645E9"}]}, {"f": [{"v": "1.704164645E9"}]}, {"f": [{"v": "1.70418264522E9"}]}]}}
+  - name: timestamp_zone_name
+    template: detect
+    vars: {csv: "2024-01-02 03:04:05 America/Los_Angeles\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704193445E9"}]}]}}
+  - name: datetime_and_timestamp
+    template: detect
+    vars: {csv: "2024-01-02 03:04:05\n2024-01-02 03:04:05Z\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "timestamp_field_0", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645E9"}]}, {"f": [{"v": "1.704164645E9"}]}]}}
+  - name: date_and_datetime
+    template: detect
+    vars: {csv: "2024-01-02\n2024-01-02 03:04:05\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "2024-01-02", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645E9"}]}]}}
+  - name: date_and_timestamp
+    template: detect
+    vars: {csv: "2024-01-02\n2024-01-02 03:04:05Z\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "2024-01-02", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645E9"}]}]}}
+  - name: time_forms
+    template: detect
+    vars: {csv: "03:04:05\n23:59:59.999999\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "time_field_0", "type": "TIME"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "03:04:05"}]}, {"f": [{"v": "23:59:59.999999"}]}]}}
+  - name: time_minutes
+    template: detect
+    vars: {csv: "03:04\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "03:04"}]}]}}
+  - name: time_and_datetime
+    template: detect
+    vars: {csv: "03:04:05\n2024-01-02 03:04:05\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "03:04:05", "type": "TIMESTAMP"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1.704164645E9"}]}]}}
+
+  # Other text.
+  - name: geography_wkt
+    template: detect
+    vars: {csv: "POINT(1 2)\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "POINT(1 2)"}]}]}}
+  - name: json_object
+    template: detect
+    vars: {csv: "\"{\"\"a\"\":1}\"\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "{\"a\":1}"}]}]}}
+  - name: base64_text
+    template: detect
+    vars: {csv: "AAEC\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "AAEC"}]}]}}
+  - name: range_text
+    template: detect
+    vars: {csv: "\"[2020-01-01, 2021-01-01)\"\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "[2020-01-01, 2021-01-01)"}]}]}}
+
+  # Empty, quoted and malformed values.
+  - name: empty_values
+    template: detect
+    vars: {csv: "1,\n,x\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": null}]}, {"f": [{"v": null}, {"v": "x"}]}]}}
+  - name: empty_column
+    template: detect
+    vars: {csv: "1,\n2,\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": null}]}, {"f": [{"v": "2"}, {"v": null}]}]}}
+  - name: empty_column_with_header
+    template: detect
+    vars: {csv: "a,b\n1,\n2,\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "b", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": null}]}, {"f": [{"v": "2"}, {"v": null}]}]}}
+  - name: quoted_values
+    template: detect
+    vars: {csv: "\"1\",\"true\",\"2024-01-02\"\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "bool_field_1", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "date_field_2", "type": "DATE"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "true"}, {"v": "2024-01-02"}]}]}}
+  - name: quoted_empty
+    template: detect
+    vars: {csv: "1,\"\"\n2,x\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": ""}]}, {"f": [{"v": "2"}, {"v": "x"}]}]}}
+  - name: quoted_newline
+    template: rejected_reason
+    vars: {csv: "\"a\nb\",1\nc,2\n"}
+    expect: {"completed_load": {"reason": "invalid"}}
+  - name: ragged_rows
+    template: detect
+    vars: {csv: "1,2\n3\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}, {"f": [{"v": "3"}, {"v": null}]}]}}
+  - name: crlf_line_endings
+    template: detect
+    vars: {csv: "a,b\r\n1,2\r\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}]}}
+  - name: empty_file
+    template: rejected_reason
+    vars: {csv: ""}
+    expect: {"completed_load": {"reason": "invalidQuery"}}
+
+  # Delimiters.
+  - name: delimiter_pipe
+    template: detect
+    vars: {csv: "a|b\n1|2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}]}}
+  - name: delimiter_tab
+    template: detect
+    vars: {csv: "a\tb\n1\t2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}]}}
+  - name: delimiter_semicolon
+    template: detect
+    vars: {csv: "a;b\n1;2\n"}
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "2"}, "table": {"numRows": "2", "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1;2"}]}, {"f": [{"v": "a;b"}]}]}}
+  - name: delimiter_comma_with_pipes
+    template: rejected
+    vars: {csv: "a|b,c\n1|2,3\n"}
+    expect: {"completed_load": {"reason": "invalidQuery", "message": "Field name 'b,c' is not supported by the current character map. Please change your field name or use character map V2 to let the system modify the field names."}}
+  - name: delimiter_explicit
+    template: detect
+    vars:
+      csv: "a;b\n1;2\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          fieldDelimiter: ;
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "2"}]}]}}
+
+  # An existing destination.
+  - name: truncate_header_changes_types
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64, b STRING);
+        INSERT `${project}.${dataset}.destination` VALUES (1, 'old');
+      csv: "a,b\nx,1\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_TRUNCATE
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "STRING"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "1"}]}]}}
+  - name: truncate_generic_names
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64, b STRING);
+        INSERT `${project}.${dataset}.destination` VALUES (1, 'old');
+      csv: "1,x\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_TRUNCATE
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "int64_field_0", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "x"}]}]}}
+  - name: truncate_all_strings_matching_names
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (name STRING, city STRING);
+        INSERT `${project}.${dataset}.destination` VALUES ('old', 'old');
+      csv: "name,city\nx,y\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_TRUNCATE
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "city", "type": "BOOLEAN"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "x"}, {"v": "true"}]}]}}
+  - name: truncate_keeps_description
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64 OPTIONS (description = 'column'))
+        OPTIONS (description = 'table');
+      csv: "a\n1\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_TRUNCATE
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}]}]}}
+  - name: truncate_required_column
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64 NOT NULL);
+      csv: "a,b\n1,x\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_TRUNCATE
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "b", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "x"}]}]}}
+  - name: append_header_reordered
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64, b STRING);
+        INSERT `${project}.${dataset}.destination` VALUES (1, 'old');
+      csv: "b,a\nx,2\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_APPEND
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "2", "schema": {"fields": [{"name": "a", "type": "INTEGER"}, {"name": "b", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "old"}]}, {"f": [{"v": "2"}, {"v": "x"}]}]}}
+  - name: append_generic_names
+    template: append_rejected
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64, b STRING);
+        INSERT `${project}.${dataset}.destination` VALUES (1, 'old');
+      csv: "2,x\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_APPEND
+    expect: {"completed_load": {"reason": "invalid", "message": "Provided Schema does not match Table ${project}:${dataset}.destination. Cannot add fields (field: int64_field_0)"}, "table": {"numRows": "1", "schema": {"fields": [{"name": "a", "type": "INTEGER"}, {"name": "b", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "old"}]}]}}
+  - name: append_detected_type_differs
+    template: append_rejected
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a STRING, b FLOAT64);
+        INSERT `${project}.${dataset}.destination` VALUES ('old', 0.5);
+      csv: "a,b\n1,2\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_APPEND
+    expect: {"completed_load": {"reason": "invalid", "message": "Provided Schema does not match Table ${project}:${dataset}.destination. Field a has changed type from STRING to INTEGER"}, "table": {"numRows": "1", "schema": {"fields": [{"name": "a", "type": "STRING"}, {"name": "b", "type": "FLOAT"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "old"}, {"v": "0.5"}]}]}}
+  - name: append_incompatible_type
+    template: append_rejected
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64, b INT64);
+        INSERT `${project}.${dataset}.destination` VALUES (1, 1);
+      csv: "a,b\n1.5,2\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_APPEND
+    expect: {"completed_load": {"reason": "invalid", "message": "Provided Schema does not match Table ${project}:${dataset}.destination. Field a has changed type from INTEGER to FLOAT"}, "table": {"numRows": "1", "schema": {"fields": [{"name": "a", "type": "INTEGER"}, {"name": "b", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "1"}]}]}}
+  - name: append_extra_column
+    template: append_rejected
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64);
+        INSERT `${project}.${dataset}.destination` VALUES (1);
+      csv: "a,b\n2,3\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_APPEND
+    expect: {"completed_load": {"reason": "invalid", "message": "Provided Schema does not match Table ${project}:${dataset}.destination. Cannot add fields (field: b)"}, "table": {"numRows": "1", "schema": {"fields": [{"name": "a", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}]}]}}
+  - name: append_missing_column
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64, b STRING);
+        INSERT `${project}.${dataset}.destination` VALUES (1, 'old');
+      csv: "a\n2\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_APPEND
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "2", "schema": {"fields": [{"name": "a", "type": "INTEGER"}, {"name": "b", "type": "STRING"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "1"}, {"v": "old"}]}, {"f": [{"v": "2"}, {"v": null}]}]}}
+  - name: write_empty_existing
+    template: detect
+    vars:
+      fixture: |
+        CREATE TABLE `${project}.${dataset}.destination` (a INT64);
+      csv: "a\n2\n"
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          autodetect: true
+          writeDisposition: WRITE_EMPTY
+    expect: {"completed_load": {"status": {"state": "DONE"}, "outputRows": "1"}, "table": {"numRows": "1", "schema": {"fields": [{"name": "a", "type": "INTEGER"}]}}, "read": {"jobComplete": true, "rows": [{"f": [{"v": "2"}]}]}}

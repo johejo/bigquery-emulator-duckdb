@@ -25,6 +25,10 @@ struct FileSource {
 std::vector<FileSource> StageFileSources(const std::vector<std::string>& uris, FileFormat format,
                                          GcsClient& gcs, TemporaryFiles& downloads);
 
+// The contents of the file at `path`, decompressed when it is gzip. Throws ApiError::Invalid when
+// it cannot be read.
+std::string ReadMaybeGzip(const std::string& path);
+
 // Rewrites JSON NUMERIC and BIGNUMERIC numbers as strings for exact conversion by FileReadQuery.
 // Returns the sources unchanged when the schema contains neither type. Malformed JSON and
 // invalid BIGNUMERIC values throw ApiError::Invalid.
