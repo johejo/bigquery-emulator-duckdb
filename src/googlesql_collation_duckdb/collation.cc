@@ -87,8 +87,20 @@ void RegisterCollationFunctions(duckdb_connection connection, bool bigquery) {
                       ApplyWithContext<Collate>, bigquery);
   RegisterWithContext(connection, "bq_collation_key", {kVarchar, kVarchar}, kBlob,
                       ApplyWithContext<googlesql_collation::SortKey>, bigquery);
+  RegisterWithContext(connection, "bq_collation_starts_with", {kVarchar, kVarchar, kVarchar},
+                      kBoolean, ApplyWithContext<googlesql_collation::StartsWith>, bigquery);
+  RegisterWithContext(connection, "bq_collation_ends_with", {kVarchar, kVarchar, kVarchar},
+                      kBoolean, ApplyWithContext<googlesql_collation::EndsWith>, bigquery);
+  RegisterWithContext(connection, "bq_collation_instr",
+                      {kVarchar, kVarchar, kVarchar, kBigint, kBigint}, kBigint,
+                      ApplyWithContext<googlesql_collation::Instr>, bigquery);
+  RegisterWithContext(connection, "bq_collation_replace", {kVarchar, kVarchar, kVarchar, kVarchar},
+                      kVarchar, ApplyWithContext<googlesql_collation::Replace>, bigquery);
   const LogicalType varchar(duckdb_create_logical_type(kVarchar));
   const LogicalType list(duckdb_create_list_type(varchar.get()));
+  RegisterWithContext(connection, "bq_collation_split",
+                      {varchar.get(), varchar.get(), varchar.get()}, list.get(),
+                      ApplyWithContext<googlesql_collation::Split>, bigquery);
   const LogicalType bigint(duckdb_create_logical_type(kBigint));
   const LogicalType boolean(duckdb_create_logical_type(kBoolean));
   RegisterWithContext(connection, "bq_collation_distinct",

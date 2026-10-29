@@ -86,7 +86,8 @@ std::optional<std::string> Call(const Catalog& functions,
   if (entry->translation == Translation::kHandler) {
     return entry->handler(call);
   }
-  return functions.Translate(name, call.arguments, safe);
+  return functions.Translate(name, call.arguments, safe,
+                             functions.SupportsCollation(name) ? collation : "");
 }
 
 }  // namespace
@@ -296,7 +297,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                                 *collation + "' is not supported.");
   }
   if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys) &&
-      !functions.HasTypeUse(name, TypeUse::kSelectsCollationValues)) {
+      !functions.HasTypeUse(name, TypeUse::kSelectsCollationValues) &&
+      !functions.SupportsCollation(name)) {
     return Unsupported(scope, "function " + name + " with collation");
   }
   if (const auto* python = dynamic_cast<const PythonFunction*>(call.function())) {
@@ -461,7 +463,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     const bool collation_operand =
         function == "$CASE_WITH_VALUE"
             ? i == 0 || (i % 2 == 1 && i + 1 < call.argument_list().size())
-            : !functions.HasTypeUse(function, TypeUse::kSelectsCollationValues);
+            : functions.HasTypeUse(function, TypeUse::kComparesCollationKeys);
     if (argument->type()->IsString() && collation_operand) {
       args.push_back(CollationKey(*sql, *collation));
     } else if (compares_intervals && argument->type()->IsInterval()) {

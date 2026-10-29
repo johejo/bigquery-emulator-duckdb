@@ -90,9 +90,11 @@ class Catalog {
                      Translation translation, std::optional<Implementation> backend = {});
   [[nodiscard]] const FunctionEntry* Find(std::string_view upper_name) const;
   [[nodiscard]] bool HasTypeUse(std::string_view upper_name, TypeUse use) const;
+  [[nodiscard]] bool SupportsCollation(std::string_view upper_name) const;
   [[nodiscard]] std::optional<std::string> Translate(std::string_view upper_name,
                                                      const std::vector<FunctionArgument>& arguments,
-                                                     bool safe = false) const;
+                                                     bool safe = false,
+                                                     std::string_view collation = {}) const;
 
  private:
   std::unordered_map<std::string_view, FunctionEntry> functions_;

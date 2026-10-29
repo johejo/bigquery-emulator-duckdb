@@ -1,0 +1,169 @@
+# Collated string search and replacement:
+# third_party/bigquery_docs/reference/standard-sql/string_functions.md
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# Case-insensitive examples from GoogleSQL's compliance/functions_testlib_string_5.cc,
+# GetFunctionTestsStringWithCollatorInitializerList and GetReplaceFunctions.
+
+SELECT STARTS_WITH(COLLATE('starts!_with', 'und:ci'), 'sTaRts!')
+=> "true"
+
+SELECT STARTS_WITH('StArTs_WiTh', COLLATE('sTarTs_wItH', 'und:ci'))
+=> "true"
+
+SELECT STARTS_WITH(COLLATE('starts_with', 'und:ci'), 'with')
+=> "false"
+
+SELECT STARTS_WITH(COLLATE('абвгд', 'und:ci'), 'аБв')
+=> "true"
+
+SELECT ENDS_WITH(COLLATE('ends_with', 'und:ci'), 'WItH')
+=> "true"
+
+SELECT ENDS_WITH('ends_wITh', COLLATE('WitH', 'und:ci'))
+=> "true"
+
+SELECT ENDS_WITH(COLLATE('ends_with', 'und:ci'), 'ends')
+=> "false"
+
+SELECT ENDS_WITH(COLLATE('абвгд', 'und:ci'), 'вгД')
+=> "true"
+
+SELECT STRPOS(COLLATE('AaA', 'und:ci'), 'a')
+=> "1"
+
+SELECT STRPOS('AbAbA', COLLATE('Ba', 'und:ci'))
+=> "2"
+
+SELECT INSTR(COLLATE('AaA', 'und:ci'), 'a')
+=> "1"
+
+SELECT INSTR('AaA', COLLATE('a', 'und:ci'), 2)
+=> "2"
+
+SELECT INSTR(COLLATE('AbAbA', 'und:ci'), 'Ba', 1, 2)
+=> "4"
+
+SELECT INSTR(COLLATE('AbAbA', 'und:ci'), 'Ba', -1)
+=> "4"
+
+SELECT INSTR(COLLATE('AbAbA', 'und:ci'), 'Ba', -1, 2)
+=> "2"
+
+SELECT REPLACE(COLLATE('ABC', 'und:ci'), 'b', 'xyz')
+=> "AxyzC"
+
+SELECT REPLACE('ABCaBC', COLLATE('bC', 'und:ci'), 'xyz')
+=> "Axyzaxyz"
+
+SELECT REPLACE(COLLATE('BaNaNA', 'und:ci'), 'AnA', 'xYz')
+=> "BxYzNA"
+
+SELECT REPLACE(COLLATE('bäNäÑä', 'und:ci'), 'n', 'ä')
+=> "bäääÑä"
+
+SELECT REPLACE(COLLATE('AbC', 'und:ci'), '', 'xyz')
+=> "AbC"
+
+SELECT SPLIT(COLLATE('banAna', 'und:ci'), 'a')
+=> [{"v":"b"},{"v":"n"},{"v":"n"},{"v":""}]
+
+SELECT SPLIT('banAnA', COLLATE('aN', 'und:ci'))
+=> [{"v":"b"},{"v":""},{"v":"A"}]
+
+SELECT SPLIT(COLLATE('a,b', 'und:ci'))
+=> [{"v":"a"},{"v":"b"}]
+
+SELECT SPLIT(COLLATE('whät', 'und:ci'), '')
+=> [{"v":"w"},{"v":"h"},{"v":"ä"},{"v":"t"}]
+
+# NULL propagation, including optional arguments and the replacement (which does not choose
+# the operation's collation).
+SELECT STARTS_WITH(COLLATE(NULL, 'und:ci'), 'a')
+=> null
+
+SELECT ENDS_WITH(COLLATE('abc', 'und:ci'), NULL)
+=> null
+
+SELECT STRPOS(COLLATE(NULL, 'und:ci'), 'a')
+=> null
+
+SELECT INSTR(COLLATE('abc', 'und:ci'), 'a', NULL)
+=> null
+
+SELECT INSTR(COLLATE('abc', 'und:ci'), 'a', 1, NULL)
+=> null
+
+SELECT REPLACE(COLLATE('abc', 'und:ci'), 'a', NULL)
+=> null
+
+SELECT SPLIT(COLLATE('abc', 'und:ci'), NULL) IS NULL
+=> "true"
+
+# INSTR rejects zero position and nonpositive occurrence, including with SAFE.
+SELECT SAFE.INSTR(COLLATE('abc', 'und:ci'), 'b', 0)
+=> null
+
+SELECT SAFE.INSTR(COLLATE('abc', 'und:ci'), 'b', 1, 0)
+=> null
+
+SELECT SAFE.INSTR(COLLATE('abc', 'und:ci'), 'b', 1, -1)
+=> null
+
+SELECT INSTR(COLLATE('abc', 'und:ci'), 'b', 0)
+=> error:
+
+SELECT INSTR(COLLATE('abc', 'und:ci'), 'b', 1, 0)
+=> error:
+
+# Conditional expressions must still short-circuit a failing collated call.
+SELECT IF(FALSE, INSTR(COLLATE('abc', 'und:ci'), 'b', 0), 7)
+=> "7"
+
+# Removing collation selects the ordinary case-sensitive implementation.
+SELECT STARTS_WITH(COLLATE(COLLATE('ABC', 'und:ci'), ''), 'a')
+=> "false"
+
+SELECT SPLIT(COLLATE(COLLATE('banAna', 'und:ci'), ''), 'a')
+=> [{"v":"b"},{"v":"nAn"},{"v":""}]
+
+# BigQuery's recorded answers: empty and ignorable-only search terms do not match under
+# und:ci, unlike binary search. Replacement and splitting preserve unmatched text.
+SELECT TO_JSON_STRING(STRUCT(
+  STARTS_WITH(COLLATE('abc', 'und:ci'), '') AS starts,
+  ENDS_WITH(COLLATE('abc', 'und:ci'), '') AS ends,
+  STRPOS(COLLATE('abc', 'und:ci'), '') AS strpos,
+  INSTR(COLLATE('abc', 'und:ci'), '') AS instr))
+=> "{\"starts\":false,\"ends\":false,\"strpos\":0,\"instr\":0}"
+
+SELECT TO_JSON_STRING(STRUCT(
+  STARTS_WITH(COLLATE('', 'und:ci'), '') AS starts,
+  ENDS_WITH(COLLATE('', 'und:ci'), '') AS ends,
+  STRPOS(COLLATE('', 'und:ci'), '') AS strpos,
+  INSTR(COLLATE('', 'und:ci'), '', -1) AS instr))
+=> "{\"starts\":false,\"ends\":false,\"strpos\":0,\"instr\":0}"
+
+SELECT TO_JSON_STRING(STRUCT(
+  STARTS_WITH(COLLATE('abc', 'und:ci'), '\u0000') AS starts,
+  ENDS_WITH(COLLATE('abc', 'und:ci'), '\u0000') AS ends,
+  STRPOS(COLLATE('abc', 'und:ci'), '\u0000') AS strpos,
+  REPLACE(COLLATE('abc', 'und:ci'), '\u0000', 'X') AS replaced,
+  SPLIT(COLLATE('abc', 'und:ci'), '\u0000') AS split))
+=> "{\"starts\":false,\"ends\":false,\"strpos\":0,\"replaced\":\"abc\",\"split\":[\"abc\"]}"
+
+# Canonically equivalent strings match, with positions in original Unicode code points,
+# including a supplementary character before the match.
+SELECT TO_JSON_STRING(STRUCT(
+  STARTS_WITH(COLLATE('a\u030ax', 'und:ci'), 'Å') AS starts,
+  ENDS_WITH(COLLATE('xa\u030a', 'und:ci'), 'Å') AS ends,
+  STRPOS(COLLATE('😀a\u030ax', 'und:ci'), 'Å') AS strpos,
+  INSTR(COLLATE('😀a\u030axÅ', 'und:ci'), 'Å', -1, 2) AS instr,
+  REPLACE(COLLATE('😀a\u030axÅ', 'und:ci'), 'Å', '!') AS replaced,
+  SPLIT(COLLATE('😀a\u030axÅ', 'und:ci'), 'Å') AS split))
+=> "{\"starts\":true,\"ends\":true,\"strpos\":2,\"instr\":2,\"replaced\":\"😀!x!\",\"split\":[\"😀\",\"x\",\"\"]}"
+
+# Propagation is determined by resolver annotations, separately from the search collation.
+SELECT REPLACE('abc', 'b', COLLATE('X', 'und:ci')) = 'AXC'
+=> "true"
+
+SELECT SPLIT(COLLATE('a,B', 'und:ci'))[OFFSET(1)] = 'b'
+=> "true"

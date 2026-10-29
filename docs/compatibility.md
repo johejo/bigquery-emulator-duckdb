@@ -212,12 +212,10 @@ INT64, and subtraction between DATE, DATETIME, TIMESTAMP or TIME values. Other l
 
 ### Collation
 
-[Collations](../third_party/bigquery_docs/reference/standard-sql/collation-concepts.md) are
-limited to comparisons, `IN` lists, joins and `ORDER BY`, including window and aggregate
-ordering; [sql.md](sql.md#collation) and [functions.md](functions.md) list the other operations,
-which are unsupported with a collation. `und:ci` compares with GoogleSQL's collator, ICU's root
-locale at secondary strength, whose Unicode data can order some strings differently from
-BigQuery's.
+[Collation](../third_party/bigquery_docs/reference/standard-sql/collation-concepts.md) support
+is listed in [sql.md](sql.md#collation) and [functions.md](functions.md). `und:ci` uses
+GoogleSQL's collator, ICU's root locale at secondary strength, whose Unicode data can order
+some strings differently from BigQuery's.
 
 Tables, views and query destination tables keep their columns' collations. Table and dataset
 default collations are supported through DDL and REST. Copy jobs involving a default collation,

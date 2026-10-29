@@ -90,6 +90,9 @@ template <typename Text, template <typename> typename List>
 struct BasicRule {
   Arity arity = 0;
   Text spelling;
+  // With an operation collation, use this spelling instead. The argument after arity.max is
+  // the quoted collation specification; omitted arguments are filled from defaults first.
+  Text collated_spelling = {};
   List<BasicCondition<List>> conditions = {};
   // The spellings of the optional arguments, from the first one past arity.min on.
   List<std::string_view> defaults = {};

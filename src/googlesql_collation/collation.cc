@@ -1,10 +1,12 @@
 #include "src/googlesql_collation/collation.h"
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "absl/base/const_init.h"
 #include "absl/status/status.h"
@@ -13,6 +15,7 @@
 #include "absl/synchronization/mutex.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/collator.h"
+#include "googlesql/public/functions/string_with_collation.h"
 
 namespace googlesql_collation {
 namespace {
@@ -45,6 +48,20 @@ absl::StatusOr<const googlesql::GoogleSqlCollator*> FindCollator(std::string_vie
   return collator->value().get();
 }
 
+template <typename Result, typename Function, typename... Args>
+absl::StatusOr<Result> Evaluate(std::string_view specification, bool bigquery, Function function,
+                                const Args&... args) {
+  GOOGLESQL_RETURN_IF_ERROR(CheckSpecification(specification, bigquery));
+  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::GoogleSqlCollator* collator,
+                             FindCollator(specification));
+  Result result;
+  absl::Status status;
+  if (!function(*collator, args..., &result, &status)) {
+    return status;
+  }
+  return result;
+}
+
 }  // namespace
 
 absl::Status CheckSpecification(std::string_view specification, bool bigquery) {
@@ -73,6 +90,44 @@ absl::StatusOr<std::string> SortKey(std::string_view value, std::string_view spe
   absl::Cord key;
   GOOGLESQL_RETURN_IF_ERROR(collator->GetSortKeyUtf8(value, &key));
   return std::string(key);
+}
+
+absl::StatusOr<bool> StartsWith(std::string_view specification, std::string_view value,
+                                std::string_view substring, bool bigquery) {
+  return Evaluate<bool>(specification, bigquery, googlesql::functions::StartsWithUtf8WithCollation,
+                        value, substring);
+}
+
+absl::StatusOr<bool> EndsWith(std::string_view specification, std::string_view value,
+                              std::string_view substring, bool bigquery) {
+  return Evaluate<bool>(specification, bigquery, googlesql::functions::EndsWithUtf8WithCollation,
+                        value, substring);
+}
+
+absl::StatusOr<int64_t> Instr(std::string_view specification, std::string_view value,
+                              std::string_view substring, int64_t position, int64_t occurrence,
+                              bool bigquery) {
+  return Evaluate<int64_t>(specification, bigquery,
+                           googlesql::functions::StrPosOccurrenceUtf8WithCollation, value,
+                           substring, position, occurrence);
+}
+
+absl::StatusOr<std::string> Replace(std::string_view specification, std::string_view value,
+                                    std::string_view old_substring, std::string_view new_substring,
+                                    bool bigquery) {
+  return Evaluate<std::string>(specification, bigquery,
+                               googlesql::functions::ReplaceUtf8WithCollation, value, old_substring,
+                               new_substring);
+}
+
+absl::StatusOr<std::vector<std::string>> Split(std::string_view specification,
+                                               std::string_view value, std::string_view delimiter,
+                                               bool bigquery) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      auto parts,
+      Evaluate<std::vector<absl::string_view>>(
+          specification, bigquery, googlesql::functions::SplitUtf8WithCollation, value, delimiter));
+  return std::vector<std::string>(parts.begin(), parts.end());
 }
 
 }  // namespace googlesql_collation

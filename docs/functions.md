@@ -68,7 +68,7 @@ functions.
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
-| [String functions](#string-functions) | 47 | 6 | 0 | 0 |
+| [String functions](#string-functions) | 53 | 0 | 0 | 0 |
 | [Text analysis functions](#text-analysis-functions) | 3 | 0 | 0 | 0 |
 | [Time functions](#time-functions) | 8 | 0 | 0 | 0 |
 | [Time series functions](#time-series-functions) | 3 | 0 | 3 | 0 |
@@ -555,13 +555,13 @@ functions.
 | [`CONCAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL, in code |  |
 | [`CONTAINS_SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`EDIT_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`ENDS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function ENDS_WITH with collation. |
+| [`ENDS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`FORMAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`FROM_BASE32`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`INITCAP`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`INSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function INSTR with collation. |
+| [`INSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`LEFT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`LENGTH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | DuckDB SQL |  |
 | [`LOWER`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
@@ -577,16 +577,16 @@ functions.
 | [`REGEXP_REPLACE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`REGEXP_SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`REPEAT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`REPLACE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function REPLACE with collation. |
+| [`REPLACE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`REVERSE`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`RIGHT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`RPAD`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`RTRIM`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SAFE_CONVERT_BYTES_TO_STRING`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SOUNDEX`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
-| [`SPLIT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function SPLIT with collation. |
-| [`STARTS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function STARTS_WITH with collation. |
-| [`STRPOS`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Partial | GoogleSQL function | Unsupported: function STRPOS with collation. |
+| [`SPLIT`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
+| [`STARTS_WITH`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
+| [`STRPOS`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SUBSTR`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`SUBSTRING`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
 | [`TO_BASE32`](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) | Supported | GoogleSQL function |  |
