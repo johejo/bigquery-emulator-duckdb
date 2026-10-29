@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -107,5 +108,79 @@ func TestProseTypeConstraints(t *testing.T) {
 func TestProseDomainsRequireSavedSources(t *testing.T) {
 	if _, err := proseDomains(t.TempDir()); err == nil {
 		t.Fatal("accepted missing source snapshots")
+	}
+}
+
+func TestExpandDomainsSyntax(t *testing.T) {
+	root := filepath.Join("..", "..", "third_party", "bigquery_docs")
+	got, err := expandDomains(root, `
+types @a = STRING | STRUCT<x INT64, y BYTES>
+types @b = @a | ARRAY<@a> | -STRING | -ARRAY<STRUCT<x INT64, y BYTES>>
+page string_functions
+for $T in @b
+  LPAD($T, INT64[, literal $T = 'x, [y]']) -> $T
+end
+note LPAD n
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []functioncoverage.Signature{
+		{Arguments: []string{"STRUCT<x INT64, y BYTES>", "INT64"}, Result: "STRUCT<x INT64, y BYTES>"},
+		{Arguments: []string{"STRUCT<x INT64, y BYTES>", "INT64", "STRUCT<x INT64, y BYTES>"}, Result: "STRUCT<x INT64, y BYTES>", Samples: []string{"", "", "'x, [y]'"}, LiteralArguments: []int{2}},
+		{Arguments: []string{"ARRAY<STRING>", "INT64"}, Result: "ARRAY<STRING>"},
+		{Arguments: []string{"ARRAY<STRING>", "INT64", "ARRAY<STRING>"}, Result: "ARRAY<STRING>", Samples: []string{"", "", "'x, [y]'"}, LiteralArguments: []int{2}},
+	}
+	if len(got) != 1 || got[0].Note != "n" || !reflect.DeepEqual(got[0].Signatures, want) {
+		t.Fatalf("expanded: %#v", got)
+	}
+	for _, text := range []string{
+		"page string_functions\nLPAD($T) -> STRING",
+		"page string_functions\nfor $T in STRING\nLPAD($T) -> $T",
+		"page string_functions\nend",
+		"types @a = STRING | -BYTES",
+		"page string_functions\nfor $T in @missing\nend",
+		"page string_functions\nLPAD(STRING[, INT64], INT64) -> STRING",
+		"page string_functions\nLPAD(STRING, , INT64) -> STRING",
+		"page string_functions\nNOT_DOCUMENTED(STRING) -> STRING",
+		"page string_functions\nLPAD(STRING) -> STRING\npage hash_functions\nLPAD(BYTES) -> BYTES",
+		"note LPAD n",
+		"page string_functions\nLPAD(STRING) -> STRING",
+		"page string_functions\nLPAD(STRING, INT64, STRING, INT64) -> STRING",
+		"page string_functions\nLPAD(STRING, INT64) -> STRING",
+	} {
+		if _, err := expandDomains(root, text); err == nil {
+			t.Errorf("accepted %q", text)
+		}
+	}
+}
+
+func TestSyntaxArity(t *testing.T) {
+	for _, c := range []struct {
+		syntax string
+		want   arity
+	}{
+		{"RAND()", arity{0, 0}},
+		{"LPAD(original_value, return_length[, pattern])", arity{2, 3}},
+		{"INSTR(value, subvalue[, position[, occurrence]])", arity{2, 4}},
+		{"REGEXP_INSTR(source_value, regexp [, position[, occurrence, [occurrence_position]]])", arity{2, 5}},
+		{"EDIT_DISTANCE(\n  value1,\n  value2,\n  [ max_distance => max_distance_value ]\n)", arity{2, 3}},
+		{"CONCAT(value1[, ...])", arity{1, -1}},
+		{"GREATEST(X1,...,XN)", arity{1, -1}},
+		{"STRING_AGG(\n  [ DISTINCT ]\n  expression [, delimiter]\n  [ WHERE where_expression ]\n  [ ORDER BY key [ { ASC | DESC } ] [, ... ] ]\n  [ LIMIT n ]\n)\n[ OVER over_clause ]", arity{1, 2}},
+		{"ARRAY_AGG(\n  [ DISTINCT ]\n  expression\n  [ { IGNORE | RESPECT } NULLS ]\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{1, 1}},
+		{"CORR(\n  X1, X2\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{2, 2}},
+		{"ANY_VALUE(\n  expression\n  [ HAVING { MAX | MIN } having_expression ]\n)", arity{1, 1}},
+	} {
+		name, _, _ := strings.Cut(c.syntax, "(")
+		got, err := syntaxArities("```\n"+c.syntax+"\n```\n", name)
+		if err != nil || len(got) != 1 || got[0] != c.want {
+			t.Errorf("%s: got %v, %v; want %v", name, got, err, c.want)
+		}
+	}
+	for _, syntax := range []string{"LPAD(a, , b)", "LPAD(a"} {
+		if _, err := syntaxArities("```\n"+syntax+"\n```\n", "LPAD"); err == nil {
+			t.Errorf("accepted %q", syntax)
+		}
 	}
 }
