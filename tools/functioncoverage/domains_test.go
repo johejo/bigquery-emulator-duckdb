@@ -145,9 +145,42 @@ note LPAD n
 		"page string_functions\nNOT_DOCUMENTED(STRING) -> STRING",
 		"page string_functions\nLPAD(STRING) -> STRING\npage hash_functions\nLPAD(BYTES) -> BYTES",
 		"note LPAD n",
+		"page string_functions\nLPAD(STRING) -> STRING",
+		"page string_functions\nLPAD(STRING, INT64, STRING, INT64) -> STRING",
+		"page string_functions\nLPAD(STRING, INT64) -> STRING",
 	} {
 		if _, err := expandDomains(root, text); err == nil {
 			t.Errorf("accepted %q", text)
+		}
+	}
+}
+
+func TestSyntaxArity(t *testing.T) {
+	for _, c := range []struct {
+		syntax string
+		want   arity
+	}{
+		{"RAND()", arity{0, 0}},
+		{"LPAD(original_value, return_length[, pattern])", arity{2, 3}},
+		{"INSTR(value, subvalue[, position[, occurrence]])", arity{2, 4}},
+		{"REGEXP_INSTR(source_value, regexp [, position[, occurrence, [occurrence_position]]])", arity{2, 5}},
+		{"EDIT_DISTANCE(\n  value1,\n  value2,\n  [ max_distance => max_distance_value ]\n)", arity{2, 3}},
+		{"CONCAT(value1[, ...])", arity{1, -1}},
+		{"GREATEST(X1,...,XN)", arity{1, -1}},
+		{"STRING_AGG(\n  [ DISTINCT ]\n  expression [, delimiter]\n  [ WHERE where_expression ]\n  [ ORDER BY key [ { ASC | DESC } ] [, ... ] ]\n  [ LIMIT n ]\n)\n[ OVER over_clause ]", arity{1, 2}},
+		{"ARRAY_AGG(\n  [ DISTINCT ]\n  expression\n  [ { IGNORE | RESPECT } NULLS ]\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{1, 1}},
+		{"CORR(\n  X1, X2\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{2, 2}},
+		{"ANY_VALUE(\n  expression\n  [ HAVING { MAX | MIN } having_expression ]\n)", arity{1, 1}},
+	} {
+		name, _, _ := strings.Cut(c.syntax, "(")
+		got, err := syntaxArities("```\n"+c.syntax+"\n```\n", name)
+		if err != nil || len(got) != 1 || got[0] != c.want {
+			t.Errorf("%s: got %v, %v; want %v", name, got, err, c.want)
+		}
+	}
+	for _, syntax := range []string{"LPAD(a, , b)", "LPAD(a"} {
+		if _, err := syntaxArities("```\n"+syntax+"\n```\n", "LPAD"); err == nil {
+			t.Errorf("accepted %q", syntax)
 		}
 	}
 }
