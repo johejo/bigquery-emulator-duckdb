@@ -1,0 +1,30 @@
+# Recorded BigQuery answers for nested collations. ARRAY/STRUCT columns remain
+# unsupported in DISTINCT set operations even when their leaves have collations.
+SELECT COUNT(*) FROM (SELECT [COLLATE('a', 'und:ci')] AS x UNION DISTINCT SELECT ['A'])
+=> error: Type ARRAY is not supported in UNION DISTINCT operation
+
+SELECT COUNT(*) FROM (SELECT [COLLATE('a', 'und:ci')] AS x INTERSECT DISTINCT SELECT ['A'])
+=> error: Type ARRAY is not supported in INTERSECT DISTINCT or EXCEPT DISTINCT operation
+
+SELECT COUNT(*) FROM (SELECT [COLLATE('a', 'und:ci')] AS x EXCEPT DISTINCT SELECT ['A'])
+=> error: Type ARRAY is not supported in INTERSECT DISTINCT or EXCEPT DISTINCT operation
+
+SELECT COUNT(*) FROM (SELECT STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n) AS x UNION DISTINCT SELECT STRUCT('A', 1))
+=> error: Type STRUCT is not supported in UNION DISTINCT operation
+
+SELECT COUNT(*) FROM (SELECT STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n) AS x INTERSECT DISTINCT SELECT STRUCT('A', 1))
+=> error: Type STRUCT is not supported in INTERSECT DISTINCT or EXCEPT DISTINCT operation
+
+SELECT COUNT(*) FROM (SELECT STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n) AS x EXCEPT DISTINCT SELECT STRUCT('A', 1))
+=> error: Type STRUCT is not supported in INTERSECT DISTINCT or EXCEPT DISTINCT operation
+
+# Nested ARRAY results and ARRAY partitioning are rejected independently of collation.
+# A NULL STRUCT and a STRUCT with a NULL field belong to different DISTINCT groups.
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM UNNEST([STRUCT([COLLATE('a', 'und:ci')] AS a), STRUCT(['A'])]) GROUP BY a))
+=> error contains: Cannot use array subquery with column of type ARRAY<STRING> because nested arrays are not supported
+
+SELECT COUNT(*) FROM (SELECT DISTINCT x FROM UNNEST([STRUCT(COLLATE('a', 'und:ci') AS s), CAST(NULL AS STRUCT<s STRING>), STRUCT(CAST(NULL AS STRING))]) AS x)
+=> "3"
+
+SELECT ARRAY(SELECT COUNT(*) OVER (PARTITION BY a) FROM UNNEST([STRUCT([COLLATE('a', 'und:ci')] AS a), STRUCT(['A'])]))
+=> error: Partitioning by expressions of type ARRAY is unsupported

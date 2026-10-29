@@ -1,6 +1,8 @@
 #include "src/translator/collation.h"
 
+#include <algorithm>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -34,21 +36,24 @@ void EachCollation(const googlesql::AnnotationMap& annotations, Visit visit) {
 
 }  // namespace
 
-std::optional<std::string> OperationCollation(const googlesql::ResolvedCollation& collation,
-                                              const Scope& scope) {
-  if (collation.Empty()) {
-    return "";
+std::optional<Collation> OperationCollation(const googlesql::ResolvedCollation& collation,
+                                            const Scope& scope) {
+  Collation result{.specification = std::string(collation.CollationName()), .children = {}};
+  result.children.reserve(collation.num_children());
+  for (const auto& child : collation.child_list()) {
+    const auto nested = OperationCollation(child, scope);
+    if (!nested) {
+      return std::nullopt;
+    }
+    result.children.push_back(*nested);
   }
-  if (collation.num_children() > 0) {
-    return Unsupported(scope, "collation of ARRAY elements or STRUCT fields");
-  }
-  return std::string(collation.CollationName());
+  return result;
 }
 
-std::optional<std::string> OperationCollation(
+std::optional<Collation> OperationCollation(
     const std::vector<googlesql::ResolvedCollation>& collations, const Scope& scope) {
   if (collations.empty()) {
-    return "";
+    return Collation{};
   }
   if (collations.size() > 1) {
     return Unsupported(scope, "several operation collations");
@@ -56,11 +61,32 @@ std::optional<std::string> OperationCollation(
   return OperationCollation(collations.front(), scope);
 }
 
-std::string CollationKey(const std::string& sql, const std::string& specification) {
-  if (specification.empty()) {
+std::string CollationKey(const std::string& sql, const Collation& collation,
+                         const googlesql::Type* type) {
+  if (collation.empty()) {
     return sql;
   }
-  return "bq_collation_key(" + sql + ", " + QuoteLiteral(specification) + ")";
+  if (collation.children.empty()) {
+    return "bq_collation_key(" + sql + ", " + QuoteLiteral(collation.specification) + ")";
+  }
+  // Bind each container once, including volatile expressions. A NULL STRUCT must remain
+  // NULL, rather than becoming a non-NULL row of NULL fields. Positional fields also handle
+  // anonymous and duplicate STRUCT field names.
+  if (type == nullptr) {
+    throw std::invalid_argument("Nested collation requires a value type");
+  }
+  if (type->IsArray()) {
+    return "list_transform(" + sql + ", lambda _ck: " +
+           CollationKey("_ck", collation.children.at(0), type->AsArray()->element_type()) + ")";
+  }
+  std::vector<std::string> fields;
+  fields.reserve(type->AsStruct()->num_fields());
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    fields.push_back(CollationKey("struct_extract_at(_ck, " + std::to_string(i + 1) + ")",
+                                  collation.children.at(i), type->AsStruct()->field(i).type));
+  }
+  return "list_transform([" + sql + "], lambda _ck: CASE WHEN _ck IS NULL THEN NULL ELSE row(" +
+         Join(fields, ", ") + ") END)[1]";
 }
 
 bool OnlyCollations(const googlesql::AnnotationMap* annotations) {
@@ -72,12 +98,24 @@ bool OnlyCollations(const googlesql::AnnotationMap* annotations) {
   return others->Empty();
 }
 
-std::string ColumnCollation(const googlesql::AnnotationMap* annotations) {
+Collation ColumnCollation(const googlesql::AnnotationMap* annotations) {
   if (annotations == nullptr) {
-    return "";
+    return {};
   }
+  Collation result;
   const googlesql::SimpleValue* collation = annotations->GetAnnotation(kCollation);
-  return collation != nullptr && collation->has_string_value() ? collation->string_value() : "";
+  if (collation != nullptr && collation->has_string_value()) {
+    result.specification = collation->string_value();
+  }
+  if (const auto* fields = annotations->AsStructMap(); fields != nullptr) {
+    for (int i = 0; i < fields->num_fields(); ++i) {
+      result.children.push_back(ColumnCollation(fields->field(i)));
+    }
+  }
+  if (std::ranges::all_of(result.children, [](const Collation& child) { return child.empty(); })) {
+    result.children.clear();
+  }
+  return result;
 }
 
 bool HasCollation(const googlesql::AnnotationMap* annotations) {

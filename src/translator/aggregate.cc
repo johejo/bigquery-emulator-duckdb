@@ -111,7 +111,12 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   }
   if (!collation->empty() && functions.HasTypeUse(name, TypeUse::kRejectsCollation)) {
     throw std::invalid_argument("Function '" + call.function()->Name() + "' with collation '" +
-                                *collation + "' is not supported.");
+                                collation->specification + "' is not supported.");
+  }
+  // Value-returning collated aggregates have STRING-specific backend rules. COUNT can
+  // compare recursive keys without changing either its result type or NULL handling.
+  if (!collation->children.empty() && name != "COUNT") {
+    return Unsupported(scope, "aggregate or analytic function " + name + " with nested collation");
   }
   const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
     return candidate.collated == !collation->empty() &&
@@ -183,9 +188,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   std::vector<std::string> keyed = arguments;
   if (rule->collated) {
     for (std::size_t i = 0; i < arguments.size(); ++i) {
-      keyed.push_back(call.argument_list(static_cast<int>(i))->type()->IsString()
-                          ? CollationKey(arguments.at(i), *collation)
-                          : arguments.at(i));
+      keyed.push_back(CollationKey(arguments.at(i), *collation,
+                                   call.argument_list(static_cast<int>(i))->type()));
     }
   }
   const std::vector<std::string> args = AggregateArguments(*rule, keyed);
@@ -289,7 +293,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                      !item.is_descending());
     }
     std::string sql = "bq_collation_distinct(" + std::string(rule->function) + "(" + args.at(0) +
-                      ")" + tail + ", " + QuoteLiteral(*collation) + ", " +
+                      ")" + tail + ", " + QuoteLiteral(collation->specification) + ", " +
                       std::to_string(direction) + ", " + (nulls_first ? "true" : "false") + ")";
     if (!limit.empty()) {
       sql = "list_slice(" + sql + ", 1, " + limit + ")";
@@ -343,7 +347,7 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     for (int i = 0; i < partition->partition_by_list_size(); ++i) {
       const auto& ref = partition->partition_by_list(i);
       const auto collation = partition->collation_list().empty()
-                                 ? std::optional<std::string>("")
+                                 ? std::optional<Collation>(Collation{})
                                  : OperationCollation(partition->collation_list(i), scope);
       if (!collation) {
         return std::nullopt;
@@ -351,8 +355,10 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
       if (HasGraph(ref->type())) {
         return Unsupported(scope, "PARTITION BY with graph values");
       }
-      if (ref->type()->IsStruct()) {
-        throw std::invalid_argument("Partitioning by expressions of type STRUCT is unsupported");
+      if (ref->type()->IsStruct() || ref->type()->IsArray()) {
+        throw std::invalid_argument(std::string("Partitioning by expressions of type ") +
+                                    (ref->type()->IsStruct() ? "STRUCT" : "ARRAY") +
+                                    " is unsupported");
       }
       if (HasInterval(ref->type()) && !ref->type()->IsInterval()) {
         return Unsupported(scope, "PARTITION BY with INTERVAL");
@@ -361,8 +367,8 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
       if (!key) {
         return std::nullopt;
       }
-      keys.push_back(
-          CollationKey(ref->type()->IsInterval() ? IntervalKey(*key) : *key, *collation));
+      keys.push_back(CollationKey(ref->type()->IsInterval() ? IntervalKey(*key) : *key, *collation,
+                                  ref->type()));
     }
     window.push_back("PARTITION BY " + Join(keys, ", "));
   }
@@ -591,9 +597,9 @@ Scope WithCorrelatedColumns(const googlesql::ResolvedAggregateScan& aggregate, c
 // What a GROUP BY key groups by: INTERVAL values by their lengths, graph elements by identity
 // and strings by their keys under the key's `collation`.
 std::string GroupKey(const googlesql::Type* type, const std::string& sql,
-                     const std::string& collation) {
+                     const Collation& collation) {
   return type->IsGraphElement() ? "struct_extract(" + sql + ", '$id')"
-                                : CollationKey(IntervalKey(type, sql), collation);
+                                : CollationKey(IntervalKey(type, sql), collation, type);
 }
 
 }  // namespace
@@ -612,10 +618,10 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     return Unsupported(scope, "GROUP BY with graph values");
   }
   // The collation of each key, which SELECT DISTINCT records as GROUP BY does.
-  std::vector<std::string> collations;
+  std::vector<Collation> collations;
   for (int i = 0; i < aggregate.group_by_list_size(); ++i) {
     const auto collation = aggregate.collation_list().empty()
-                               ? std::optional<std::string>("")
+                               ? std::optional<Collation>(Collation{})
                                : OperationCollation(aggregate.collation_list(i), scope);
     if (!collation) {
       return std::nullopt;
@@ -681,7 +687,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         projections.push_back(column + " AS " + ColumnName(id));
       } else {
         const std::string name = QuoteIdentifier("_k" + std::to_string(id));
-        collation_keys.push_back(CollationKey(column, collations.at(i)) + " AS " + name);
+        collation_keys.push_back(CollationKey(column, collations.at(i), key->expr()->type()) +
+                                 " AS " + name);
         key_columns.emplace(id, "q." + name);
         const std::string value = "first(" + column + ")";
         key_values.emplace(id, value);

@@ -1,0 +1,56 @@
+# Collation propagates into ARRAY elements and STRUCT fields, and affects comparisons
+# and grouping at those positions. Unannotated fields still compare by code point.
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+# STRUCT comparisons use three-valued field equality:
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+SELECT STRUCT(COLLATE('a', 'und:ci'), 1) = STRUCT('A', 1)
+=> "true"
+
+SELECT STRUCT(COLLATE('a', 'und:ci'), 'b') = STRUCT('A', 'B')
+=> "false"
+
+SELECT STRUCT(STRUCT(COLLATE('a', 'und:ci'), 1), 'b') != STRUCT(STRUCT('A', 1), 'b')
+=> "false"
+
+SELECT STRUCT(COLLATE('a', 'und:ci'), CAST(NULL AS INT64)) = STRUCT('A', CAST(NULL AS INT64))
+=> null
+
+SELECT STRUCT(COLLATE('a', 'und:ci'), 1) IN (STRUCT('A', 1), STRUCT('b', 2))
+=> "true"
+
+SELECT STRUCT(COLLATE('a', 'und:ci'), 1) IN (SELECT STRUCT('A', 1))
+=> "true"
+
+SELECT STRUCT('A', 1) IN (SELECT STRUCT(COLLATE('a', 'und:ci'), 1))
+=> "true"
+
+SELECT NULLIF(STRUCT(COLLATE('a', 'und:ci'), 1), STRUCT('A', 1)) IS NULL
+=> "true"
+
+SELECT (NULLIF(STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n), STRUCT('b', 1))).s
+=> "a"
+
+SELECT CASE STRUCT(COLLATE('a', 'und:ci'), 1) WHEN STRUCT('A', 1) THEN 'match' ELSE ERROR('not matched') END
+=> "match"
+
+# Grouping compares transformed keys but returns the original value, not a BLOB key.
+SELECT COUNT(*) FROM (SELECT DISTINCT a FROM UNNEST([STRUCT([COLLATE('a', 'und:ci')] AS a), STRUCT(['A']), STRUCT(['b'])]))
+=> "2"
+
+SELECT COUNT(*) FROM (SELECT x FROM UNNEST([STRUCT(STRUCT(COLLATE('a', 'und:ci') AS s, 'b' AS t) AS x), STRUCT(STRUCT('A', 'b')), STRUCT(STRUCT('A', 'B'))]) GROUP BY x)
+=> "2"
+
+SELECT COUNT(*) FROM (SELECT x FROM UNNEST([STRUCT(STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n) AS x), STRUCT(STRUCT('A', 1)), STRUCT(STRUCT('b', 1))]) GROUP BY x)
+=> "2"
+
+SELECT COUNT(DISTINCT x) FROM UNNEST([STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n), ('A', 1), ('b', 1)]) AS x
+=> "2"
+
+SELECT COUNT(*) FROM (SELECT DISTINCT a FROM UNNEST([STRUCT([COLLATE('a', 'und:ci'), 'b'] AS a), STRUCT(['A', 'B']), STRUCT(['A', 'c'])]))
+=> "2"
+
+SELECT ARRAY_LENGTH(a) FROM (SELECT a FROM UNNEST([STRUCT([COLLATE('a', 'und:ci'), 'b'] AS a)]) GROUP BY a)
+=> "2"
+
+SELECT x.s FROM (SELECT x FROM UNNEST([STRUCT(STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n) AS x)]) GROUP BY x)
+=> "a"

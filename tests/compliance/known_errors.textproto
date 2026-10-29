@@ -376,7 +376,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects STRUCT partition keys, which GoogleSQL accepts"
+  reason: "BigQuery rejects ARRAY and STRUCT partition keys, which GoogleSQL accepts"
+  label: "analytic_partitionby_orderby_test:partitionby_array"
   label: "analytic_partitionby_orderby_test:partitionby_struct"
 }
 
