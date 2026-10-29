@@ -81,7 +81,7 @@ compliance *args:
 sql-runtime-deps *targets:
     bash tools/sql-runtime-deps.sh report {{ targets }}
 
-# Compliance remains opt-in until its driver switches to the shared runtime.
+# Reject transitive application/Storage dependencies from the supplied runtime roots.
 sql-runtime-deps-check *targets:
     bash tools/sql-runtime-deps.sh check {{ targets }}
 
@@ -108,9 +108,9 @@ bigquery-answers-validate path=(justfile_directory() + "/tests/e2e/goclient/test
 run *args:
     bazelisk run //:bigquery-emulator-duckdb -- "$@"
 
-# Protect the extracted runtime now; add compliance after its driver switches.
+# Protect both compositions of the shared runtime.
 sql-runtime-core-deps-check:
-    just sql-runtime-deps-check //:sql_runtime
+    just sql-runtime-deps-check //:sql_runtime //:compliance_test
 
 check: sql-runtime-core-deps-check lint test e2e docs-check
 

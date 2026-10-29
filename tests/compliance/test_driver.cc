@@ -1,13 +1,15 @@
 // Runs GoogleSQL's compliance tests against the emulator. Each statement goes through
-// Emulator::RunQuery as a query job would, with parameters converted to BigQuery's
-// QueryParameter form and the result decoded from the rows the job returns.
+// SqlRuntime::ExecuteQuery, shared with production query jobs, with parameters converted
+// to BigQuery's QueryParameter form and the result decoded from the runtime's rows.
 
 #include "googlesql/compliance/test_driver.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <format>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -39,18 +41,22 @@
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/backend.h"
 #include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
-#include "src/emulator.h"
-#include "src/external_query.h"
+#include "src/external_table_provider.h"
 #include "src/field_schema.h"
+#include "src/googlesql_functions_duckdb/objectref_options.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/language_options.h"
+#include "src/location.h"
+#include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/result_googlesql.h"
 #include "src/result_value.h"
+#include "src/sql_runtime.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -208,10 +214,10 @@ absl::StatusOr<Value> ResultValue(const QueryResult& result, googlesql::TypeFact
       table_type, googlesql::InternalValue::kIgnoresOrder, std::move(rows));
 }
 
-// The status a failed job stands for. Analysis errors are invalid arguments; DuckDB
+// The status a failed execution stands for. Analysis errors are invalid arguments; DuckDB
 // errors that mean the translation is wrong are internal, which no expected error matches;
 // any other failure is a runtime error.
-absl::Status JobStatus(const ApiError& error) {
+absl::Status ExecutionStatus(const ApiError& error) {
   const std::string_view message = error.what();
   if (message.starts_with("The emulator does not support")) {
     return absl::UnimplementedError(message);
@@ -301,17 +307,20 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     for (const auto& [name, ddl] : test_db.property_graph_defs) {
       // Keep unsupported definitions absent, just as unsupported tables above. Their queries
       // remain known errors, but supported graphs exercise the translator and its functions.
-      const auto job = emulator_->RunQuery(QueryRequest{
-          .project_id = kProject,
-          .location = std::nullopt,
-          .query = ddl,
-          .default_dataset = DatasetReference{kProject, kDataset},
-          .job_id = {},
-          .parameters = {},
-          .destination_table = std::nullopt,
-      });
-      if (job->error.has_value()) {
-        LOG(WARNING) << "Cannot load property graph " << name << ": " << job->error->what();
+      QueryJob statement;
+      const auto result = Execute(
+          QueryRequest{
+              .project_id = kProject,
+              .location = std::nullopt,
+              .query = ddl,
+              .default_dataset = DatasetReference{kProject, kDataset},
+              .job_id = {},
+              .parameters = {},
+              .destination_table = std::nullopt,
+          },
+          statement);
+      if (!result.ok()) {
+        LOG(WARNING) << "Cannot load property graph " << name << ": " << result.status();
       }
     }
     return absl::OkStatus();
@@ -329,32 +338,46 @@ class EmulatorTestDriver : public googlesql::TestDriver {
       return absl::UnimplementedError("Only queries are compared: " + sql);
     }
     GOOGLESQL_ASSIGN_OR_RETURN(QueryParameters query_parameters, ToQueryParameters(parameters));
-    const std::shared_ptr<const Job> job =
-        emulator_->RunQuery(QueryRequest{.project_id = kProject,
-                                         .location = std::nullopt,
-                                         .query = sql,
-                                         .default_dataset = DatasetReference{kProject, kDataset},
-                                         .job_id = {},
-                                         .parameters = std::move(query_parameters),
-                                         .destination_table = std::nullopt,
-                                         // BigQuery returns a NULL array as an empty one, which
-                                         // would fail every case that expects a NULL array.
-                                         .null_arrays = true});
-    if (job->error.has_value()) {
-      return JobStatus(*job->error);
-    }
-    if (job->query()->statement_type != "SELECT" || !job->result.has_value()) {
+    QueryJob statement;
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        QueryResult result,
+        Execute(QueryRequest{.project_id = kProject,
+                             .location = std::nullopt,
+                             .query = sql,
+                             .default_dataset = DatasetReference{kProject, kDataset},
+                             .job_id = {},
+                             .parameters = std::move(query_parameters),
+                             .destination_table = std::nullopt,
+                             // BigQuery returns a NULL array as an empty one, which
+                             // would fail every case that expects a NULL array.
+                             .null_arrays = true},
+                statement));
+    if (statement.statement_type != "SELECT") {
       return absl::UnimplementedError("Only queries are compared: " + sql);
     }
-    return ResultValue(*job->result, type_factory);
+    return ResultValue(result, type_factory);
   }
 
  private:
+  // Preserve the facade's exception classification without registering REST jobs or
+  // installing service providers. Statement metadata comes from the shared executor.
+  absl::StatusOr<QueryResult> Execute(QueryRequest request, QueryJob& statement) {
+    statement = QueryJob{.query = request.query, .destination_table = request.destination_table};
+    JobLocation location(RequestedLocation(request.location));
+    try {
+      return runtime_->ExecuteQuery(std::move(request), statement, location);
+    } catch (const ApiError& error) {
+      return ExecutionStatus(error);
+    } catch (const std::exception& error) {
+      return ExecutionStatus(ApiError::InvalidQuery(error.what()));
+    }
+  }
+
   // Creates the table `name` with `schema` and inserts the given `columns` of `rows`.
   absl::Status LoadTable(const std::string& name, const std::vector<FieldSchema>& schema,
                          const Value& rows, const std::vector<int>& columns) {
     try {
-      emulator_->CreateTable(TableReference{kProject, kDataset, name}, schema);
+      runtime_->CreateTable(TableReference{kProject, kDataset, name}, schema);
     } catch (const ApiError& error) {
       return absl::UnimplementedError(error.what());
     }
@@ -379,33 +402,33 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     }
     GOOGLESQL_ASSIGN_OR_RETURN(Value kept, Value::MakeArray(table_type, std::move(kept_rows)));
     GOOGLESQL_ASSIGN_OR_RETURN(QueryParameters parameters, ToQueryParameters({{"rows", kept}}));
-    const std::shared_ptr<const Job> job = emulator_->RunQuery(
+    QueryJob statement;
+    const auto result = Execute(
         QueryRequest{.project_id = kProject,
                      .location = std::nullopt,
                      .query = absl::StrCat("INSERT INTO `", name, "` SELECT * FROM UNNEST(@rows)"),
                      .default_dataset = DatasetReference{kProject, kDataset},
                      .job_id = {},
                      .parameters = std::move(parameters),
-                     .destination_table = std::nullopt});
-    if (job->error.has_value()) {
-      return JobStatus(*job->error);
-    }
-    return absl::OkStatus();
+                     .destination_table = std::nullopt},
+        statement);
+    return result.status();
   }
 
   // Expose only GoogleSQL declarations, without BigQuery's exclusions or semantic corrections;
   // end-to-end tests check BigQuery-specific declarations, exclusions and semantic differences.
   void Reset() {
-    emulator_ = std::make_unique<Emulator>(
+    runtime_ = std::make_unique<SqlRuntime>(
         "", std::vector<Project>{{.project_id = kProject}}, std::nullopt, BackendInitializer{},
-        std::vector<ExternalConnection>(),
+        functions_duckdb::ObjectStorage{}, DatabaseInitializer{},
+        std::function<std::unique_ptr<ExternalTableProvider>(Backend&)>{},
         googlesql_geography::Options{.expand_bounding_box = true}, functions_duckdb::Options{},
         ExcludedFunctionIds{}, FunctionDeclarations::kGoogleSQL);
-    emulator_->CreateDataset(DatasetReference{kProject, kDataset});
+    runtime_->CreateDataset(DatasetReference{kProject, kDataset});
   }
 
   googlesql::TypeFactory type_factory_;
-  std::unique_ptr<Emulator> emulator_;
+  std::unique_ptr<SqlRuntime> runtime_;
 };
 
 }  // namespace

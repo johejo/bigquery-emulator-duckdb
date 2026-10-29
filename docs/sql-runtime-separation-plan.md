@@ -1,7 +1,8 @@
 # SQL runtime and external-service separation plan
 
-Status: steps 1–4 implemented; compliance migration and final validation (steps 5–6)
-remain. Step 4 validation is recorded in the boundary inventory.
+Status: steps 1–6 implemented. Compliance uses the shared runtime without external
+services; full-suite outcome comparison, link isolation and production validation are
+recorded in the boundary inventory.
 See the [boundary inventory and dependency checks](sql-runtime-separation-boundaries.md)
 for dependency paths, responsibility allocation, client coverage and the recorded
 compliance baseline.
@@ -166,6 +167,13 @@ Compliance still uses the facade until step 5.
 Completion: compliance and production use the same runtime implementation, while
 compliance has no Storage dependency and production retains external-service behavior.
 
+Implemented by switching the driver to `SqlRuntime` native APIs and `ExecuteQuery`,
+without service providers or REST job registration. Parameter/result conversions and
+reference options are unchanged. All 59,877 full-suite statement outcomes match the
+step-4 facade baseline exactly; the focused 173-case baseline also matches. Configured
+dependencies and actual link inputs contain neither Storage nor Spanner. Both runtime
+and compliance dependency assertions are enforced by `just check`.
+
 ## 6. Validate and document the resulting architecture
 
 - Run `just fmt` and `just check` before committing, plus `just compliance` for the
@@ -181,6 +189,12 @@ compliance has no Storage dependency and production retains external-service beh
 - Update `architecture.md` to describe the implemented ownership and composition.
   Regenerate support tables only if their inputs change; this refactor should not
   change advertised support or add compatibility exceptions.
+
+Validation complete on Darwin arm64: `just fmt`, `just check`, full `just compliance`
+and `just compliance-summary` pass. Existing end-to-end tests retain external-service
+coverage, and `architecture.md` describes the final composition. No support-table inputs,
+known-error entries, filters or compatibility exceptions changed. Detailed results and
+reproduction commands are in the boundary inventory.
 
 ## Non-goals and risks
 

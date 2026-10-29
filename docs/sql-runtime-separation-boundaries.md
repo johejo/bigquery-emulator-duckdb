@@ -121,6 +121,39 @@ with the facade using the extracted executor. Compliance still links `:emulator`
 driver switch, before/after comparison and actual link input inspection remain step 5. The allocation table below is the original inventory;
 its runtime/application ownership is now implemented, while driver migration is pending.
 
+## Compliance migration and final validation (steps 5–6)
+
+The driver now constructs `SqlRuntime` directly, with no service providers, storage
+callbacks or connector initializers. Dataset/table creation and fixture INSERTs use
+its public APIs; graph preparation and compared queries use `ExecuteQuery`. The driver
+converts thrown errors using the same classification previously applied to job errors.
+Parameter conversion, schema annotations, NULL-array preservation, GoogleSQL declarations,
+reference options and result decoding are unchanged. No known-error entries or filters
+changed.
+
+Validation on Darwin arm64:
+
+- The focused array baseline matches all 173 recorded outcomes exactly.
+- Before switching the driver, the existing completed step-4 full-suite logs were
+  summarized with `just compliance-summary -results /tmp/sql-runtime-step5/before.tsv`.
+  After switching, `just compliance` (32 shards) and `just compliance-summary -results
+  /tmp/sql-runtime-step5/after.tsv` pass. The two per-statement TSVs match exactly:
+  59,877 outcomes, comprising 52,816 pass, 2,018 known failure and 5,043 unsupported,
+  with zero failures or newly passing known errors.
+- `just sql-runtime-deps` reports no compliance paths to GCS, Storage or Spanner.
+  `just sql-runtime-core-deps-check` checks both the runtime and compliance roots.
+- Configured `cquery` and the compliance `CppLink` action, including expanded parameter
+  files (`aquery --include_param_files`), contain no `google_cloud_cpp` inputs. The
+  command links `libsql_runtime.a`, not the facade, acquisition/extraction libraries,
+  service composition or external database adapters. Thus Spanner is absent too;
+  this is not merely removal of the direct GCS edge.
+- `just fmt` and `just check` pass, retaining the existing production/client coverage
+  listed below. No advertised support or compatibility exception changed.
+
+The normal check path now enforces both runtime and compliance isolation. Production
+continues to compose the same runtime with external-service capabilities through `Emulator`.
+See [architecture.md](architecture.md) for the resulting ownership and composition.
+
 ## Responsibility and mutable-state allocation
 
 The table preserves pre-extraction names and source locations. “Runtime” means the
@@ -156,7 +189,7 @@ introduce a new global query lock or prescribe a generic plugin API.
 
 ## Compliance driver surface and baseline
 
-`tests/compliance/test_driver.cc::EmulatorTestDriver` uses:
+Before migration, `tests/compliance/test_driver.cc::EmulatorTestDriver` used:
 
 - Construction/reset with in-memory project registration, GoogleSQL declarations,
   empty exclusions and uncorrected function options; then `CreateDataset`.
@@ -167,9 +200,9 @@ introduce a new global query lock or prescribe a generic plugin API.
   `null_arrays = true`. `JobStatus` and `ResultValue` convert errors/results back to
   GoogleSQL. Non-query comparisons are rejected before mutation.
 
-The future runtime API must cover these operations without job registration. Preserve
+The runtime API now covers these operations without job registration, preserving
 parameter conversion, schema collations, reference compatibility options and result
-conversion; do not change the oracle as part of switching the driver.
+conversion. The migration does not change the oracle.
 
 A focused pre-extraction baseline was run at the revision/platform above:
 
@@ -223,25 +256,22 @@ root reaches `:emulator` (application facade), `:service_backend`,
 `:service_table_provider` (application composition), `:gcs`, `:file_read` (acquisition),
 `:extract`, or the Storage SDK. The roots default to `//:compliance_test`. Query
 errors also fail the command; they are not interpreted as absence of dependencies.
-It deliberately fails on today's compliance target. The compliance assertion remains
-opt-in; `just check` now runs the assertion for `//:sql_runtime`.
+`just check` runs this assertion for both `//:sql_runtime` and `//:compliance_test`.
 
-The shared runtime assertion is active. Apply it also to `//:compliance_test` after step 5. Keep `:backend`,
-`:duckdb_table_source`, `:duckdb_catalog` and `:table_comments` as useful diagnostic
-roots while extracting; do not permanently assert the whole server is service-free.
-In step 6 add the compliance root alongside the runtime on the normal `just check` path.
+Keep `:backend`, `:duckdb_table_source`, `:duckdb_catalog` and `:table_comments` as
+useful diagnostic roots; do not assert the whole server is service-free.
 If load/extract orchestration gains new targets, add those specific targets to the
 forbidden set then. This is a narrow architecture check, not a frozen allowlist of
 all third-party libraries. Spanner remains separately reported, not silently counted
 as Storage or evidence that all cloud SDKs have disappeared.
 
-For the configured build, also inspect actual linking in step 5:
+For the configured build, reproduce the actual link inspection with:
 
 ```sh
 bazelisk cquery 'deps(//:compliance_test)' --output=label
-bazelisk aquery 'mnemonic("CppLink", //:compliance_test)' --output=text
+bazelisk aquery 'mnemonic("CppLink", //:compliance_test)' --output=text --include_param_files
 ```
 
 Check link inputs/arguments (including parameter files when used) as well as the
-target graph for Storage libraries. The current step establishes repeatable graph
-checks; it does not claim the existing executable is Storage-free.
+target graph for Storage libraries. The steps 5–6 validation above records the
+Storage-free compliance executable as well as the repeatable graph checks.

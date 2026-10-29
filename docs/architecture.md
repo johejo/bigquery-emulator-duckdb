@@ -26,9 +26,13 @@ factories, ObjectRef callbacks and connector initializers. A bare runtime instal
 external services; its function catalog omits ObjectRef metadata fetch when no fetch
 callback is supplied. Service-independent ObjectRef operations remain available. Native
 catalog resolution still rejects external operations when their provider is absent.
-`just check` verifies that `//:sql_runtime` has no transitive dependency on the facade,
-load acquisition, extraction or the Cloud Storage SDK. Compliance still constructs the
-facade pending the driver migration in the [separation plan](sql-runtime-separation-plan.md).
+The compliance driver constructs this same runtime directly, prepares fixtures through
+its native catalog and SQL APIs, and calls `ExecuteQuery` without REST job bookkeeping.
+It retains GoogleSQL reference compatibility options and the existing parameter/result
+conversion, but installs no external-service providers or callbacks. `just check` verifies
+that both `//:sql_runtime` and `//:compliance_test` have no transitive dependency on the
+facade, load acquisition, extraction or the Cloud Storage SDK. See the
+[separation plan](sql-runtime-separation-plan.md) for validation records.
 
 A query result keeps its rows as the DuckDB chunks of the statement's result, which a job keeps
 for `jobs.getQueryResults`. A row is encoded as BigQuery's JSON cells only when a response reads
