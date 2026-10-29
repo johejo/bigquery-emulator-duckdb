@@ -19,7 +19,14 @@ cc_library(
     linkstatic = True,
     visibility = ["//visibility:public"],
     deps = [
+        ":options",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],
+)
+
+cc_library(
+    name = "options",
+    hdrs = ["options.h"],
+    visibility = ["//visibility:public"],
 )
