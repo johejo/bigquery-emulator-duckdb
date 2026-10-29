@@ -8,14 +8,26 @@
 
 - [ASCII](#ascii)
 - [BYTE_LENGTH](#byte_length)
+- [CHARACTER_LENGTH](#character_length)
+- [CHAR_LENGTH](#char_length)
+- [CHR](#chr)
+- [CODE_POINTS_TO_BYTES](#code_points_to_bytes)
+- [CODE_POINTS_TO_STRING](#code_points_to_string)
 - [CONCAT](#concat)
+- [EDIT_DISTANCE](#edit_distance)
 - [ENDS_WITH](#ends_with)
+- [FROM_BASE32](#from_base32)
+- [FROM_BASE64](#from_base64)
+- [FROM_HEX](#from_hex)
+- [INITCAP](#initcap)
 - [INSTR](#instr)
 - [LEFT](#left)
 - [LENGTH](#length)
 - [LOWER](#lower)
 - [LPAD](#lpad)
 - [LTRIM](#ltrim)
+- [NORMALIZE](#normalize)
+- [NORMALIZE_AND_CASEFOLD](#normalize_and_casefold)
 - [OCTET_LENGTH](#octet_length)
 - [REGEXP_CONTAINS](#regexp_contains)
 - [REGEXP_EXTRACT](#regexp_extract)
@@ -29,14 +41,20 @@
 - [RIGHT](#right)
 - [RPAD](#rpad)
 - [RTRIM](#rtrim)
+- [SAFE_CONVERT_BYTES_TO_STRING](#safe_convert_bytes_to_string)
+- [SOUNDEX](#soundex)
 - [SPLIT](#split)
 - [STARTS_WITH](#starts_with)
 - [STRPOS](#strpos)
 - [SUBSTR](#substr)
 - [SUBSTRING](#substring)
+- [TO_BASE32](#to_base32)
+- [TO_BASE64](#to_base64)
 - [TO_CODE_POINTS](#to_code_points)
+- [TO_HEX](#to_hex)
 - [TRANSLATE](#translate)
 - [TRIM](#trim)
+- [UNICODE](#unicode)
 - [UPPER](#upper)
 
 ## ASCII
@@ -57,6 +75,46 @@ Source: [BYTE_LENGTH](../../third_party/bigquery_docs/reference/standard-sql/str
 | `STRING` | `INT64` | Supported |  |
 | `BYTES` | `INT64` | Supported |  |
 
+## CHARACTER_LENGTH
+
+Source: [CHARACTER_LENGTH](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+
+## CHAR_LENGTH
+
+Source: [CHAR_LENGTH](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
+
+## CHR
+
+Source: [CHR](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `STRING` | Supported |  |
+
+## CODE_POINTS_TO_BYTES
+
+Source: [CODE_POINTS_TO_BYTES](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `BYTES` | Supported |  |
+
+## CODE_POINTS_TO_STRING
+
+Source: [CODE_POINTS_TO_STRING](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `ARRAY<INT64>` | `STRING` | Supported |  |
+
 ## CONCAT
 
 Source: [CONCAT](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
@@ -70,6 +128,17 @@ Only same-type STRING and BYTES forms are enumerated; implicit conversions to ST
 | `BYTES` | `BYTES` | Supported |  |
 | `BYTES, BYTES` | `BYTES` | Supported |  |
 
+## EDIT_DISTANCE
+
+Source: [EDIT_DISTANCE](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+The optional named max_distance argument is not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING, STRING` | `INT64` | Supported |  |
+| `BYTES, BYTES` | `INT64` | Supported |  |
+
 ## ENDS_WITH
 
 Source: [ENDS_WITH](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
@@ -78,6 +147,39 @@ Source: [ENDS_WITH](../../third_party/bigquery_docs/reference/standard-sql/strin
 | --- | --- | --- | --- |
 | `STRING, STRING` | `BOOL` | Supported |  |
 | `BYTES, BYTES` | `BOOL` | Supported |  |
+
+## FROM_BASE32
+
+Source: [FROM_BASE32](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+
+## FROM_BASE64
+
+Source: [FROM_BASE64](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+
+## FROM_HEX
+
+Source: [FROM_HEX](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `BYTES` | Supported |  |
+
+## INITCAP
+
+Source: [INITCAP](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
 
 ## INSTR
 
@@ -139,6 +241,26 @@ Source: [LTRIM](../../third_party/bigquery_docs/reference/standard-sql/string_fu
 | `STRING` | `STRING` | Supported |  |
 | `STRING, STRING` | `STRING` | Supported |  |
 | `BYTES, BYTES` | `BYTES` | Supported |  |
+
+## NORMALIZE
+
+Source: [NORMALIZE](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+
+## NORMALIZE_AND_CASEFOLD
+
+Source: [NORMALIZE_AND_CASEFOLD](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
 
 ## OCTET_LENGTH
 
@@ -274,6 +396,22 @@ Source: [RTRIM](../../third_party/bigquery_docs/reference/standard-sql/string_fu
 | `STRING, STRING` | `STRING` | Supported |  |
 | `BYTES, BYTES` | `BYTES` | Supported |  |
 
+## SAFE_CONVERT_BYTES_TO_STRING
+
+Source: [SAFE_CONVERT_BYTES_TO_STRING](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BYTES` | `STRING` | Supported |  |
+
+## SOUNDEX
+
+Source: [SOUNDEX](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `STRING` | Supported |  |
+
 ## SPLIT
 
 Source: [SPLIT](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
@@ -324,6 +462,22 @@ Source: [SUBSTRING](../../third_party/bigquery_docs/reference/standard-sql/strin
 | `BYTES, INT64` | `BYTES` | Supported |  |
 | `BYTES, INT64, INT64` | `BYTES` | Supported |  |
 
+## TO_BASE32
+
+Source: [TO_BASE32](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BYTES` | `STRING` | Supported |  |
+
+## TO_BASE64
+
+Source: [TO_BASE64](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BYTES` | `STRING` | Supported |  |
+
 ## TO_CODE_POINTS
 
 Source: [TO_CODE_POINTS](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
@@ -332,6 +486,14 @@ Source: [TO_CODE_POINTS](../../third_party/bigquery_docs/reference/standard-sql/
 | --- | --- | --- | --- |
 | `STRING` | `ARRAY<INT64>` | Supported |  |
 | `BYTES` | `ARRAY<INT64>` | Supported |  |
+
+## TO_HEX
+
+Source: [TO_HEX](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `BYTES` | `STRING` | Supported |  |
 
 ## TRANSLATE
 
@@ -351,6 +513,14 @@ Source: [TRIM](../../third_party/bigquery_docs/reference/standard-sql/string_fun
 | `STRING` | `STRING` | Supported |  |
 | `STRING, STRING` | `STRING` | Supported |  |
 | `BYTES, BYTES` | `BYTES` | Supported |  |
+
+## UNICODE
+
+Source: [UNICODE](../../third_party/bigquery_docs/reference/standard-sql/string_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `STRING` | `INT64` | Supported |  |
 
 ## UPPER
 

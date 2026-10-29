@@ -31,6 +31,78 @@
       ]
     },
     {
+      "name": "ACOS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ACOSH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "ANY_VALUE",
       "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
       "signatures": [
@@ -1519,6 +1591,268 @@
       ]
     },
     {
+      "name": "ASIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ASINH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "ATAN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "ATAN2",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "ATANH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "0"
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "0"
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "0"
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "0"
+          ]
+        }
+      ]
+    },
+    {
       "name": "AVG",
       "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
       "signatures": [
@@ -1569,6 +1903,36 @@
             "BYTES"
           ],
           "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "CBRT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
         }
       ]
     },
@@ -1629,6 +1993,42 @@
             "FLOAT64"
           ],
           "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "CHARACTER_LENGTH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "CHAR_LENGTH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "CHR",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "STRING"
         }
       ]
     },
@@ -2160,6 +2560,30 @@
       ]
     },
     {
+      "name": "CODE_POINTS_TO_BYTES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "BYTES"
+        }
+      ]
+    },
+    {
+      "name": "CODE_POINTS_TO_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "CONCAT",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "note": "Only same-type STRING and BYTES forms are enumerated; implicit conversions to STRING are not yet enumerated.",
@@ -2304,6 +2728,126 @@
         {
           "arguments": [
             "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "COS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "COSH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "COT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "COTH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
             "FLOAT64"
           ],
           "result": "FLOAT64"
@@ -2547,6 +3091,66 @@
       ]
     },
     {
+      "name": "CSC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "CSCH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "DIV",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -2612,6 +3216,27 @@
             "BIGNUMERIC"
           ],
           "result": "BIGNUMERIC"
+        }
+      ]
+    },
+    {
+      "name": "EDIT_DISTANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "note": "The optional named max_distance argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "INT64"
         }
       ]
     },
@@ -2714,6 +3339,51 @@
       ]
     },
     {
+      "name": "FROM_BASE32",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "'MFRGGZDF74======'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FROM_BASE64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "'/+A='"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FROM_HEX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "'00010203aaeeefff'"
+          ]
+        }
+      ]
+    },
+    {
       "name": "GENERATE_ARRAY",
       "source": "third_party/bigquery_docs/reference/standard-sql/array_functions.md",
       "note": "Same-type numeric inputs are enumerated; mixed-type inputs are not yet enumerated.",
@@ -2777,6 +3447,326 @@
             "FLOAT64"
           ],
           "result": "ARRAY\u003cFLOAT64\u003e"
+        }
+      ]
+    },
+    {
+      "name": "GREATEST",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "note": "Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        }
+      ]
+    },
+    {
+      "name": "IEEE_DIVIDE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
         }
       ]
     },
@@ -3395,6 +4385,25 @@
       ]
     },
     {
+      "name": "INITCAP",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "INSTR",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -3445,6 +4454,268 @@
             "INT64"
           ],
           "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "IS_INF",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "IS_NAN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "LEAST",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "note": "Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
         }
       ]
     },
@@ -4048,6 +5319,183 @@
       ]
     },
     {
+      "name": "NET.HOST",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'http://abc.xyz'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.IPV4_FROM_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "BYTES"
+        }
+      ]
+    },
+    {
+      "name": "NET.IPV4_TO_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64",
+          "samples": [
+            "b'0123'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.IP_FROM_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "'48.49.50.51'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.IP_NET_MASK",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "4",
+            "20"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.IP_TO_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING",
+          "samples": [
+            "b'0123'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.IP_TRUNC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "b'0123'",
+            "24"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.PUBLIC_SUFFIX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'http://abc.xyz'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.REG_DOMAIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "'http://abc.xyz'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NET.SAFE_IP_FROM_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/net_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "'48.49.50.51'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NORMALIZE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "note": "Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "NORMALIZE_AND_CASEFOLD",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "note": "Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "OCTET_LENGTH",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -4297,6 +5745,16 @@
             "FLOAT64",
             "FLOAT64"
           ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "RAND",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [],
           "result": "FLOAT64"
         }
       ]
@@ -5099,6 +6557,18 @@
       ]
     },
     {
+      "name": "SAFE_CONVERT_BYTES_TO_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "SAFE_DIVIDE",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -5483,6 +6953,66 @@
       ]
     },
     {
+      "name": "SEC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "SECH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "SHA1",
       "source": "third_party/bigquery_docs/reference/standard-sql/hash_functions.md",
       "signatures": [
@@ -5563,6 +7093,78 @@
             "FLOAT64"
           ],
           "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "SIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "SINH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "SOUNDEX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
         }
       ]
     },
@@ -5922,6 +7524,90 @@
       ]
     },
     {
+      "name": "TAN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "TANH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "TO_BASE32",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "TO_BASE64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "TO_CODE_POINTS",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -5936,6 +7622,18 @@
             "BYTES"
           ],
           "result": "ARRAY\u003cINT64\u003e"
+        }
+      ]
+    },
+    {
+      "name": "TO_HEX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING"
         }
       ]
     },
@@ -6042,6 +7740,18 @@
             "INT64"
           ],
           "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "UNICODE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "INT64"
         }
       ]
     },

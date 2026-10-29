@@ -128,6 +128,44 @@ func proseDomains(root string) ([]functioncoverage.Function, error) {
 		add("array_functions", "ARRAY_TO_STRING", []string{"ARRAY<" + t + ">", t}, t)
 		add("array_functions", "ARRAY_TO_STRING", []string{"ARRAY<" + t + ">", t, t}, t)
 	}
+	page := "string_functions"
+	for _, name := range []string{"CHAR_LENGTH", "CHARACTER_LENGTH", "UNICODE"} {
+		add(page, name, []string{"STRING"}, "INT64")
+	}
+	add(page, "CHR", []string{"INT64"}, "STRING")
+	add(page, "CODE_POINTS_TO_BYTES", []string{"ARRAY<INT64>"}, "BYTES")
+	add(page, "CODE_POINTS_TO_STRING", []string{"ARRAY<INT64>"}, "STRING")
+	for _, name := range []string{"TO_BASE32", "TO_BASE64", "TO_HEX", "SAFE_CONVERT_BYTES_TO_STRING"} {
+		add(page, name, []string{"BYTES"}, "STRING")
+	}
+	for _, encoding := range [][2]string{{"FROM_BASE32", "'MFRGGZDF74======'"}, {"FROM_BASE64", "'/+A='"}, {"FROM_HEX", "'00010203aaeeefff'"}} {
+		add(page, encoding[0], []string{"STRING"}, "BYTES").Samples = []string{encoding[1]}
+	}
+	for _, name := range []string{"INITCAP", "NORMALIZE", "NORMALIZE_AND_CASEFOLD", "SOUNDEX"} {
+		add(page, name, []string{"STRING"}, "STRING")
+	}
+	add(page, "INITCAP", []string{"STRING", "STRING"}, "STRING")
+	for _, name := range []string{"NORMALIZE", "NORMALIZE_AND_CASEFOLD"} {
+		functions[name].Note = "Only the default normalization mode is enumerated; explicit normalization modes are not yet enumerated."
+	}
+	for _, t := range []string{"STRING", "BYTES"} {
+		add(page, "EDIT_DISTANCE", []string{t, t}, "INT64")
+	}
+	functions["EDIT_DISTANCE"].Note = "The optional named max_distance argument is not yet enumerated."
+
+	page = "net_functions"
+	for _, name := range []string{"NET.HOST", "NET.PUBLIC_SUFFIX", "NET.REG_DOMAIN"} {
+		add(page, name, []string{"STRING"}, "STRING").Samples = []string{"'http://abc.xyz'"}
+	}
+	for _, name := range []string{"NET.IP_FROM_STRING", "NET.SAFE_IP_FROM_STRING"} {
+		add(page, name, []string{"STRING"}, "BYTES").Samples = []string{"'48.49.50.51'"}
+	}
+	add(page, "NET.IP_NET_MASK", []string{"INT64", "INT64"}, "BYTES").Samples = []string{"4", "20"}
+	add(page, "NET.IP_TO_STRING", []string{"BYTES"}, "STRING").Samples = []string{"b'0123'"}
+	add(page, "NET.IP_TRUNC", []string{"BYTES", "INT64"}, "BYTES").Samples = []string{"b'0123'", "24"}
+	add(page, "NET.IPV4_FROM_INT64", []string{"INT64"}, "BYTES")
+	add(page, "NET.IPV4_TO_INT64", []string{"BYTES"}, "INT64").Samples = []string{"b'0123'"}
+
 	nonArray := append(slices.Clone(scalarTypes), structTypes...)
 	all := slices.Clone(nonArray)
 	for _, t := range nonArray {
@@ -164,9 +202,34 @@ func proseDomains(root string) ([]functioncoverage.Function, error) {
 		for _, name := range []string{"MIN", "MAX"} {
 			add("aggregate_functions", name, []string{t}, t)
 		}
+		for _, name := range []string{"GREATEST", "LEAST"} {
+			add("mathematical_functions", name, []string{t}, t)
+			add("mathematical_functions", name, []string{t, t}, t)
+		}
 	}
 	numeric := []string{"INT64", "NUMERIC", "BIGNUMERIC", "FLOAT64"}
+	for _, name := range []string{"GREATEST", "LEAST"} {
+		functions[name].Note = "Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated."
+	}
+	add("mathematical_functions", "RAND", []string{}, "FLOAT64")
 	for _, t := range numeric {
+		for _, name := range []string{"ACOS", "ACOSH", "ASIN", "ASINH", "ATAN", "ATANH", "CBRT", "COS", "COSH", "COT", "COTH", "CSC", "CSCH", "SEC", "SECH", "SIN", "SINH", "TAN", "TANH"} {
+			s := add("mathematical_functions", name, []string{t}, "FLOAT64")
+			// The generic sample 2 is outside these inverse functions' domains.
+			if name == "ACOS" || name == "ASIN" {
+				s.Samples = []string{"1"}
+			} else if name == "ATANH" {
+				s.Samples = []string{"0"}
+			}
+		}
+		for _, name := range []string{"IS_INF", "IS_NAN"} {
+			add("mathematical_functions", name, []string{t}, "BOOL")
+		}
+		for _, u := range numeric {
+			for _, name := range []string{"ATAN2", "IEEE_DIVIDE"} {
+				add("mathematical_functions", name, []string{t, u}, "FLOAT64")
+			}
+		}
 		for _, name := range []string{"STDDEV", "STDDEV_POP", "STDDEV_SAMP", "VAR_POP", "VAR_SAMP", "VARIANCE"} {
 			add("statistical_aggregate_functions", name, []string{t}, "FLOAT64")
 		}

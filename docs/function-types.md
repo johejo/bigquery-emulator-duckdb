@@ -12,10 +12,14 @@ extracts reviewed type tables and expands reviewed prose domains from the checke
 documentation:
 
 - [Mathematical functions](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md):
-  numeric input/output tables, mixed-type pairs, synonyms and optional precision and rounding modes.
+  numeric input/output tables, mixed-type pairs, synonyms, trigonometric functions, floating-point
+  predicates, same-type scalar comparisons, RAND and optional precision and rounding modes.
 - [String functions](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) and
   [hash functions](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md):
-  STRING/BYTES forms, optional positional arguments and array results.
+  STRING/BYTES forms, optional positional arguments, array results, code-point conversion,
+  base encodings and default-mode normalization.
+- [Net functions](../third_party/bigquery_docs/reference/standard-sql/net_functions.md):
+  URL and IP address operations with valid address and network-mask samples.
 - [Array functions](../third_party/bigquery_docs/reference/standard-sql/array_functions.md) and
   [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md):
   concrete element and value types, including nested STRUCTs and ARRAYs of STRUCTs.
@@ -48,7 +52,7 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **92 of 407 functions**. The remaining **315** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **146 of 407 functions**. The remaining **261** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Details by domain
 
@@ -57,6 +61,7 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 - [conditional](function-types/conditional.md)
 - [hash](function-types/hash.md)
 - [mathematical](function-types/mathematical.md)
+- [net](function-types/net.md)
 - [range](function-types/range.md)
 - [statistical-aggregate](function-types/statistical-aggregate.md)
 - [string](function-types/string.md)
@@ -66,8 +71,8 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | Function | Enumerated forms | Status |
 | --- | --- | --- |
 | [ABS](function-types/mathematical.md#abs) | 4 | Supported |
-| `ACOS` | 0 | Not enumerated |
-| `ACOSH` | 0 | Not enumerated |
+| [ACOS](function-types/mathematical.md#acos) | 4 | Supported |
+| [ACOSH](function-types/mathematical.md#acosh) | 4 | Supported |
 | `AEAD.DECRYPT_BYTES` | 0 | Not enumerated |
 | `AEAD.DECRYPT_STRING` | 0 | Not enumerated |
 | `AEAD.ENCRYPT` | 0 | Not enumerated |
@@ -89,11 +94,11 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | [ARRAY_SLICE](function-types/array.md#array_slice) | 20 | Supported |
 | [ARRAY_TO_STRING](function-types/array.md#array_to_string) | 4 | Broken |
 | [ASCII](function-types/string.md#ascii) | 2 | Supported |
-| `ASIN` | 0 | Not enumerated |
-| `ASINH` | 0 | Not enumerated |
-| `ATAN` | 0 | Not enumerated |
-| `ATAN2` | 0 | Not enumerated |
-| `ATANH` | 0 | Not enumerated |
+| [ASIN](function-types/mathematical.md#asin) | 4 | Supported |
+| [ASINH](function-types/mathematical.md#asinh) | 4 | Supported |
+| [ATAN](function-types/mathematical.md#atan) | 4 | Supported |
+| [ATAN2](function-types/mathematical.md#atan2) | 16 | Supported |
+| [ATANH](function-types/mathematical.md#atanh) | 4 | Supported |
 | [AVG](function-types/aggregate.md#avg) | 5 | Supported |
 | `BAG_OF_WORDS` | 0 | Not enumerated |
 | `BIT_AND` | 0 | Not enumerated |
@@ -104,31 +109,31 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | [BYTE_LENGTH](function-types/string.md#byte_length) | 2 | Supported |
 | `CASE` | 0 | Not enumerated |
 | `CAST` | 0 | Not enumerated |
-| `CBRT` | 0 | Not enumerated |
+| [CBRT](function-types/mathematical.md#cbrt) | 4 | Broken |
 | [CEIL](function-types/mathematical.md#ceil) | 4 | Supported |
 | [CEILING](function-types/mathematical.md#ceiling) | 4 | Supported |
 | `CHANGES` | 0 | Not enumerated |
-| `CHARACTER_LENGTH` | 0 | Not enumerated |
-| `CHAR_LENGTH` | 0 | Not enumerated |
-| `CHR` | 0 | Not enumerated |
+| [CHARACTER_LENGTH](function-types/string.md#character_length) | 1 | Supported |
+| [CHAR_LENGTH](function-types/string.md#char_length) | 1 | Supported |
+| [CHR](function-types/string.md#chr) | 1 | Supported |
 | [COALESCE](function-types/conditional.md#coalesce) | 80 | Supported |
-| `CODE_POINTS_TO_BYTES` | 0 | Not enumerated |
-| `CODE_POINTS_TO_STRING` | 0 | Not enumerated |
+| [CODE_POINTS_TO_BYTES](function-types/string.md#code_points_to_bytes) | 1 | Supported |
+| [CODE_POINTS_TO_STRING](function-types/string.md#code_points_to_string) | 1 | Supported |
 | `COLLATE` | 0 | Not enumerated |
 | [CONCAT](function-types/string.md#concat) | 4 | Supported |
 | `CONTAINS_SUBSTR` | 0 | Not enumerated |
 | [CORR](function-types/statistical-aggregate.md#corr) | 16 | Supported |
-| `COS` | 0 | Not enumerated |
-| `COSH` | 0 | Not enumerated |
+| [COS](function-types/mathematical.md#cos) | 4 | Supported |
+| [COSH](function-types/mathematical.md#cosh) | 4 | Supported |
 | `COSINE_DISTANCE` | 0 | Not enumerated |
-| `COT` | 0 | Not enumerated |
-| `COTH` | 0 | Not enumerated |
+| [COT](function-types/mathematical.md#cot) | 4 | Supported |
+| [COTH](function-types/mathematical.md#coth) | 4 | Supported |
 | `COUNT` | 0 | Not enumerated |
 | `COUNTIF` | 0 | Not enumerated |
 | [COVAR_POP](function-types/statistical-aggregate.md#covar_pop) | 16 | Supported |
 | [COVAR_SAMP](function-types/statistical-aggregate.md#covar_samp) | 16 | Supported |
-| `CSC` | 0 | Not enumerated |
-| `CSCH` | 0 | Not enumerated |
+| [CSC](function-types/mathematical.md#csc) | 4 | Supported |
+| [CSCH](function-types/mathematical.md#csch) | 4 | Supported |
 | `CUME_DIST` | 0 | Not enumerated |
 | `CURRENT_DATE` | 0 | Not enumerated |
 | `CURRENT_DATETIME` | 0 | Not enumerated |
@@ -157,7 +162,7 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `DLP_DETERMINISTIC_ENCRYPT` | 0 | Not enumerated |
 | `DLP_KEY_CHAIN` | 0 | Not enumerated |
 | `EDGES` | 0 | Not enumerated |
-| `EDIT_DISTANCE` | 0 | Not enumerated |
+| [EDIT_DISTANCE](function-types/string.md#edit_distance) | 2 | Supported |
 | `ELEMENT_ID` | 0 | Not enumerated |
 | [ENDS_WITH](function-types/string.md#ends_with) | 2 | Supported |
 | `ERROR` | 0 | Not enumerated |
@@ -175,30 +180,30 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `FORMAT_DATETIME` | 0 | Not enumerated |
 | `FORMAT_TIME` | 0 | Not enumerated |
 | `FORMAT_TIMESTAMP` | 0 | Not enumerated |
-| `FROM_BASE32` | 0 | Not enumerated |
-| `FROM_BASE64` | 0 | Not enumerated |
-| `FROM_HEX` | 0 | Not enumerated |
+| [FROM_BASE32](function-types/string.md#from_base32) | 1 | Supported |
+| [FROM_BASE64](function-types/string.md#from_base64) | 1 | Supported |
+| [FROM_HEX](function-types/string.md#from_hex) | 1 | Supported |
 | `GAP_FILL` | 0 | Not enumerated |
 | [GENERATE_ARRAY](function-types/array.md#generate_array) | 8 | Supported |
 | `GENERATE_DATE_ARRAY` | 0 | Not enumerated |
 | `GENERATE_RANGE_ARRAY` | 0 | Not enumerated |
 | `GENERATE_TIMESTAMP_ARRAY` | 0 | Not enumerated |
 | `GENERATE_UUID` | 0 | Not enumerated |
-| `GREATEST` | 0 | Not enumerated |
+| [GREATEST](function-types/mathematical.md#greatest) | 30 | Broken |
 | `GROUPING` | 0 | Not enumerated |
 | `HLL_COUNT.EXTRACT` | 0 | Not enumerated |
 | `HLL_COUNT.INIT` | 0 | Not enumerated |
 | `HLL_COUNT.MERGE` | 0 | Not enumerated |
 | `HLL_COUNT.MERGE_PARTIAL` | 0 | Not enumerated |
-| `IEEE_DIVIDE` | 0 | Not enumerated |
+| [IEEE_DIVIDE](function-types/mathematical.md#ieee_divide) | 16 | Supported |
 | [IF](function-types/conditional.md#if) | 40 | Supported |
 | [IFNULL](function-types/conditional.md#ifnull) | 40 | Supported |
-| `INITCAP` | 0 | Not enumerated |
+| [INITCAP](function-types/string.md#initcap) | 2 | Supported |
 | [INSTR](function-types/string.md#instr) | 6 | Supported |
 | `INT64` | 0 | Not enumerated |
 | `IS_ACYCLIC` | 0 | Not enumerated |
-| `IS_INF` | 0 | Not enumerated |
-| `IS_NAN` | 0 | Not enumerated |
+| [IS_INF](function-types/mathematical.md#is_inf) | 4 | Supported |
+| [IS_NAN](function-types/mathematical.md#is_nan) | 4 | Supported |
 | `IS_SIMPLE` | 0 | Not enumerated |
 | `IS_TRAIL` | 0 | Not enumerated |
 | `JSON_ARRAY` | 0 | Not enumerated |
@@ -252,7 +257,7 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `LAX_INT64` | 0 | Not enumerated |
 | `LAX_STRING` | 0 | Not enumerated |
 | `LEAD` | 0 | Not enumerated |
-| `LEAST` | 0 | Not enumerated |
+| [LEAST](function-types/mathematical.md#least) | 30 | Broken |
 | [LEFT](function-types/string.md#left) | 2 | Supported |
 | [LENGTH](function-types/string.md#length) | 2 | Supported |
 | [LN](function-types/mathematical.md#ln) | 4 | Supported |
@@ -270,19 +275,19 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | [MIN](function-types/aggregate.md#min) | 15 | Supported |
 | `MIN_BY` | 0 | Not enumerated |
 | [MOD](function-types/mathematical.md#mod) | 9 | Supported |
-| `NET.HOST` | 0 | Not enumerated |
-| `NET.IPV4_FROM_INT64` | 0 | Not enumerated |
-| `NET.IPV4_TO_INT64` | 0 | Not enumerated |
-| `NET.IP_FROM_STRING` | 0 | Not enumerated |
-| `NET.IP_NET_MASK` | 0 | Not enumerated |
-| `NET.IP_TO_STRING` | 0 | Not enumerated |
-| `NET.IP_TRUNC` | 0 | Not enumerated |
-| `NET.PUBLIC_SUFFIX` | 0 | Not enumerated |
-| `NET.REG_DOMAIN` | 0 | Not enumerated |
-| `NET.SAFE_IP_FROM_STRING` | 0 | Not enumerated |
+| [NET.HOST](function-types/net.md#nethost) | 1 | Supported |
+| [NET.IPV4_FROM_INT64](function-types/net.md#netipv4_from_int64) | 1 | Supported |
+| [NET.IPV4_TO_INT64](function-types/net.md#netipv4_to_int64) | 1 | Supported |
+| [NET.IP_FROM_STRING](function-types/net.md#netip_from_string) | 1 | Supported |
+| [NET.IP_NET_MASK](function-types/net.md#netip_net_mask) | 1 | Supported |
+| [NET.IP_TO_STRING](function-types/net.md#netip_to_string) | 1 | Supported |
+| [NET.IP_TRUNC](function-types/net.md#netip_trunc) | 1 | Supported |
+| [NET.PUBLIC_SUFFIX](function-types/net.md#netpublic_suffix) | 1 | Supported |
+| [NET.REG_DOMAIN](function-types/net.md#netreg_domain) | 1 | Supported |
+| [NET.SAFE_IP_FROM_STRING](function-types/net.md#netsafe_ip_from_string) | 1 | Supported |
 | `NODES` | 0 | Not enumerated |
-| `NORMALIZE` | 0 | Not enumerated |
-| `NORMALIZE_AND_CASEFOLD` | 0 | Not enumerated |
+| [NORMALIZE](function-types/string.md#normalize) | 1 | Supported |
+| [NORMALIZE_AND_CASEFOLD](function-types/string.md#normalize_and_casefold) | 1 | Supported |
 | `NTH_VALUE` | 0 | Not enumerated |
 | `NTILE` | 0 | Not enumerated |
 | `NULLIF` | 0 | Not enumerated |
@@ -307,7 +312,7 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `PERCENT_RANK` | 0 | Not enumerated |
 | [POW](function-types/mathematical.md#pow) | 16 | Supported |
 | [POWER](function-types/mathematical.md#power) | 16 | Supported |
-| `RAND` | 0 | Not enumerated |
+| [RAND](function-types/mathematical.md#rand) | 1 | Supported |
 | [RANGE](function-types/range.md#range) | 3 | Supported |
 | `RANGE_BUCKET` | 0 | Not enumerated |
 | [RANGE_CONTAINS](function-types/range.md#range_contains) | 6 | Supported |
@@ -335,22 +340,22 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `S2_COVERINGCELLIDS` | 0 | Not enumerated |
 | [SAFE_ADD](function-types/mathematical.md#safe_add) | 16 | Supported |
 | `SAFE_CAST` | 0 | Not enumerated |
-| `SAFE_CONVERT_BYTES_TO_STRING` | 0 | Not enumerated |
+| [SAFE_CONVERT_BYTES_TO_STRING](function-types/string.md#safe_convert_bytes_to_string) | 1 | Supported |
 | [SAFE_DIVIDE](function-types/mathematical.md#safe_divide) | 16 | Supported |
 | [SAFE_MULTIPLY](function-types/mathematical.md#safe_multiply) | 16 | Supported |
 | [SAFE_NEGATE](function-types/mathematical.md#safe_negate) | 4 | Supported |
 | [SAFE_SUBTRACT](function-types/mathematical.md#safe_subtract) | 16 | Supported |
 | `SEARCH` | 0 | Not enumerated |
-| `SEC` | 0 | Not enumerated |
-| `SECH` | 0 | Not enumerated |
+| [SEC](function-types/mathematical.md#sec) | 4 | Supported |
+| [SECH](function-types/mathematical.md#sech) | 4 | Supported |
 | `SESSION_USER` | 0 | Not enumerated |
 | [SHA1](function-types/hash.md#sha1) | 2 | Supported |
 | [SHA256](function-types/hash.md#sha256) | 2 | Supported |
 | [SHA512](function-types/hash.md#sha512) | 2 | Supported |
 | [SIGN](function-types/mathematical.md#sign) | 4 | Supported |
-| `SIN` | 0 | Not enumerated |
-| `SINH` | 0 | Not enumerated |
-| `SOUNDEX` | 0 | Not enumerated |
+| [SIN](function-types/mathematical.md#sin) | 4 | Supported |
+| [SINH](function-types/mathematical.md#sinh) | 4 | Supported |
+| [SOUNDEX](function-types/string.md#soundex) | 1 | Supported |
 | `SOURCE_NODE_ID` | 0 | Not enumerated |
 | [SPLIT](function-types/string.md#split) | 3 | Supported |
 | [SQRT](function-types/mathematical.md#sqrt) | 4 | Supported |
@@ -433,8 +438,8 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | [SUBSTR](function-types/string.md#substr) | 4 | Supported |
 | [SUBSTRING](function-types/string.md#substring) | 4 | Supported |
 | [SUM](function-types/aggregate.md#sum) | 5 | Supported |
-| `TAN` | 0 | Not enumerated |
-| `TANH` | 0 | Not enumerated |
+| [TAN](function-types/mathematical.md#tan) | 4 | Supported |
+| [TANH](function-types/mathematical.md#tanh) | 4 | Supported |
 | `TEXT_ANALYZE` | 0 | Not enumerated |
 | `TF_IDF` | 0 | Not enumerated |
 | `TIME` | 0 | Not enumerated |
@@ -451,17 +456,17 @@ Type signatures are enumerated for **92 of 407 functions**. The remaining **315*
 | `TIME_DIFF` | 0 | Not enumerated |
 | `TIME_SUB` | 0 | Not enumerated |
 | `TIME_TRUNC` | 0 | Not enumerated |
-| `TO_BASE32` | 0 | Not enumerated |
-| `TO_BASE64` | 0 | Not enumerated |
+| [TO_BASE32](function-types/string.md#to_base32) | 1 | Supported |
+| [TO_BASE64](function-types/string.md#to_base64) | 1 | Supported |
 | [TO_CODE_POINTS](function-types/string.md#to_code_points) | 2 | Supported |
-| `TO_HEX` | 0 | Not enumerated |
+| [TO_HEX](function-types/string.md#to_hex) | 1 | Supported |
 | `TO_JSON` | 0 | Not enumerated |
 | `TO_JSON_STRING` | 0 | Not enumerated |
 | [TRANSLATE](function-types/string.md#translate) | 2 | Supported |
 | [TRIM](function-types/string.md#trim) | 3 | Supported |
 | [TRUNC](function-types/mathematical.md#trunc) | 8 | Supported |
 | `TYPEOF` | 0 | Not enumerated |
-| `UNICODE` | 0 | Not enumerated |
+| [UNICODE](function-types/string.md#unicode) | 1 | Supported |
 | `UNIX_DATE` | 0 | Not enumerated |
 | `UNIX_MICROS` | 0 | Not enumerated |
 | `UNIX_MILLIS` | 0 | Not enumerated |
