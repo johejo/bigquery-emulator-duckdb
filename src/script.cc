@@ -378,10 +378,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
     const AnalyzerSettings settings = Settings(executor);
     std::unique_ptr<TableSource> source = host_.NewTableSource(backend_.get(), /*expire=*/false);
+    const TimestampPrecision precision = host_.functions().timestamp_precision();
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
-                            settings.default_dataset, settings.timestamp_precision, nullptr,
+                            settings.default_dataset, precision, nullptr,
                             host_.excluded_function_ids(), host_.function_declarations());
-    return AnalyzeScriptType(segment, catalog, type_factory_, settings);
+    return AnalyzeScriptType(segment, catalog, type_factory_, precision, settings);
   }
 
   bool IsSupportedVariableType(const googlesql::TypeWithParameters& /*type*/) override {
@@ -480,9 +481,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const TimestampPrecision precision = host_.functions().timestamp_precision();
       RoutineCatalog catalog(source, &type_factory_, routine.reference.project_id, "", precision,
                              nullptr, host_.excluded_function_ids(), host_.function_declarations());
-      const auto analyzed = AnalyzeGoogleSql(
-          RoutineStatement(routine), catalog, type_factory_,
-          {.default_project = routine.reference.project_id, .timestamp_precision = precision});
+      const auto analyzed =
+          AnalyzeGoogleSql(RoutineStatement(routine), catalog, type_factory_, precision,
+                           {.default_project = routine.reference.project_id});
       const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateProcedureStmt>();
       std::unique_ptr<googlesql::ParserOutput> parsed;
       GOOGLESQL_RETURN_IF_ERROR(googlesql::ParseScript(
@@ -626,8 +627,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     catalog.tables = std::make_unique<RoutineCatalog>(
         *catalog.source, &type_factory_, settings.default_project, settings.default_dataset,
-        settings.timestamp_precision, catalog.temporary.get(), host_.excluded_function_ids(),
-        host_.function_declarations());
+        host_.functions().timestamp_precision(), catalog.temporary.get(),
+        host_.excluded_function_ids(), host_.function_declarations());
     catalog.variables = std::make_unique<googlesql::SimpleCatalog>("variables", &type_factory_);
     for (const auto& [name, value] : executor.GetCurrentVariables()) {
       std::unique_ptr<googlesql::SimpleConstant> constant;
@@ -748,7 +749,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     std::string unsupported;
     std::optional<QueryParameters> parameters =
-        TranslateParameters(*values, &unsupported, settings.timestamp_precision);
+        TranslateParameters(*values, &unsupported, host_.functions().timestamp_precision());
     if (!parameters.has_value()) {
       return Unsupported(unsupported);
     }
@@ -778,7 +779,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     GOOGLESQL_ASSIGN_OR_RETURN(
         AnalyzerResult analyzed,
-        AnalyzeScriptStatement(segment, *catalog.catalog, type_factory_, settings));
+        AnalyzeScriptStatement(segment, *catalog.catalog, type_factory_,
+                               host_.functions().timestamp_precision(), settings));
     const auto& statement = analyzed.statement();
     if (statement.Is<googlesql::ResolvedBeginStmt>()) {
       const auto* begin = statement.GetAs<googlesql::ResolvedBeginStmt>();
@@ -884,9 +886,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings));
-    GOOGLESQL_ASSIGN_OR_RETURN(const AnalyzerResult analyzed,
-                               AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
-                                                       type_factory_, settings));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        const AnalyzerResult analyzed,
+        AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog, type_factory_,
+                                host_.functions().timestamp_precision(), settings));
     std::string unsupported;
     const auto variables = SystemVariables(executor);
     const auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
@@ -977,7 +980,6 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = &variables,
-      .timestamp_precision = host.functions().timestamp_precision(),
   };
   for (const FieldSchema& field : parameters.named_types()) {
     absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
@@ -986,7 +988,8 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
     }
     settings.named_parameters.emplace_back(field.name, *type);
   }
-  absl::StatusOr<googlesql::AnalyzerOptions> analyzer_options = ScriptAnalyzerOptions(settings);
+  absl::StatusOr<googlesql::AnalyzerOptions> analyzer_options =
+      ScriptAnalyzerOptions(host.functions().timestamp_precision(), settings);
   if (!analyzer_options.ok()) {
     throw ApiError::InvalidQuery(std::string(analyzer_options.status().message()));
   }

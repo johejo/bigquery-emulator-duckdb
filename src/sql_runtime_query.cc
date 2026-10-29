@@ -434,7 +434,6 @@ TranslatedStatement SqlRuntime::Translate(
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = system_variables,
-      .timestamp_precision = functions_.timestamp_precision(),
   };
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
@@ -445,9 +444,10 @@ TranslatedStatement SqlRuntime::Translate(
   }
   const auto source = NewTableSource(nullptr, true, location);
   RoutineCatalog catalog(*source, &type_factory, settings.default_project, settings.default_dataset,
-                         settings.timestamp_precision, nullptr, excluded_function_ids_,
+                         functions_.timestamp_precision(), nullptr, excluded_function_ids_,
                          declarations_);
-  const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
+  const AnalyzerResult analyzed =
+      AnalyzeGoogleSql(query, catalog, type_factory, functions_.timestamp_precision(), settings);
   std::string unsupported;
   std::optional<TranslatedStatement> translated = TranslateStatement(
       functions_, analyzed.statement(), parameters,
@@ -551,17 +551,15 @@ std::vector<std::string> SqlRuntime::ColumnDefaultStatements(
     if (!type.ok()) {
       throw ApiError::Invalid(std::string(type.status().message()));
     }
-    const AnalyzerSettings settings{
-        .default_project = table.project_id,
-        .timestamp_precision = functions_.timestamp_precision(),
-    };
+    const AnalyzerSettings settings{.default_project = table.project_id};
     // A default cannot read tables, so they need not be expired first.
     const auto source = NewTableSource(nullptr, /*expire=*/false);
     RoutineCatalog catalog(*source, &type_factory, table.project_id, "",
-                           settings.timestamp_precision, nullptr, excluded_function_ids_,
+                           functions_.timestamp_precision(), nullptr, excluded_function_ids_,
                            declarations_);
-    const absl::StatusOr<AnalyzerResult> analyzed = AnalyzeScriptExpression(
-        field.default_value_expression, nullptr, *type, catalog, type_factory, settings);
+    const absl::StatusOr<AnalyzerResult> analyzed =
+        AnalyzeScriptExpression(field.default_value_expression, nullptr, *type, catalog,
+                                type_factory, functions_.timestamp_precision(), settings);
     if (!analyzed.ok()) {
       throw ApiError::Invalid("Invalid default value for field " + field.name + ": " +
                               std::string(analyzed.status().message()));
@@ -608,7 +606,6 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   std::vector<std::string> setup;
   AnalyzerSettings settings{
       .default_project = request.project_id,
-      .timestamp_precision = functions_.timestamp_precision(),
   };
   if (request.default_dataset.has_value()) {
     const std::string dataset_project = ResolveProject(request.default_dataset->project_id.empty()

@@ -56,11 +56,11 @@ std::string Problem(const json& catalog) {
   googlesql::TypeFactory factory;
   NoTables source;
   BigQueryCatalog tables(source, &factory, "test", "d", TimestampPrecision::kMicroseconds);
-  const auto settings = ScriptAnalyzerOptions({
-      .default_project = "test",
-      .default_dataset = "d",
-      .timestamp_precision = TimestampPrecision::kMicroseconds,
-  });
+  const auto settings =
+      ScriptAnalyzerOptions(TimestampPrecision::kMicroseconds, {
+                                                                   .default_project = "test",
+                                                                   .default_dataset = "d",
+                                                               });
   if (!settings.ok()) {
     return settings.status().ToString();
   }

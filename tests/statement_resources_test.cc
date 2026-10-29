@@ -67,13 +67,11 @@ TranslatedStatement TranslateRead(const std::string& query, Preparation prepare)
   FileSource source(std::move(prepare));
   googlesql::TypeFactory types;
   BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds);
-  const auto analyzed =
-      AnalyzeGoogleSql(query, catalog, types,
-                       {
-                           .default_project = "test",
-                           .default_dataset = "d",
-                           .timestamp_precision = TimestampPrecision::kMicroseconds,
-                       });
+  const auto analyzed = AnalyzeGoogleSql(query, catalog, types, TimestampPrecision::kMicroseconds,
+                                         {
+                                             .default_project = "test",
+                                             .default_dataset = "d",
+                                         });
   std::string unsupported;
   auto translation = TranslateStatement(
       EmulatorFunctionCatalog(BigQueryFunctionOptions()), analyzed.statement(), {},
@@ -188,13 +186,12 @@ TEST(StatementResourcesTest, ScalarExpressionKeepsItsOwnExecutionScope) {
     });
     googlesql::TypeFactory types;
     BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds);
-    const auto analyzed =
-        AnalyzeScriptExpression("(SELECT value FROM t)", nullptr, nullptr, catalog, types,
-                                {
-                                    .default_project = "test",
-                                    .default_dataset = "d",
-                                    .timestamp_precision = TimestampPrecision::kMicroseconds,
-                                });
+    const auto analyzed = AnalyzeScriptExpression("(SELECT value FROM t)", nullptr, nullptr,
+                                                  catalog, types, TimestampPrecision::kMicroseconds,
+                                                  {
+                                                      .default_project = "test",
+                                                      .default_dataset = "d",
+                                                  });
     ASSERT_TRUE(analyzed.ok()) << analyzed.status();
     const auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
     std::string unsupported;

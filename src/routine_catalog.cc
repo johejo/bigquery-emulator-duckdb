@@ -277,11 +277,10 @@ absl::StatusOr<AnalyzerResult> RoutineCatalog::AnalyzeDefinition(
   std::optional<AnalyzerResult> analyzed;
   std::string error;
   try {
-    analyzed.emplace(AnalyzeGoogleSql(sql, *catalog, *type_factory(),
+    analyzed.emplace(AnalyzeGoogleSql(sql, *catalog, *type_factory(), timestamp_precision(),
                                       {
                                           .default_project = project,
                                           .default_dataset = dataset,
-                                          .timestamp_precision = timestamp_precision(),
                                       }));
   } catch (const std::exception& exception) {
     std::string_view message = exception.what();

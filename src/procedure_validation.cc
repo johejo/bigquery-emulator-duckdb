@@ -94,8 +94,8 @@ class ProcedureValidator {
       TypeParameters parameters;
       if (declaration->type() != nullptr) {
         GOOGLESQL_ASSIGN_OR_RETURN(
-            const auto resolved,
-            AnalyzeScriptType(Segment(*declaration->type()), catalog_, types_, Settings()));
+            const auto resolved, AnalyzeScriptType(Segment(*declaration->type()), catalog_, types_,
+                                                   catalog_.timestamp_precision(), Settings()));
         type = resolved.type;
         parameters = resolved.type_params;
       }
@@ -154,7 +154,8 @@ class ProcedureValidator {
       return WithCatalog([&](Catalog& catalog) -> absl::Status {
         GOOGLESQL_ASSIGN_OR_RETURN(
             const auto analyzed,
-            AnalyzeScriptStatement(Segment(node), catalog, types_, Settings()));
+            AnalyzeScriptStatement(Segment(node), catalog, types_, catalog_.timestamp_precision(),
+                                   Settings()));
         const auto* call = node.GetAsOrNull<ASTCallStatement>();
         if (call == nullptr) {
           return absl::OkStatus();
@@ -210,7 +211,6 @@ class ProcedureValidator {
     return {
         .default_project = "",
         .system_variables = &system_variables_,
-        .timestamp_precision = catalog_.timestamp_precision(),
     };
   }
 
@@ -254,9 +254,10 @@ class ProcedureValidator {
                                               const googlesql::Type* target) {
     return WithCatalog([&](googlesql::Catalog& catalog) -> absl::StatusOr<googlesql::Value> {
       const auto segment = Segment(expression);
-      GOOGLESQL_ASSIGN_OR_RETURN(const auto analyzed,
-                                 AnalyzeScriptExpression(segment.GetSegmentText(), &segment, target,
-                                                         catalog, types_, Settings()));
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          const auto analyzed,
+          AnalyzeScriptExpression(segment.GetSegmentText(), &segment, target, catalog, types_,
+                                  catalog_.timestamp_precision(), Settings()));
       std::vector<const googlesql::ResolvedNode*> nodes{&analyzed.expression()};
       while (!nodes.empty()) {
         const auto* node = nodes.back();
@@ -281,7 +282,8 @@ class ProcedureValidator {
       evaluator_options.type_factory = &types_;
       evaluator_options.default_time_zone = absl::UTCTimeZone();
       googlesql::PreparedExpression evaluator(&analyzed.expression(), evaluator_options);
-      GOOGLESQL_ASSIGN_OR_RETURN(const auto options, ScriptAnalyzerOptions(Settings()));
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto options,
+                                 ScriptAnalyzerOptions(catalog_.timestamp_precision(), Settings()));
       GOOGLESQL_RETURN_IF_ERROR(evaluator.Prepare(options, &catalog));
       return evaluator.ExecuteAfterPrepare({}, {}, system_variables_);
     });
@@ -330,9 +332,8 @@ absl::Status CheckProcedure(const Routine& routine, const googlesql::ASTScript& 
                             RoutineCatalog& catalog, googlesql::TypeFactory& types) {
   const std::string body = routine.resource.at("definitionBody").get<std::string>();
   ProcedureValidator validator(body, catalog, types);
-  const auto signature = AnalyzeGoogleSql(
-      RoutineStatement(routine), catalog, types,
-      {.default_project = "", .timestamp_precision = catalog.timestamp_precision()});
+  const auto signature = AnalyzeGoogleSql(RoutineStatement(routine), catalog, types,
+                                          catalog.timestamp_precision(), {.default_project = ""});
   const auto& create = *signature.statement().GetAs<googlesql::ResolvedCreateProcedureStmt>();
   for (int i = 0; i < create.argument_name_list_size(); ++i) {
     GOOGLESQL_RETURN_IF_ERROR(
