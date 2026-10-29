@@ -58,7 +58,46 @@ func TestProseTypeConstraints(t *testing.T) {
 			t.Errorf("%s lacks mixed numeric pairs", name)
 		}
 	}
-	for _, name := range []string{"CONCAT", "GENERATE_ARRAY", "COALESCE", "IFNULL", "IF"} {
+	for _, name := range []string{"ATAN2", "IEEE_DIVIDE"} {
+		if len(functions[name].Signatures) != 16 {
+			t.Errorf("%s lacks mixed numeric pairs", name)
+		}
+	}
+	for _, name := range []string{"ACOS", "ASIN", "ATANH"} {
+		for _, s := range functions[name].Signatures {
+			want := "1"
+			if name == "ATANH" {
+				want = "0"
+			}
+			if s.Result != "FLOAT64" || len(s.Samples) != 1 || s.Samples[0] != want {
+				t.Errorf("%s needs a valid inverse-function sample and FLOAT64 result: %+v", name, s)
+			}
+		}
+	}
+	for _, name := range []string{"CHAR_LENGTH", "CHARACTER_LENGTH", "UNICODE", "FROM_BASE32", "FROM_BASE64", "FROM_HEX", "INITCAP", "NORMALIZE", "NORMALIZE_AND_CASEFOLD", "SOUNDEX"} {
+		if !has(name, "STRING") || has(name, "BYTES") {
+			t.Errorf("%s must cover STRING, not BYTES", name)
+		}
+	}
+	for _, name := range []string{"TO_BASE32", "TO_BASE64", "TO_HEX", "SAFE_CONVERT_BYTES_TO_STRING"} {
+		if !has(name, "BYTES") || has(name, "STRING") {
+			t.Errorf("%s must cover BYTES, not STRING", name)
+		}
+	}
+	if !has("RAND") || functions["RAND"].Signatures[0].Result != "FLOAT64" {
+		t.Error("RAND needs a zero-argument FLOAT64 form")
+	}
+	for _, name := range []string{"NET.IP_FROM_STRING", "NET.SAFE_IP_FROM_STRING", "NET.IP_NET_MASK", "NET.IP_TO_STRING", "NET.IP_TRUNC", "NET.IPV4_TO_INT64", "FROM_BASE32", "FROM_BASE64", "FROM_HEX"} {
+		for _, s := range functions[name].Signatures {
+			if len(s.Samples) != len(s.Arguments) || s.Samples[0] == "" {
+				t.Errorf("%s needs a valid function-specific sample", name)
+			}
+			if _, reason := functioncoverage.Query(functions[name], s); reason != "" {
+				t.Errorf("%s: %s", name, reason)
+			}
+		}
+	}
+	for _, name := range []string{"CONCAT", "GENERATE_ARRAY", "COALESCE", "IFNULL", "IF", "GREATEST", "LEAST", "NORMALIZE", "NORMALIZE_AND_CASEFOLD", "EDIT_DISTANCE"} {
 		if functions[name].Note == "" {
 			t.Errorf("%s needs its incomplete expansion documented", name)
 		}

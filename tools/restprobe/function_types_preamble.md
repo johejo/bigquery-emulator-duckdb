@@ -12,10 +12,14 @@ extracts reviewed type tables and expands reviewed prose domains from the checke
 documentation:
 
 - [Mathematical functions](../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md):
-  numeric input/output tables, mixed-type pairs, synonyms and optional precision and rounding modes.
+  numeric input/output tables, mixed-type pairs, synonyms, trigonometric functions, floating-point
+  predicates, same-type scalar comparisons, RAND and optional precision and rounding modes.
 - [String functions](../third_party/bigquery_docs/reference/standard-sql/string_functions.md) and
   [hash functions](../third_party/bigquery_docs/reference/standard-sql/hash_functions.md):
-  STRING/BYTES forms, optional positional arguments and array results.
+  STRING/BYTES forms, optional positional arguments, array results, code-point conversion,
+  base encodings and default-mode normalization.
+- [Net functions](../third_party/bigquery_docs/reference/standard-sql/net_functions.md):
+  URL and IP address operations with valid address and network-mask samples.
 - [Array functions](../third_party/bigquery_docs/reference/standard-sql/array_functions.md) and
   [aggregate functions](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md):
   concrete element and value types, including nested STRUCTs and ARRAYs of STRUCTs.

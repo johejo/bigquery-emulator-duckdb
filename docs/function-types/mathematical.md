@@ -7,25 +7,51 @@
 ## Functions
 
 - [ABS](#abs)
+- [ACOS](#acos)
+- [ACOSH](#acosh)
+- [ASIN](#asin)
+- [ASINH](#asinh)
+- [ATAN](#atan)
+- [ATAN2](#atan2)
+- [ATANH](#atanh)
+- [CBRT](#cbrt)
 - [CEIL](#ceil)
 - [CEILING](#ceiling)
+- [COS](#cos)
+- [COSH](#cosh)
+- [COT](#cot)
+- [COTH](#coth)
+- [CSC](#csc)
+- [CSCH](#csch)
 - [DIV](#div)
 - [EXP](#exp)
 - [FLOOR](#floor)
+- [GREATEST](#greatest)
+- [IEEE_DIVIDE](#ieee_divide)
+- [IS_INF](#is_inf)
+- [IS_NAN](#is_nan)
+- [LEAST](#least)
 - [LN](#ln)
 - [LOG](#log)
 - [LOG10](#log10)
 - [MOD](#mod)
 - [POW](#pow)
 - [POWER](#power)
+- [RAND](#rand)
 - [ROUND](#round)
 - [SAFE_ADD](#safe_add)
 - [SAFE_DIVIDE](#safe_divide)
 - [SAFE_MULTIPLY](#safe_multiply)
 - [SAFE_NEGATE](#safe_negate)
 - [SAFE_SUBTRACT](#safe_subtract)
+- [SEC](#sec)
+- [SECH](#sech)
 - [SIGN](#sign)
+- [SIN](#sin)
+- [SINH](#sinh)
 - [SQRT](#sqrt)
+- [TAN](#tan)
+- [TANH](#tanh)
 - [TRUNC](#trunc)
 
 ## ABS
@@ -37,6 +63,106 @@ Source: [ABS](../../third_party/bigquery_docs/reference/standard-sql/mathematica
 | `INT64` | `INT64` | Supported |  |
 | `NUMERIC` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## ACOS
+
+Source: [ACOS](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## ACOSH
+
+Source: [ACOSH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## ASIN
+
+Source: [ASIN](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## ASINH
+
+Source: [ASINH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## ATAN
+
+Source: [ATAN](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## ATAN2
+
+Source: [ATAN2](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `FLOAT64` | Supported |  |
+| `INT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+
+## ATANH
+
+Source: [ATANH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## CBRT
+
+Source: [CBRT](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Broken | return type NUMERIC, documented FLOAT64 |
+| `BIGNUMERIC` | `FLOAT64` | Broken | return type BIGNUMERIC, documented FLOAT64 |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
 ## CEIL
@@ -59,6 +185,72 @@ Source: [CEILING](../../third_party/bigquery_docs/reference/standard-sql/mathema
 | `INT64` | `FLOAT64` | Supported |  |
 | `NUMERIC` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## COS
+
+Source: [COS](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## COSH
+
+Source: [COSH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## COT
+
+Source: [COT](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## COTH
+
+Source: [COTH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## CSC
+
+Source: [CSC](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## CSCH
+
+Source: [CSCH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
 ## DIV
@@ -98,6 +290,129 @@ Source: [FLOOR](../../third_party/bigquery_docs/reference/standard-sql/mathemati
 | `NUMERIC` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
+
+## GREATEST
+
+Source: [GREATEST](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `NUMERIC` | Supported |  |
+| `NUMERIC, NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL` | `BOOL` | Supported |  |
+| `BOOL, BOOL` | `BOOL` | Supported |  |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `DATE` | `DATE` | Supported |  |
+| `DATE, DATE` | `DATE` | Supported |  |
+| `DATETIME` | `DATETIME` | Supported |  |
+| `DATETIME, DATETIME` | `DATETIME` | Supported |  |
+| `TIME` | `TIME` | Supported |  |
+| `TIME, TIME` | `TIME` | Supported |  |
+| `TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL` | `INTERVAL` | Broken | `SELECT GREATEST(a0) AS result FROM (SELECT INTERVAL 2 DAY AS a0)`: Unsupported type in function GREATEST |
+| `INTERVAL, INTERVAL` | `INTERVAL` | Broken | `SELECT GREATEST(a0, a1) AS result FROM (SELECT INTERVAL 2 DAY AS a0, INTERVAL 2 DAY AS a1)`: Unsupported type in function GREATEST |
+| `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+
+## IEEE_DIVIDE
+
+Source: [IEEE_DIVIDE](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64, INT64` | `FLOAT64` | Supported |  |
+| `INT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `INT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `NUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, INT64` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC, FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, INT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, NUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+
+## IS_INF
+
+Source: [IS_INF](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `BOOL` | Supported |  |
+| `NUMERIC` | `BOOL` | Supported |  |
+| `BIGNUMERIC` | `BOOL` | Supported |  |
+| `FLOAT64` | `BOOL` | Supported |  |
+
+## IS_NAN
+
+Source: [IS_NAN](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `BOOL` | Supported |  |
+| `NUMERIC` | `BOOL` | Supported |  |
+| `BIGNUMERIC` | `BOOL` | Supported |  |
+| `FLOAT64` | `BOOL` | Supported |  |
+
+## LEAST
+
+Source: [LEAST](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `INT64` | Supported |  |
+| `INT64, INT64` | `INT64` | Supported |  |
+| `NUMERIC` | `NUMERIC` | Supported |  |
+| `NUMERIC, NUMERIC` | `NUMERIC` | Supported |  |
+| `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `BIGNUMERIC, BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+| `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+| `BOOL` | `BOOL` | Supported |  |
+| `BOOL, BOOL` | `BOOL` | Supported |  |
+| `STRING` | `STRING` | Supported |  |
+| `STRING, STRING` | `STRING` | Supported |  |
+| `BYTES` | `BYTES` | Supported |  |
+| `BYTES, BYTES` | `BYTES` | Supported |  |
+| `DATE` | `DATE` | Supported |  |
+| `DATE, DATE` | `DATE` | Supported |  |
+| `DATETIME` | `DATETIME` | Supported |  |
+| `DATETIME, DATETIME` | `DATETIME` | Supported |  |
+| `TIME` | `TIME` | Supported |  |
+| `TIME, TIME` | `TIME` | Supported |  |
+| `TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
+| `INTERVAL` | `INTERVAL` | Broken | `SELECT LEAST(a0) AS result FROM (SELECT INTERVAL 2 DAY AS a0)`: Unsupported type in function LEAST |
+| `INTERVAL, INTERVAL` | `INTERVAL` | Broken | `SELECT LEAST(a0, a1) AS result FROM (SELECT INTERVAL 2 DAY AS a0, INTERVAL 2 DAY AS a1)`: Unsupported type in function LEAST |
+| `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<DATETIME>, RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
+| `RANGE<TIMESTAMP>, RANGE<TIMESTAMP>` | `RANGE<TIMESTAMP>` | Supported |  |
 
 ## LN
 
@@ -209,6 +524,14 @@ Source: [POWER](../../third_party/bigquery_docs/reference/standard-sql/mathemati
 | `FLOAT64, NUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
+
+## RAND
+
+Source: [RAND](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `` | `FLOAT64` | Supported |  |
 
 ## ROUND
 
@@ -330,6 +653,28 @@ Source: [SAFE_SUBTRACT](../../third_party/bigquery_docs/reference/standard-sql/m
 | `FLOAT64, BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64, FLOAT64` | `FLOAT64` | Supported |  |
 
+## SEC
+
+Source: [SEC](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## SECH
+
+Source: [SECH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
 ## SIGN
 
 Source: [SIGN](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -341,6 +686,28 @@ Source: [SIGN](../../third_party/bigquery_docs/reference/standard-sql/mathematic
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
+## SIN
+
+Source: [SIN](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## SINH
+
+Source: [SINH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
 ## SQRT
 
 Source: [SQRT](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
@@ -350,6 +717,28 @@ Source: [SQRT](../../third_party/bigquery_docs/reference/standard-sql/mathematic
 | `INT64` | `FLOAT64` | Supported |  |
 | `NUMERIC` | `NUMERIC` | Supported |  |
 | `BIGNUMERIC` | `BIGNUMERIC` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## TAN
+
+Source: [TAN](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
+| `FLOAT64` | `FLOAT64` | Supported |  |
+
+## TANH
+
+Source: [TANH](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
+
+| Input types | Return type | Status | Notes |
+| --- | --- | --- | --- |
+| `INT64` | `FLOAT64` | Supported |  |
+| `NUMERIC` | `FLOAT64` | Supported |  |
+| `BIGNUMERIC` | `FLOAT64` | Supported |  |
 | `FLOAT64` | `FLOAT64` | Supported |  |
 
 ## TRUNC
