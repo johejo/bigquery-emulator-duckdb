@@ -87,6 +87,8 @@ void RegisterCollationFunctions(duckdb_connection connection, bool bigquery) {
                       ApplyWithContext<Collate>, bigquery);
   RegisterWithContext(connection, "bq_collation_key", {kVarchar, kVarchar}, kBlob,
                       ApplyWithContext<googlesql_collation::SortKey>, bigquery);
+  RegisterWithContext(connection, "bq_collation_like", {kVarchar, kVarchar, kVarchar}, kBoolean,
+                      ApplyWithContext<googlesql_collation::Like>, bigquery);
   RegisterWithContext(connection, "bq_collation_starts_with", {kVarchar, kVarchar, kVarchar},
                       kBoolean, ApplyWithContext<googlesql_collation::StartsWith>, bigquery);
   RegisterWithContext(connection, "bq_collation_ends_with", {kVarchar, kVarchar, kVarchar},

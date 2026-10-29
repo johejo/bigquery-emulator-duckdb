@@ -24,7 +24,7 @@ rejected.
 | [Queries](#queries) | 34 | 2 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 22 | 10 | 1 |
-| [Collation](#collation) | 13 | 0 | 2 |
+| [Collation](#collation) | 14 | 0 | 1 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -136,7 +136,7 @@ rejected.
 | --- | --- | --- |
 | Collated comparisons | Supported | See [Collation](compatibility.md#collation). |
 | Collated `IN` | Supported |  |
-| Collated `LIKE` | Unsupported |  |
+| Collated `LIKE` | Supported |  |
 | Collated joins | Supported |  |
 | Collated `ORDER BY` | Supported |  |
 | Collated `GROUP BY` | Supported |  |

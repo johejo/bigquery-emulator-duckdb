@@ -789,6 +789,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
                                  "THEN !1 ELSE "
                                  "($1 LIKE $2 ESCAPE '\\') END",
+                     .collated_spelling = "bq_collation_like($3, $1, $2)",
                      .conditions = kString,
                      .errors = kLikeErrors,
                  },

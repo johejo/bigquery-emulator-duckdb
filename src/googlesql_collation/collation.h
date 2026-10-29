@@ -26,6 +26,8 @@ absl::StatusOr<std::string> SortKey(std::string_view value, std::string_view spe
 
 // Search and replacement use GoogleSQL's ICU implementations, not sort keys: their positions
 // and returned substrings refer to the original text.
+absl::StatusOr<bool> Like(std::string_view specification, std::string_view value,
+                          std::string_view pattern, bool bigquery);
 absl::StatusOr<bool> StartsWith(std::string_view specification, std::string_view value,
                                 std::string_view substring, bool bigquery);
 absl::StatusOr<bool> EndsWith(std::string_view specification, std::string_view value,
