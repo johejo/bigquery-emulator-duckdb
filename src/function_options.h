@@ -13,7 +13,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .signed_zero_strings = true,
       .unpadded_iso_year = true,
       .extended_array_limits = true,
-      .trunc_early_positive_zero = true,
+      .rounding_early_positive_zero = true,
       .json_strict_numbers = true,
       .json_preserve_negative_zero = true,
       .bigquery_collations = true,
