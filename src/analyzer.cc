@@ -601,8 +601,9 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     const std::string_view message = status.message();
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
-        std::array<std::string_view, 7>{
+        std::array<std::string_view, 8>{
             "Casting between arrays with incompatible element types",
+            "DISTINCT is not allowed for function ",
             "First argument (key type) in function KEYS.NEW_KEYSET",
             "Argument 2 to BIGQUERYGOOGLESQL:TF_IDF ",
             "Argument 3 to BIGQUERYGOOGLESQL:TF_IDF ",

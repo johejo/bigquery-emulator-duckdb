@@ -1,5 +1,6 @@
 # BigQuery's answers: DISTINCT with OVER, which GoogleSQL takes on every aggregate function that
-# takes DISTINCT, works on some of them only. The documentation shows COUNT and SUM:
+# takes DISTINCT, works on COUNT, SUM, AVG, MIN, MAX and ANY_VALUE only. The documentation shows
+# COUNT and SUM:
 # third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
 
 SELECT ARRAY(SELECT AVG(DISTINCT x) OVER () FROM UNNEST([1, 1, 2]) AS x)
@@ -8,8 +9,45 @@ SELECT ARRAY(SELECT AVG(DISTINCT x) OVER () FROM UNNEST([1, 1, 2]) AS x)
 SELECT ARRAY(SELECT MAX(DISTINCT x) OVER () FROM UNNEST([1, 2]) AS x)
 => [{"v":"2"},{"v":"2"}]
 
+SELECT ARRAY(SELECT MIN(DISTINCT x) OVER () FROM UNNEST([1, 2]) AS x)
+=> [{"v":"1"},{"v":"1"}]
+
+SELECT ARRAY(SELECT ANY_VALUE(DISTINCT x) OVER () FROM UNNEST([1, 1]) AS x)
+=> [{"v":"1"},{"v":"1"}]
+
 SELECT ARRAY(SELECT STRING_AGG(DISTINCT x) OVER () FROM UNNEST(['a', 'a']) AS x)
 => error: Analytic function string_agg does not support DISTINCT.
 
 SELECT ARRAY(SELECT LOGICAL_OR(DISTINCT x) OVER () FROM UNNEST([TRUE, FALSE]) AS x)
 => error: Analytic function logical_or does not support DISTINCT.
+
+SELECT ARRAY(SELECT LOGICAL_AND(DISTINCT x) OVER () FROM UNNEST([TRUE, FALSE]) AS x)
+=> error: Analytic function logical_and does not support DISTINCT.
+
+SELECT ARRAY(SELECT BIT_AND(DISTINCT x) OVER () FROM UNNEST([1, 3]) AS x)
+=> error: Analytic function bit_and does not support DISTINCT.
+
+SELECT ARRAY(SELECT BIT_OR(DISTINCT x) OVER () FROM UNNEST([1, 2]) AS x)
+=> error: Analytic function bit_or does not support DISTINCT.
+
+SELECT ARRAY(SELECT BIT_XOR(DISTINCT x) OVER () FROM UNNEST([1, 1, 2]) AS x)
+=> error: Analytic function bit_xor does not support DISTINCT.
+
+SELECT ARRAY(SELECT COUNTIF(DISTINCT x) OVER () FROM UNNEST([TRUE, TRUE]) AS x)
+=> error: Analytic function countif does not support DISTINCT.
+
+SELECT ARRAY(SELECT STDDEV_SAMP(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
+=> error: Analytic function stddev_samp does not support DISTINCT.
+
+SELECT ARRAY(SELECT STDDEV_POP(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
+=> error: Analytic function stddev_pop does not support DISTINCT.
+
+SELECT ARRAY(SELECT VAR_SAMP(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
+=> error: Analytic function var_samp does not support DISTINCT.
+
+SELECT ARRAY(SELECT VAR_POP(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
+=> error: Analytic function var_pop does not support DISTINCT.
+
+# CORR takes no DISTINCT at all.
+SELECT ARRAY(SELECT CORR(DISTINCT x, x) OVER () FROM UNNEST([1, 2]) AS x)
+=> error: DISTINCT is not allowed for function CORR at [1:21]

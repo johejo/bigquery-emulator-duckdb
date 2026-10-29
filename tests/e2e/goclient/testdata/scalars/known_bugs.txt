@@ -106,3 +106,11 @@ SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f00000000000000
 # BigQuery has no ARRAY_INCLUDES, which GoogleSQL has.
 SELECT ARRAY_INCLUDES([COLLATE('a', 'und:ci')], 'A')
 !> error: Function ARRAY_INCLUDES is not yet implemented.
+
+# BigQuery's answers: STDDEV and VARIANCE reject DISTINCT with OVER, naming the function as the query
+# spells it. GoogleSQL resolves them to STDDEV_SAMP and VAR_SAMP, and the emulator names those.
+SELECT ARRAY(SELECT STDDEV(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
+!> error: Analytic function stddev does not support DISTINCT.
+
+SELECT ARRAY(SELECT VARIANCE(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
+!> error: Analytic function variance does not support DISTINCT.

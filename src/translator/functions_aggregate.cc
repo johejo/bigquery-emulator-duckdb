@@ -628,22 +628,25 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       Define("COUNTIF",
              {
                  {.function = "count", .arguments = kCountIfArguments},
-             }),
-      Define("LOGICAL_AND", {{.function = "bool_and"}}),
+             },
+             {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("LOGICAL_AND", {{.function = "bool_and"}},
+             {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
       Define("LOGICAL_OR", {{.function = "bool_or"}},
              {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
-      Define("BIT_AND", {{.function = "bit_and"}}),
-      Define("BIT_OR", {{.function = "bit_or"}}),
-      Define("BIT_XOR", {{.function = "bit_xor"}}),
+      Define("BIT_AND", {{.function = "bit_and"}}, {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("BIT_OR", {{.function = "bit_or"}}, {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
+      Define("BIT_XOR", {{.function = "bit_xor"}}, {.uses = {TypeUse::kRejectsAnalyticDistinct}}),
 
       Define("STDDEV", kStddevSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
+      // GoogleSQL resolves STDDEV to STDDEV_SAMP, so calls of both find this definition.
       Define("STDDEV_SAMP", kStddevSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("STDDEV_POP",
@@ -652,17 +655,18 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "stddev_pop"},
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("VARIANCE", kVarSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
+      // GoogleSQL resolves VARIANCE to VAR_SAMP, so calls of both find this definition.
       Define("VAR_SAMP", kVarSamp,
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("VAR_POP",
@@ -671,7 +675,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "var_pop"},
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsAnalyticDistinct},
              }),
 
       Define("CORR",
