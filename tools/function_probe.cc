@@ -34,6 +34,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "nlohmann/json.hpp"
+#include "src/builtin_function_options.h"
 #include "src/catalog.h"
 #include "src/emulator_functions.h"
 #include "src/field_schema.h"
@@ -478,7 +479,8 @@ int Main(int argc, char** argv) {
 
   googlesql::TypeFactory type_factory;
   NoTables tables;
-  BigQueryCatalog catalog(tables, &type_factory, "test", "", TimestampPrecision::kMicroseconds);
+  BigQueryCatalog catalog(tables, &type_factory, "test", "", TimestampPrecision::kMicroseconds,
+                          nullptr, BigQueryExcludedFunctionIds(), FunctionDeclarations::kBigQuery);
   for (const auto& [name, docs] : functions) {
     const googlesql::Function* function = nullptr;
     // Aliases such as CEILING resolve to the function they stand for.

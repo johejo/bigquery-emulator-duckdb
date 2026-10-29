@@ -1477,6 +1477,7 @@ cc_binary(
     srcs = ["tools/function_probe.cc"],
     copts = ["-std=c++20"],
     deps = [
+        ":builtin_function_options",
         ":catalog",
         ":emulator_functions",
         ":field_schema",
@@ -1830,6 +1831,7 @@ cc_test(
     linkstatic = True,
     deps = [
         ":analyzer",
+        ":builtin_function_options",
         ":catalog",
         ":ddl_option_types",
         ":field_schema",
@@ -1949,6 +1951,7 @@ cc_test(
         ":analyzer",
         ":backend",
         ":backend_error",
+        ":builtin_function_options",
         ":catalog",
         ":default_dataset",
         ":emulator_functions",

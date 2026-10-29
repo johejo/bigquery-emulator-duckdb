@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 #include "src/analyzer.h"
+#include "src/builtin_function_options.h"
 #include "src/catalog.h"
 #include "src/ddl_option_types.h"
 #include "src/field_schema.h"
@@ -55,7 +56,8 @@ bool Applies(const json& context, const std::string& name) {
 std::string Problem(const json& catalog) {
   googlesql::TypeFactory factory;
   NoTables source;
-  BigQueryCatalog tables(source, &factory, "test", "d", TimestampPrecision::kMicroseconds);
+  BigQueryCatalog tables(source, &factory, "test", "d", TimestampPrecision::kMicroseconds, nullptr,
+                         BigQueryExcludedFunctionIds(), FunctionDeclarations::kBigQuery);
   const auto settings =
       ScriptAnalyzerOptions(TimestampPrecision::kMicroseconds, {
                                                                    .default_project = "test",

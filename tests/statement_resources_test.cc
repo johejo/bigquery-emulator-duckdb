@@ -16,6 +16,7 @@
 #include "src/analyzer.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/builtin_function_options.h"
 #include "src/catalog.h"
 #include "src/default_dataset.h"
 #include "src/emulator_functions.h"
@@ -66,7 +67,8 @@ std::string FileQuery(const std::string& path) {
 TranslatedStatement TranslateRead(const std::string& query, Preparation prepare) {
   FileSource source(std::move(prepare));
   googlesql::TypeFactory types;
-  BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds);
+  BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds, nullptr,
+                          BigQueryExcludedFunctionIds(), FunctionDeclarations::kBigQuery);
   const auto analyzed = AnalyzeGoogleSql(query, catalog, types, TimestampPrecision::kMicroseconds,
                                          {
                                              .default_project = "test",
@@ -185,7 +187,8 @@ TEST(StatementResourcesTest, ScalarExpressionKeepsItsOwnExecutionScope) {
       return FileQuery(path);
     });
     googlesql::TypeFactory types;
-    BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds);
+    BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds, nullptr,
+                            BigQueryExcludedFunctionIds(), FunctionDeclarations::kBigQuery);
     const auto analyzed = AnalyzeScriptExpression("(SELECT value FROM t)", nullptr, nullptr,
                                                   catalog, types, TimestampPrecision::kMicroseconds,
                                                   {
