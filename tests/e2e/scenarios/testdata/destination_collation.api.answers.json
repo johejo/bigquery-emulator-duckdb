@@ -1,0 +1,3762 @@
+{
+  "version": 1,
+  "cases": {
+    "copy_create_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "destination": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_create_no_defaults": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_create_source_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_create_source_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": ""
+        },
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_create_source_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "destination": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_replace_source_ci_existing_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_replace_source_ci_existing_none_dataset_none": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_replace_source_empty_existing_ci_dataset_none": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "copy_replace_source_none_existing_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": ""
+        },
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_create_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_create_no_defaults": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_create_source_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_create_source_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": ""
+        },
+        "destination": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_create_source_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_replace_source_ci_existing_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": "und:ci"
+        },
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_replace_source_ci_existing_none_dataset_none": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_replace_source_empty_existing_ci_dataset_none": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {},
+        "destination": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    },
+    "query_replace_source_none_existing_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "vznpv2dvzlrkv3nddc2mqd5x2y",
+      "steps": {
+        "add_column": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "dataset": {
+          "defaultCollation": ""
+        },
+        "destination": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "mode": "NULLABLE",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "setup": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "source": {
+          "schema": {
+            "fields": [
+              {
+                "name": "unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "unassigned",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "",
+                    "name": "binary",
+                    "type": "STRING"
+                  },
+                  {
+                    "collation": "und:ci",
+                    "name": "ci",
+                    "type": "STRING"
+                  }
+                ],
+                "name": "nested",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "repeated_unassigned",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "REPEATED",
+                "name": "repeated_binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "REPEATED",
+                "name": "repeated_ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "write": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "write_job": {}
+      }
+    }
+  }
+}

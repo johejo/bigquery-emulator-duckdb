@@ -143,8 +143,8 @@ void CheckCopySource(const CopyJob& copy, const TableReference& source,
 // The metadata of the table that a SNAPSHOT, RESTORE or CLONE `copy` of `source`, whose metadata
 // is `metadata`, creates: the source's without its expiration, with the source as the base table
 // of a snapshot or a clone, as BigQuery answers. A RESTORE that replaces a table, which `exists`,
-// keeps that table's metadata instead. Rejects WRITE_TRUNCATE for a SNAPSHOT with BigQuery's
-// message, and the dispositions whose outcome is not known.
+// keeps that table's metadata except for the source's assigned default collation. Rejects
+// WRITE_TRUNCATE for a SNAPSHOT with BigQuery's message, and dispositions whose outcome is unknown.
 TableMetadata CopiedMetadata(const CopyJob& copy, const TableReference& source,
                              TableMetadata metadata, bool exists) {
   const std::string what = "copy operationType " + std::string(OperationName(copy.operation));
@@ -161,7 +161,9 @@ TableMetadata CopiedMetadata(const CopyJob& copy, const TableReference& source,
                                 (exists ? " to an existing table" : ""));
   }
   if (exists) {
-    return {};
+    TableMetadata retained;
+    retained.default_collation = metadata.default_collation;
+    return retained;
   }
   metadata.expiration_time.reset();
   metadata.creation_time = 0;
@@ -358,8 +360,16 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     }
     if (existing.has_value() && !appends) {
       const auto info = GetTable(load.destination_table, /*include_row_count=*/false);
+      const auto dataset = GetDataset({
+          .project_id = load.destination_table.project_id,
+          .dataset_id = load.destination_table.dataset_id,
+      });
+      if (config.value("autodetect", false)) {
+        throw ApiError::Unsupported("load replacement with autodetect");
+      }
       auto inherited = written;
       ApplyDefaultRoundingMode(inherited, info.metadata.default_rounding_mode);
+      ApplyDefaultCollation(inherited, dataset.default_collation);
       // BigQuery keeps an unchanged schema, including its modes. A changed schema is replaced
       // as a whole with the load schema, without inheriting the retained table default.
       if (SameSchema(NormalizeLoadScales(inherited), NormalizeLoadScales(info.schema))) {
@@ -480,6 +490,11 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     // table's, while an appended table keeps its own and a copy of several tables takes none.
     const bool keyed = copy.source_tables.size() == 1 && !source_metadata.primary_key.empty();
     TableMetadata metadata;
+    // Unlike a single-source copy, several sources supply no table default, even if
+    // their defaults agree. A replaced or appended destination retains its own.
+    if (copy.source_tables.size() == 1) {
+      metadata.default_collation = source_metadata.default_collation;
+    }
     if (copy.operation != CopyOperation::kCopy || keyed) {
       bool exists = true;
       try {

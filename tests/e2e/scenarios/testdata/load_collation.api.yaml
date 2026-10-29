@@ -1,0 +1,214 @@
+# Expectations are from the accompanying BigQuery answer sidecar.
+version: 1
+# Follow-up to scenarios/testdata/destination_collation.api.yaml. Query destination
+# replacement and load replacement need not have the same inheritance rules.
+description: >-
+  WRITE_TRUNCATE load collation: separate a retained table default, the current
+  dataset default, an unchanged schema and a replacement schema. Use multipart
+  CSV uploads to avoid GCS prerequisites. Read metadata before and after the load,
+  verify the old row was replaced, and add a column to exercise the retained default.
+vars:
+  dataset: bqa_${run}_${case}
+  table_setup: ''
+  dataset_setup: ''
+  load_schema: '${mixed_schema}'
+  mixed_schema:
+    fields:
+      - {name: value, type: STRING}
+      - {name: binary, type: STRING, collation: ''}
+      - {name: ci, type: STRING, collation: 'und:ci'}
+  unassigned_schema:
+    fields:
+      - {name: value, type: STRING}
+      - {name: binary, type: STRING}
+      - {name: ci, type: STRING}
+  changed_schema:
+    fields:
+      - {name: value, type: STRING}
+      - {name: renamed, type: STRING}
+      - {name: ci, type: STRING, collation: ''}
+  changed_collation_schema:
+    fields:
+      - {name: value, type: STRING, collation: 'und:ci'}
+      - {name: binary, type: STRING, collation: 'und:ci'}
+      - {name: ci, type: STRING, collation: ''}
+  table_ci: ALTER TABLE `${project}.${dataset}.destination` SET DEFAULT COLLATE 'und:ci';
+  table_empty: ALTER TABLE `${project}.${dataset}.destination` SET DEFAULT COLLATE '';
+  dataset_ci: ALTER SCHEMA `${project}.${dataset}` SET DEFAULT COLLATE 'und:ci';
+  dataset_empty: ALTER SCHEMA `${project}.${dataset}` SET DEFAULT COLLATE '';
+  load_configuration:
+    load:
+      destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+      sourceFormat: CSV
+      writeDisposition: WRITE_TRUNCATE
+      schema: '${load_schema}'
+  recorded_schema_1: {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}, {"name": "added", "type": "STRING"}]}
+  recorded_schema_2: {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}]}
+  recorded_schema_3: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+  recorded_schema_4: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}]}
+  recorded_schema_5: {"fields": [{"name": "value", "type": "STRING"}, {"collation": "", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "name": "ci", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+  recorded_schema_6: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"name": "added", "type": "STRING"}]}
+  recorded_schema_7: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"mode": "NULLABLE", "name": "ci", "type": "STRING"}]}
+  recorded_schema_8: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+  recorded_schema_9: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "ci", "type": "STRING"}]}
+  recorded_schema_10: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"mode": "NULLABLE", "name": "renamed", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"name": "added", "type": "STRING"}]}
+  recorded_schema_11: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"mode": "NULLABLE", "name": "renamed", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}]}
+  recorded_schema_12: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "renamed", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+  recorded_schema_13: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "renamed", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}]}
+  recorded_schema_14: {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}, {"mode": "NULLABLE", "name": "renamed", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+  recorded_schema_15: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"name": "added", "type": "STRING"}]}
+  recorded_schema_16: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}]}
+  recorded_schema_17: {"fields": [{"collation": "und:ci", "mode": "NULLABLE", "name": "value", "type": "STRING"}, {"collation": "und:ci", "mode": "NULLABLE", "name": "binary", "type": "STRING"}, {"collation": "", "mode": "NULLABLE", "name": "ci", "type": "STRING"}, {"collation": "und:ci", "name": "added", "type": "STRING"}]}
+templates:
+  replace:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.destination`
+                (value STRING, binary STRING COLLATE '', ci STRING COLLATE 'und:ci');
+              INSERT `${project}.${dataset}.destination` VALUES ('old', 'a', 'a');
+              ${table_setup}
+              ${dataset_setup}
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors}
+      - name: before_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe: {defaultCollation: /body/defaultCollation, schema: /body/schema, numRows: /body/numRows}
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration: '${load_configuration}'
+          upload: |
+            new,A,A
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status, outputRows: /body/statistics/load/outputRows}
+      - name: after_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe: {defaultCollation: /body/defaultCollation, schema: /body/schema, numRows: /body/numRows}
+      - name: add_and_read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              ALTER TABLE `${project}.${dataset}.destination` ADD COLUMN added STRING;
+              SELECT * FROM `${project}.${dataset}.destination`;
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors, rows: /body/rows}
+      - name: after_add
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe: {defaultCollation: /body/defaultCollation, schema: /body/schema}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: unchanged_ci_dataset_empty
+    template: replace
+    vars: {table_setup: '${table_ci}', dataset_setup: '${dataset_empty}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "after_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: unchanged_empty_dataset_ci
+    template: replace
+    vars: {table_setup: '${table_empty}', dataset_setup: '${dataset_ci}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_4}"}, "before_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: unchanged_unassigned_dataset_ci
+    template: replace
+    vars: {dataset_setup: '${dataset_ci}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_3}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_4}"}, "before_load": {"numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: unchanged_ci_dataset_unassigned
+    template: replace
+    vars: {table_setup: '${table_ci}'}
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_5}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: unassigned_columns_ci_dataset_empty
+    template: replace
+    vars:
+      table_setup: '${table_ci}'
+      dataset_setup: '${dataset_empty}'
+      load_schema: '${unassigned_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_6}"}, "after_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_7}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: unassigned_columns_empty_dataset_ci
+    template: replace
+    vars:
+      table_setup: '${table_empty}'
+      dataset_setup: '${dataset_ci}'
+      load_schema: '${unassigned_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_8}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_9}"}, "before_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: changed_ci_dataset_empty
+    template: replace
+    vars:
+      table_setup: '${table_ci}'
+      dataset_setup: '${dataset_empty}'
+      load_schema: '${changed_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_10}"}, "after_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_11}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: changed_empty_dataset_ci
+    template: replace
+    vars:
+      table_setup: '${table_empty}'
+      dataset_setup: '${dataset_ci}'
+      load_schema: '${changed_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_12}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_13}"}, "before_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: changed_unassigned_dataset_ci
+    template: replace
+    vars:
+      dataset_setup: '${dataset_ci}'
+      load_schema: '${changed_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_12}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_13}"}, "before_load": {"numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: changed_ci_dataset_unassigned
+    template: replace
+    vars:
+      table_setup: '${table_ci}'
+      load_schema: '${changed_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_14}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_11}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: annotations_changed_ci_dataset_empty
+    template: replace
+    vars:
+      table_setup: '${table_ci}'
+      dataset_setup: '${dataset_empty}'
+      load_schema: '${changed_collation_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_15}"}, "after_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_16}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: annotations_changed_empty_dataset_ci
+    template: replace
+    vars:
+      table_setup: '${table_empty}'
+      dataset_setup: '${dataset_ci}'
+      load_schema: '${changed_collation_schema}'
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "und:ci", "schema": "${recorded_schema_17}"}, "after_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_16}"}, "before_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}
+  - name: omitted_schema_ci_dataset_empty
+    template: replace
+    vars:
+      table_setup: '${table_ci}'
+      dataset_setup: '${dataset_empty}'
+      load_configuration:
+        load:
+          destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+          sourceFormat: CSV
+          writeDisposition: WRITE_TRUNCATE
+    expect: {"add_and_read": {"jobComplete": true, "rows": [{"f": [{"v": "new"}, {"v": "A"}, {"v": "A"}, {"v": null}]}]}, "after_add": {"defaultCollation": "", "schema": "${recorded_schema_1}"}, "after_load": {"defaultCollation": "", "numRows": "1", "schema": "${recorded_schema_2}"}, "before_load": {"defaultCollation": "und:ci", "numRows": "1", "schema": "${recorded_schema_2}"}, "completed_load": {"outputRows": "1", "status": {"state": "DONE"}}, "fixture": {"jobComplete": true}}

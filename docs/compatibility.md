@@ -36,7 +36,7 @@ Loads and extracts also accept local paths. Their limits are:
   single-field group that DuckDB reads as its field, including a LIST without
   `parquetOptions.enableListInference`.
 - Query and load jobs cannot partition or cluster their destination table. Loads reject
-  `destinationTableProperties`.
+  `destinationTableProperties` and replacement of an existing table with `autodetect`.
 - Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns.
   BIGNUMERIC Parquet output uses `DECIMAL(76, 38)` with `BYTE_ARRAY` rather than
   `FIXED_LEN_BYTE_ARRAY`.
@@ -217,10 +217,7 @@ is listed in [sql.md](sql.md#collation) and [functions.md](functions.md). `und:c
 GoogleSQL's collator, ICU's root locale at secondary strength, whose Unicode data can order
 some strings differently from BigQuery's.
 
-Tables, views and query destination tables keep their columns' collations. Table and dataset
-default collations are supported through DDL and REST. Copy jobs involving a default collation,
-job replacement of a destination with a default collation, default collations on views, and
-materialized views with collated columns remain unsupported.
+Default collations on views and materialized views with collated columns remain unsupported.
 
 ### RANGE values
 

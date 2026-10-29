@@ -1,0 +1,1507 @@
+{
+  "version": 1,
+  "cases": {
+    "unchanged_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "unchanged_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "unchanged_unassigned_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "unchanged_ci_dataset_unassigned": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "unassigned_columns_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "unassigned_columns_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "changed_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "changed_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "changed_unassigned_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "changed_ci_dataset_unassigned": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "renamed",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "annotations_changed_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "annotations_changed_empty_dataset_ci": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "und:ci",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "mode": "NULLABLE",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "mode": "NULLABLE",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    },
+    "omitted_schema_ci_dataset_empty": {
+      "project": "johejo-sandbox",
+      "run": "zpqxq2h7kzo5ll2n72vk3yre2f",
+      "steps": {
+        "add_and_read": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": "A"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "after_add": {
+          "defaultCollation": "",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              },
+              {
+                "name": "added",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "after_load": {
+          "defaultCollation": "",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "before_load": {
+          "defaultCollation": "und:ci",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "value",
+                "type": "STRING"
+              },
+              {
+                "collation": "",
+                "name": "binary",
+                "type": "STRING"
+              },
+              {
+                "collation": "und:ci",
+                "name": "ci",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "completed_load": {
+          "outputRows": "1",
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "load": {
+          "status": {
+            "state": "RUNNING"
+          }
+        }
+      }
+    }
+  }
+}

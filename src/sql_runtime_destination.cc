@@ -171,10 +171,13 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
     }
     appended = Join(columns, ", ");
   }
-  // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known, besides the
-  // primary key a copy gives the table it truncates.
+  // Other than the primary key and default collation, whether BigQuery replaces an existing
+  // table's metadata or keeps it is not known.
   TableMetadata replaced = metadata;
   replaced.primary_key.clear();
+  if (copy) {
+    replaced.default_collation.reset();
+  }
   if (existing.has_value() && !replaced.empty()) {
     throw ApiError::Unsupported("setting the expiration of an existing destination table " +
                                 TableName(destination));
@@ -215,25 +218,36 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
     // documents for new tables. As BigQuery answers, a replaced table keeps its default rounding
     // mode, and a copy job's new table takes no default
     // rounding mode, neither the source's nor the dataset's.
-    if ((copy &&
-         (metadata.default_collation.has_value() || dataset.default_collation.has_value())) ||
-        (existing.has_value() && existing->metadata.default_collation.has_value())) {
-      throw ApiError::Unsupported("copying or replacing a destination with a default collation");
-    }
     TableDefinition definition{
         .table = destination,
         .schema = schema,
         .metadata = metadata,
+        // Apply job-specific collation inheritance below, not CREATE TABLE's inheritance.
+        .copies_table = true,
         .keeps_rounding_modes = existing.has_value() || copy,
     };
     DatasetMetadata defaults = existing.has_value() ? DatasetMetadata{} : dataset;
     if (existing.has_value() && restore) {
       definition.metadata = existing->metadata;
       definition.metadata.clone.reset();
+      if (metadata.default_collation.has_value()) {
+        definition.metadata.default_collation = metadata.default_collation;
+      }
     } else if (existing.has_value()) {
       definition.metadata.default_rounding_mode = existing->metadata.default_rounding_mode;
     } else if (copy) {
       defaults.default_rounding_mode = RoundingMode::kUnspecified;
+    }
+    // BigQuery observations: copies preserve column annotations and ignore dataset defaults.
+    // Query results instead take the dataset default on unassigned columns. On replacement,
+    // a missing new default retains the existing table default, without applying that retained
+    // default to the replacement columns.
+    if (!copy) {
+      definition.metadata.default_collation = dataset.default_collation;
+      ApplyDefaultCollation(definition.schema, dataset.default_collation);
+    }
+    if (!definition.metadata.default_collation.has_value() && existing.has_value()) {
+      definition.metadata.default_collation = existing->metadata.default_collation;
     }
     std::ranges::move(CreateTableWrite(definition, defaults).metadata_statements,
                       std::back_inserter(statements));
