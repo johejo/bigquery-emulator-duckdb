@@ -109,12 +109,12 @@ Source: [ARRAY_CONCAT_AGG](../../third_party/bigquery_docs/reference/standard-sq
 | `ARRAY<INTERVAL>` | `ARRAY<INTERVAL>` | Supported |  |
 | `ARRAY<GEOGRAPHY>` | `ARRAY<GEOGRAPHY>` | Supported |  |
 | `ARRAY<JSON>` | `ARRAY<JSON>` | Supported |  |
-| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
-| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
-| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
+| `ARRAY<RANGE<DATE>>` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `ARRAY<RANGE<DATETIME>>` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `ARRAY<RANGE<TIMESTAMP>>` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
 | `ARRAY<STRUCT<x INT64, label STRING>>` | `ARRAY<STRUCT<x INT64, label STRING>>` | Supported |  |
 | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | `ARRAY<STRUCT<n NUMERIC, nested STRUCT<flag BOOL>>>` | Supported |  |
-| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG with RANGE |
+| `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | `ARRAY<STRUCT<items ARRAY<BIGNUMERIC>, span RANGE<DATE>>>` | Supported |  |
 
 ## AVG
 
