@@ -316,6 +316,8 @@ void RegisterMathFunctions(duckdb_connection connection, const Options& options)
            CheckedInteger, /*nulls=*/false);
   RegisterWithContext(connection, "bq_trunc_digits", {kDouble, kBigint}, kDouble,
                       ApplyWithContext<TruncDigits>, options.trunc_early_positive_zero);
+  Register(connection, "bq_round_digits", {kDouble, kBigint}, kDouble,
+           Apply<fn::RoundDecimal<double>>);
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
            {"bq_sqrt", Apply<fn::Sqrt<double>>},

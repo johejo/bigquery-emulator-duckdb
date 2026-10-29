@@ -1,0 +1,57 @@
+# FLOAT64 ROUND with digits past DuckDB's INTEGER, past the value's precision, at decimal
+# boundaries, and where the result is zero. The emulator answers as GoogleSQL's reference
+# implementation does.
+
+SELECT ROUND(x, 3000000000) FROM UNNEST([1.5]) x
+?>
+
+SELECT ROUND(x, -3000000000) FROM UNNEST([1.5]) x
+?>
+
+SELECT ROUND(x, 9223372036854775807) FROM UNNEST([3.1415925]) x
+?>
+
+SELECT ROUND(x, -9223372036854775808) FROM UNNEST([3.1415925]) x
+?>
+
+SELECT ROUND(x, 40000) FROM UNNEST([1.0]) x
+?>
+
+SELECT ROUND(x, -40000) FROM UNNEST([1.0]) x
+?>
+
+SELECT ROUND(x, -309) FROM UNNEST([1.6e308]) x
+?>
+
+SELECT ROUND(x, 308) FROM UNNEST([1.6e308]) x
+?>
+
+SELECT ROUND(x, 324) FROM UNNEST([4.94065645841247e-324]) x
+?>
+
+SELECT ROUND(x, 323) FROM UNNEST([4.94065645841247e-324]) x
+?>
+
+SELECT ROUND(x, 3) FROM UNNEST([1.2345]) x
+?>
+
+SELECT ROUND(x, 6) FROM UNNEST([75.736617999999993]) x
+?>
+
+SELECT ROUND(x, 5) FROM UNNEST([0.01207]) x
+?>
+
+SELECT ROUND(x, 0) FROM UNNEST([-0.1]) x
+?>
+
+SELECT ROUND(x, -1) FROM UNNEST([-1.0]) x
+?>
+
+SELECT ROUND(x, -400) FROM UNNEST([-1.0]) x
+?>
+
+SELECT ROUND(x, 2) FROM UNNEST([CAST('inf' AS FLOAT64)]) x
+?>
+
+SELECT ROUND(x, -2) FROM UNNEST([CAST('nan' AS FLOAT64)]) x
+?>

@@ -1,0 +1,18 @@
+# Expected values: BigQuery's ROUND examples and overflow error:
+# third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+# SAFE. returns NULL for an evaluation error.
+
+SELECT ROUND(x, -1) FROM UNNEST([123.7]) x
+=> "120.0"
+
+SELECT ROUND(x, 2) FROM UNNEST([1.235]) x
+=> "1.24"
+
+SELECT ROUND(x, digits) FROM UNNEST([STRUCT(1.235 AS x, 2 AS digits)])
+=> "1.24"
+
+SELECT ROUND(x, -308) FROM UNNEST([1.6e308]) x
+=> error:
+
+SELECT SAFE.ROUND(x, -308) FROM UNNEST([1.6e308]) x
+=> null
