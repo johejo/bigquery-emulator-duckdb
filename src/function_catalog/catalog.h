@@ -28,7 +28,10 @@ struct ScalarCall {
   bool safe = false;
   // The project the query runs in, which connection IDs without one belong to.
   std::string_view project = {};
-  TimestampPrecision timestamp_precision;
+  // The precision of the TIMESTAMPs in `arguments`' SQL and in the SQL a handler returns:
+  // microseconds when Call adapts a nanosecond query to a microsecond overload, so it can
+  // differ from the catalog's timestamp_precision().
+  TimestampPrecision sql_timestamp_precision;
 
   // Access resolved arguments and types without including the AST definitions in handlers.
   [[nodiscard]] const googlesql::ResolvedExpr& Argument(std::size_t i) const;

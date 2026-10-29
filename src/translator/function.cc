@@ -77,7 +77,7 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
       .name = name,
       .safe = safe,
       .project = project,
-      .timestamp_precision = precision,
+      .sql_timestamp_precision = precision,
   };
   for (size_t i = 0; i < args.size(); ++i) {
     const googlesql::ResolvedExpr& argument = *resolved.argument_list(static_cast<int>(i));

@@ -216,7 +216,7 @@ void ValueFieldNames(const googlesql::Type* type, std::vector<std::string>& name
 // Pair each value with its original struct names, without evaluating the value twice. The
 // backend reconstructs the GoogleSQL type from these names and the physical value type.
 std::optional<std::string> ValueArgument(const ScalarCall& call, size_t i) {
-  const auto type = DuckDbType(call.ArgumentType(i), nullptr, call.timestamp_precision);
+  const auto type = DuckDbType(call.ArgumentType(i), nullptr, call.sql_timestamp_precision);
   if (!type) {
     return std::nullopt;
   }
@@ -388,7 +388,8 @@ std::optional<std::string> ConcatStrings(const ScalarCall& call) {
 std::optional<std::string> Format(const ScalarCall& call) {
   std::vector<std::string> arguments;
   for (std::size_t i = 0; i < call.arguments.size(); ++i) {
-    const auto duckdb_type = DuckDbType(call.ArgumentType(i), nullptr, call.timestamp_precision);
+    const auto duckdb_type =
+        DuckDbType(call.ArgumentType(i), nullptr, call.sql_timestamp_precision);
     if (!duckdb_type) {
       return std::nullopt;
     }
@@ -462,7 +463,7 @@ std::optional<std::string> TextAnalyze(const ScalarCall& call) {
 // qualifying one with the query's project from a URI, and the details. A NULL URI or ObjectRef
 // makes NULL. The JSON form is unsupported.
 std::optional<std::string> MakeRef(const ScalarCall& call) {
-  const auto type = DuckDbType(call.ResultType(), nullptr, call.timestamp_precision);
+  const auto type = DuckDbType(call.ResultType(), nullptr, call.sql_timestamp_precision);
   const std::vector<std::string> args = Sqls(call);
   if (!type || (args.size() != 4 && args.size() != 2)) {
     return std::nullopt;
@@ -487,7 +488,7 @@ std::optional<std::string> MakeRef(const ScalarCall& call) {
 std::optional<std::string> FetchMetadata(const ScalarCall& call) {
   const googlesql::Type* result = call.ResultType();
   const auto type = DuckDbType(result->IsArray() ? result->AsArray()->element_type() : result,
-                               nullptr, call.timestamp_precision);
+                               nullptr, call.sql_timestamp_precision);
   if (!type || call.arguments.size() != 1) {
     return std::nullopt;
   }
