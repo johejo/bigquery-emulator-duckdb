@@ -55,7 +55,6 @@
 #include "src/catalog.h"
 #include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
-#include "src/emulator_functions.h"
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
@@ -844,7 +843,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     std::string unsupported;
     const auto variables = SystemVariables(executor);
     const std::optional<TranslatedStatement> translation = TranslateStatement(
-        EmulatorFunctionCatalog(), analyzed.statement(), parameters,
+        host_.functions(), analyzed.statement(), parameters,
         DefaultDataset{
             .project = settings.default_project,
             .dataset = settings.default_dataset,
@@ -887,7 +886,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const auto variables = SystemVariables(executor);
     const auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
     const std::optional<std::string> query =
-        TranslateExpression(EmulatorFunctionCatalog(), analyzed.expression(), parameters,
+        TranslateExpression(host_.functions(), analyzed.expression(), parameters,
                             DefaultDataset{
                                 .project = settings.default_project,
                                 .dataset = settings.default_dataset,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <compare>
+
 namespace googlesql_collation {
 
 // Which of BigQuery's differences from GoogleSQL's collator the functions adapt. Defaults keep
@@ -13,6 +15,8 @@ struct Options {
   // third_party/bigquery_docs/reference/standard-sql/operators.md; GoogleSQL's compliance data
   // still uses the implementation that rejects it.
   bool like_unescaped_underscore = false;
+
+  std::strong_ordering operator<=>(const Options&) const = default;
 };
 
 }  // namespace googlesql_collation

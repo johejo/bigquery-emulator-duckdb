@@ -34,6 +34,12 @@
 #include "src/system_variables.h"
 #include "src/table_metadata.h"
 
+// Declared rather than included to keep the generated GoogleSQL protocol buffer headers it needs
+// out of this header, which most of the application includes.
+namespace bigquery_emulator_duckdb::function_catalog {
+class Catalog;
+}
+
 namespace bigquery_emulator_duckdb {
 
 class TableSource;
@@ -391,6 +397,8 @@ class Emulator {
   // lookups may expire other relations on the same thread.
   std::recursive_mutex expiration_mutex_;
   Backend backend_;
+  // The translator's functions, chosen by the same options as the backend's.
+  const function_catalog::Catalog& functions_;
   ExcludedFunctionIds excluded_function_ids_;
   FunctionDeclarations declarations_;
   bool has_session_user_;

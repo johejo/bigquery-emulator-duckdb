@@ -17,8 +17,8 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
-#include "src/emulator_functions.h"
 #include "src/field_schema.h"
+#include "src/function_catalog/catalog.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
 #include "src/translator.h"
@@ -32,12 +32,11 @@ namespace {
 // The DuckDB expression for `value`, a value of `field` in a streamed row. DuckDB's
 // casts round halfway values away from zero, so the values of ROUND_HALF_EVEN fields are read
 // unrounded and rounded to even, as BigQuery rounds the rows it streams.
-std::string RoundedInsertValue(const json& value, const FieldSchema& field,
-                               bool ignore_unknown_values) {
+std::string RoundedInsertValue(const function_catalog::Catalog& functions, const json& value,
+                               const FieldSchema& field, bool ignore_unknown_values) {
   const FieldSchema unrounded = WithoutRoundingParameters(field);
   const std::optional<std::string> rounded = TranslateAppendedValue(
-      EmulatorFunctionCatalog(), InsertValue(value, unrounded, ignore_unknown_values), unrounded,
-      field);
+      functions, InsertValue(value, unrounded, ignore_unknown_values), unrounded, field);
   if (!rounded.has_value()) {
     throw ApiError::Unsupported("streaming into ROUND_HALF_EVEN columns");
   }
@@ -103,8 +102,8 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
         columns.push_back(QuoteIdentifier(field.name));
         const auto value = row.find(field.name);
         try {
-          values.push_back(
-              RoundedInsertValue(value == row.end() ? json(nullptr) : *value, field, false));
+          values.push_back(RoundedInsertValue(
+              functions_, value == row.end() ? json(nullptr) : *value, field, false));
         } catch (const ApiError& error) {
           return {{.index = index, .message = error.what()}};
         }
@@ -163,8 +162,9 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
       for (const FieldSchema& field : schema) {
         columns.push_back(QuoteIdentifier(field.name));
         const auto it = values.find(field.name);
-        literals.push_back(
-            it == values.end() ? "DEFAULT" : RoundedInsertValue(*it, field, ignore_unknown_values));
+        literals.push_back(it == values.end()
+                               ? "DEFAULT"
+                               : RoundedInsertValue(functions_, *it, field, ignore_unknown_values));
       }
       std::string statement = "INSERT INTO ";
       statement += QualifiedName(table);

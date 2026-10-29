@@ -22,6 +22,7 @@
 #include "src/field_schema.h"
 #include "src/file_read.h"
 #include "src/file_read_options.h"
+#include "src/function_options.h"
 #include "src/references.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
@@ -69,7 +70,7 @@ TranslatedStatement TranslateRead(const std::string& query, Preparation prepare)
       AnalyzeGoogleSql(query, catalog, types, {.default_project = "test", .default_dataset = "d"});
   std::string unsupported;
   auto translation = TranslateStatement(
-      EmulatorFunctionCatalog(), analyzed.statement(), {},
+      EmulatorFunctionCatalog(BigQueryFunctionOptions()), analyzed.statement(), {},
       DefaultDataset{
           .project = "test",
           .dataset = "d",
@@ -187,7 +188,8 @@ TEST(StatementResourcesTest, ScalarExpressionKeepsItsOwnExecutionScope) {
     ASSERT_TRUE(analyzed.ok()) << analyzed.status();
     const auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
     std::string unsupported;
-    const auto query = TranslateExpression(EmulatorFunctionCatalog(), analyzed->expression(), {},
+    const auto query = TranslateExpression(EmulatorFunctionCatalog(BigQueryFunctionOptions()),
+                                           analyzed->expression(), {},
                                            DefaultDataset{
                                                .project = "test",
                                                .dataset = "d",

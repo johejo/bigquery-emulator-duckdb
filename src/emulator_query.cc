@@ -37,7 +37,6 @@
 #include "src/duckdb_sql.h"
 #include "src/duckdb_table_source.h"
 #include "src/emulator.h"
-#include "src/emulator_functions.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/location.h"
@@ -318,6 +317,9 @@ class Emulator::ScriptHostImpl : public ScriptHost {
   [[nodiscard]] FunctionDeclarations function_declarations() const override {
     return emulator_.declarations_;
   }
+  [[nodiscard]] const function_catalog::Catalog& functions() const override {
+    return emulator_.functions_;
+  }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
     return emulator_.NewTableSource(session, expire, &location_);
   }
@@ -446,7 +448,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
   std::optional<TranslatedStatement> translated = TranslateStatement(
-      EmulatorFunctionCatalog(), analyzed.statement(), parameters,
+      functions_, analyzed.statement(), parameters,
       DefaultDataset{
           .project = settings.default_project,
           .dataset = settings.default_dataset,
@@ -571,7 +573,7 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
     }
     std::string unsupported;
     const std::optional<std::string> query =
-        TranslateExpression(EmulatorFunctionCatalog(), analyzed->expression(), {},
+        TranslateExpression(functions_, analyzed->expression(), {},
                             DefaultDataset{
                                 .project = table.project_id,
                                 .dataset = {},

@@ -7,6 +7,7 @@
 
 #include "src/backend.h"
 #include "src/builtin_function_options.h"
+#include "src/function_catalog/catalog.h"
 #include "src/query_parameters.h"
 
 namespace googlesql {
@@ -32,6 +33,8 @@ class ScriptHost {
   [[nodiscard]] virtual bool has_session_user() const = 0;
   [[nodiscard]] virtual const ExcludedFunctionIds& excluded_function_ids() const = 0;
   [[nodiscard]] virtual FunctionDeclarations function_declarations() const = 0;
+  // The functions that statements translate to.
+  [[nodiscard]] virtual const function_catalog::Catalog& functions() const = 0;
   // A catalog source for the tables, views and datasets the emulator holds, as `session` sees
   // them.
   virtual std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) = 0;

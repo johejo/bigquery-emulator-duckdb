@@ -1,5 +1,7 @@
 #pragma once
 
+#include <compare>
+
 #include "src/googlesql_collation/options.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
@@ -26,6 +28,8 @@ struct Options {
   bool json_strict_numbers = false;
   bool json_preserve_negative_zero = false;
   googlesql_collation::Options collation;
+
+  std::strong_ordering operator<=>(const Options&) const = default;
 };
 
 }  // namespace bigquery_emulator_duckdb::functions_duckdb

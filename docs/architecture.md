@@ -97,10 +97,12 @@ the resolved AST definitions remain private to the implementation source. Its sh
 function handlers, keeping query translation independent of the builtin function definitions.
 
 [emulator_functions.cc](../src/emulator_functions.cc) assembles the application's catalog from
-[builtin definitions](../src/translator/functions.cc) and feature providers. The emulator and
-function probe use this same composition. [backend_functions.cc](../src/backend_functions.cc)
-registers the executable implementations with DuckDB at the same application layer. The translator
-and common catalog do not depend on the feature adapters' function-registration targets.
+[builtin definitions](../src/translator/functions.cc) and feature providers, one for each choice
+of the backend functions' options, so that BigQuery's and GoogleSQL's semantics can translate
+differently. The emulator and function probe use this same composition.
+[backend_functions.cc](../src/backend_functions.cc) registers the executable implementations with
+DuckDB at the same application layer. The translator and common catalog do not depend on the
+feature adapters' function-registration targets.
 
 Geography's DuckDB adapter declares backend registrations and the SQL functions that call them
 together. Both `RegisterGeographyFunctions` and the application's catalog composition consume
