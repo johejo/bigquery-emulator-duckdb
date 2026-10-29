@@ -81,6 +81,8 @@ struct FunctionEntry {
 class Catalog {
  public:
   void Add(std::string_view name, FunctionEntry entry);
+  // Composition omits service-dependent forms whose backend capability is absent.
+  void Remove(std::string_view name);
   void AddRules(std::string_view name, FunctionDefinition<Rule> definition,
                 Implementation fallback);
   void AddRules(std::string_view name, const StaticFunctionDefinition<StaticRule>& definition,

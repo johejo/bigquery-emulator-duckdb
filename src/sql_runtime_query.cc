@@ -36,7 +36,6 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_table_source.h"
-#include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/location.h"
@@ -45,7 +44,7 @@
 #include "src/result_value.h"
 #include "src/routine_catalog.h"
 #include "src/script.h"
-#include "src/service_table_provider.h"
+#include "src/sql_runtime.h"
 #include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
 #include "src/table_source.h"
@@ -305,9 +304,9 @@ std::string ProjectionSql(const Projection& projection, const std::string& value
 }  // namespace
 
 // Runs the statements of a script as parts of one job, in `location`.
-class Emulator::ScriptHostImpl : public ScriptHost {
+class SqlRuntime::ScriptHostImpl : public ScriptHost {
  public:
-  ScriptHostImpl(Emulator& emulator, JobLocation& location)
+  ScriptHostImpl(SqlRuntime& emulator, JobLocation& location)
       : emulator_(emulator), location_(location) {}
 
   Backend& backend() override { return emulator_.backend_; }
@@ -331,24 +330,24 @@ class Emulator::ScriptHostImpl : public ScriptHost {
   }
 
  private:
-  Emulator& emulator_;
+  SqlRuntime& emulator_;
   JobLocation& location_;
 };
 
-std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire,
-                                                      JobLocation* location) {
+std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool expire,
+                                                        JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
   return NewDuckDbTableSource(backend, project_ids_, location,
-                              NewServiceTableProvider(connections_, gcs_client_));
+                              external_tables_ ? external_tables_(backend_) : nullptr);
 }
 
-QueryResult Emulator::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }
+QueryResult SqlRuntime::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }
 
-QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
-                              bool null_arrays) {
+QueryResult SqlRuntime::Execute(const std::string& sql, const std::vector<std::string>& setup,
+                                bool null_arrays) {
   try {
     return backend_.Execute(sql, setup, null_arrays);
   } catch (const BackendError& error) {
@@ -356,7 +355,7 @@ QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::str
   }
 }
 
-QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
+QueryResult SqlRuntime::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
   try {
     return backend_.Prepare(sql, setup);
   } catch (const BackendError& error) {
@@ -364,7 +363,7 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
-std::shared_ptr<const StorageSnapshot> Emulator::ReadStorageTable(
+std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
     TableReference table, const std::vector<std::string>& selected_fields,
     const std::string& restriction) {
   table.project_id = ResolveProject(table.project_id);
@@ -427,11 +426,10 @@ std::shared_ptr<const StorageSnapshot> Emulator::ReadStorageTable(
   return snapshot;
 }
 
-TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
-                                        const std::string& default_project,
-                                        const std::string& default_dataset, JobLocation* location,
-                                        const googlesql::SystemVariableValuesMap* system_variables,
-                                        bool stores_result, bool dry_run) {
+TranslatedStatement SqlRuntime::Translate(
+    const std::string& query, const QueryParameters& parameters, const std::string& default_project,
+    const std::string& default_dataset, JobLocation* location,
+    const googlesql::SystemVariableValuesMap* system_variables, bool stores_result, bool dry_run) {
   AnalyzerSettings settings{
       .default_project = default_project,
       .default_dataset = default_dataset,
@@ -474,8 +472,8 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a query, then its defaults.
-void Emulator::InferLocation(const std::string& query, const std::string& default_project,
-                             const std::string& default_dataset, JobLocation& location) {
+void SqlRuntime::InferLocation(const std::string& query, const std::string& default_project,
+                               const std::string& default_dataset, JobLocation& location) {
   googlesql::TableNamesSet names;
   if (!googlesql::ExtractTableNamesFromScript(
            query, googlesql::AnalyzerOptions(GoogleSqlLanguageOptions()), &names)
@@ -539,8 +537,8 @@ void Emulator::InferLocation(const std::string& query, const std::string& defaul
   }
 }
 
-std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference& table,
-                                                           const std::vector<FieldSchema>& schema) {
+std::vector<std::string> SqlRuntime::ColumnDefaultStatements(
+    const TableReference& table, const std::vector<FieldSchema>& schema) {
   std::vector<std::string> statements;
   for (const FieldSchema& field : schema) {
     if (field.default_value_expression.empty()) {
@@ -594,116 +592,99 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
   return statements;
 }
 
-std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
+QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobLocation& location) {
   request.project_id = ResolveProject(request.project_id);
-  JobLocation location(RequestedLocation(request.location));
-  auto job = std::make_shared<Job>();
-  job->project_id = request.project_id;
-  job->job_id = request.job_id;
-  job->configuration = QueryJob{
-      .query = request.query,
-      .dry_run = request.dry_run,
-      .destination_table = request.destination_table,
-      .create_disposition = request.create_disposition,
-      .write_disposition = request.write_disposition,
-  };
-  return RunJob(std::move(job), location, [&](Job& job) {
-    if (request.destination_table) {
-      auto& project = request.destination_table->project_id;
-      project = ResolveProject(project.empty() ? request.project_id : project);
-    }
-    std::vector<std::string> setup;
-    AnalyzerSettings settings{.default_project = request.project_id};
-    if (request.default_dataset.has_value()) {
-      const std::string dataset_project = ResolveProject(request.default_dataset->project_id.empty()
-                                                             ? request.project_id
-                                                             : request.default_dataset->project_id);
-      setup.push_back("USE " + QualifiedName(DatasetReference{
-                                   .project_id = dataset_project,
-                                   .dataset_id = request.default_dataset->dataset_id,
-                               }));
-      settings.default_project = dataset_project;
-      settings.default_dataset = request.default_dataset->dataset_id;
-    } else {
-      setup.push_back("USE " + QuoteIdentifier(request.project_id));
-    }
+  if (request.destination_table) {
+    auto& project = request.destination_table->project_id;
+    project = ResolveProject(project.empty() ? request.project_id : project);
+  }
+  std::vector<std::string> setup;
+  AnalyzerSettings settings{.default_project = request.project_id};
+  if (request.default_dataset.has_value()) {
+    const std::string dataset_project = ResolveProject(request.default_dataset->project_id.empty()
+                                                           ? request.project_id
+                                                           : request.default_dataset->project_id);
+    setup.push_back("USE " + QualifiedName(DatasetReference{
+                                 .project_id = dataset_project,
+                                 .dataset_id = request.default_dataset->dataset_id,
+                             }));
+    settings.default_project = dataset_project;
+    settings.default_dataset = request.default_dataset->dataset_id;
+  } else {
+    setup.push_back("USE " + QuoteIdentifier(request.project_id));
+  }
 
-    std::get<QueryJob>(job.configuration).destination_table = request.destination_table;
-    InferLocation(request.query, settings.default_project, settings.default_dataset, location);
-    if (request.destination_table.has_value()) {
-      const DatasetReference dataset{
-          .project_id = request.destination_table->project_id,
-          .dataset_id = request.destination_table->dataset_id,
-      };
-      if (const std::optional<std::string> found = DatasetLocation(backend_, dataset)) {
-        location.Reference("Dataset " + dataset.project_id + ":" + dataset.dataset_id, *found);
-      }
-    }
-
-    if (const auto script = ParseScript(request.query)) {
-      std::get<QueryJob>(job.configuration).statement_type = ScriptStatementType(*script);
-      if (request.dry_run) {
-        throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
-      }
-      if (request.destination_table.has_value()) {
-        throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
-      }
-      ScriptHostImpl host(*this, location);
-      job.result =
-          RunScript(host, request.query, *script, request.parameters, settings.default_project,
-                    settings.default_dataset, setup, request.project_id, next_script_number_++);
-      return;
-    }
-    const googlesql::SystemVariableValuesMap variables{
-        {{"project_id"}, googlesql::Value::String(request.project_id)},
+  query.destination_table = request.destination_table;
+  InferLocation(request.query, settings.default_project, settings.default_dataset, location);
+  if (request.destination_table.has_value()) {
+    const DatasetReference dataset{
+        .project_id = request.destination_table->project_id,
+        .dataset_id = request.destination_table->dataset_id,
     };
-    const TranslatedStatement translation = Translate(
-        request.query, request.parameters, settings.default_project, settings.default_dataset,
-        &location, &variables, request.destination_table.has_value(), request.dry_run);
-    auto& query = std::get<QueryJob>(job.configuration);
-    query.statement_type = translation.statement_type;
-    query.ddl_target_table = translation.ddl_target_table;
-    query.ddl_target_dataset = translation.ddl_target_dataset;
-    query.ddl_target_routine = translation.ddl_target_routine;
-    if (!request.dry_run && !request.destination_table.has_value()) {
-      job.result = RunStatement(translation, setup, request.null_arrays, nullptr, &location);
-      return;
+    if (const std::optional<std::string> found = DatasetLocation(backend_, dataset)) {
+      location.Reference("Dataset " + dataset.project_id + ":" + dataset.dataset_id, *found);
     }
-    CheckDdlTarget(translation);
-    UseTargets(backend_, translation, location);
-    if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
-      throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
+  }
+
+  if (const auto script = ParseScript(request.query)) {
+    query.statement_type = ScriptStatementType(*script);
+    if (request.dry_run) {
+      throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
     }
-    QueryResult result;
-    if (!request.dry_run) {
-      // A destination table reports the mode of each field, as a query result does.
-      std::vector<FieldSchema> written = *translation.result_schema;
-      SetModesGiven(written);
-      result = WriteDestination(request.project_id, *request.destination_table,
-                                request.create_disposition, request.write_disposition,
-                                translation.sql, written, setup);
-      result.rows.KeepResources(translation.resources);
-    } else if (!AlterationStatements(translation).has_value()) {
-      // A dry run checks an alteration against the table or dataset without running it.
-      std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
-      if (translation.property_graph || translation.reads_property_graph) {
-        graph_lock.lock();
-      }
-      result = Prepare(translation.sql, setup);
+    if (request.destination_table.has_value()) {
+      throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
     }
-    if (translation.result_schema.has_value()) {
-      result.schema = ReconcileSchema(std::move(result.schema),
-                                      request.destination_table.has_value()
-                                          ? *translation.result_schema
-                                          : UniqueResultNames(*translation.result_schema));
+    ScriptHostImpl host(*this, location);
+    return RunScript(host, request.query, *script, request.parameters, settings.default_project,
+                     settings.default_dataset, setup, request.project_id, next_script_number_++);
+  }
+  const googlesql::SystemVariableValuesMap variables{
+      {{"project_id"}, googlesql::Value::String(request.project_id)},
+  };
+  const TranslatedStatement translation = Translate(
+      request.query, request.parameters, settings.default_project, settings.default_dataset,
+      &location, &variables, request.destination_table.has_value(), request.dry_run);
+  query.statement_type = translation.statement_type;
+  query.ddl_target_table = translation.ddl_target_table;
+  query.ddl_target_dataset = translation.ddl_target_dataset;
+  query.ddl_target_routine = translation.ddl_target_routine;
+  if (!request.dry_run && !request.destination_table.has_value()) {
+    return RunStatement(translation, setup, request.null_arrays, nullptr, &location);
+  }
+  CheckDdlTarget(translation);
+  UseTargets(backend_, translation, location);
+  if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
+    throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
+  }
+  QueryResult result;
+  if (!request.dry_run) {
+    // A destination table reports the mode of each field, as a query result does.
+    std::vector<FieldSchema> written = *translation.result_schema;
+    SetModesGiven(written);
+    result =
+        WriteDestination(request.project_id, *request.destination_table, request.create_disposition,
+                         request.write_disposition, translation.sql, written, setup);
+    result.rows.KeepResources(translation.resources);
+  } else if (!AlterationStatements(translation).has_value()) {
+    // A dry run checks an alteration against the table or dataset without running it.
+    std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
+    if (translation.property_graph || translation.reads_property_graph) {
+      graph_lock.lock();
     }
-    job.result = std::move(result);
-  });
+    result = Prepare(translation.sql, setup);
+  }
+  if (translation.result_schema.has_value()) {
+    result.schema = ReconcileSchema(std::move(result.schema),
+                                    request.destination_table.has_value()
+                                        ? *translation.result_schema
+                                        : UniqueResultNames(*translation.result_schema));
+  }
+  return result;
 }
 
-QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
-                                   const std::vector<std::string>& setup, bool null_arrays,
-                                   Backend* session, JobLocation* location) {
+QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
+                                     const std::vector<std::string>& setup, bool null_arrays,
+                                     Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
   std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_, std::defer_lock);
   if (translation.statement_type == "DROP_SCHEMA") {

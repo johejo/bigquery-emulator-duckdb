@@ -1,7 +1,34 @@
 # Architecture
 
-SQL follows the path `Server` → GoogleSQL analysis → translation → DuckDB execution.
-REST metadata operations and Storage RPCs share the same `Emulator` and catalog.
+SQL follows the path `Server` → `Emulator` → `SqlRuntime` → GoogleSQL analysis →
+translation → DuckDB execution. REST metadata operations and Storage RPCs use that same
+runtime and native catalog through the application facade.
+
+## SQL runtime and application ownership
+
+[`SqlRuntime`](../src/sql_runtime.h) owns the backend database, project registrations and
+aliases, function configuration, native catalog operations and the single query execution
+path in [sql_runtime_query.cc](../src/sql_runtime_query.cc). It also owns expiration, graph
+and per-table history locks and the script namespace counter. Scripts execute through a
+backend session of this runtime; analysis and statements see that session's transaction.
+Results and snapshots retain their statement resources independently of job bookkeeping.
+
+[`Emulator`](../src/emulator.h) is the application facade. Its runtime base supplies the
+native API methods without duplicating state. [emulator_jobs.cc](../src/emulator_jobs.cc)
+registers jobs, records errors, times and resolved locations, and orchestrates load, copy
+and extract. Native destination writes, including dispositions, metadata and history,
+live in [sql_runtime_destination.cc](../src/sql_runtime_destination.cc), not in the job
+registry. `SqlRuntime::ExecuteQuery` returns a result and updates statement metadata and
+location without registering a job or converting exceptions into a job failure.
+
+The facade owns GCS and the external connection registry and supplies table-provider
+factories, ObjectRef callbacks and connector initializers. A bare runtime installs no
+external services; its function catalog omits ObjectRef metadata fetch when no fetch
+callback is supplied. Service-independent ObjectRef operations remain available. Native
+catalog resolution still rejects external operations when their provider is absent.
+`just check` verifies that `//:sql_runtime` has no transitive dependency on the facade,
+load acquisition, extraction or the Cloud Storage SDK. Compliance still constructs the
+facade pending the driver migration in the [separation plan](sql-runtime-separation-plan.md).
 
 A query result keeps its rows as the DuckDB chunks of the statement's result, which a job keeps
 for `jobs.getQueryResults`. A row is encoded as BigQuery's JSON cells only when a response reads
@@ -174,7 +201,7 @@ to GoogleSQL's behavior. The adapters read
 give each function only its own flags, as context the registration owns
 (`RegisterWithContext` and `ApplyWithContext` in [duckdb_functions](../src/duckdb_functions/)).
 [`BigQueryFunctionOptions()`](../src/function_options.h) selects every difference, and is the
-default of `Backend`, `Emulator` and `RegisterBackendFunctions`.
+default of `Backend`, `SqlRuntime`, `Emulator` and `RegisterBackendFunctions`.
 
 ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapter receives
 connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
@@ -263,11 +290,13 @@ impose; the backend validates the argument range before propagating a NULL sketc
 
 [duckdb_catalog.cc](../src/duckdb_catalog.cc) reads metadata and removes expired relations using
 the supplied backend, including uncommitted script changes.
-[duckdb_table_source.cc](../src/duckdb_table_source.cc) adapts it to `TableSource`, tracks job
-locations and registers external connection macros. Neither depends on `Emulator` or the parser.
+[duckdb_table_source.cc](../src/duckdb_table_source.cc) adapts it to `TableSource` and tracks job
+locations; the application provider registers external connection macros. Neither native
+component depends on `Emulator` or the parser.
 
-Resource operations live in `emulator_datasets.cc`, `emulator_tables.cc` and `emulator_routines.cc`;
-`emulator_tabledata.cc` handles rows, and `emulator_ddl.cc` handles query DDL metadata.
+Resource operations live in `sql_runtime_datasets.cc`, `sql_runtime_tables.cc` and
+`sql_runtime_routines.cc`; `sql_runtime_tabledata.cc` handles rows, and `sql_runtime_ddl.cc`
+handles query DDL metadata.
 Mutations and their response reads share the expiration mutex; expiration drops recheck metadata
 within their transaction.
 

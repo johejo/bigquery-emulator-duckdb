@@ -18,10 +18,10 @@
 #include "src/catalog.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
-#include "src/emulator.h"
 #include "src/language_options.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/sql_runtime.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
 #include "src/translated_statement.h"
@@ -88,7 +88,7 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source,
 
 }  // namespace
 
-std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
+std::vector<Routine> SqlRuntime::ListRoutines(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   std::vector<Routine> routines;
@@ -107,7 +107,7 @@ std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
   return routines;
 }
 
-Routine Emulator::GetRoutine(RoutineReference routine) {
+Routine SqlRuntime::GetRoutine(RoutineReference routine) {
   routine.project_id = ResolveProject(routine.project_id);
   GetDataset(DatasetReference{.project_id = routine.project_id, .dataset_id = routine.dataset_id});
   const QueryResult result = Execute(RoutineQuery(routine));
@@ -121,7 +121,7 @@ Routine Emulator::GetRoutine(RoutineReference routine) {
   return *std::move(found);
 }
 
-Routine Emulator::WriteRoutine(Routine routine, bool update) {
+Routine SqlRuntime::WriteRoutine(Routine routine, bool update) {
   routine.reference.project_id = ResolveProject(routine.reference.project_id);
   const RoutineReference& reference = routine.reference;
   GetDataset({.project_id = reference.project_id, .dataset_id = reference.dataset_id});
@@ -161,7 +161,7 @@ Routine Emulator::WriteRoutine(Routine routine, bool update) {
   return routine;
 }
 
-void Emulator::DeleteRoutine(RoutineReference routine) {
+void SqlRuntime::DeleteRoutine(RoutineReference routine) {
   routine.project_id = ResolveProject(routine.project_id);
   GetRoutine(routine);
   Execute("DROP MACRO " + QualifiedName(routine));

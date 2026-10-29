@@ -12,7 +12,7 @@ if [[ $# -eq 0 ]]; then set -- //:compliance_test; fi
 
 # These existing targets represent application composition, acquisition and extraction.
 # Include the SDK itself so a new path bypassing :gcs is also caught.
-forbidden='set(//:emulator //:gcs //:file_read //:extract @google_cloud_cpp//:storage)'
+forbidden='set(//:emulator //:service_backend //:service_table_provider //:gcs //:file_read //:extract @google_cloud_cpp//:storage)'
 failed=0
 for root in "$@"; do
   # Resolve separately: a misspelled or missing root must never count as an empty path.

@@ -1,6 +1,7 @@
 # SQL runtime and external-service separation plan
 
-Status: steps 1–3 completed; shared runtime extraction (steps 4–6) remains proposed.
+Status: steps 1–4 implemented; compliance migration and final validation (steps 5–6)
+remain. Step 4 validation is recorded in the boundary inventory.
 See the [boundary inventory and dependency checks](sql-runtime-separation-boundaries.md)
 for dependency paths, responsibility allocation, client coverage and the recorded
 compliance baseline.
@@ -136,6 +137,17 @@ application facade until step 5.
 Completion: the runtime target has no dependency on GCS, load/extract orchestration
 or application composition. Server and shell delegate SQL to this shared target.
 Steps 3 and 4 may be split into smaller patches where existing ownership requires it.
+
+Implemented by `SqlRuntime` (`//:sql_runtime`): it owns the backend, native catalog,
+project registry, query configuration, locks and script counter. `Emulator` retains
+its public native APIs through the runtime base and wraps `ExecuteQuery` with REST
+job bookkeeping. Load/copy/extract orchestration stays in `emulator_jobs.cc` and uses
+the runtime's native catalog and destination-write operations. External table factories,
+ObjectRef callbacks and backend initializers are supplied only by the facade; runtime
+defaults install none. The function catalog omits metadata fetch when its backend
+callback is absent, while retaining service-independent ObjectRef operations.
+`just check` now enforces the runtime's transitive application/Storage isolation.
+Compliance still uses the facade until step 5.
 
 ## 5. Switch compliance to the shared runtime
 

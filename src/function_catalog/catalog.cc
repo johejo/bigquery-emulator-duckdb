@@ -52,6 +52,8 @@ std::string_view Describe(Implementation implementation) {
 
 }  // namespace
 
+void Catalog::Remove(std::string_view name) { functions_.erase(name); }
+
 std::string Describe(const FunctionEntry& entry) {
   std::string description;
   for (const Implementation implementation : entry.implementations) {

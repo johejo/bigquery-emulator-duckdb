@@ -96,10 +96,36 @@ outcomes match `sql-runtime-separation-baseline.tsv` exactly (153 pass, 6 known 
 14 unsupported). Full compliance and final runtime/compliance link isolation remain
 for the driver extraction steps.
 
+## Implemented shared runtime (step 4)
+
+`//:sql_runtime` now owns the backend, project registry/aliases, native catalog APIs,
+query analysis/translation/execution, scripts, destination writes and all SQL locks and
+counters. The `sql_runtime_*.cc` sources are the moved implementations, not a second
+executor. `Emulator` inherits the native APIs and wraps runtime execution with the one
+application job registry. Its `emulator_jobs.cc` retains load/copy/extract orchestration;
+the native write operation it calls is `SqlRuntime::WriteDestination`.
+
+Only the facade constructs GCS-backed ObjectRef callbacks, the external-table provider
+factory and connector initializers. Runtime defaults install none, and its assembled
+function catalog omits `OBJ.FETCH_METADATA` when the backend has no fetch callback.
+ObjectRef validation remains registered. Provider preparations keep their existing owned
+state and statement-resource lifetime. No fake service client is installed.
+
+`just sql-runtime-deps-check //:sql_runtime` passes, and `just check` now includes that
+assertion. `just sql-runtime-deps //:sql_runtime` also reports no paths to GCS, Storage
+or Spanner. The new runtime test covers concurrent script namespace/session isolation,
+consumption of results after runtime destruction and missing ObjectRef fetch capability.
+`just fmt` and `just check` pass, including C++ tests, end-to-end tests and generated-doc
+checks. The full `just compliance` run (32 shards) and `just compliance-summary` also pass
+with the facade using the extracted executor. Compliance still links `:emulator`; its
+driver switch, before/after comparison and actual link input inspection remain step 5. The allocation table below is the original inventory;
+its runtime/application ownership is now implemented, while driver migration is pending.
+
 ## Responsibility and mutable-state allocation
 
-“Runtime” below means the future shared SQL runtime; “application” means the
-production facade/services. Each existing state item gets one owner, not a copy in both.
+The table preserves pre-extraction names and source locations. “Runtime” means the
+shared SQL runtime; “application” means the production facade/services. Each state item
+gets one owner, not a copy in both.
 
 | Existing implementation/state | Intended owner and boundary |
 |---|---|
@@ -193,16 +219,17 @@ Do not duplicate these queries in C++ tests.
 ## Dependency assertions and activation
 
 `just sql-runtime-deps-check //:TARGET ...` fails if **any transitive path** from a
-root reaches `:emulator` (application facade), `:gcs`, `:file_read` (acquisition),
+root reaches `:emulator` (application facade), `:service_backend`,
+`:service_table_provider` (application composition), `:gcs`, `:file_read` (acquisition),
 `:extract`, or the Storage SDK. The roots default to `//:compliance_test`. Query
 errors also fail the command; they are not interpreted as absence of dependencies.
-It deliberately fails on today's compliance target. It is opt-in, not yet in `check`.
+It deliberately fails on today's compliance target. The compliance assertion remains
+opt-in; `just check` now runs the assertion for `//:sql_runtime`.
 
-Apply it to the future shared runtime target as soon as that target exists and is
-service-free, and to `//:compliance_test` after step 5. Keep `:backend`,
+The shared runtime assertion is active. Apply it also to `//:compliance_test` after step 5. Keep `:backend`,
 `:duckdb_table_source`, `:duckdb_catalog` and `:table_comments` as useful diagnostic
 roots while extracting; do not permanently assert the whole server is service-free.
-In step 6 put the runtime and compliance roots on the normal `just check` path.
+In step 6 add the compliance root alongside the runtime on the normal `just check` path.
 If load/extract orchestration gains new targets, add those specific targets to the
 forbidden set then. This is a narrow architecture check, not a frozen allowlist of
 all third-party libraries. Spanner remains separately reported, not silently counted

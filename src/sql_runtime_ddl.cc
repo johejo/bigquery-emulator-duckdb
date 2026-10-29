@@ -11,9 +11,9 @@
 #include "src/backend.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
-#include "src/emulator.h"
 #include "src/location.h"
 #include "src/references.h"
+#include "src/sql_runtime.h"
 #include "src/table_comments.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
@@ -23,7 +23,7 @@ namespace bigquery_emulator_duckdb {
 
 using nlohmann::json;
 
-void Emulator::CheckDdlTarget(const TranslatedStatement& translation) {
+void SqlRuntime::CheckDdlTarget(const TranslatedStatement& translation) {
   if (const auto& target = translation.ddl_target_table;
       target.has_value() && IsDuckDbSchema(target->dataset_id)) {
     throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" + target->dataset_id);
@@ -38,7 +38,7 @@ void Emulator::CheckDdlTarget(const TranslatedStatement& translation) {
   }
 }
 
-void Emulator::CheckRelationTarget(Backend& backend, const TranslatedStatement& translation) {
+void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement& translation) {
   const std::optional<TableReference>& target = translation.ddl_target_table;
   if (!target.has_value()) {
     return;
@@ -112,7 +112,7 @@ void Emulator::CheckRelationTarget(Backend& backend, const TranslatedStatement& 
 
 // Throws DuckDB's `error` about the macro that records the routine a CREATE or DROP FUNCTION
 // names in BigQuery's words, if it says that the routine exists or that it does not.
-std::optional<std::vector<std::string>> Emulator::AlterationStatements(
+std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     const TranslatedStatement& translation) {
   if (const auto& alteration = translation.altered_table) {
     const TableReference& table = alteration->table;
@@ -171,8 +171,8 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
   return std::nullopt;
 }
 
-DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
-                                           const TranslatedStatement& translation) {
+DatasetMetadata SqlRuntime::CreatedInDataset(Backend& backend,
+                                             const TranslatedStatement& translation) {
   std::optional<TableReference> table;
   if (translation.table.has_value() && !translation.table->temporary) {
     table = translation.table->table;
@@ -188,13 +188,13 @@ DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
                              : ParseDatasetMetadata(result.rows.OptionalString(0, 1));
 }
 
-std::optional<std::string> Emulator::DatasetLocation(Backend& backend,
-                                                     const DatasetReference& dataset) {
+std::optional<std::string> SqlRuntime::DatasetLocation(Backend& backend,
+                                                       const DatasetReference& dataset) {
   return LocationOf(backend, dataset);
 }
 
-void Emulator::UseTargets(Backend& backend, const TranslatedStatement& translation,
-                          JobLocation& location) {
+void SqlRuntime::UseTargets(Backend& backend, const TranslatedStatement& translation,
+                            JobLocation& location) {
   const auto use = [&](const DatasetReference& dataset) {
     if (const std::optional<std::string> found = DatasetLocation(backend, dataset)) {
       location.Reference("Dataset " + dataset.project_id + ":" + dataset.dataset_id, *found);

@@ -81,7 +81,7 @@ compliance *args:
 sql-runtime-deps *targets:
     bash tools/sql-runtime-deps.sh report {{ targets }}
 
-# Opt-in until runtime extraction finishes. Pass the core target and compliance target then.
+# Compliance remains opt-in until its driver switches to the shared runtime.
 sql-runtime-deps-check *targets:
     bash tools/sql-runtime-deps.sh check {{ targets }}
 
@@ -108,7 +108,11 @@ bigquery-answers-validate path=(justfile_directory() + "/tests/e2e/goclient/test
 run *args:
     bazelisk run //:bigquery-emulator-duckdb -- "$@"
 
-check: lint test e2e docs-check
+# Protect the extracted runtime now; add compliance after its driver switches.
+sql-runtime-core-deps-check:
+    just sql-runtime-deps-check //:sql_runtime
+
+check: sql-runtime-core-deps-check lint test e2e docs-check
 
 # Snapshot new citations and localize references. Uses ADC, or DEVELOPERKNOWLEDGE_API_KEY when set.
 bigquery-docs-sync:
