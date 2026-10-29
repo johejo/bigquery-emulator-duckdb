@@ -8,6 +8,7 @@
 #include "src/location.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb {
@@ -56,7 +57,7 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 // rejects.
 std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                               std::vector<FieldSchema>& schema,
-                                              TableMetadata metadata);
+                                              TableMetadata metadata, TimestampPrecision precision);
 
 // The statements that apply `alteration` to its dataset, whose metadata is `metadata` when it
 // runs. Throws ApiError::Invalid for labels BigQuery rejects.

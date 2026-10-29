@@ -11,6 +11,7 @@
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
 #include "src/system_variables.h"
+#include "src/timestamp_precision.h"
 
 namespace googlesql {
 class AnalyzerOptions;
@@ -82,30 +83,34 @@ std::optional<std::vector<FieldSchema>> ResultSchema(const googlesql::ResolvedSt
 std::vector<std::string> ResultColumnNames(const googlesql::ResolvedQueryStmt& query);
 
 // Parses `sql` as a single GoogleSQL statement and resolves its names and types against
-// `catalog`. Throws std::runtime_error with a caret-annotated message when the statement does
-// not parse or analyze. Array-cast errors use BigQuery's message and location format.
+// `catalog`, with TIMESTAMPs of `precision`. Throws std::runtime_error with a caret-annotated
+// message when the statement does not parse or analyze. Array-cast errors use BigQuery's message
+// and location format.
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
-                                googlesql::TypeFactory& type_factory,
-                                const AnalyzerSettings& settings = {});
+                                googlesql::TypeFactory& type_factory, TimestampPrecision precision,
+                                const AnalyzerSettings& settings);
 
 // BigQuery's error for a view or function definition that refers to a system variable, which
 // names only a temporary function.
 absl::Status CheckDefinition(const googlesql::ASTNode& statement);
 
 // The options the statements of a script are analyzed with, from which its executor takes the
-// language, the query parameters and how errors are reported.
-absl::StatusOr<googlesql::AnalyzerOptions> ScriptAnalyzerOptions(const AnalyzerSettings& settings);
+// language, with TIMESTAMPs of `precision`, the query parameters and how errors are reported.
+absl::StatusOr<googlesql::AnalyzerOptions> ScriptAnalyzerOptions(TimestampPrecision precision,
+                                                                 const AnalyzerSettings& settings);
 
 // Analyzes the type name `segment` of a script's DECLARE.
 absl::StatusOr<googlesql::TypeWithParameters> AnalyzeScriptType(
     const googlesql::ScriptSegment& segment, googlesql::Catalog& catalog,
-    googlesql::TypeFactory& type_factory, const AnalyzerSettings& settings);
+    googlesql::TypeFactory& type_factory, TimestampPrecision precision,
+    const AnalyzerSettings& settings);
 
 // Analyzes the statement `segment` of a script. A failure is returned rather than thrown, with
 // its location in the whole script as a payload, which the script's executor reports.
 absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSegment& segment,
                                                       googlesql::Catalog& catalog,
                                                       googlesql::TypeFactory& type_factory,
+                                                      TimestampPrecision precision,
                                                       const AnalyzerSettings& settings);
 
 // Analyzes the expression `sql` of a script, coerced to `target_type` as an assignment would be,
@@ -116,6 +121,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
                                                        const googlesql::Type* target_type,
                                                        googlesql::Catalog& catalog,
                                                        googlesql::TypeFactory& type_factory,
+                                                       TimestampPrecision precision,
                                                        const AnalyzerSettings& settings);
 
 }  // namespace bigquery_emulator_duckdb

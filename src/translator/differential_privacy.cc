@@ -83,8 +83,8 @@ std::optional<std::pair<std::string, std::string>> Bounds(
   if (value.field(0).is_null() || value.field(1).is_null()) {
     return Unsupported(scope, "contribution bounds with NULL");
   }
-  const auto lower = Literal(value.field(0));
-  const auto upper = Literal(value.field(1));
+  const auto lower = Literal(value.field(0), scope.context.timestamp_precision);
+  const auto upper = Literal(value.field(1), scope.context.timestamp_precision);
   if (!lower || !upper) {
     return std::nullopt;
   }
@@ -116,7 +116,8 @@ std::optional<Relation> Contributions(const googlesql::ResolvedScan& input, cons
     }
     partition.push_back(*sql);
   }
-  const auto size = Literal(sample.size()->GetAs<googlesql::ResolvedLiteral>()->value());
+  const auto size = Literal(sample.size()->GetAs<googlesql::ResolvedLiteral>()->value(),
+                            scope.context.timestamp_precision);
   if (!size) {
     return std::nullopt;
   }
@@ -229,8 +230,9 @@ std::optional<Relation> DifferentialPrivacyAggregateScan(
     Check(epsilon.status());
     const auto bounds = Bounds(call, scope);
     const auto value = Expression(*call.argument_list(0), scope, input->columns);
-    const auto type = DuckDbType(call.type());
-    const auto epsilon_sql = Literal(googlesql::Value::Double(*epsilon));
+    const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
+    const auto epsilon_sql =
+        Literal(googlesql::Value::Double(*epsilon), scope.context.timestamp_precision);
     if (!bounds || !value || !type || !epsilon_sql) {
       return std::nullopt;
     }

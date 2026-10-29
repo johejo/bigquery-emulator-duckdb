@@ -81,7 +81,11 @@ bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' -e 'SE
 For comparing results with GoogleSQL's reference implementation (`just reference`),
 `shell --semantics=googlesql` drops every BigQuery difference the emulator selects: queries can
 call exactly GoogleSQL's built-in functions, which behave as GoogleSQL's do, and geography bounds
-are not expanded outward by one floating-point step. The default, `bigquery`, matches BigQuery.
+are not expanded outward by one floating-point step. TIMESTAMP values retain nanoseconds across
+0001–9999, including in arrays, structs and comparisons; shell output shows them as timestamp text.
+Operations still using the microsecond backend reject inputs that would lose precision, and
+`RANGE<TIMESTAMP>` bounds remain limited to microseconds. The default, `bigquery`, keeps BigQuery's
+microsecond TIMESTAMP representation.
 
 ```sh
 bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' \
@@ -91,6 +95,8 @@ bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' \
 For debugging the emulator itself, `shell --duckdb` runs the input as DuckDB SQL on the
 emulator's database instead of as query jobs. Each project is a catalog, and
 `bq_geography_text` shows the S2 vertices of a stored GEOGRAPHY, which DuckDB keeps as a BLOB.
+`bq_timestamp_nanos_text(t)` shows a nanosecond TIMESTAMP created in GoogleSQL mode. Use the same
+semantics mode when creating and querying stored tables; their timestamp representations differ.
 
 ```sh
 bazel-bin/bigquery-emulator-duckdb shell --data-dir DIR --duckdb \

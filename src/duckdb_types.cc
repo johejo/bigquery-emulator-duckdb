@@ -10,6 +10,7 @@
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -19,6 +20,9 @@ namespace {
 FieldType ToBigQueryType(duckdb_logical_type type) {
   if (IsRange(type)) {
     return FieldType::kRange;
+  }
+  if (IsTimestampNanos(type)) {
+    return FieldType::kTimestamp;
   }
   switch (duckdb_get_type_id(type)) {
     case DUCKDB_TYPE_BOOLEAN:
@@ -77,6 +81,9 @@ FieldType ToBigQueryType(duckdb_logical_type type) {
 
 std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_logical_type type,
                                               int depth) {
+  if (IsTimestampNanos(type)) {
+    return std::nullopt;
+  }
   switch (duckdb_get_type_id(type)) {
     case DUCKDB_TYPE_UBIGINT:
     case DUCKDB_TYPE_HUGEINT:
@@ -120,6 +127,14 @@ std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_log
 }
 
 }  // namespace
+
+bool IsTimestampNanos(duckdb_logical_type type) {
+  if (duckdb_get_type_id(type) != DUCKDB_TYPE_HUGEINT) {
+    return false;
+  }
+  const DuckString alias(duckdb_logical_type_get_alias(type));
+  return alias != nullptr && std::string_view(alias.get()) == kTimestampNanosType;
+}
 
 bool IsRange(duckdb_logical_type type) {
   if (duckdb_get_type_id(type) != DUCKDB_TYPE_STRUCT || duckdb_struct_type_child_count(type) != 2) {
@@ -179,6 +194,32 @@ std::string UnsupportedDuckDbType(duckdb_logical_type type) {
       return "";
     default:
       return "";
+  }
+}
+
+bool HasOtherTimestampPrecision(duckdb_logical_type type, TimestampPrecision precision) {
+  if (IsTimestampNanos(type)) {
+    return precision != TimestampPrecision::kNanoseconds;
+  }
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
+      return precision != TimestampPrecision::kMicroseconds;
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY:
+      return HasOtherTimestampPrecision(ElementType(type).get(), precision);
+    case DUCKDB_TYPE_STRUCT:
+      if (IsRange(type)) {
+        return false;
+      }
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType const child(duckdb_struct_type_child_type(type, i));
+        if (HasOtherTimestampPrecision(child.get(), precision)) {
+          return true;
+        }
+      }
+      return false;
+    default:
+      return false;
   }
 }
 

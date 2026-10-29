@@ -18,6 +18,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/comparison.h"
+#include "src/timestamp_precision.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/function.h"
@@ -88,6 +89,20 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
   return std::nullopt;
 }
 
+std::optional<std::string> CastValue(const googlesql::Type* from, const googlesql::Type* to,
+                                     const std::string& sql, bool safe, Context& context);
+
+// A cast to or from a RANGE's bound, which holds a microsecond TIMESTAMP at either precision;
+// see MapToDuckDb.
+std::optional<std::string> CastBound(const googlesql::Type* from, const googlesql::Type* to,
+                                     const std::string& sql, bool safe, Context& context) {
+  const TimestampPrecision precision =
+      std::exchange(context.timestamp_precision, TimestampPrecision::kMicroseconds);
+  auto cast = CastValue(from, to, sql, safe, context);
+  context.timestamp_precision = precision;
+  return cast;
+}
+
 // A cast of `sql` from `from` to `to`. A BIGNUMERIC is cast by GoogleSQL's conversions, which make
 // their errors NULL under SAFE_CAST, where DuckDB would cast a BIGNUM through DOUBLE or truncate a
 // string. Implicit array coercions convert elements; explicit casts between different array
@@ -99,6 +114,35 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
                                      const std::string& sql, bool safe, Context& context) {
   if (from->Equals(to)) {
     return sql;
+  }
+  if (context.timestamp_precision == TimestampPrecision::kNanoseconds &&
+      (from->IsTimestamp() || to->IsTimestamp())) {
+    std::optional<std::string> result;
+    if (from->IsString() && to->IsTimestamp()) {
+      result = "bq_timestamp_nanos_from_string(" + sql + ")";
+    } else if (from->IsTimestamp() && to->IsString()) {
+      result = "bq_timestamp_nanos_text(CAST(" + sql + " AS bq_timestamp_nanos))";
+    } else if (from->IsTimestamp()) {
+      const std::string micros =
+          "bq_timestamp_nanos_to_micros(CAST(" + sql + " AS bq_timestamp_nanos))";
+      result = ConvertedCast(from, to, micros, safe);
+      if (!result) {
+        const auto type = DuckDbType(to, context.timestamp_precision);
+        if (type) {
+          result = "CAST(" + micros + " AS " + *type + ")";
+        }
+      }
+    } else if (to->IsTimestamp()) {
+      auto micros = ConvertedCast(from, to, sql, safe);
+      if (!micros) {
+        micros = "CAST(" + sql + " AS TIMESTAMPTZ)";
+      }
+      result = "bq_timestamp_nanos_from_micros(" + *micros + ")";
+    }
+    if (safe && result) {
+      *result = "TRY(" + *result + ")";
+    }
+    return result;
   }
   if (from->IsArray() && to->IsArray()) {
     const std::string element = context.FreshName("_e");
@@ -162,7 +206,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     std::vector<std::string> bounds;
     for (const std::string_view name : {kRangeStart, kRangeEnd}) {
       const std::string bound = "struct_extract(" + range + ", " + QuoteLiteral(name) + ")";
-      const auto text = CastValue(from->AsRange()->element_type(), to, bound, safe, context);
+      const auto text = CastBound(from->AsRange()->element_type(), to, bound, safe, context);
       if (!text) {
         return std::nullopt;
       }
@@ -182,7 +226,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     std::vector<std::string> failures;
     for (const int index : {1, 2}) {
       const std::string bound_text = texts + "[" + std::to_string(index) + "]";
-      const auto bound = CastValue(from, to->AsRange()->element_type(), bound_text, safe, context);
+      const auto bound = CastBound(from, to->AsRange()->element_type(), bound_text, safe, context);
       if (!bound) {
         return std::nullopt;
       }
@@ -217,7 +261,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     if (const auto converted = ConvertedCast(from, to, sql, safe)) {
       return converted;
     }
-    const auto type = DuckDbType(to);
+    const auto type = DuckDbType(to, context.timestamp_precision);
     return type ? std::optional<std::string>(std::string(safe ? "TRY_CAST(" : "CAST(") + sql +
                                              " AS " + *type + ")")
                 : std::nullopt;
@@ -246,6 +290,10 @@ std::optional<std::string> FormatCast(const googlesql::ResolvedCast& cast,
                                       const Columns& columns) {
   const googlesql::Type* from = cast.expr()->type();
   const googlesql::Type* to = cast.type();
+  if (scope.context.timestamp_precision == TimestampPrecision::kNanoseconds &&
+      (HasTimestamp(from) || HasTimestamp(to))) {
+    return Unsupported(scope, "formatted casts with nanosecond TIMESTAMP");
+  }
   const auto format = Expression(*cast.format(), scope, columns);
   if (!format) {
     return std::nullopt;
@@ -372,12 +420,13 @@ Scope Nested(const Scope& scope, const Columns& columns) {
 
 std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const Scope& scope,
                                       const Columns& columns) {
-  const auto type = DuckDbType(expr.type());
+  const auto type = DuckDbType(expr.type(), scope.context.timestamp_precision);
   if (!type || !OnlyCollations(expr.type_annotation_map())) {
     return Unsupported(scope, "type " + expr.type()->DebugString());
   }
   if (expr.Is<googlesql::ResolvedLiteral>()) {
-    auto literal = Literal(expr.GetAs<googlesql::ResolvedLiteral>()->value());
+    auto literal = Literal(expr.GetAs<googlesql::ResolvedLiteral>()->value(),
+                           scope.context.timestamp_precision);
     if (!literal) {
       return Unsupported(scope, "literal of type " + expr.type()->DebugString());
     }
@@ -480,7 +529,8 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   if (expr.Is<googlesql::ResolvedConstant>()) {
     const absl::StatusOr<googlesql::Value> value =
         expr.GetAs<googlesql::ResolvedConstant>()->constant()->GetValue();
-    const auto literal = value.ok() ? Literal(*value) : std::nullopt;
+    const auto literal =
+        value.ok() ? Literal(*value, scope.context.timestamp_precision) : std::nullopt;
     return literal ? literal : Unsupported(scope, "constant of type " + expr.type()->DebugString());
   }
   if (expr.Is<googlesql::ResolvedSystemVariable>()) {
@@ -489,7 +539,7 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     if (variables == nullptr || !variables->contains(path)) {
       return Unsupported(scope, "system variable @@" + Join(path, "."));
     }
-    const auto literal = Literal(variables->at(path));
+    const auto literal = Literal(variables->at(path), scope.context.timestamp_precision);
     return literal ? literal
                    : Unsupported(scope, "system variable of type " + expr.type()->DebugString());
   }

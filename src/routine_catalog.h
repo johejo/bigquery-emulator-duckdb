@@ -13,6 +13,7 @@
 #include "src/catalog.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/timestamp_precision.h"
 
 namespace googlesql {
 class Function;
@@ -36,7 +37,7 @@ class RoutineCatalog : public BigQueryCatalog {
   // `source`, `type_factory` and `temporary` must outlive the catalog, as for BigQueryCatalog.
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                  std::string default_project, std::string default_dataset,
-                 const TemporaryTables* temporary = nullptr,
+                 TimestampPrecision timestamp_precision, const TemporaryTables* temporary = nullptr,
                  const ExcludedFunctionIds& excluded_function_ids = BigQueryExcludedFunctionIds(),
                  FunctionDeclarations declarations = FunctionDeclarations::kBigQuery);
   ~RoutineCatalog() override;
@@ -68,7 +69,8 @@ class RoutineCatalog : public BigQueryCatalog {
   struct State;
 
   RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
-                 std::string default_project, std::string default_dataset, State& state,
+                 std::string default_project, std::string default_dataset,
+                 TimestampPrecision timestamp_precision, State& state,
                  const ExcludedFunctionIds& excluded_function_ids,
                  FunctionDeclarations declarations);
 

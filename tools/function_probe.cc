@@ -41,6 +41,7 @@
 #include "src/function_options.h"
 #include "src/language_options.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -477,7 +478,7 @@ int Main(int argc, char** argv) {
 
   googlesql::TypeFactory type_factory;
   NoTables tables;
-  BigQueryCatalog catalog(tables, &type_factory, "test", "");
+  BigQueryCatalog catalog(tables, &type_factory, "test", "", TimestampPrecision::kMicroseconds);
   for (const auto& [name, docs] : functions) {
     const googlesql::Function* function = nullptr;
     // Aliases such as CEILING resolve to the function they stand for.

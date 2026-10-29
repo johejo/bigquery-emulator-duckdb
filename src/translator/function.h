@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "src/timestamp_precision.h"
 #include "src/translator/context.h"
 
 namespace googlesql {
@@ -32,7 +33,7 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call);
 // Until then, an ARRAY may hold NULL, and a GEOGRAPHY, also in tables, keeps the form queries hold
 // it in (see src/googlesql_geography_duckdb/codec.h).
 std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, bool stored = false);
+                        std::string_view column, bool stored, TimestampPrecision precision);
 
 // `value`, the SQL of a value of `type` that a statement writes to the column `field`. DuckDB's
 // cast to a parameterized NUMERIC or BIGNUMERIC rounds halfway values away from zero, so the value

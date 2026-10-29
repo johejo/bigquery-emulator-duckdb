@@ -25,6 +25,7 @@
 #include "src/schema_sql.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb {
@@ -255,7 +256,8 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
 
 std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                               std::vector<FieldSchema>& schema,
-                                              TableMetadata metadata) {
+                                              TableMetadata metadata,
+                                              TimestampPrecision precision) {
   TableReference table = alteration.table;
   std::vector<std::string> statements;
   // The columns whose comments the actions change, which are written once the schema is final.
@@ -271,9 +273,10 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       }
       // Existing rows read an added REPEATED column as empty, as rows that leave it out later do;
       // see RepeatedColumnDefaultStatements.
-      statements.push_back(std::format(
-          "ALTER TABLE {} ADD COLUMN {}{}", QualifiedName(table), ColumnDefinition(add->field),
-          add->field.mode == FieldMode::kRepeated ? " DEFAULT []" : ""));
+      statements.push_back(
+          std::format("ALTER TABLE {} ADD COLUMN {}{}", QualifiedName(table),
+                      ColumnDefinition(add->field, precision),
+                      add->field.mode == FieldMode::kRepeated ? " DEFAULT []" : ""));
       schema.push_back(add->field);
       ApplyDefaultRoundingMode(schema.back(), metadata.default_rounding_mode);
       ApplyDefaultCollation(schema.back(), metadata.default_collation);

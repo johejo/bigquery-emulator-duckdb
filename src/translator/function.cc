@@ -21,6 +21,7 @@
 #include "src/language_options.h"
 #include "src/python_function.h"
 #include "src/schema_sql.h"
+#include "src/timestamp_precision.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -43,11 +44,13 @@ using function_catalog::TypeUse;
 
 namespace {
 
-// The DuckDB spelling of a scalar call over already translated arguments.
-std::optional<std::string> Call(const Catalog& functions,
-                                const googlesql::ResolvedFunctionCall& resolved,
-                                std::string_view name, const std::vector<std::string>& args,
-                                bool safe, std::string_view project, const std::string& collation) {
+// The DuckDB spelling of a scalar call over already translated arguments, whose TIMESTAMPs have
+// `precision`.
+std::optional<std::string> LegacyCall(const Catalog& functions,
+                                      const googlesql::ResolvedFunctionCall& resolved,
+                                      std::string_view name, const std::vector<std::string>& args,
+                                      bool safe, std::string_view project,
+                                      const std::string& collation, TimestampPrecision precision) {
   const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr) {
     return std::nullopt;
@@ -69,7 +72,13 @@ std::optional<std::string> Call(const Catalog& functions,
            CollationKey("_e", collation) + ")], lambda _keys: _ext[list_position(_keys, " +
            (name == "GREATEST" ? "list_max" : "list_min") + "(_keys))])[1] END)[1]";
   }
-  ScalarCall call{.resolved = resolved, .name = name, .safe = safe, .project = project};
+  ScalarCall call{
+      .resolved = resolved,
+      .name = name,
+      .safe = safe,
+      .project = project,
+      .sql_timestamp_precision = precision,
+  };
   for (size_t i = 0; i < args.size(); ++i) {
     const googlesql::ResolvedExpr& argument = *resolved.argument_list(static_cast<int>(i));
     call.arguments.push_back({
@@ -88,6 +97,41 @@ std::optional<std::string> Call(const Catalog& functions,
   }
   return functions.Translate(name, call.arguments, safe,
                              functions.SupportsCollation(name) ? collation : "");
+}
+
+// Functions that only carry or compare values can operate directly on epoch nanoseconds.
+// Other existing overloads may use the microsecond backend only when the conversion is exact.
+// The adapter rejects finer inputs instead of silently truncating them.
+std::optional<std::string> Call(const Catalog& functions,
+                                const googlesql::ResolvedFunctionCall& resolved,
+                                std::string_view name, const std::vector<std::string>& args,
+                                bool safe, std::string_view project, const std::string& collation) {
+  if (functions.timestamp_precision() != TimestampPrecision::kNanoseconds ||
+      functions.HasTypeUse(name, TypeUse::kCarries) ||
+      functions.HasTypeUse(name, TypeUse::kCompares) ||
+      functions.HasTypeUse(name, TypeUse::kCarriesResults)) {
+    return LegacyCall(functions, resolved, name, args, safe, project, collation,
+                      functions.timestamp_precision());
+  }
+  std::vector<std::string> converted = args;
+  for (size_t i = 0; i < args.size(); ++i) {
+    const auto* type = resolved.argument_list(static_cast<int>(i))->type();
+    if (type->IsTimestamp()) {
+      converted.at(i) =
+          "bq_timestamp_nanos_to_micros(CAST(" + args.at(i) + " AS bq_timestamp_nanos))";
+    } else if (HasTimestamp(type, /*range_bounds=*/false)) {
+      return std::nullopt;
+    }
+  }
+  if (HasTimestamp(resolved.type(), /*range_bounds=*/false) && !resolved.type()->IsTimestamp()) {
+    return std::nullopt;
+  }
+  auto sql = LegacyCall(functions, resolved, name, converted, safe, project, collation,
+                        TimestampPrecision::kMicroseconds);
+  if (sql && resolved.type()->IsTimestamp()) {
+    *sql = "bq_timestamp_nanos_from_micros(" + *sql + ")";
+  }
+  return sql;
 }
 
 }  // namespace
@@ -127,8 +171,13 @@ bool HasResultForm(const googlesql::Type* type, bool stored) {
 }
 
 std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, bool stored, int depth) {
-  if (!HasResultForm(type, stored)) {
+                        std::string_view column, bool stored, TimestampPrecision precision,
+                        int depth) {
+  if (precision == TimestampPrecision::kNanoseconds && type->IsTimestamp()) {
+    return "CAST(" + value + " AS bq_timestamp_nanos)";
+  }
+  if (!HasResultForm(type, stored) &&
+      (precision != TimestampPrecision::kNanoseconds || !HasTimestamp(type, false))) {
     return value;
   }
   if (type->IsGeography()) {
@@ -142,7 +191,9 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
            QuoteLiteral("Array cannot have a null element; error in writing field " +
                         std::string(column)) +
            ") ELSE " +
-           ResultValue(name, type->AsArray()->element_type(), column, stored, depth + 1) + " END)";
+           ResultValue(name, type->AsArray()->element_type(), column, stored, precision,
+                       depth + 1) +
+           " END)";
   }
   const auto* structure = type->AsStruct();
   const std::vector<std::string> names = DuckDbStructFieldNames(structure);
@@ -151,7 +202,7 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
   for (int i = 0; i < structure->num_fields(); ++i) {
     fields.push_back(QuoteIdentifier(names.at(i)) + " := " +
                      ResultValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
-                                 structure->field(i).type, column, stored, depth + 1));
+                                 structure->field(i).type, column, stored, precision, depth + 1));
   }
   return "list_transform([" + value + "], lambda " + name + ": CASE WHEN " + name +
          " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
@@ -160,8 +211,8 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
 }  // namespace
 
 std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, bool stored) {
-  return ResultValue(value, type, column, stored, 0);
+                        std::string_view column, bool stored, TimestampPrecision precision) {
+  return ResultValue(value, type, column, stored, precision, 0);
 }
 
 namespace {
@@ -234,8 +285,9 @@ std::optional<std::string> RoundedValue(const Catalog& functions, const std::str
 std::optional<std::string> WrittenValue(const Catalog& functions, const std::string& value,
                                         const googlesql::Type* type, const FieldSchema& field,
                                         bool assignment) {
-  const auto rounded =
-      RoundedToEven(functions, ResultValue(value, type, field.name, true), type, field);
+  const auto rounded = RoundedToEven(
+      functions, ResultValue(value, type, field.name, true, functions.timestamp_precision()), type,
+      field);
   return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, field, assignment))
                  : std::nullopt;
 }
@@ -270,7 +322,11 @@ std::optional<std::string> ExternalCall(const googlesql::ResolvedFunctionCall& c
   std::vector<std::string> args = {QuoteLiteral(source)};
   for (const auto& argument : call.argument_list()) {
     const auto sql = Expression(*argument, scope, columns);
-    const auto duckdb_type = DuckDbType(argument->type());
+    if (scope.context.timestamp_precision == TimestampPrecision::kNanoseconds &&
+        HasTimestamp(argument->type(), false)) {
+      return Unsupported(scope, "nanosecond TIMESTAMP argument of an external-language UDF");
+    }
+    const auto duckdb_type = DuckDbType(argument->type(), scope.context.timestamp_precision);
     if (!sql || !duckdb_type) {
       return std::nullopt;
     }

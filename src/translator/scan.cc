@@ -32,6 +32,7 @@
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 #include "src/translator/aggregate.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
@@ -54,7 +55,8 @@ constexpr auto kZoneIndependentFunctions = std::to_array<std::string_view>({
 // and PostgreSQL numerics beyond DuckDB's precision arrive as text. MySQL TIMESTAMP arrives as
 // a UTC timestamp without a time zone. Dates and times outside BigQuery's ranges fail.
 std::string ExternalValue(const googlesql::Type* type, const std::string& value) {
-  std::string sql = "CAST(" + value + " AS " + DuckDbType(type).value_or("VARCHAR") + ")";
+  std::string sql = "CAST(" + value + " AS " +
+                    DuckDbType(type, TimestampPrecision::kMicroseconds).value_or("VARCHAR") + ")";
   const auto in_range = [&](const std::string& condition, std::string_view name) {
     return "CASE WHEN " + sql + " IS NULL OR " + condition + " THEN " + sql + " ELSE error('" +
            std::string(name) + " value out of range: ' || CAST(" + sql + " AS VARCHAR)) END";
@@ -88,6 +90,10 @@ std::optional<Relation> ExternalQueryScan(const googlesql::ResolvedTVFScan& tvf,
   const auto literal = [&](size_t i) {
     return arguments.at(i).GetScalarArgType()->literal_value()->string_value();
   };
+  // ExternalValue reads TIMESTAMPs as microseconds.
+  if (scope.context.timestamp_precision == TimestampPrecision::kNanoseconds) {
+    return Unsupported(scope, "EXTERNAL_QUERY with nanosecond TIMESTAMPs");
+  }
   // The catalog accepted the connection ID.
   const std::optional<std::string> key = ConnectionKey(literal(0), scope.context.defaults.project);
   if (!key) {
@@ -134,7 +140,8 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   std::string range;
   for (int i = 0; i < schema.num_columns(); ++i) {
     const auto& column = argument.argument_column_list(i);
-    if (!DuckDbType(column.type()) || column.type_annotation_map() != nullptr) {
+    if (!DuckDbType(column.type(), scope.context.timestamp_precision) ||
+        column.type_annotation_map() != nullptr) {
       return Unsupported(scope, "RANGE_SESSIONIZE column type");
     }
     const std::string name = ColumnName(column.column_id());
@@ -751,14 +758,15 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     std::vector<std::string> projections;
     for (int i = 0; i < table->column_list_size(); ++i) {
       const auto& column = table->column_list(i);
-      if (!DuckDbType(column.type()) || !OnlyCollations(column.type_annotation_map())) {
+      if (!DuckDbType(column.type(), scope.context.timestamp_precision) ||
+          !OnlyCollations(column.type_annotation_map())) {
         return Unsupported(scope, "column type " + column.type()->DebugString());
       }
       const std::string alias = ColumnName(column.column_id());
       projections.push_back(
           StoredColumn(
               QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()),
-              column.type()) +
+              column.type(), scope.context.timestamp_precision) +
           " AS " + alias);
       result.columns.emplace(column.column_id(), "q." + alias);
     }
@@ -906,11 +914,12 @@ std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& s
   return result;
 }
 
-std::string StoredColumn(const std::string& column, const googlesql::Type* type) {
+std::string StoredColumn(const std::string& column, const googlesql::Type* type,
+                         TimestampPrecision precision) {
   if (!HasBigNumeric(type) && !HasGeography(type)) {
     return column;
   }
-  return "CAST(" + column + " AS " + DuckDbType(type).value_or("") + ")";
+  return "CAST(" + column + " AS " + DuckDbType(type, precision).value_or("") + ")";
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

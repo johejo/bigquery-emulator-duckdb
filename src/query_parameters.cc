@@ -24,6 +24,7 @@
 #include "src/googlesql_geography/wkt.h"
 #include "src/googlesql_geography_duckdb/codec.h"
 #include "src/interval_sql.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -54,6 +55,7 @@ struct TypedValue {
   const json& type;
   const json& value;
   const std::string& parameter;
+  TimestampPrecision precision;
 };
 
 // The value of a parameter that carries none, which is how BigQuery spells a NULL.
@@ -94,8 +96,8 @@ FieldSchema ToFieldSchema(const std::string& name, const json& type) {
   return field;
 }
 
-std::string ToDuckDbType(const json& type) {
-  absl::StatusOr<std::string> duckdb_type = DuckDbParameterType(ToFieldSchema("", type));
+std::string ToDuckDbType(const json& type, TimestampPrecision precision) {
+  absl::StatusOr<std::string> duckdb_type = DuckDbParameterType(ToFieldSchema("", type), precision);
   if (!duckdb_type.ok()) {
     throw ApiError::Invalid("Unsupported query parameter type: " +
                             std::string(duckdb_type.status().message()));
@@ -139,16 +141,18 @@ std::string ArrayLiteral(const TypedValue& parameter) {
                                .type = parameter.type["arrayType"],
                                .value = element,
                                .parameter = parameter.parameter,
+                               .precision = parameter.precision,
                            });
                          });
   // The cast pins down the element type, which an empty list literal does not carry.
-  return "CAST([" + Join(elements, ", ") + "] AS " + ToDuckDbType(parameter.type) + ")";
+  return "CAST([" + Join(elements, ", ") + "] AS " +
+         ToDuckDbType(parameter.type, parameter.precision) + ")";
 }
 
 std::string StructLiteral(const TypedValue& parameter) {
   // Parameter values are keyed by field name, so anonymous or duplicate names cannot carry
   // distinct field values. Validate their stored schema before spelling the value.
-  (void)ToDuckDbType(parameter.type);
+  (void)ToDuckDbType(parameter.type, parameter.precision);
   const json& values = parameter.value["structValues"];
   std::vector<std::string> fields;
   for (const json& field : parameter.type.value("structTypes", json::array())) {
@@ -159,6 +163,7 @@ std::string StructLiteral(const TypedValue& parameter) {
                          .type = field.at("type"),
                          .value = value == values.end() ? NoValue() : *value,
                          .parameter = parameter.parameter,
+                         .precision = parameter.precision,
                      }));
   }
   return "struct_pack(" + Join(fields, ", ") + ")";
@@ -166,16 +171,23 @@ std::string StructLiteral(const TypedValue& parameter) {
 
 // A RANGE's bounds are values of its element type; a missing one is unbounded.
 std::string RangeLiteral(const TypedValue& parameter) {
-  const std::string type = ToDuckDbType(parameter.type);
+  const std::string type = ToDuckDbType(parameter.type, parameter.precision);
   const json& values = parameter.value["rangeValue"];
   std::vector<std::string> bounds;
   for (const char* name : {"start", "end"}) {
     const auto value = values.find(name);
-    bounds.push_back(ToDuckDbLiteral({
+    std::string bound = ToDuckDbLiteral({
         .type = parameter.type["rangeElementType"],
         .value = value == values.end() ? NoValue() : *value,
         .parameter = parameter.parameter,
-    }));
+        .precision = parameter.precision,
+    });
+    if (parameter.precision == TimestampPrecision::kNanoseconds &&
+        CanonicalTypeName(parameter.type["rangeElementType"]) == "TIMESTAMP") {
+      bound.insert(0, "bq_timestamp_nanos_to_micros(");
+      bound += ')';
+    }
+    bounds.push_back(std::move(bound));
   }
   return "CAST(" + DuckDbRange(bounds.at(0), bounds.at(1)) + " AS " + type + ")";
 }
@@ -196,7 +208,7 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
   // A missing or null `value` is how BigQuery spells a NULL parameter; the cast keeps the type
   // of the NULL, which matters wherever the parameter is compared or inserted.
   if (!value.contains("value") || value["value"].is_null()) {
-    return "CAST(NULL AS " + ToDuckDbType(type) + ")";
+    return "CAST(NULL AS " + ToDuckDbType(type, parameter.precision) + ")";
   }
   const std::string text = ValueText(value["value"]);
   if (ParseFieldType(name) == FieldType::kBigNumeric) {
@@ -215,6 +227,9 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
     }
     return IntervalSql(*interval);
   }
+  if (name == "TIMESTAMP" && parameter.precision == TimestampPrecision::kNanoseconds) {
+    return "bq_timestamp_nanos_from_string(" + QuoteLiteral(text) + ")";
+  }
   if (name == "BYTES") {
     // BYTES parameters are base64 encoded, which DuckDB decodes back into a BLOB.
     return "from_base64(" + QuoteLiteral(text) + ")";
@@ -222,7 +237,7 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
   if (name == "GEOGRAPHY") {
     return GeographyLiteral(text, parameter.parameter);
   }
-  return "CAST(" + QuoteLiteral(text) + " AS " + ToDuckDbType(type) + ")";
+  return "CAST(" + QuoteLiteral(text) + " AS " + ToDuckDbType(type, parameter.precision) + ")";
 }
 
 }  // namespace
@@ -235,7 +250,7 @@ QueryParameters::QueryParameters(const std::vector<std::pair<std::string, std::s
   }
 }
 
-QueryParameters QueryParameters::Parse(const json& parameters) {
+QueryParameters QueryParameters::Parse(const json& parameters, TimestampPrecision precision) {
   QueryParameters result;
   if (!parameters.is_array()) {
     throw ApiError::Invalid("queryParameters must be an array");
@@ -250,6 +265,7 @@ QueryParameters QueryParameters::Parse(const json& parameters) {
         .type = parameter["parameterType"],
         .value = value == parameter.end() ? NoValue() : *value,
         .parameter = name,
+        .precision = precision,
     });
     FieldSchema type = ToFieldSchema(name, parameter["parameterType"]);
     if (name.empty()) {

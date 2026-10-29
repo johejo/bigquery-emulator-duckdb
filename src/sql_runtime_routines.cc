@@ -18,12 +18,14 @@
 #include "src/catalog.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/function_catalog/catalog.h"
 #include "src/language_options.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/sql_runtime.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb {
@@ -35,6 +37,7 @@ namespace {
 // Routine.definitionBody requires project-qualified references to other routines. Built-in
 // namespaces such as NET and SAFE are still allowed.
 void CheckApiRoutineBody(const Routine& routine, TableSource& source,
+                         TimestampPrecision timestamp_precision,
                          const ExcludedFunctionIds& excluded_function_ids,
                          FunctionDeclarations declarations) {
   if (routine.resource.value("language", "SQL") == "PYTHON") {
@@ -54,7 +57,8 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source,
     throw ApiError::Invalid(std::string(status.message()));
   }
   googlesql::TypeFactory types;
-  BigQueryCatalog builtins(source, &types, "", "", nullptr, excluded_function_ids, declarations);
+  BigQueryCatalog builtins(source, &types, "", "", timestamp_precision, nullptr,
+                           excluded_function_ids, declarations);
   std::vector<const googlesql::ASTNode*> nodes{
       procedure ? static_cast<const googlesql::ASTNode*>(parsed->script())
       : tvf     ? static_cast<const googlesql::ASTNode*>(parsed->statement())
@@ -134,7 +138,8 @@ Routine SqlRuntime::WriteRoutine(Routine routine, bool update) {
   }
   try {
     const auto source = NewTableSource();
-    CheckApiRoutineBody(routine, *source, excluded_function_ids_, declarations_);
+    CheckApiRoutineBody(routine, *source, functions_.timestamp_precision(), excluded_function_ids_,
+                        declarations_);
     std::string statement = RoutineStatement(routine);
     if (update) {
       statement.replace(0, std::string("CREATE").size(), "CREATE OR REPLACE");

@@ -9,6 +9,7 @@
 #include "src/default_dataset.h"
 #include "src/query_parameters.h"
 #include "src/system_variables.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 
 namespace googlesql {
@@ -57,7 +58,7 @@ std::optional<std::string> TranslateExpression(
 std::optional<QueryParameters> TranslateParameters(
     const std::variant<std::vector<googlesql::Value>, std::map<std::string, googlesql::Value>>&
         values,
-    std::string* unsupported);
+    std::string* unsupported, TimestampPrecision precision);
 
 // `value`, the SQL of a column of `source` that a job appends to the existing column
 // `destination`, with the values of its ROUND_HALF_EVEN fields rounded to their scale as DML

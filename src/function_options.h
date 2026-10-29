@@ -1,12 +1,14 @@
 #pragma once
 
 #include "src/googlesql_functions_duckdb/options.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 
 // The emulator's choice of every BigQuery difference, kept outside the libraries and adapters.
 constexpr functions_duckdb::Options BigQueryFunctionOptions() {
   return {
+      .timestamp_precision = TimestampPrecision::kMicroseconds,
       .chr_zero_is_empty = true,
       .format_specifiers = true,
       .unsigned_nan = true,

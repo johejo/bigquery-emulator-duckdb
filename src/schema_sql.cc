@@ -20,6 +20,7 @@
 #include "src/field_schema.h"
 #include "src/interval_sql.h"
 #include "src/references.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -210,7 +211,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
 }  // namespace
 
 std::string ToDuckDbType(const FieldSchema& field) {
-  absl::StatusOr<std::string> type = DuckDbColumnType(field);
+  absl::StatusOr<std::string> type = DuckDbColumnType(field, TimestampPrecision::kMicroseconds);
   if (!type.ok()) {
     throw ApiError::Invalid(std::string(type.status().message()));
   }
@@ -342,16 +343,21 @@ std::string ReadColumns(const std::vector<FieldSchema>& schema, bool selected) {
   return Join(columns, ", ");
 }
 
-std::string ColumnDefinition(const FieldSchema& field) {
-  return QuoteIdentifier(field.name) + " " + ToDuckDbType(field) +
+std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision) {
+  const auto type = DuckDbColumnType(field, precision);
+  if (!type.ok()) {
+    throw ApiError::Invalid(std::string(type.status().message()));
+  }
+  return QuoteIdentifier(field.name) + " " + *type +
          (field.mode == FieldMode::kRequired ? " NOT NULL" : "");
 }
 
-std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema) {
+std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema,
+                                             TimestampPrecision precision) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
     try {
-      columns.push_back(ColumnDefinition(field));
+      columns.push_back(ColumnDefinition(field, precision));
     } catch (const ApiError&) {
       return std::nullopt;
     }

@@ -90,7 +90,7 @@ class Backend {
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 
   // Why the columns of `relation`, a table or view, cannot be read, naming the first column of a
-  // DuckDB type the emulator does not support, or nullopt.
+  // DuckDB type the emulator does not support or of the other TIMESTAMP precision, or nullopt.
   std::optional<std::string> UnreadableColumnError(const std::string& relation);
 
   // A SELECT that converts external numeric columns to the emulator's query representation,

@@ -31,5 +31,8 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__subpackages__"],
-    deps = ["@googlesql//googlesql/public:type_cc_proto"],
+    deps = [
+        "//:timestamp_precision",
+        "@googlesql//googlesql/public:type_cc_proto",
+    ],
 )

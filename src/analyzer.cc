@@ -43,6 +43,7 @@
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/table_path.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -332,10 +333,11 @@ absl::Status CheckMaterializedView(const googlesql::ResolvedCreateMaterializedVi
 }
 
 // The options a statement of a request, or of the script `settings.script`, is analyzed with.
-absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSettings& settings,
+absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision precision,
+                                                           const AnalyzerSettings& settings,
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
-  options.set_language(GoogleSqlLanguageOptions());
+  options.set_language(AnalyzerLanguageOptions(precision));
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
   // SELECT WITH DIFFERENTIAL_PRIVACY aggregates each privacy unit's contributions first, and
@@ -570,13 +572,13 @@ absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
 }
 
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
-                                googlesql::TypeFactory& type_factory,
+                                googlesql::TypeFactory& type_factory, TimestampPrecision precision,
                                 const AnalyzerSettings& settings) {
   if (!settings.named_parameters.empty() && !settings.positional_parameters.empty()) {
     throw std::invalid_argument("A statement cannot use both named and positional parameters");
   }
   absl::StatusOr<googlesql::AnalyzerOptions> options =
-      AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
+      AnalyzerOptions(precision, settings, googlesql::ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
   if (!options.ok()) {
     throw std::invalid_argument(options.status().ToString());
   }
@@ -690,15 +692,18 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
   return AnalyzerResult(std::move(analyzer_output));
 }
 
-absl::StatusOr<googlesql::AnalyzerOptions> ScriptAnalyzerOptions(const AnalyzerSettings& settings) {
-  return AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
+absl::StatusOr<googlesql::AnalyzerOptions> ScriptAnalyzerOptions(TimestampPrecision precision,
+                                                                 const AnalyzerSettings& settings) {
+  return AnalyzerOptions(precision, settings, googlesql::ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
 }
 
 absl::StatusOr<googlesql::TypeWithParameters> AnalyzeScriptType(
     const googlesql::ScriptSegment& segment, googlesql::Catalog& catalog,
-    googlesql::TypeFactory& type_factory, const AnalyzerSettings& settings) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::AnalyzerOptions options,
-                             AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
+    googlesql::TypeFactory& type_factory, TimestampPrecision precision,
+    const AnalyzerSettings& settings) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const googlesql::AnalyzerOptions options,
+      AnalyzerOptions(precision, settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   googlesql::TypeWithParameters type;
   googlesql::TypeModifiers modifiers;
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeType(std::string(segment.GetSegmentText()), options,
@@ -711,9 +716,11 @@ absl::StatusOr<googlesql::TypeWithParameters> AnalyzeScriptType(
 absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSegment& segment,
                                                       googlesql::Catalog& catalog,
                                                       googlesql::TypeFactory& type_factory,
+                                                      TimestampPrecision precision,
                                                       const AnalyzerSettings& settings) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::AnalyzerOptions options,
-                             AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const googlesql::AnalyzerOptions options,
+      AnalyzerOptions(precision, settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
                                                         &type_factory, &analyzer_output))
@@ -730,11 +737,13 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
                                                        const googlesql::Type* target_type,
                                                        googlesql::Catalog& catalog,
                                                        googlesql::TypeFactory& type_factory,
+                                                       TimestampPrecision precision,
                                                        const AnalyzerSettings& settings) {
   GOOGLESQL_ASSIGN_OR_RETURN(
       const googlesql::AnalyzerOptions options,
-      AnalyzerOptions(settings, segment != nullptr ? googlesql::ERROR_MESSAGE_WITH_PAYLOAD
-                                                   : googlesql::ERROR_MESSAGE_ONE_LINE));
+      AnalyzerOptions(precision, settings,
+                      segment != nullptr ? googlesql::ERROR_MESSAGE_WITH_PAYLOAD
+                                         : googlesql::ERROR_MESSAGE_ONE_LINE));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   const absl::Status status =
       target_type != nullptr

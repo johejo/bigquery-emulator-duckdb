@@ -28,6 +28,7 @@
 #include "src/location.h"
 #include "src/references.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -48,19 +49,24 @@ FieldSchema ColumnField(const ViewColumn& column) {
 }
 
 // Selects the rows as `columns`. The values are cast in one outer SELECT so that a column is
-// typed even when every row has NULL in it.
+// typed even when every row has NULL in it. A TIMESTAMP cell is text, which DuckDB casts only to
+// microseconds.
 absl::StatusOr<std::string> ViewSql(std::span<const ViewColumn> columns,
-                                    const std::vector<Row>& rows) {
+                                    const std::vector<Row>& rows, TimestampPrecision precision) {
   std::vector<std::string> names;
   std::vector<std::string> projections;
   for (const ViewColumn& column : columns) {
-    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(column));
+    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(column), precision);
     if (!type.ok()) {
       return type.status();
     }
     names.push_back("c" + std::to_string(names.size()));
-    projections.push_back("CAST(" + names.back() + " AS " + *type + ") AS " +
-                          QuoteIdentifier(column.name));
+    const bool nanos = precision == TimestampPrecision::kNanoseconds &&
+                       column.type == FieldType::kTimestamp && !column.repeated;
+    projections.push_back(
+        (nanos ? "bq_timestamp_nanos_from_micros(CAST(" + names.back() + " AS TIMESTAMPTZ))"
+               : "CAST(" + names.back() + " AS " + *type + ")") +
+        " AS " + QuoteIdentifier(column.name));
   }
   std::vector<std::string> values;
   for (const Row& row : rows) {
@@ -235,7 +241,7 @@ bool IsInformationSchemaPath(const std::vector<std::string>& parts) {
 absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     const std::vector<std::string>& parts, TableSource& source,
     googlesql::TypeFactory* type_factory, const std::string& default_project,
-    const std::string& default_dataset) {
+    const std::string& default_dataset, TimestampPrecision precision) {
   // NOLINTEND(bugprone-easily-swappable-parameters)
   const std::string view = ToUpperAscii(parts.back());
   const std::vector<std::string> qualifier(parts.begin(), parts.end() - 2);
@@ -318,7 +324,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
   if (!rows.ok()) {
     return rows.status();
   }
-  absl::StatusOr<std::string> sql = ViewSql(columns, *rows);
+  absl::StatusOr<std::string> sql = ViewSql(columns, *rows, precision);
   if (!sql.ok()) {
     return sql.status();
   }

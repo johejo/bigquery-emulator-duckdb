@@ -8,21 +8,24 @@
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 
 // The DuckDB SQL that keeps BigQuery tables in DuckDB. Each function throws ApiError::Invalid
 // for a schema or value BigQuery rejects or the emulator does not support.
 
-// The DuckDB column type of a BigQuery TableFieldSchema.
+// The DuckDB column type of a BigQuery TableFieldSchema, with microsecond TIMESTAMPs: the REST
+// API's table writes and schema updates that use it serve only BigQuery's semantics.
 std::string ToDuckDbType(const FieldSchema& field);
 
 // A DuckDB column definition for `field`, which enforces REQUIRED as BigQuery does.
-std::string ColumnDefinition(const FieldSchema& field);
+std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision);
 
 // Column definitions for a table that holds `schema`, or nullopt when a type has no column
 // type of its own in the emulator.
-std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema);
+std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema,
+                                             TimestampPrecision precision);
 
 // The DuckDB expression for `value`, a value of `field` in a tabledata.insertAll row. An unknown
 // field of a RECORD is an error unless `ignore_unknown_values` is set.

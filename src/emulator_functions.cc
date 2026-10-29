@@ -60,7 +60,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
   if (functions != nullptr) {
     return *functions;
   }
-  functions = std::make_unique<function_catalog::Catalog>();
+  functions = std::make_unique<function_catalog::Catalog>(options.timestamp_precision);
   translator::AddBuiltinFunctions(*functions);
   functions->Add("COLLATE",
                  {

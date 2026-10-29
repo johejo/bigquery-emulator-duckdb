@@ -44,7 +44,8 @@ absl::Status BigQueryCatalog::FindPropertyGraph(absl::Span<const std::string> pa
       return absl::NotFoundError("Property graph not found");
     }
     auto catalog = std::make_unique<GraphCatalog>(*this, type_factory_);
-    const googlesql::AnalyzerOptions analyzer_options(GoogleSqlLanguageOptions());
+    const googlesql::AnalyzerOptions analyzer_options(
+        AnalyzerLanguageOptions(timestamp_precision_));
     const auto status = googlesql::AddPropertyGraphFromCreatePropertyGraphStmt(
         *ddl, analyzer_options, graph_artifacts_, *catalog);
     if (!status.ok()) {

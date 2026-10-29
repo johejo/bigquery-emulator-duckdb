@@ -21,6 +21,7 @@
 #include "src/query_parameters.h"
 #include "src/schema_sql.h"
 #include "src/system_variables.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -46,6 +47,7 @@ std::optional<TranslatedStatement> TranslateStatement(
   translated.resources = definition ? nullptr : defaults.resources;
   translator::Context context{
       .functions = functions,
+      .timestamp_precision = functions.timestamp_precision(),
       .parameters = parameters,
       .defaults = defaults,
       .statement = translated,
@@ -73,6 +75,7 @@ std::optional<std::string> TranslateExpression(
   TranslatedStatement translated;
   translator::Context context{
       .functions = functions,
+      .timestamp_precision = functions.timestamp_precision(),
       .parameters = parameters,
       .defaults = defaults,
       .statement = translated,
@@ -92,7 +95,7 @@ std::optional<std::string> TranslateExpression(
 std::optional<QueryParameters> TranslateParameters(
     const std::variant<std::vector<googlesql::Value>, std::map<std::string, googlesql::Value>>&
         values,
-    std::string* unsupported) {
+    std::string* unsupported, TimestampPrecision precision) {
   // Positional parameters are the ones without a name.
   std::vector<std::pair<std::string, googlesql::Value>> parameters;
   if (const auto* list = std::get_if<std::vector<googlesql::Value>>(&values)) {
@@ -107,7 +110,7 @@ std::optional<QueryParameters> TranslateParameters(
   std::vector<std::pair<std::string, std::string>> named;
   std::vector<std::string> positional;
   for (const auto& [name, value] : parameters) {
-    std::optional<std::string> literal = translator::Literal(value);
+    std::optional<std::string> literal = translator::Literal(value, precision);
     if (!literal) {
       *unsupported = "query parameters of type " + value.type()->DebugString();
       return std::nullopt;

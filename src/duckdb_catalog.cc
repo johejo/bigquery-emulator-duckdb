@@ -189,7 +189,7 @@ std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& tab
   schema = ApplyColumnComments(std::move(schema), comments);
   if (const std::optional<std::string> error = backend.UnreadableColumnError(QualifiedName(table));
       error.has_value()) {
-    throw ApiError::Invalid(*error + "; change the column's type to read the table");
+    throw ApiError::Invalid(*error);
   }
   return schema;
 }

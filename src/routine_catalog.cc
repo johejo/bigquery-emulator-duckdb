@@ -42,6 +42,7 @@
 #include "src/routine.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -98,20 +99,22 @@ struct RoutineCatalog::State {
 
 RoutineCatalog::RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                std::string default_project, std::string default_dataset,
+                               TimestampPrecision timestamp_precision,
                                const TemporaryTables* temporary,
                                const ExcludedFunctionIds& excluded_function_ids,
                                FunctionDeclarations declarations)
     : BigQueryCatalog(source, type_factory, std::move(default_project), std::move(default_dataset),
-                      temporary, excluded_function_ids, declarations),
+                      timestamp_precision, temporary, excluded_function_ids, declarations),
       owned_state_(std::make_unique<State>()),
       state_(owned_state_.get()) {}
 
 RoutineCatalog::RoutineCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                std::string default_project, std::string default_dataset,
-                               State& state, const ExcludedFunctionIds& excluded_function_ids,
+                               TimestampPrecision timestamp_precision, State& state,
+                               const ExcludedFunctionIds& excluded_function_ids,
                                FunctionDeclarations declarations)
     : BigQueryCatalog(source, type_factory, std::move(default_project), std::move(default_dataset),
-                      nullptr, excluded_function_ids, declarations),
+                      timestamp_precision, nullptr, excluded_function_ids, declarations),
       state_(&state) {}
 
 RoutineCatalog::~RoutineCatalog() = default;
@@ -203,8 +206,9 @@ absl::Status RoutineCatalog::CheckRoutine(const Routine& routine) {
       }
     }
     if (routine.resource.value("strictMode", true)) {
-      RoutineCatalog catalog(source(), type_factory(), routine.reference.project_id, "", nullptr,
-                             excluded_function_ids(), function_declarations());
+      RoutineCatalog catalog(source(), type_factory(), routine.reference.project_id, "",
+                             timestamp_precision(), nullptr, excluded_function_ids(),
+                             function_declarations());
       return CheckProcedure(routine, *parsed->script(), catalog, *type_factory());
     }
     return absl::OkStatus();
@@ -263,8 +267,9 @@ absl::StatusOr<AnalyzerResult> RoutineCatalog::AnalyzeDefinition(
   if (!state_->resolving.insert(key).second) {
     return absl::InvalidArgumentError("Recursive dependency: " + absl::StrJoin(key, "."));
   }
-  auto* catalog = new RoutineCatalog(source(), type_factory(), project, dataset, *state_,
-                                     excluded_function_ids(), function_declarations());
+  auto* catalog =
+      new RoutineCatalog(source(), type_factory(), project, dataset, timestamp_precision(), *state_,
+                         excluded_function_ids(), function_declarations());
   state_->catalogs.emplace_back(catalog);
   if (body_catalog != nullptr) {
     *body_catalog = catalog;
@@ -272,8 +277,11 @@ absl::StatusOr<AnalyzerResult> RoutineCatalog::AnalyzeDefinition(
   std::optional<AnalyzerResult> analyzed;
   std::string error;
   try {
-    analyzed.emplace(AnalyzeGoogleSql(sql, *catalog, *type_factory(),
-                                      {.default_project = project, .default_dataset = dataset}));
+    analyzed.emplace(AnalyzeGoogleSql(sql, *catalog, *type_factory(), timestamp_precision(),
+                                      {
+                                          .default_project = project,
+                                          .default_dataset = dataset,
+                                      }));
   } catch (const std::exception& exception) {
     std::string_view message = exception.what();
     message = message.substr(0, message.find('\n'));

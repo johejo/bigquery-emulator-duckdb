@@ -3,6 +3,7 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -67,6 +68,16 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     return options;
   }();
   return *kLanguageOptions;
+}
+
+const googlesql::LanguageOptions& AnalyzerLanguageOptions(TimestampPrecision precision) {
+  static const googlesql::LanguageOptions* const kNanosecondOptions = [] {
+    auto* options = new googlesql::LanguageOptions(GoogleSqlLanguageOptions());
+    options->EnableLanguageFeature(googlesql::FEATURE_TIMESTAMP_NANOS);
+    return options;
+  }();
+  return precision == TimestampPrecision::kNanoseconds ? *kNanosecondOptions
+                                                       : GoogleSqlLanguageOptions();
 }
 
 }  // namespace bigquery_emulator_duckdb

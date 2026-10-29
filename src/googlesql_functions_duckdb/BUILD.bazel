@@ -341,8 +341,32 @@ cc_library(
 )
 
 cc_library(
+    name = "timestamp",
+    srcs = ["timestamp.cc"],
+    hdrs = ["timestamp.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//:backend_error",
+        "//:duckdb_handle",
+        "//:timestamp_nanos",
+        "//:timestamp_precision",
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/base:status",
+    ],
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
     name = "options",
     hdrs = ["options.h"],
     visibility = ["//:__pkg__"],
-    deps = ["//src/googlesql_collation:options"],
+    deps = [
+        "//:timestamp_precision",
+        "//src/googlesql_collation:options",
+    ],
 )

@@ -12,6 +12,7 @@ cc_library(
         "//:query_parameters",
         "//:statement_resources",
         "//:system_variables",
+        "//:timestamp_precision",
     ],
 )
 
@@ -77,7 +78,10 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":context"],
+    deps = [
+        ":context",
+        "//:timestamp_precision",
+    ],
 )
 
 # Builtin function definitions and handlers, added to an application-owned catalog.
@@ -121,6 +125,7 @@ cc_library(
         "//:bignumeric",
         "//:duckdb_sql",
         "//:language_options",
+        "//:timestamp_nanos",
         "//:type_mapping",
         "@googlesql//googlesql/public:interval_value",
         "@googlesql//googlesql/public:strings",
@@ -129,6 +134,7 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
+    deps = ["//:timestamp_precision"],
 )
 
 # DDL name resolution and metadata options do not depend on query translation.
@@ -232,6 +238,7 @@ cc_library(
         "//:field_schema",
         "//:references",
         "//:table_metadata",
+        "//:timestamp_precision",
         "//:translated_statement",
         "//:type_mapping",
         "@googlesql//googlesql/public:catalog",

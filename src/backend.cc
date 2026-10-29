@@ -31,6 +31,7 @@
 #include "src/result_rows.h"
 #include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
+#include "src/timestamp_precision.h"
 
 // DuckDB v2 requires explicit registration of statically linked extensions before opening a
 // database. Keep using duckdb.h's V1 C API for database access.
@@ -170,11 +171,13 @@ json QueryResult::SchemaToJson() const {
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
   std::mutex ddl_mutex;
+  TimestampPrecision timestamp_precision;
   Database(const std::optional<std::string>& session_user,
            const functions_duckdb::ObjectStorage& storage,
            const googlesql_geography::Options& geography,
            const functions_duckdb::Options& functions, const BackendInitializer& initialize,
-           const DatabaseInitializer& initialize_database) {
+           const DatabaseInitializer& initialize_database)
+      : timestamp_precision(functions.timestamp_precision) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -385,7 +388,15 @@ std::optional<std::string> Backend::UnreadableColumnError(const std::string& rel
        Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
     if (const std::string type = UnsupportedDuckDbType(column.type.get()); !type.empty()) {
       return "Column " + column.name + " has the DuckDB type " + type +
-             ", which the emulator does not support";
+             ", which the emulator does not support; change the column's type to read the table";
+    }
+    if (HasOtherTimestampPrecision(column.type.get(), db_->timestamp_precision)) {
+      return "Column " + column.name +
+             (db_->timestamp_precision == TimestampPrecision::kNanoseconds
+                  ? " holds microsecond TIMESTAMP values, which shell --semantics=googlesql does "
+                    "not read"
+                  : " holds nanosecond TIMESTAMP values, which only shell --semantics=googlesql "
+                    "reads");
     }
   }
   return std::nullopt;

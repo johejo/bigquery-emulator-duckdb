@@ -25,6 +25,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/googlesql_geography_duckdb/codec.h"
+#include "src/timestamp_precision.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -117,7 +118,8 @@ absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
 enum class TypeUse : std::uint8_t { kQuery, kColumn, kParameter, kDefinition };
 
 std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
-                                       const googlesql::TypeParameters* parameters, TypeUse use) {
+                                       const googlesql::TypeParameters* parameters, TypeUse use,
+                                       TimestampPrecision precision) {
   if (parameters != nullptr && (parameters->IsEmpty() || parameters->IsStringTypeParameters())) {
     parameters = nullptr;
   }
@@ -159,7 +161,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       }
       std::vector<std::string> properties;
       for (const auto& property : type->AsGraphElement()->property_types()) {
-        const auto mapped = MapToDuckDb(property.value_type, nullptr, use);
+        const auto mapped = MapToDuckDb(property.value_type, nullptr, use, precision);
         if (!mapped) {
           return std::nullopt;
         }
@@ -178,8 +180,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       if (use != TypeUse::kQuery) {
         return std::nullopt;
       }
-      const auto nodes = MapToDuckDb(type->AsGraphPath()->node_type(), nullptr, use);
-      const auto edges = MapToDuckDb(type->AsGraphPath()->edge_type(), nullptr, use);
+      const auto nodes = MapToDuckDb(type->AsGraphPath()->node_type(), nullptr, use, precision);
+      const auto edges = MapToDuckDb(type->AsGraphPath()->edge_type(), nullptr, use, precision);
       return nodes && edges ? std::optional<std::string>("STRUCT(\"$nodes\" " + *nodes +
                                                          "[], \"$edges\" " + *edges + "[])")
                             : std::nullopt;
@@ -189,7 +191,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     case googlesql::TYPE_DATE:
       return "DATE";
     case googlesql::TYPE_TIMESTAMP:
-      return "TIMESTAMPTZ";
+      return precision == TimestampPrecision::kNanoseconds ? kTimestampNanosType : "TIMESTAMPTZ";
     case googlesql::TYPE_DATETIME:
       return "TIMESTAMP";
     case googlesql::TYPE_TIME:
@@ -205,7 +207,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     case googlesql::TYPE_INTERVAL:
       return "INTERVAL";
     case googlesql::TYPE_RANGE: {
-      const auto element = MapToDuckDb(type->AsRange()->element_type(), nullptr, use);
+      const auto element = MapToDuckDb(type->AsRange()->element_type(), nullptr, use,
+                                       TimestampPrecision::kMicroseconds);
       return element ? std::optional<std::string>(
                            std::format("STRUCT({} {}, {} {})", QuoteIdentifier(kRangeStart),
                                        *element, QuoteIdentifier(kRangeEnd), *element))
@@ -217,7 +220,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                  ? geography_duckdb::kGeographyStorageType
                  : "BLOB";
     case googlesql::TYPE_ARRAY: {
-      const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);
+      const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use, precision);
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
     }
     case googlesql::TYPE_STRUCT: {
@@ -225,7 +228,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       std::vector<std::string> fields;
       for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
         const auto& field = type->AsStruct()->field(i);
-        const auto field_type = MapToDuckDb(field.type, child(i), use);
+        const auto field_type = MapToDuckDb(field.type, child(i), use, precision);
         // Metadata and parameters already have their final field names. Query values and
         // resolved SQL definitions can still need positional names.
         if (!field_type || ((use == TypeUse::kColumn || use == TypeUse::kParameter) &&
@@ -247,7 +250,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
   }
 }
 
-absl::StatusOr<std::string> DuckDbFieldType(const FieldSchema& field, TypeUse use) {
+absl::StatusOr<std::string> DuckDbFieldType(const FieldSchema& field, TypeUse use,
+                                            TimestampPrecision precision) {
   googlesql::TypeFactory type_factory;
   absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
   if (!type.ok()) {
@@ -257,7 +261,7 @@ absl::StatusOr<std::string> DuckDbFieldType(const FieldSchema& field, TypeUse us
   if (!parameters.ok()) {
     return parameters.status();
   }
-  std::optional<std::string> duckdb_type = MapToDuckDb(*type, &*parameters, use);
+  std::optional<std::string> duckdb_type = MapToDuckDb(*type, &*parameters, use, precision);
   if (duckdb_type.has_value()) {
     return *std::move(duckdb_type);
   }
@@ -564,9 +568,26 @@ std::string DuckDbRange(std::string_view start, std::string_view end, std::strin
       QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd));
 }
 
-std::optional<std::string> DuckDbType(const googlesql::Type* type,
-                                      const googlesql::TypeParameters* parameters) {
-  return MapToDuckDb(type, parameters, TypeUse::kQuery);
+std::optional<std::string> DuckDbType(const googlesql::Type* type, TimestampPrecision precision) {
+  return MapToDuckDb(type, nullptr, TypeUse::kQuery, precision);
+}
+
+bool HasTimestamp(const googlesql::Type* type, bool range_bounds) {
+  if (type->IsTimestamp()) {
+    return true;
+  }
+  if (type->IsArray()) {
+    return HasTimestamp(type->AsArray()->element_type(), range_bounds);
+  }
+  if (type->IsRange()) {
+    return range_bounds && HasTimestamp(type->AsRange()->element_type(), range_bounds);
+  }
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(), [range_bounds](const auto& field) {
+      return HasTimestamp(field.type, range_bounds);
+    });
+  }
+  return false;
 }
 
 bool HasGraph(const googlesql::Type* type) {
@@ -581,16 +602,19 @@ bool HasGraph(const googlesql::Type* type) {
 }
 
 std::optional<std::string> DuckDbColumnType(const googlesql::Type* type,
-                                            const googlesql::TypeParameters* parameters) {
-  return MapToDuckDb(type, parameters, TypeUse::kDefinition);
+                                            const googlesql::TypeParameters* parameters,
+                                            TimestampPrecision precision) {
+  return MapToDuckDb(type, parameters, TypeUse::kDefinition, precision);
 }
 
-absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field) {
-  return DuckDbFieldType(field, TypeUse::kColumn);
+absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field,
+                                             TimestampPrecision precision) {
+  return DuckDbFieldType(field, TypeUse::kColumn, precision);
 }
 
-absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field) {
-  return DuckDbFieldType(field, TypeUse::kParameter);
+absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field,
+                                                TimestampPrecision precision) {
+  return DuckDbFieldType(field, TypeUse::kParameter, precision);
 }
 
 }  // namespace bigquery_emulator_duckdb
