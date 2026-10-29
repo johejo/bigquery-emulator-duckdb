@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "cases": {
+    "both_schemas": {
+      "project": "johejo-sandbox",
+      "run": "4dz5jbz6ccj6yzq7lkudlgqaj4",
+      "steps": {
+        "create": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": null
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_4dz5jbz6ccj6yzq7lkudlgqaj4_both_schemas.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "information_schema_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        }
+      }
+    },
+    "conflicting_schemas": {
+      "project": "johejo-sandbox",
+      "run": "4dz5jbz6ccj6yzq7lkudlgqaj4",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_missing_source": {
+      "project": "johejo-sandbox",
+      "run": "4dz5jbz6ccj6yzq7lkudlgqaj4",
+      "steps": {
+        "create": {
+          "jobComplete": true
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: URI gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: URI gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
+        }
+      }
+    },
+    "explicit_autodetect_false": {
+      "project": "johejo-sandbox",
+      "run": "4dz5jbz6ccj6yzq7lkudlgqaj4",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": false,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "autodetect": false,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": null
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_4dz5jbz6ccj6yzq7lkudlgqaj4_explicit_autodetect_false.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "information_schema_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        }
+      }
+    },
+    "explicit_external_schema": {
+      "project": "johejo-sandbox",
+      "run": "4dz5jbz6ccj6yzq7lkudlgqaj4",
+      "steps": {
+        "create": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": null
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_4dz5jbz6ccj6yzq7lkudlgqaj4_explicit_external_schema.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "information_schema_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        }
+      }
+    },
+    "explicit_table_schema": {
+      "project": "johejo-sandbox",
+      "run": "4dz5jbz6ccj6yzq7lkudlgqaj4",
+      "steps": {
+        "create": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": null
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_4dz5jbz6ccj6yzq7lkudlgqaj4_explicit_table_schema.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "information_schema_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://bqanswers-missing-4dz5jbz6ccj6yzq7lkudlgqaj4/missing.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        }
+      }
+    }
+  }
+}

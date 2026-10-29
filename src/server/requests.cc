@@ -79,41 +79,57 @@ const ResourceMask& DatasetFields() {
 // The fields of a Table resource tables.insert, patch and update handle, although they support
 // only some of their values.
 const ResourceMask& TableFields() {
-  static const ResourceMask* const kFields =
-      new ResourceMask(MaskOf("Table", {
-                                           "tableReference",
-                                           "schema.fields.name",
-                                           "schema.fields.type",
-                                           "schema.fields.mode",
-                                           "schema.fields.fields",
-                                           "schema.fields.description",
-                                           "schema.fields.maxLength",
-                                           "schema.fields.precision",
-                                           "schema.fields.scale",
-                                           "schema.fields.roundingMode",
-                                           "schema.fields.rangeElementType",
-                                           "schema.fields.defaultValueExpression",
-                                           "schema.fields.policyTags",
-                                           "schema.fields.collation",
-                                           "view.query",
-                                           "view.useLegacySql",
-                                           "materializedView.query",
-                                           "materializedView.enableRefresh",
-                                           "materializedView.allowNonIncrementalDefinition",
-                                           "timePartitioning",
-                                           "rangePartitioning",
-                                           "clustering",
-                                           "requirePartitionFilter",
-                                           "description",
-                                           "friendlyName",
-                                           "labels",
-                                           "resourceTags",
-                                           "expirationTime",
-                                           "defaultRoundingMode",
-                                           "defaultCollation",
-                                           "tableConstraints",
-                                           "encryptionConfiguration",
-                                       }));
+  static const ResourceMask* const kFields = new ResourceMask(
+      MaskOf("Table", {
+                          "tableReference",
+                          "externalDataConfiguration.sourceFormat",
+                          "externalDataConfiguration.sourceUris",
+                          "externalDataConfiguration.autodetect",
+                          "externalDataConfiguration.schema.fields.name",
+                          "externalDataConfiguration.schema.fields.type",
+                          "externalDataConfiguration.schema.fields.mode",
+                          "externalDataConfiguration.schema.fields.fields",
+                          "externalDataConfiguration.schema.fields.description",
+                          "externalDataConfiguration.schema.fields.maxLength",
+                          "externalDataConfiguration.schema.fields.precision",
+                          "externalDataConfiguration.schema.fields.scale",
+                          "externalDataConfiguration.schema.fields.roundingMode",
+                          "externalDataConfiguration.schema.fields.rangeElementType",
+                          "externalDataConfiguration.schema.fields.defaultValueExpression",
+                          "externalDataConfiguration.schema.fields.policyTags",
+                          "externalDataConfiguration.schema.fields.collation",
+                          "schema.fields.name",
+                          "schema.fields.type",
+                          "schema.fields.mode",
+                          "schema.fields.fields",
+                          "schema.fields.description",
+                          "schema.fields.maxLength",
+                          "schema.fields.precision",
+                          "schema.fields.scale",
+                          "schema.fields.roundingMode",
+                          "schema.fields.rangeElementType",
+                          "schema.fields.defaultValueExpression",
+                          "schema.fields.policyTags",
+                          "schema.fields.collation",
+                          "view.query",
+                          "view.useLegacySql",
+                          "materializedView.query",
+                          "materializedView.enableRefresh",
+                          "materializedView.allowNonIncrementalDefinition",
+                          "timePartitioning",
+                          "rangePartitioning",
+                          "clustering",
+                          "requirePartitionFilter",
+                          "description",
+                          "friendlyName",
+                          "labels",
+                          "resourceTags",
+                          "expirationTime",
+                          "defaultRoundingMode",
+                          "defaultCollation",
+                          "tableConstraints",
+                          "encryptionConfiguration",
+                      }));
   return *kFields;
 }
 
@@ -717,6 +733,10 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
       .dataset_id = dataset.dataset_id,
       .table_id = table.table_reference().table_id(),
   };
+  if (body.contains("externalDataConfiguration") &&
+      (table.has_view() || table.has_materialized_view())) {
+    throw ApiError::Invalid("Cannot combine an external table and a view");
+  }
   if (table.has_materialized_view()) {
     if (table.has_view()) {
       throw ApiError::Invalid("Cannot specify both view and materializedView");
@@ -732,6 +752,21 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
     request.schema = SchemaFromJson(body.value("schema", json::object()));
   }
   request.metadata = TableMetadataFromJson(body);
+  if (request.metadata.external_data) {
+    const auto& config = body["externalDataConfiguration"];
+    if (config.contains("schema") && !config["schema"].is_null()) {
+      auto external_schema = SchemaFromJson(config["schema"]);
+      if (body.contains("schema") && !body["schema"].is_null() &&
+          !SameSchema(request.schema, external_schema)) {
+        throw ApiError::Invalid(
+            "When defining a table with an ExternalDataConfiguration, a schema must be present "
+            "on either the Table or the ExternalDataConfiguration. If the schema is present on "
+            "both, the schemas must be the same.");
+      }
+      request.schema = std::move(external_schema);
+    }
+    SetModesGiven(request.schema);
+  }
   return request;
 }
 
@@ -839,6 +874,9 @@ TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
   const auto table = ToProto<v2::Table>(body);
   if (table.has_materialized_view()) {
     throw ApiError::Unsupported("updating materializedView");
+  }
+  if (body.contains("externalDataConfiguration")) {
+    throw ApiError::Unsupported("updating externalDataConfiguration");
   }
   TableUpdateRequest request{.resource = body, .schema = std::nullopt, .view = std::nullopt};
   // As BigQuery answers, a patch that sets the schema to null keeps it; the emulator keeps a view

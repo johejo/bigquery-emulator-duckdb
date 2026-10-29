@@ -61,6 +61,14 @@ void Emulator::CheckRelationTarget(Backend& backend, const TranslatedStatement& 
   if (!comment.has_value()) {
     return;
   }
+  const bool external = CommentMetadata(*comment).external_data.has_value();
+  if (external && translation.altered_table) {
+    throw ApiError::Unsupported("ALTER TABLE on external tables");
+  }
+  if (translation.replaces &&
+      (external || (translation.table && translation.table->metadata.external_data))) {
+    throw ApiError::Unsupported("replacing an external table or replacing a table with one");
+  }
   const bool snapshot = CommentMetadata(*comment).snapshot.has_value();
   if (translation.statement_type == "DROP_SNAPSHOT_TABLE" && !snapshot) {
     throw ApiError::InvalidQuery("Invalid value: Cannot drop " + TableName(*target) +

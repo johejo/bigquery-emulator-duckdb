@@ -16,6 +16,8 @@ class ResolvedCreateSchemaStmt;
 class ResolvedCreateSnapshotTableStmt;
 class ResolvedCreateTableAsSelectStmt;
 class ResolvedCreateTableStmt;
+// Keep the heavy resolved AST header out of the DDL dispatcher interface.
+class ResolvedCreateExternalTableStmt;
 class ResolvedCreateViewBase;
 class ResolvedDropFunctionStmt;
 class ResolvedDropMaterializedViewStmt;
@@ -30,6 +32,8 @@ namespace bigquery_emulator_duckdb::translator {
 
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
                                        const Scope& scope);
+std::optional<std::string> CreateExternalTable(
+    const googlesql::ResolvedCreateExternalTableStmt& create, const Scope& scope);
 std::optional<std::string> CreateTableAsSelect(
     const googlesql::ResolvedCreateTableAsSelectStmt& create, const Scope& scope);
 std::optional<std::string> CreateSnapshotTable(

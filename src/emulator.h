@@ -43,7 +43,7 @@ struct TranslatedStatement;
 inline constexpr char kScriptStatementType[] = "SCRIPT";
 
 // What kind of table a dataset holds.
-enum class TableType : std::uint8_t { kTable, kSnapshot, kView, kMaterializedView };
+enum class TableType : std::uint8_t { kTable, kSnapshot, kView, kMaterializedView, kExternal };
 
 struct TableListEntry {
   std::string table_id;
@@ -68,9 +68,8 @@ struct TableInfo {
   std::optional<MaterializedViewSource> materialized_source = {};
 };
 
-// Throws ApiError::Invalid with BigQuery's message for a query, load or Storage write when `table`
-// is a table snapshot, whose rows cannot change.
-void RejectSnapshotWrite(const TableInfo& table);
+// Rejects a query, load or Storage write to a snapshot or external table.
+void RejectReadOnlyWrite(const TableInfo& table);
 
 struct InsertError {
   size_t index;

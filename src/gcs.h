@@ -39,6 +39,11 @@ class GcsClient {
   // when they are available and anonymous access otherwise.
   GcsClient(std::string endpoint, bool emulator);
   ~GcsClient();
+  // Deferred statement reads keep the configured client and its connection pools alive.
+  GcsClient(const GcsClient&) = default;
+  GcsClient& operator=(const GcsClient&) = default;
+  GcsClient(GcsClient&&) noexcept = default;
+  GcsClient& operator=(GcsClient&&) noexcept = default;
 
   // The Storage API endpoint downloads read from.
   [[nodiscard]] const std::string& endpoint() const;
@@ -59,7 +64,7 @@ class GcsClient {
 
  private:
   struct Impl;
-  std::unique_ptr<Impl> impl_;
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace bigquery_emulator_duckdb

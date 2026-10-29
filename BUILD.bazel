@@ -945,6 +945,7 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
         ":field_schema",
+        ":gcs",
         ":references",
         ":table_metadata",
         "@nlohmann_json//:json",
@@ -1603,6 +1604,24 @@ cc_library(
 )
 
 cc_library(
+    name = "external_table",
+    srcs = ["src/external_table.cc"],
+    hdrs = ["src/external_table.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":field_schema",
+        ":file_read",
+        ":file_read_options",
+        ":gcs",
+        ":parquet_metadata",
+        ":statement_resources",
+        ":table_metadata",
+        ":temporary_files",
+    ],
+)
+
+cc_library(
     name = "duckdb_table_source",
     srcs = ["src/duckdb_table_source.cc"],
     hdrs = ["src/duckdb_table_source.h"],
@@ -1613,7 +1632,9 @@ cc_library(
         ":duckdb_catalog",
         ":duckdb_sql",
         ":external_query",
+        ":external_table",
         ":field_schema",
+        ":gcs",
         ":location",
         ":mysql_query",
         ":references",
@@ -1628,6 +1649,7 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@nlohmann_json//:json",
     ],
+    deps = [":gcs"],
 )
 
 # The types of the options the DDL handlers implement, which :ddl_options_catalog_test compares

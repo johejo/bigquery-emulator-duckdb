@@ -338,7 +338,7 @@ std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool exp
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
-  return NewDuckDbTableSource(backend, connections_, project_ids_, location);
+  return NewDuckDbTableSource(backend, connections_, gcs_client_, project_ids_, location);
 }
 
 QueryResult Emulator::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }
@@ -365,6 +365,9 @@ std::shared_ptr<const StorageSnapshot> Emulator::ReadStorageTable(
     const std::string& restriction) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
+  if (info.metadata.external_data) {
+    throw ApiError::Unsupported("Storage Read of external tables");
+  }
   if (info.view_query) {
     throw ApiError::Invalid("Storage Read does not support logical views");
   }

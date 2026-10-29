@@ -14,6 +14,13 @@
 
 namespace bigquery_emulator_duckdb {
 
+// The first supported external source: GCS Parquet with an explicit table schema.
+struct GcsExternalData {
+  std::vector<std::string> uris;
+  std::optional<bool> autodetect;
+  bool operator==(const GcsExternalData&) const = default;
+};
+
 enum class TimePartitionUnit : uint8_t { kDay, kHour, kMonth, kYear };
 std::string_view TimePartitionUnitName(TimePartitionUnit unit);
 std::optional<TimePartitionUnit> ParseTimePartitionUnit(std::string_view name);
@@ -52,6 +59,7 @@ struct BaseTableDefinition {
 // to it later take, the cloneDefinition of a clone or snapshotDefinition of a table snapshot, and
 // its expiration. An empty description or friendly name, or kUnspecified rounding mode, is unset.
 struct TableMetadata {
+  std::optional<GcsExternalData> external_data;
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
@@ -78,7 +86,7 @@ struct TableMetadata {
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old tables.
 
   [[nodiscard]] bool empty() const {
-    return description.empty() && friendly_name.empty() && labels.empty() &&
+    return !external_data && description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !partitioned() && !require_partition_filter &&
            clustering.empty() && primary_key.empty() &&
            default_rounding_mode == RoundingMode::kUnspecified && !clone.has_value() &&
@@ -96,7 +104,7 @@ struct TableMetadata {
 // Why ordinary row writes are forbidden. Independent of how rows are read: a snapshot
 // reads native storage, while a converted read query need not imply a write restriction.
 // Metadata changes and explicit table replacement have their own validation.
-enum class TableWriteRestriction : uint8_t { kNone, kExternalNumericStorage, kSnapshot };
+enum class TableWriteRestriction : uint8_t { kNone, kExternalNumericStorage, kSnapshot, kExternal };
 
 // The schema and metadata of a table as tables.get reports them.
 struct TableDescription {

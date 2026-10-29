@@ -61,6 +61,7 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
         .table_id = result.rows.String(row, 0),
         .type = view && view->materialized             ? TableType::kMaterializedView
                 : result.rows.String(row, 1) == "VIEW" ? TableType::kView
+                : metadata.external_data               ? TableType::kExternal
                 : metadata.snapshot.has_value()        ? TableType::kSnapshot
                                                        : TableType::kTable,
         .metadata = std::move(metadata),
@@ -105,7 +106,7 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
       throw ApiError::NotFound("Table not found: " + table.table_id);
     }
     info.storage_id = identity.rows.Int64(0, 0);
-    if (include_row_count) {
+    if (include_row_count && !info.metadata.external_data) {
       const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
       info.num_rows = count.rows.Int64(0, 0);
     }
@@ -195,6 +196,9 @@ TableInfo Emulator::UpdateTable(TableReference table,
   }
   if (view.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
+  }
+  if (info.metadata.external_data && schema.has_value()) {
+    throw ApiError::Unsupported("changing the schema of an external table");
   }
   // A snapshot's schema, clustering and default rounding mode cannot change.
   if (info.metadata.snapshot.has_value() &&
@@ -351,7 +355,10 @@ std::unique_lock<std::mutex> Emulator::KeepVersion(Backend& backend, const Table
   return lock;
 }
 
-void RejectSnapshotWrite(const TableInfo& table) {
+void RejectReadOnlyWrite(const TableInfo& table) {
+  if (table.metadata.external_data) {
+    throw ApiError::Invalid("Cannot write to external table " + TableName(table.reference));
+  }
   if (table.metadata.snapshot.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table.reference) +
                             " is a snapshot, and snapshots are immutable.");

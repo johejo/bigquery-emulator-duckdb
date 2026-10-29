@@ -72,7 +72,7 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
   if (info.view_query) {
     throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
   }
-  RejectSnapshotWrite(info);
+  RejectReadOnlyWrite(info);
   // Held until the transaction that keeps the table's rows and appends to it commits.
   std::unique_lock<std::mutex> kept;
   try {

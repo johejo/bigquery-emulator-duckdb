@@ -18,6 +18,7 @@ using I = DdlOptionId;
 using enum DdlOptionType;
 constexpr auto kContexts = std::to_array<std::pair<C, std::string_view>>({
     {C::kCreateTable, "CREATE TABLE"},
+    {C::kCreateExternalTable, "CREATE EXTERNAL TABLE"},
     {C::kAlterTable, "ALTER TABLE"},
     {C::kCreateSchema, "CREATE SCHEMA"},
     {C::kAlterSchema, "ALTER SCHEMA"},
@@ -45,8 +46,14 @@ constexpr auto kNames = std::to_array<std::pair<I, std::string_view>>({
     {I::kRuntimeVersion, "runtime_version"},
     {I::kEntryPoint, "entry_point"},
     {I::kStrictMode, "strict_mode"},
+    {I::kFormat, "format"},
+    {I::kUris, "uris"},
 });
 constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
+    {.context = C::kCreateExternalTable, .name = I::kFormat, .type = kString},
+    {.context = C::kCreateExternalTable, .name = I::kUris, .type = kStrings},
+    {.context = C::kCreateExternalTable, .name = I::kDescription, .type = kString},
+    {.context = C::kCreateExternalTable, .name = I::kExpirationTimestamp, .type = kTimestamp},
     {.context = C::kCreateTable, .name = I::kDescription, .type = kString},
     {.context = C::kCreateTable, .name = I::kFriendlyName, .type = kString},
     {.context = C::kCreateTable, .name = I::kLabels, .type = kLabels},
@@ -148,6 +155,8 @@ const DdlOptionDefinition* FindDdlOption(C context, std::string_view name) {
 
 const googlesql::Type* DdlOptionSqlType(DdlOptionType type) {
   switch (type) {
+    case kStrings:
+      return googlesql::types::StringArrayType();
     case kString:
       return googlesql::types::StringType();
     case kBool:

@@ -338,7 +338,8 @@
       },
       {
         "name": "format",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'PARQUET'", "'CSV'", "'NEWLINE_DELIMITED_JSON'", "'AVRO'", "'ORC'"]
       },
       {
         "name": "hive_partition_uri_prefix",
@@ -440,7 +441,8 @@
       },
       {
         "name": "uris",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['gs://bucket/data.parquet']", "['gs://bucket/part*.parquet']", "['gs://bucket/a.parquet', 'gs://bucket/b.parquet']"]
       }
     ],
     "function_option_list": [
@@ -1893,7 +1895,24 @@
     },
     {
       "name": "CREATE EXTERNAL TABLE",
-      "group": "external_table_option_list"
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "exclude": ["format", "uris"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE format",
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "only": ["format"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], {option})"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE uris",
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "only": ["uris"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', {option})"
     },
     {
       "name": "CREATE TABLE generated column",
