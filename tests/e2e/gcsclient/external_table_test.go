@@ -392,4 +392,27 @@ func TestExternalParquetWildcard(t *testing.T) {
 		t.Fatal(err)
 	}
 	externalRows(t, client, "SELECT id FROM gcs.multiple ORDER BY id", []int64{1, 2})
+	// _FILE_NAME contains the full source path and is excluded from SELECT *:
+	// third_party/bigquery_docs/query-cloud-storage-data.md
+	for _, table := range []string{"external", "multiple"} {
+		it, err := client.Query("SELECT *, t._file_name AS filename FROM gcs." + table + " t ORDER BY id").Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range []int64{1, 2} {
+			var row []bigquery.Value
+			if err := it.Next(&row); err != nil {
+				t.Fatal(err)
+			}
+			want := []bigquery.Value{id, fmt.Sprintf("gs://bucket/data%d.parquet", id)}
+			if !reflect.DeepEqual(row, want) {
+				t.Fatalf("%s row = %v, want %v", table, row, want)
+			}
+		}
+		var row []bigquery.Value
+		if err := it.Next(&row); err != iterator.Done {
+			t.Fatalf("extra row: %v, %v", row, err)
+		}
+		externalRows(t, client, "SELECT id FROM gcs."+table+" WHERE _FILE_NAME = 'gs://bucket/data2.parquet'", []int64{2})
+	}
 }

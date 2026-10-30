@@ -201,6 +201,14 @@
       "updateTime": "2026-10-23T18:04:35Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/query-cloud-storage-data",
+      "file": "third_party/bigquery_docs/query-cloud-storage-data.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/query-cloud-storage-data",
+      "title": "Query Cloud Storage data in external tables",
+      "sha256": "8dde83911f023963f293e37359ac6ef93d5151e58321590657d0d300902cf608",
+      "updateTime": "2026-10-27T12:15:41Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/reference/bq-cli-reference",
       "file": "third_party/bigquery_docs/reference/bq-cli-reference.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/reference/bq-cli-reference",
