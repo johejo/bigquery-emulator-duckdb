@@ -136,16 +136,19 @@ inline constexpr int64_t kConvertedLastInteger = 18;
 // A column of a Parquet file in the shape BigQuery loads it: a group is a STRUCT, and a LIST group
 // or a repeated field a LIST.
 struct ParquetColumn {
-  enum class Kind : uint8_t { kLeaf, kStruct, kList, kMap };
+  // kOther is a MAP or LIST group of another shape.
+  enum class Kind : uint8_t { kLeaf, kStruct, kList, kMap, kOther };
 
   // GeoParquet WKB edge interpretation; ordinary binary columns have kNone.
   enum class Edges : uint8_t { kNone, kPlanar, kSpherical };
   Edges edges = Edges::kNone;
+  // Whether its SchemaElement is REQUIRED; a kList of a repeated field is not.
   bool required = false;
 
   std::string name;
   Kind kind = Kind::kLeaf;
-  // kStruct: the fields. kList: the element, whose name is the list's.
+  // kStruct: the fields. kList: the element, whose name is the list's. kMap: the list of its
+  // entries, each a kStruct of the key and the value.
   std::vector<ParquetColumn> children;
   // A kStruct of one field that DuckDB reads as that field.
   bool unwrapped = false;
@@ -170,12 +173,12 @@ struct ParquetColumn {
   [[nodiscard]] bool IsWideDecimal() const;
   // An INT32 or INT64 that DuckDB reads as an integer.
   [[nodiscard]] bool IsInteger() const;
-  // Whether this column or a descendant is unwrapped, nullable or has null_elements, which a load
-  // handles after DuckDB reads it.
+  // Whether this column or a descendant is a kMap, unwrapped, nullable or has null_elements, which
+  // a read reshapes after DuckDB reads it.
   [[nodiscard]] bool Reshaped() const;
   // Whether this column or a descendant is a wide DECIMAL.
   [[nodiscard]] bool HasWideDecimal() const;
-  // The field of a kStruct named `field` in any case, or null.
+  // The field of a kStruct, or the entries of a kMap, named `field` in any case, or null.
   [[nodiscard]] const ParquetColumn* Child(std::string_view field) const;
 };
 

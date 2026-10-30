@@ -141,6 +141,21 @@ func TestParquetLists(t *testing.T) {
 			schema: "a RECORD REPEATED (x INTEGER NULLABLE, y INTEGER NULLABLE)",
 			rows:   []string{`{"a":[{"x":1,"y":2},{"x":3,"y":4}]}`},
 		},
+		// Nested groups are converted into STRUCT types, as
+		// [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
+		// states, where DuckDB reads a repeated group of one field as a list of the field.
+		{
+			name: "repeated_group_of_one", inference: true,
+			file:   writeParquetColumn(t, group("a", repeated, integer("x", optional)), pair(2, 1, 2)),
+			schema: "a RECORD REPEATED (x INTEGER NULLABLE)",
+			rows:   []string{`{"a":[{"x":1},{"x":2}]}`},
+		},
+		{
+			name:   "repeated_group_of_one_without_inference",
+			file:   writeParquetColumn(t, group("a", repeated, integer("x", optional)), pair(2, 1, 2)),
+			schema: "a RECORD REPEATED (x INTEGER NULLABLE)",
+			rows:   []string{`{"a":[{"x":1},{"x":2}]}`},
+		},
 		{
 			name: "repeated_leaf", inference: true,
 			file:   writeParquetColumn(t, integer("a", repeated), pair(1, 1, 2)),

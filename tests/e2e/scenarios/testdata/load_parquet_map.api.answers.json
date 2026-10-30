@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "cases": {
+    "load_map": {
+      "project": "johejo-sandbox",
+      "run": "6nuzawjlggta22esmxzj6gw5g7",
+      "steps": {
+        "completed_load": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "REQUIRED",
+                        "name": "key",
+                        "type": "INTEGER"
+                      },
+                      {
+                        "mode": "NULLABLE",
+                        "name": "value",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "key_value",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "m",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"m\":{\"key_value\":[{\"key\":1,\"value\":2}]}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

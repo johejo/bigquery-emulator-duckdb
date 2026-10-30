@@ -327,6 +327,8 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
   }
   const bool repeated =
       IntField(element, parquet::kElementRepetition).value_or(0) == parquet::kRepeated;
+  column.required =
+      IntField(element, parquet::kElementRepetition).value_or(0) == parquet::kRequired;
   const int64_t count = IntField(element, parquet::kElementChildren).value_or(0);
   if (count == 0) {
     column.type = IntField(element, parquet::kElementType).value_or(-1);
@@ -344,30 +346,39 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
       elements.push_back(next);
       column.children.push_back(Column(schema, next, depth + 1, list_inference));
     }
+    const auto repeated_child = [&] {
+      return count == 1 && column.children.front().kind == ParquetColumn::Kind::kList &&
+             IntField(schema.at(elements.front()), parquet::kElementRepetition).value_or(0) ==
+                 parquet::kRepeated;
+    };
     if (Annotated(element, parquet::kLogicalMap,
                   {parquet::kConvertedMap, parquet::kConvertedMapKeyValue})) {
-      column.kind = ParquetColumn::Kind::kMap;
+      // A repeated group of a required key and a value, which DuckDB reads as a MAP.
+      const auto& entry = column.children.front().children;
+      column.kind = repeated_child() && entry.front().kind == ParquetColumn::Kind::kStruct &&
+                            entry.front().children.size() == 2 &&
+                            IntField(schema.at(entry.front().children.front().element),
+                                     parquet::kElementRepetition)
+                                    .value_or(0) == parquet::kRequired
+                        ? ParquetColumn::Kind::kMap
+                        : ParquetColumn::Kind::kOther;
     } else if (Annotated(element, parquet::kLogicalList, {parquet::kConvertedList})) {
       const ParquetColumn& child = column.children.front();
-      if (count != 1 || child.kind != ParquetColumn::Kind::kList ||
-          IntField(schema.at(elements.front()), parquet::kElementRepetition).value_or(0) !=
-              parquet::kRepeated) {
-        column.kind = ParquetColumn::Kind::kMap;
+      if (!repeated_child()) {
+        column.kind = ParquetColumn::Kind::kOther;
       } else {
         // A repeated group of one field is that field's list, unless its name marks it as an
-        // element struct of one field. DuckDB reads either as the field's list.
+        // element struct of one field.
         ParquetColumn item = child.children.front();
         bool null_elements = false;
-        if (item.kind == ParquetColumn::Kind::kStruct && item.children.size() == 1) {
-          if (list_inference && child.name != "array" && child.name != column.name + "_tuple") {
-            // Copy before replacing the parent, whose assignment destroys this child.
-            item = ParquetColumn(item.children.front());
-            null_elements =
-                IntField(schema.at(item.element), parquet::kElementRepetition).value_or(0) ==
-                parquet::kOptional;
-          } else {
-            item.unwrapped = true;
-          }
+        if (list_inference && item.kind == ParquetColumn::Kind::kStruct &&
+            item.children.size() == 1 && child.name != "array" &&
+            child.name != column.name + "_tuple") {
+          // Copy before replacing the parent, whose assignment destroys this child.
+          item = ParquetColumn(item.children.front());
+          null_elements =
+              IntField(schema.at(item.element), parquet::kElementRepetition).value_or(0) ==
+              parquet::kOptional;
         }
         if (list_inference) {
           if (item.kind == ParquetColumn::Kind::kList) {
@@ -391,6 +402,10 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
   // Writers differ in the repetition they give the schema's root, which is the row.
   if (!repeated || depth == 0) {
     return column;
+  }
+  // DuckDB reads a repeated group of one field as a list of the field.
+  if (column.kind == ParquetColumn::Kind::kStruct && column.children.size() == 1) {
+    column.unwrapped = true;
   }
   ParquetColumn list;
   list.name = column.name;
@@ -453,7 +468,7 @@ bool ParquetColumn::IsInteger() const {
 }
 
 bool ParquetColumn::Reshaped() const {
-  return unwrapped || null_elements ||
+  return kind == Kind::kMap || unwrapped || null_elements ||
          std::ranges::any_of(children, [](const ParquetColumn& child) { return child.Reshaped(); });
 }
 
@@ -464,7 +479,7 @@ bool ParquetColumn::HasWideDecimal() const {
 }
 
 const ParquetColumn* ParquetColumn::Child(std::string_view field) const {
-  if (kind != Kind::kStruct) {
+  if (kind != Kind::kStruct && kind != Kind::kMap) {
     return nullptr;
   }
   const auto found = std::ranges::find_if(children, [field](const ParquetColumn& child) {

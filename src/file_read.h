@@ -47,8 +47,8 @@ struct ParquetSources {
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
                                    bool list_inference);
 
-// Restores GEOGRAPHY and wide DECIMAL types in an inferred schema. Wide decimals require
-// BIGNUMERIC in targets.
+// Restores GEOGRAPHY and wide DECIMAL types and REQUIRED modes in an inferred schema. Wide
+// decimals require BIGNUMERIC in targets.
 void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
                          const std::vector<DecimalTargetType>& targets);
 

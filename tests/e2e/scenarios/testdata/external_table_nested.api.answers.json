@@ -1,0 +1,760 @@
+{
+  "version": 1,
+  "cases": {
+    "declared_extra_field": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<x INT64, y INT64, z INT64>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "name": "y",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "name": "z",
+                    "type": "INTEGER"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2,\"z\":null}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "declared_missing_field": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<x INT64>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "declared_reordered_fields": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<y INT64, x INT64>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "name": "y",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"y\":2,\"x\":1}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "declared_repeated_as_scalar": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "r"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "INT64"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "r",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Schema mismatch: field 'Msg_0_CLOUD_QUERY_TABLE.r' is repeated in file (max repetition level 1) but expected to be optional/required in BigQuery File: gs://johejo-sandbox-us/3d5zdthcu3rrdrwxbkso6tjjkk/declared_repeated_as_scalar/source.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Schema mismatch: field 'Msg_0_CLOUD_QUERY_TABLE.r' is repeated in file (max repetition level 1) but expected to be optional/required in BigQuery File: gs://johejo-sandbox-us/3d5zdthcu3rrdrwxbkso6tjjkk/declared_repeated_as_scalar/source.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "map_detected": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "m"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<key_value ARRAY<STRUCT<key INT64, value INT64>>>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "REQUIRED",
+                        "name": "key",
+                        "type": "INTEGER"
+                      },
+                      {
+                        "mode": "NULLABLE",
+                        "name": "value",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "key_value",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "m",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"m\":{\"key_value\":[{\"key\":1,\"value\":2}]}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "nested_detected": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<x INT64, y INT64>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "r"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "ARRAY<INT64>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "g"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "ARRAY<STRUCT<x INT64>>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "l"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<list ARRAY<STRUCT<element INT64>>>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "NULLABLE",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "required_detected": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "STRUCT<x INT64, y INT64>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "l"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "STRUCT<list ARRAY<STRUCT<element INT64>>>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "REQUIRED",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":null},\"l\":{\"list\":[{\"element\":2}]}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "declared_required_field": {
+      "project": "johejo-sandbox",
+      "run": "3d5zdthcu3rrdrwxbkso6tjjkk",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<x INT64, y INT64>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "declared_required_column_null": {
+      "project": "johejo-sandbox",
+      "run": "6nuzawjlggta22esmxzj6gw5g7",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "STRUCT<x INT64, y INT64>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "declared_required_field_null": {
+      "project": "johejo-sandbox",
+      "run": "6nuzawjlggta22esmxzj6gw5g7",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "s"
+                },
+                {
+                  "v": "YES"
+                },
+                {
+                  "v": "STRUCT<x INT64, y INT64>"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "REQUIRED",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "name": "s",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":null}}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

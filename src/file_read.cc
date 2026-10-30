@@ -332,9 +332,27 @@ std::string ParquetShape(const std::string& sql, const ParquetColumn& column, in
         value == name ? sql : std::format("list_transform({}, lambda {}: {})", sql, name, value);
     return column.nullable ? std::format("coalesce({}, [])", list) : list;
   }
+  if (column.kind == ParquetColumn::Kind::kMap) {
+    // BigQuery reads a MAP as the RECORD of its repeated key_value group.
+    const ParquetColumn& entries = column.children.front();
+    const ParquetColumn& entry = entries.children.front();
+    const std::string name = "_p" + std::to_string(depth);
+    std::vector<std::string> fields;
+    for (const auto& [child, part] :
+         {std::pair{&entry.children.front(), "key"}, {&entry.children.back(), "value"}}) {
+      fields.push_back(
+          std::format("{} := {}", QuoteIdentifier(child->name),
+                      ParquetShape(std::format("struct_extract({}, {})", name, QuoteLiteral(part)),
+                                   *child, depth + 1, false)));
+    }
+    return std::format(
+        "CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1} := list_transform(map_entries({0}), "
+        "lambda {2}: struct_pack({3}))) END",
+        sql, QuoteIdentifier(entries.name), name, Join(fields, ", "));
+  }
   if (column.kind != ParquetColumn::Kind::kStruct) {
     throw ApiError::Unsupported(
-        "loading a Parquet MAP with a STRUCT of one field that DuckDB reads as the field");
+        "reading a Parquet MAP or LIST group of a shape DuckDB reads otherwise");
   }
   std::vector<std::string> fields;
   for (const ParquetColumn& child : column.children) {
@@ -396,6 +414,25 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column,
         column->precision, column->scale));
   }
   field.type = FieldType::kBigNumeric;
+}
+
+// Makes `field` and its fields REQUIRED where `column` and its fields are, as BigQuery detects
+// them; DuckDB reads every column as nullable.
+void DetectModes(FieldSchema& field, const ParquetColumn* column) {
+  if (column == nullptr) {
+    return;
+  }
+  if (field.mode == FieldMode::kRepeated) {
+    if (column->kind != ParquetColumn::Kind::kList) {
+      return;
+    }
+    column = &column->children.front();
+  } else if (column->required) {
+    field.mode = FieldMode::kRequired;
+  }
+  for (FieldSchema& child : field.fields) {
+    DetectModes(child, column->Child(child.name));
+  }
 }
 
 // `field` with each BIGNUMERIC or Base64-encoded BYTES in it, at any depth, a STRING.
@@ -508,9 +545,6 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
             }
             found->edges = edges == "planar" ? ParquetColumn::Edges::kPlanar
                                              : ParquetColumn::Edges::kSpherical;
-            const auto& element = metadata.Field(parquet::kSchema)->elements.at(found->element);
-            const auto* repetition = element.Field(parquet::kElementRepetition);
-            found->required = repetition != nullptr && repetition->integer == 0;
           }
         } catch (const json::exception& error) {
           throw ApiError::Invalid(std::string("Invalid GeoParquet metadata: ") + error.what());
@@ -564,10 +598,10 @@ void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& 
                          const std::vector<DecimalTargetType>& targets) {
   for (FieldSchema& field : schema) {
     DetectDecimals(field, columns.Child(field.name), targets);
+    DetectModes(field, columns.Child(field.name));
     const ParquetColumn* column = columns.Child(field.name);
     if (column != nullptr && column->edges != ParquetColumn::Edges::kNone) {
       field.type = FieldType::kGeography;
-      field.mode = column->required ? FieldMode::kRequired : FieldMode::kNullable;
     }
   }
 }

@@ -1,0 +1,71 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run 6nuzawjlggta22esmxzj6gw5g7; the answers
+# sidecar keeps the observations. external_table_nested.api.yaml records that external tables
+# read a MAP the same way.
+description: >-
+  A Parquet load of a MAP column, which BigQuery reads as the RECORD of its repeated key_value
+  group, keeping the key REQUIRED.
+# The fixture was written with arrow-go v18.8.0's Parquet writer, uncompressed, without statistics
+# or dictionaries, and base64-encoded without newlines: the row {m: {1: 2}} of
+# `optional group m (MAP) {repeated group key_value {required int64 key; optional int64 value}}`.
+vars:
+  dataset: bqa_${run}_${case}
+  map_parquet: UEFSMRUAFSgVKCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgIBAAAAAAAAABUAFSgVKCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgMCAAAAAAAAABUEGVxIBnNjaGVtYRUCADUCGAFtFQIVAkwsAAAANQQYCWtleV92YWx1ZRUEABUEJQAYA2tleQAVBCUCGAV2YWx1ZQAWAhkcGSwmCBwVBBklAAYZOAFtCWtleV92YWx1ZQNrZXkVABYCFk4WTiYISRwVABUAFQIAAAAmVhwVBBklAAYZOAFtCWtleV92YWx1ZQV2YWx1ZRUAFgIWThZOJlZJHBUAFQAVAgAAABacARYCJggWnAEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZLBwAABwAAADcAAAAUEFSMQ==
+templates:
+  load:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            jobReference: {projectId: '${project}', location: US}
+            configuration:
+              load:
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+                sourceFormat: PARQUET
+          uploadBase64: '${contents}'
+        bind: {job: /body/jobReference/jobId}
+      - name: completed_load
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t) FROM `${project}.${dataset}.t` AS t ORDER BY 1
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: load_map
+    template: load
+    vars: {contents: '${map_parquet}'}
+    expect: {"completed_load": {"status": {"state": "DONE"}}, "get": {"schema": {"fields": [{"fields": [{"fields": [{"mode": "REQUIRED", "name": "key", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "value", "type": "INTEGER"}], "mode": "REPEATED", "name": "key_value", "type": "RECORD"}], "mode": "NULLABLE", "name": "m", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"m\":{\"key_value\":[{\"key\":1,\"value\":2}]}}"}]}], "status": 200}}
