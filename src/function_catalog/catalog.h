@@ -85,8 +85,11 @@ struct FunctionEntry {
 // The application assembles a catalog before passing it to the translator.
 class Catalog {
  public:
-  explicit Catalog(TimestampPrecision precision) : timestamp_precision_(precision) {}
+  // `bigquery_query_forms` rejects query forms GoogleSQL accepts but BigQuery does not.
+  Catalog(TimestampPrecision precision, bool bigquery_query_forms)
+      : timestamp_precision_(precision), bigquery_query_forms_(bigquery_query_forms) {}
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
+  [[nodiscard]] bool bigquery_query_forms() const { return bigquery_query_forms_; }
   void Add(std::string_view name, FunctionEntry entry);
   // Composition omits service-dependent forms whose backend capability is absent.
   void Remove(std::string_view name);
@@ -107,6 +110,7 @@ class Catalog {
 
  private:
   TimestampPrecision timestamp_precision_;
+  bool bigquery_query_forms_;
   std::unordered_map<std::string_view, FunctionEntry> functions_;
 };
 

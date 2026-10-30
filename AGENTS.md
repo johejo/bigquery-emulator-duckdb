@@ -170,9 +170,9 @@ expected result from one layer to another.
   in the probes or the docs.
 - **GoogleSQL's compliance tests** (`just compliance`) check query results broadly against
   GoogleSQL's reference implementation, which is not BigQuery. They run the backend functions
-  with GoogleSQL's behavior, so select a BigQuery difference in a backend function through
-  `functions_duckdb::Options`, enabled in `BigQueryFunctionOptions()`, rather than listing the
-  statements that show it; end-to-end tests check the difference. CI fails on both an unlisted
+  with GoogleSQL's behavior, so select a BigQuery difference in a backend function, or a query form
+  BigQuery rejects, through `functions_duckdb::Options`, enabled in `BigQueryFunctionOptions()`,
+  rather than listing the statements that show it; end-to-end tests check the difference. CI fails on both an unlisted
   failure and a listed failure that passes; `just compliance-summary` names both. Remove fixed
   statements from `tests/compliance/known_errors.textproto`, or the platform-specific file.
   List newly failing statements by name with the reason, including failures exposed by adding

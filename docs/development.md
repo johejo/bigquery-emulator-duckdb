@@ -28,8 +28,9 @@ Clang-tidy runs through the repository's [Bazel aspect](../tools/clang_tidy/READ
 
 For comparing results with GoogleSQL's reference implementation (`just reference`),
 `shell --semantics=googlesql` drops every BigQuery difference the emulator selects: queries can
-call exactly GoogleSQL's built-in functions, which behave as GoogleSQL's do, and geography bounds
-are not expanded outward by one floating-point step. TIMESTAMP values retain nanoseconds across
+call exactly GoogleSQL's built-in functions, which behave as GoogleSQL's do, use query forms
+BigQuery rejects, such as INTERSECT ALL, and geography bounds are not expanded outward by one
+floating-point step. TIMESTAMP values retain nanoseconds across
 0001–9999, including in arrays, structs and comparisons; shell output shows them as timestamp text.
 Operations still using the microsecond backend reject inputs that would lose precision, and
 `RANGE<TIMESTAMP>` bounds remain limited to microseconds. The default, `bigquery`, keeps BigQuery's

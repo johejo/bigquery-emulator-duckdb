@@ -222,7 +222,9 @@ to GoogleSQL's behavior. The adapters read
 give each function only its own flags, as context the registration owns
 (`RegisterWithContext` and `ApplyWithContext` in [duckdb_functions](../src/duckdb_functions/)).
 [`BigQueryFunctionOptions()`](../src/function_options.h) selects every difference, and is the
-default of `Backend`, `SqlRuntime`, `Emulator` and `RegisterBackendFunctions`.
+default of `Backend`, `SqlRuntime`, `Emulator` and `RegisterBackendFunctions`. Its
+`bigquery_query_forms` reaches the translator through the function catalog instead, which then
+rejects query forms GoogleSQL accepts and BigQuery does not, such as INTERSECT ALL.
 
 ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapter receives
 connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
