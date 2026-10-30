@@ -520,6 +520,10 @@ const Definitions& GeographyDefinitions() {
                         EachRow<SetOperation<S2BooleanOperation::OpType::DIFFERENCE>>);
     definitions->Scalar("bq_st_boundary", {kGeography}, kGeography,
                         EachRow<Call<googlesql_geography::Boundary>>);
+    definitions->Scalar("bq_st_simplify", {kGeography, kDouble}, kGeography,
+                        EachRow<Call<googlesql_geography::Simplify>>);
+    definitions->Scalar("bq_st_snaptogrid", {kGeography, kDouble}, kGeography,
+                        EachRow<Call<googlesql_geography::SnapToGrid>>);
     definitions->Scalar("bq_st_touches", {kGeography, kGeography}, kBoolean,
                         EachRow<Call<googlesql_geography::Touches>>);
     {
@@ -772,6 +776,9 @@ GeographyFunctions() {
       Define("ST_DIFFERENCE", {{.arity = 2, .spelling = "bq_st_difference($1, $2)"}},
              {.uses = kUses}),
       Define("ST_BOUNDARY", {{.arity = 1, .spelling = "bq_st_boundary($1)"}}, {.uses = kUses}),
+      Define("ST_SIMPLIFY", {{.arity = 2, .spelling = "bq_st_simplify($1, $2)"}}, {.uses = kUses}),
+      Define("ST_SNAPTOGRID", {{.arity = 2, .spelling = "bq_st_snaptogrid($1, $2)"}},
+             {.uses = kUses}),
       Define("ST_TOUCHES", {{.arity = 2, .spelling = "bq_st_touches($1, $2)"}}, {.uses = kUses}),
       Define("ST_COVERS", {{.arity = 2, .spelling = "bq_st_covers($1, $2)"}}, {.uses = kUses}),
       Define("ST_CONTAINS", {{.arity = 2, .spelling = "bq_st_contains($1, $2)"}}, {.uses = kUses}),

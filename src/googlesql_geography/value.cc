@@ -665,6 +665,43 @@ absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts) {
   return Read(*output);
 }
 
+absl::StatusOr<Geography> Snap(const Geography& geography,
+                               const S2Builder::SnapFunction& snap_function, bool simplify) {
+  S2Builder::Options options(snap_function);
+  options.set_simplify_edge_chains(simplify);
+  S2Builder builder(options);
+  using PolylineLayer = s2builderutil::S2PolylineVectorLayer;
+  PolylineLayer::Options line_options;
+  line_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+  line_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
+  line_options.set_duplicate_edges(PolylineLayer::Options::DuplicateEdges::MERGE);
+  BooleanResult output;
+  std::vector<std::unique_ptr<S2Builder::Layer>> layers;
+  layers.push_back(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
+  layers.push_back(std::make_unique<PolylineLayer>(&output.lines, line_options));
+  layers.push_back(std::make_unique<s2builderutil::S2PolygonLayer>(&output.polygon));
+  std::vector<std::unique_ptr<S2Builder::Layer>> normalized =
+      s2builderutil::NormalizeClosedSet(std::move(layers));
+  builder.StartLayer(std::move(normalized.at(0)));
+  for (const S2Point& point : geography.points) {
+    builder.AddPoint(point);
+  }
+  builder.StartLayer(std::move(normalized.at(1)));
+  for (const std::vector<S2Point>& line : geography.lines) {
+    builder.AddPolyline(line);
+  }
+  builder.StartLayer(std::move(normalized.at(2)));
+  builder.AddIsFullPolygonPredicate(S2Builder::IsFullPolygon(geography.Full()));
+  if (!geography.polygons.empty()) {
+    builder.AddPolygon(*ToS2Polygon(geography));
+  }
+  S2Error error;
+  if (!builder.Build(&error)) {
+    return absl::InternalError("S2Builder failed: " + std::string(error.message()));
+  }
+  return Read(output);
+}
+
 absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,
                                              const MutableS2ShapeIndex& b,
                                              S2BooleanOperation::OpType operation) {

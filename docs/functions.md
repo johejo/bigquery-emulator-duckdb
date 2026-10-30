@@ -52,7 +52,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 60 | 5 | 6 | 0 |
+| [Geography functions](#geography-functions) | 62 | 5 | 4 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -293,8 +293,8 @@ functions.
 | [`ST_PERIMETER`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_POINTN`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_REGIONSTATS`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Unsupported |  |  |
-| [`ST_SIMPLIFY`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Unsupported |  |  |
-| [`ST_SNAPTOGRID`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Unsupported |  |  |
+| [`ST_SIMPLIFY`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
+| [`ST_SNAPTOGRID`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_STARTPOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_TOUCHES`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_UNION`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
