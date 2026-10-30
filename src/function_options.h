@@ -20,6 +20,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .json_preserve_negative_zero = true,
       .collate_und_ci_only = true,
       .intersect_except_distinct_only = true,
+      .arrays_without_null_elements = true,
       .collation = {.like_unescaped_underscore = true},
   };
 }

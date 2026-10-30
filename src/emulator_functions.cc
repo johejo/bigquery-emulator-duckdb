@@ -64,6 +64,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
       options.timestamp_precision,
       function_catalog::QueryRestrictions{
           .intersect_except_distinct_only = options.intersect_except_distinct_only,
+          .arrays_without_null_elements = options.arrays_without_null_elements,
       });
   translator::AddBuiltinFunctions(*functions);
   functions->Add("COLLATE",
