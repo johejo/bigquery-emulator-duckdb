@@ -165,9 +165,9 @@ expected result from one layer to another.
   runner in `tests/e2e/rest_*.yml`.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
   `docs/api.md`, `docs/storage.md`, `docs/sql.md`, `docs/options.md`, `docs/functions.md` and
-  `docs/function-types*`; never edit those by hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
-  from GoogleSQL's signatures and the samples in `tools/function_probe_hints.txt`, and
-  `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
+  `docs/function-types*`; never edit those by hand, and commit them regenerated when their
+  inputs change. `//:function_probe` builds calls from GoogleSQL's signatures and the samples in
+  `tools/function_probe_hints.txt`, and `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
   class of forms with an `elements` or `argument` hint that matches their signatures, and extend
   the probe only for what hints cannot express. Probe the forms BigQuery runs, whether it
   documents them or answers an unverified case; a form it rejects, such as GoogleSQL syntax it
@@ -227,9 +227,8 @@ and limits in [docs/storage-api.md](docs/storage-api.md), implementation details
 [tools/restprobe/README.md](tools/restprobe/README.md). Describe the current state; leave plans,
 progress and validation records to pull requests and Git history. The support tables listed
 above are generated; the preambles under `tools/restprobe/` and `tools/storageprobe/` are their
-handwritten inputs. A
-probe's note is a sentence or a link to a section of `docs/compatibility.md` or
-`docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
+handwritten inputs. A probe's note is a sentence or a link to a section of
+`docs/compatibility.md` or `docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
 probe rejects to the probe. Describe emulator-specific limits and differences; do not restate
 BigQuery's normal semantics for supported features or narrate their implementation.
 
