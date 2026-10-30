@@ -164,3 +164,10 @@ SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, [2] AS y), (2, [1])])
 
 SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, ST_GEOGPOINT(1, 2) AS y)])
 !> error contains: must support ordering; Type GEOGRAPHY does not
+
+# APPROX_QUANTILES with RESPECT NULLS is unsupported; BigQuery keeps the NULL, which a result
+# array cannot hold.
+SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
+  RANGE<DATE> '[2020-01-01, 2020-02-01)', CAST(NULL AS RANGE<DATE>),
+  RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']) AS r
+!> error: Array cannot have a null element; error in writing field f0_
