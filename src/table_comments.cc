@@ -29,6 +29,19 @@ json ParseComment(const std::optional<std::string>& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
+// Whether `field` or one of its fields has a type or setting that external Parquet reads do not
+// detect.
+bool UnsupportedExternalField(const FieldSchema& field) {
+  return field.max_length || field.precision || field.scale || field.collation ||
+         !field.default_value_expression.empty() ||
+         (field.type != FieldType::kInteger && field.type != FieldType::kString &&
+          field.type != FieldType::kBoolean && field.type != FieldType::kFloat &&
+          field.type != FieldType::kBytes && field.type != FieldType::kNumeric &&
+          field.type != FieldType::kDate && field.type != FieldType::kTime &&
+          field.type != FieldType::kTimestamp && field.type != FieldType::kRecord) ||
+         std::ranges::any_of(field.fields, UnsupportedExternalField);
+}
+
 // The cloneDefinition or snapshotDefinition `definition` that the emulator recorded in a table
 // comment, which TableMetadataFromJson ignores since clients cannot set them; `time` names its
 // time.
@@ -97,16 +110,7 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
         metadata.snapshot) {
       throw ApiError::Unsupported("external table storage options");
     }
-    const auto unsupported = std::ranges::find_if(schema, [](const FieldSchema& field) {
-      // The types and modes that external Parquet reads detect for scalar columns.
-      return field.mode == FieldMode::kRepeated || field.max_length || field.precision ||
-             field.scale || field.collation || !field.default_value_expression.empty() ||
-             (field.type != FieldType::kInteger && field.type != FieldType::kString &&
-              field.type != FieldType::kBoolean && field.type != FieldType::kFloat &&
-              field.type != FieldType::kBytes && field.type != FieldType::kNumeric &&
-              field.type != FieldType::kDate && field.type != FieldType::kTime &&
-              field.type != FieldType::kTimestamp);
-    });
+    const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);
     if (unsupported != schema.end()) {
       throw ApiError::Unsupported("this external table column definition: " + unsupported->name);
     }

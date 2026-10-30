@@ -292,6 +292,7 @@ query `CREATE SNAPSHOT TABLE` | CREATE TEMP TABLE s (id INT64); CREATE SNAPSHOT 
 query `CREATE SNAPSHOT TABLE` | CREATE TABLE tagged (id INT64) OPTIONS (tags = [('123456789012/env', 'test')]); CREATE SNAPSHOT TABLE n CLONE tagged
 note `CREATE SNAPSHOT TABLE` | See [Table snapshots](compatibility.md#table-snapshots).
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (s STRUCT<x INT64>, r ARRAY<STRUCT<y STRING>>) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE IF NOT EXISTS n (a INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])

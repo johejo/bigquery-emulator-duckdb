@@ -1,0 +1,137 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, runs 3d5zdthcu3rrdrwxbkso6tjjkk and
+# 6nuzawjlggta22esmxzj6gw5g7 (the declared_required cases), with sources in the bucket
+# johejo-sandbox-us; the answers sidecar keeps the observations.
+description: >-
+  Schema detection and reads of nested and repeated columns of Parquet external tables, with
+  sources in a Cloud Storage bucket.
+# [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md) converts
+# nested groups into STRUCT types, and TestParquetLists records how loads read LIST groups. These
+# cases settle what that leaves open for external tables: REQUIRED fields of a group and of a LIST
+# group's elements keep their mode, a MAP is the RECORD of its repeated key_value group, and a
+# query matches the fields of a declared RECORD to the source's by name, dropping the source's
+# others and reading absent ones as NULL, and reads a NULL value of a NOT NULL column or field as
+# NULL.
+# Fixtures were written with arrow-go v18.8.0's Parquet writer, uncompressed, without statistics or
+# dictionaries, and base64-encoded without newlines:
+# - nested: rows {s: {x: 1, y: 2}, r: [1, 2], g: [{x: 3}, {x: 4}], l: [5, NULL]} and
+#   {s: NULL, r: [], g: [], l: NULL} of `optional group s {optional int64 x; optional int64 y}`,
+#   `repeated int64 r`, `repeated group g {optional int64 x}` and
+#   `optional group l (LIST) {repeated group list {optional int64 element}}`.
+# - required: the row {s: {x: 1, y: NULL}, l: [2]} of
+#   `required group s {required int64 x; optional int64 y}` and
+#   `required group l (LIST) {repeated group list {required int64 element}}`.
+# - map: the row {m: {1: 2}} of
+#   `optional group m (MAP) {repeated group key_value {required int64 key; optional int64 value}}`.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  nested_parquet: UEFSMRUAFR4VHiwVBBUAFQYVBhwAAAADAAAAAwIAAQAAAAAAAAAVABUeFR4sFQQVABUGFQYcAAAAAwAAAAMCAAIAAAAAAAAAFQAVOBU4LBUGFQAVBhUGHAAAAAIAAAADAgIAAAADAwEAAAAAAAAAAgAAAAAAAAAVABU6FTosFQYVABUGFQYcAAAAAgAAAAMCAwAAAAMKAAMAAAAAAAAABAAAAAAAAAAVABUqFSosFQYVABUGFQYcAAAAAgAAAAMCAwAAAAMLAAUAAAAAAAAAFQQZrEgGc2NoZW1hFQgANQIYAXMVBAAVBCUCGAF4ABUEJQIYAXkAFQQlBBgBcgA1BBgBZxUCABUEJQIYAXgANQIYAWwVAhUGTDwAAAA1BBgEbGlzdBUCABUEJQIYB2VsZW1lbnQAFgQZHBlcJggcFQQZJQAGGSgBcwF4FQAWBBZEFkQmCEkcFQAVABUCAAAAJkwcFQQZJQAGGSgBcwF5FQAWBBZEFkQmTEkcFQAVABUCAAAAJpABHBUEGSUABhkYAXIVABYGFl4WXiaQAUkcFQAVABUCAAAAJu4BHBUEGSUABhkoAWcBeBUAFgYWYBZgJu4BSRwVABUAFQIAAAAmzgIcFQQZJQAGGTgBbARsaXN0B2VsZW1lbnQVABYGFlAWUCbOAkkcFQAVABUCAAAAFpYDFgQmCBaWAxQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBlcHAAAHAAAHAAAHAAAHAAAAGkBAABQQVIx
+  required_parquet: UEFSMRUAFRAVECwVAhUAFQYVBhwAAAABAAAAAAAAABUAFQwVDCwVAhUAFQYVBhwAAAACAAAAAgAVABUoFSgsFQIVABUGFQYcAAAAAgAAAAIAAgAAAAIBAgAAAAAAAAAVBBl8SAZzY2hlbWEVBAA1ABgBcxUEABUEJQAYAXgAFQQlAhgBeQA1ABgBbBUCFQZMPAAAADUEGARsaXN0FQIAFQQlABgHZWxlbWVudAAWAhkcGTwmCBwVBBklAAYZKAFzAXgVABYCFjYWNiYISRwVABUAFQIAAAAmPhwVBBklAAYZKAFzAXkVABYCFjIWMiY+SRwVABUAFQIAAAAmcBwVBBklAAYZOAFsBGxpc3QHZWxlbWVudBUAFgIWThZOJnBJHBUAFQAVAgAAABa2ARYCJggWtgEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZPBwAABwAABwAAAD/AAAAUEFSMQ==
+  map_parquet: UEFSMRUAFSgVKCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgIBAAAAAAAAABUAFSgVKCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgMCAAAAAAAAABUEGVxIBnNjaGVtYRUCADUCGAFtFQIVAkwsAAAANQQYCWtleV92YWx1ZRUEABUEJQAYA2tleQAVBCUCGAV2YWx1ZQAWAhkcGSwmCBwVBBklAAYZOAFtCWtleV92YWx1ZQNrZXkVABYCFk4WTiYISRwVABUAFQIAAAAmVhwVBBklAAYZOAFtCWtleV92YWx1ZQV2YWx1ZRUAFgIWThZOJlZJHBUAFQAVAgAAABacARYCJggWnAEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZLBwAABwAAADcAAAAUEFSMQ==
+templates:
+  external:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/source.parquet', base64: '${contents}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${columns} OPTIONS (format = 'PARQUET', uris = ['${prefix}/source.parquet'])
+        observe:
+          status: /status
+          message: /body/error/message
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+      - name: columns
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT column_name, is_nullable, data_type FROM `${project}.${dataset}.INFORMATION_SCHEMA.COLUMNS` WHERE table_name = 't' ORDER BY ordinal_position
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t) FROM `${project}.${dataset}.t` AS t ORDER BY 1
+        observe:
+          status: /status
+          message: /body/error/message
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/source.parquet'}
+cases:
+  - name: nested_detected
+    template: external
+    vars: {contents: '${nested_parquet}', columns: ''}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRUCT<x INT64, y INT64>"}]}, {"f": [{"v": "r"}, {"v": "NO"}, {"v": "ARRAY<INT64>"}]}, {"f": [{"v": "g"}, {"v": "NO"}, {"v": "ARRAY<STRUCT<x INT64>>"}]}, {"f": [{"v": "l"}, {"v": "YES"}, {"v": "STRUCT<list ARRAY<STRUCT<element INT64>>>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "NULLABLE", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "NULLABLE", "name": "l", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"}]}], "status": 200}}
+  - name: required_detected
+    template: external
+    vars: {contents: '${required_parquet}', columns: ''}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "NO"}, {"v": "STRUCT<x INT64, y INT64>"}]}, {"f": [{"v": "l"}, {"v": "NO"}, {"v": "STRUCT<list ARRAY<STRUCT<element INT64>>>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "REQUIRED", "name": "s", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "REQUIRED", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "REQUIRED", "name": "l", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":{\"x\":1,\"y\":null},\"l\":{\"list\":[{\"element\":2}]}}"}]}], "status": 200}}
+  - name: map_detected
+    template: external
+    vars: {contents: '${map_parquet}', columns: ''}
+    expect: {"columns": {"rows": [{"f": [{"v": "m"}, {"v": "YES"}, {"v": "STRUCT<key_value ARRAY<STRUCT<key INT64, value INT64>>>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"fields": [{"mode": "REQUIRED", "name": "key", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "value", "type": "INTEGER"}], "mode": "REPEATED", "name": "key_value", "type": "RECORD"}], "mode": "NULLABLE", "name": "m", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"m\":{\"key_value\":[{\"key\":1,\"value\":2}]}}"}]}], "status": 200}}
+  - name: declared_missing_field
+    template: external
+    vars: {contents: '${nested_parquet}', columns: '(s STRUCT<x INT64>)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRUCT<x INT64>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "x", "type": "INTEGER"}], "name": "s", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1}}"}]}], "status": 200}}
+  - name: declared_extra_field
+    template: external
+    vars: {contents: '${nested_parquet}', columns: '(s STRUCT<x INT64, y INT64, z INT64>)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRUCT<x INT64, y INT64, z INT64>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}, {"name": "z", "type": "INTEGER"}], "name": "s", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2,\"z\":null}}"}]}], "status": 200}}
+  - name: declared_reordered_fields
+    template: external
+    vars: {contents: '${nested_parquet}', columns: '(s STRUCT<y INT64, x INT64>)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRUCT<y INT64, x INT64>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "y", "type": "INTEGER"}, {"name": "x", "type": "INTEGER"}], "name": "s", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":null}"}]}, {"f": [{"v": "{\"s\":{\"y\":2,\"x\":1}}"}]}], "status": 200}}
+  - name: declared_repeated_as_scalar
+    template: external
+    vars: {contents: '${nested_parquet}', columns: '(r INT64)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "r"}, {"v": "YES"}, {"v": "INT64"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"name": "r", "type": "INTEGER"}]}, "status": 200}, "query": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading data, error message: Schema mismatch: field 'Msg_0_CLOUD_QUERY_TABLE.r' is repeated in file (max repetition level 1) but expected to be optional/required in BigQuery File: ${prefix}/source.parquet", "reason": "invalid"}], "message": "Error while reading data, error message: Schema mismatch: field 'Msg_0_CLOUD_QUERY_TABLE.r' is repeated in file (max repetition level 1) but expected to be optional/required in BigQuery File: ${prefix}/source.parquet", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: declared_required_field
+    template: external
+    vars: {contents: '${nested_parquet}', columns: '(s STRUCT<x INT64 NOT NULL, y INT64>)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRUCT<x INT64, y INT64>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}], "name": "s", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2}}"}]}], "status": 200}}
+  - name: declared_required_column_null
+    template: external
+    vars: {contents: '${nested_parquet}', columns: '(s STRUCT<x INT64, y INT64> NOT NULL)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "NO"}, {"v": "STRUCT<x INT64, y INT64>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}], "mode": "REQUIRED", "name": "s", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2}}"}]}], "status": 200}}
+  - name: declared_required_field_null
+    template: external
+    vars: {contents: '${required_parquet}', columns: '(s STRUCT<x INT64, y INT64 NOT NULL>)'}
+    expect: {"columns": {"rows": [{"f": [{"v": "s"}, {"v": "YES"}, {"v": "STRUCT<x INT64, y INT64>"}]}]}, "create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "x", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "y", "type": "INTEGER"}], "name": "s", "type": "RECORD"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"s\":{\"x\":1,\"y\":null}}"}]}], "status": 200}}

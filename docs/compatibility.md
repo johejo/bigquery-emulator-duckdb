@@ -64,13 +64,14 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 GCS external tables support Parquet through `CREATE EXTERNAL TABLE` or `tables.insert`. Sources
 must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A table created
 without a schema takes the one BigQuery detects from the alphabetically last source file when it
-is created, so creation reads the sources. Columns must be top-level and non-repeated, of the
-Parquet types that the
-[Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
-convert to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, or a DECIMAL that NUMERIC
-holds. An explicit schema must give each column the type detected for it; coercions, ENUM,
-GeoParquet, column name conversions and the options that select other types are unsupported.
-Queries require every source file to have each column of the schema.
+is created, so creation reads the sources. Columns and their fields must be of the Parquet types
+that the [Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
+convert to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a DECIMAL that NUMERIC
+holds, or a group, which is a RECORD; a repeated field is REPEATED, so a LIST or MAP group is a
+RECORD of its repeated field. An explicit schema must give each column and field the type
+detected for it; coercions, ENUM, GeoParquet, column name conversions, list inference and the
+options that select other types are unsupported. Every source file must have each REQUIRED and
+REPEATED column and field of the schema.
 
 CSV, JSON, Bigtable, BigLake connections, Hive partitioning, metadata caching,
 Configuration updates, `ALTER TABLE`, stored views over external tables and time

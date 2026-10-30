@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <format>
 #include <iterator>
 #include <optional>
 #include <set>
@@ -126,14 +127,6 @@ std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetC
   }
 }
 
-// The mode of the column whose SchemaElement is `element`: a REPEATED field is a list, which the
-// emulator does not take.
-FieldMode DetectedMode(const ThriftValue& element) {
-  const ThriftValue* repetition = element.Field(parquet::kElementRepetition);
-  return repetition != nullptr && repetition->integer == parquet::kRequired ? FieldMode::kRequired
-                                                                            : FieldMode::kNullable;
-}
-
 const ThriftValue& Element(const ThriftValue& metadata, const ParquetColumn& column) {
   return metadata.Field(parquet::kSchema)->elements.at(column.element);
 }
@@ -174,6 +167,85 @@ bool StandardColumnName(std::string_view name) {
                              [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; });
 }
 
+// `name` in lower case, since BigQuery compares column names without case.
+std::string Folded(std::string_view name) {
+  std::string folded;
+  std::ranges::transform(name, std::back_inserter(folded),
+                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return folded;
+}
+
+// The field BigQuery detects for `column` of `metadata`, without list inference: a group is a
+// RECORD, a MAP the RECORD of its repeated key_value group, a repeated field REPEATED, and another
+// field REQUIRED or NULLABLE as the file declares it. None for a field of a type or name the
+// emulator does not detect.
+std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const ParquetColumn& column) {
+  if (!StandardColumnName(column.name)) {
+    return std::nullopt;
+  }
+  FieldSchema field{.name = column.name};
+  const ParquetColumn* value = &column;
+  if (column.kind == ParquetColumn::Kind::kList) {
+    field.mode = FieldMode::kRepeated;
+    value = &column.children.front();
+  } else {
+    const ThriftValue* repetition = Element(metadata, column).Field(parquet::kElementRepetition);
+    field.mode = repetition != nullptr && repetition->integer == parquet::kRequired
+                     ? FieldMode::kRequired
+                     : FieldMode::kNullable;
+  }
+  if (value->kind == ParquetColumn::Kind::kStruct || value->kind == ParquetColumn::Kind::kMap) {
+    field.type = FieldType::kRecord;
+    std::set<std::string> names;
+    for (const ParquetColumn& child : value->children) {
+      auto detected = DetectedField(metadata, child);
+      if (!detected || !names.insert(Folded(child.name)).second) {
+        return std::nullopt;
+      }
+      field.fields.push_back(*std::move(detected));
+    }
+    return field;
+  }
+  const auto type = DetectedType(Element(metadata, *value), *value);
+  if (!type) {
+    return std::nullopt;
+  }
+  field.type = *type;
+  return field;
+}
+
+// Whether a source whose column has the `detected` field, or none, can be read as `declared`:
+// the same type, REPEATED in both or neither, and each declared field one of the source's, or
+// NULLABLE and absent. BigQuery, as DuckDB's casts do, matches a RECORD's fields by name in any
+// case and drops the source's other fields.
+bool Matches(const FieldSchema& declared, const FieldSchema* detected) {
+  if (detected == nullptr) {
+    return declared.mode == FieldMode::kNullable;
+  }
+  if (declared.type != detected->type ||
+      (declared.mode == FieldMode::kRepeated) != (detected->mode == FieldMode::kRepeated)) {
+    return false;
+  }
+  return std::ranges::all_of(declared.fields, [detected](const FieldSchema& field) {
+    const auto found = std::ranges::find_if(detected->fields, [&field](const FieldSchema& source) {
+      return Folded(source.name) == Folded(field.name);
+    });
+    return Matches(field, found == detected->fields.end() ? nullptr : &*found);
+  });
+}
+
+// `field` with each REQUIRED column and field in it NULLABLE: BigQuery reads a NULL value of an
+// external table's REQUIRED column or field as NULL rather than failing.
+FieldSchema Unenforced(FieldSchema field) {
+  if (field.mode == FieldMode::kRequired) {
+    field.mode = FieldMode::kNullable;
+  }
+  for (FieldSchema& child : field.fields) {
+    child = Unenforced(std::move(child));
+  }
+  return field;
+}
+
 // Reads the footer of each source, rejecting GeoParquet, whose geometry BigQuery reads as
 // GEOGRAPHY rather than the BYTES its columns hold.
 ThriftValue SourceMetadata(const FileSource& source) {
@@ -200,19 +272,14 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
   std::vector<FieldSchema> schema;
   std::set<std::string> names;
   for (const ParquetColumn& column : columns.children) {
-    std::string folded;
-    std::ranges::transform(column.name, std::back_inserter(folded),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (!StandardColumnName(column.name) || !names.insert(folded).second) {
+    if (!StandardColumnName(column.name) || !names.insert(Folded(column.name)).second) {
       throw ApiError::Unsupported("detecting external table column name " + column.name);
     }
-    const ThriftValue& element = Element(metadata, column);
-    const auto type = DetectedType(element, column);
-    if (!type) {
+    auto field = DetectedField(metadata, column);
+    if (!field) {
       throw ApiError::Unsupported("detecting the type of external Parquet column " + column.name);
     }
-    schema.push_back(
-        FieldSchema{.name = column.name, .type = *type, .mode = DetectedMode(element)});
+    schema.push_back(*std::move(field));
   }
   if (schema.empty()) {
     throw ApiError::Invalid("External Parquet source " + last.uri + " has no columns");
@@ -225,6 +292,9 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
   return [definition = std::move(definition), schema = std::move(schema),
           client = std::move(client)](TemporaryFiles& files) mutable {
     const auto sources = StageFileSources(definition.uris, FileFormat::kParquet, client, files);
+    std::vector<FieldSchema> read_schema;
+    std::ranges::transform(schema, std::back_inserter(read_schema), Unenforced);
+    std::vector<std::string> reads;
     for (const auto& source : sources) {
       const ThriftValue metadata = SourceMetadata(source);
       const auto columns = ParquetColumns(metadata, false);
@@ -232,23 +302,26 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       // detect for it, so that no incompatible column is silently cast to the declared type.
       for (const auto& field : schema) {
         const auto* column = columns.Child(field.name);
-        if (column == nullptr && field.mode == FieldMode::kNullable) {
-          continue;
+        const auto detected = column == nullptr ? std::nullopt : DetectedField(metadata, *column);
+        if (detected && detected->mode == FieldMode::kRepeated &&
+            field.mode != FieldMode::kRepeated) {
+          throw ApiError::Invalid(std::format(
+              "Error while reading data, error message: Schema mismatch: field "
+              "'Msg_0_CLOUD_QUERY_TABLE.{}' is repeated in file (max repetition level 1) but "
+              "expected to be optional/required in BigQuery File: {}",
+              field.name, source.uri));
         }
-        if (column == nullptr || DetectedType(Element(metadata, *column), *column) != field.type ||
-            (field.mode == FieldMode::kRequired &&
-             DetectedMode(Element(metadata, *column)) != FieldMode::kRequired)) {
+        if ((column != nullptr && !detected) || !Matches(field, detected ? &*detected : nullptr)) {
           throw ApiError::Unsupported(std::string("external Parquet source schema for column ") +
                                       field.name);
         }
       }
+      // Each source is read with its own columns, which put back what DuckDB unwraps.
+      reads.push_back("SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
+                      FileReadQuery(ParquetReadOptions{.allow_missing_columns = true}, {source},
+                                    read_schema, columns) +
+                      ") AS source");
     }
-    std::vector<std::string> reads;
-    std::ranges::transform(sources, std::back_inserter(reads), [&schema](const FileSource& source) {
-      return "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-             FileReadQuery(ParquetReadOptions{.allow_missing_columns = true}, {source}, schema) +
-             ") AS source";
-    });
     if (reads.empty()) {
       throw ApiError::Invalid("External table source URIs match no files");
     }

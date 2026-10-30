@@ -404,7 +404,8 @@ absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
                    {
                        String(field.name),
                        Int(static_cast<int64_t>(i) + 1),
-                       String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
+                       // An ARRAY is never NULL.
+                       String(field.mode == FieldMode::kNullable ? "YES" : "NO"),
                        String(*type),
                        String("NEVER"),
                        kNull,

@@ -226,6 +226,72 @@ func TestExternalParquetDetectedTypes(t *testing.T) {
 	}
 }
 
+// Each source is read with its own columns, so that a field one source lacks is NULL and DuckDB's
+// reading of a repeated group of one field as a list of the field is undone in each.
+// external_table_nested.api.yaml records how BigQuery reads one source.
+func TestExternalParquetNestedSources(t *testing.T) {
+	configure(t)
+	optional, repeated := parquet.Repetitions.Optional, parquet.Repetitions.Repeated
+	group := func(name string, repetition parquet.Repetition, fields ...schema.Node) schema.Node {
+		return schema.MustGroup(schema.NewGroupNode(name, repetition, fields, -1))
+	}
+	integer := func(name string) schema.Node { return schema.NewInt64Node(name, optional, -1) }
+	type leaf struct {
+		values    []int64
+		def, reps []int16
+	}
+	write := func(fields schema.FieldList, leaves ...leaf) []byte {
+		return externalParquetFile(t, fields, func(rows file.SerialRowGroupWriter) {
+			for _, leaf := range leaves {
+				chunk, err := rows.NextColumn()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := chunk.(*file.Int64ColumnChunkWriter).WriteBatch(leaf.values, leaf.def, leaf.reps); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+	objects(t, map[string][]byte{
+		// The rows {s: {x: 1, y: 2}, g: [{x: 3}, {x: 4}]} and {s: NULL, g: []}.
+		"a.parquet": write(schema.FieldList{group("s", optional, integer("x"), integer("y")), group("g", repeated, integer("x"))},
+			leaf{[]int64{1}, []int16{2, 0}, []int16{0, 0}}, leaf{[]int64{2}, []int16{2, 0}, []int16{0, 0}},
+			leaf{[]int64{3, 4}, []int16{2, 2, 0}, []int16{0, 1, 0}}),
+		// The row {s: {x: 5}, g: [{x: 6}]}.
+		"b.parquet": write(schema.FieldList{group("s", optional, integer("x")), group("g", repeated, integer("x"))},
+			leaf{[]int64{5}, []int16{2}, []int16{0}}, leaf{[]int64{6}, []int16{2}, []int16{0}}),
+	})
+	client := start(t)
+	if err := externalDDL(t.Context(), client, `CREATE EXTERNAL TABLE gcs.nested
+		(s STRUCT<x INT64, y INT64>, g ARRAY<STRUCT<x INT64>>)
+		OPTIONS (format = 'PARQUET', uris = ['gs://bucket/*'])`); err != nil {
+		t.Fatal(err)
+	}
+	it, err := client.Query("SELECT TO_JSON_STRING(t) FROM gcs.nested AS t ORDER BY 1").Read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for {
+		var row []bigquery.Value
+		if err := it.Next(&row); err == iterator.Done {
+			break
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, row[0].(string))
+	}
+	want := []string{
+		`{"s":null,"g":[]}`,
+		`{"s":{"x":1,"y":2},"g":[{"x":3},{"x":4}]}`,
+		`{"s":{"x":5,"y":null},"g":[{"x":6}]}`,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("rows = %v, want %v", got, want)
+	}
+}
+
 // Through tables.insert, a table without a schema takes the one its sources have, as does
 // autodetect, which BigQuery's API documents.
 func TestExternalParquetDetectedThroughAPI(t *testing.T) {
@@ -268,24 +334,10 @@ func TestExternalParquetDetectsLastFile(t *testing.T) {
 func TestExternalParquetUndetectedTypes(t *testing.T) {
 	configure(t)
 	required := parquet.Repetitions.Required
-	group, err := schema.NewGroupNode("g", required, schema.FieldList{schema.NewInt64Node("x", required, -1)}, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
 	files := map[string][]byte{
-		"enum.parquet":     parquetColumns(t, parquetColumn{node: logicalNode(t, "e", required, schema.EnumLogicalType{}, parquet.Types.ByteArray, -1), values: []parquet.ByteArray{[]byte("A")}}),
-		"nanos.parquet":    parquetColumns(t, parquetColumn{node: logicalNode(t, "ts", required, schema.NewTimestampLogicalType(true, schema.TimeUnitNanos), parquet.Types.Int64, -1), values: []int64{1}}),
-		"wide.parquet":     parquetColumns(t, parquetColumn{node: logicalNode(t, "n", required, schema.NewDecimalLogicalType(18, 10), parquet.Types.Int64, -1), values: []int64{1}}),
-		"repeated.parquet": parquetColumns(t, parquetColumn{node: schema.NewInt64Node("r", parquet.Repetitions.Repeated, -1), values: []int64{1}, levels: []int16{1}, repetitions: []int16{0}}),
-		"group.parquet": externalParquetFile(t, schema.FieldList{group}, func(rows file.SerialRowGroupWriter) {
-			chunk, err := rows.NextColumn()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := chunk.(*file.Int64ColumnChunkWriter).WriteBatch([]int64{1}, nil, nil); err != nil {
-				t.Fatal(err)
-			}
-		}),
+		"enum.parquet":  parquetColumns(t, parquetColumn{node: logicalNode(t, "e", required, schema.EnumLogicalType{}, parquet.Types.ByteArray, -1), values: []parquet.ByteArray{[]byte("A")}}),
+		"nanos.parquet": parquetColumns(t, parquetColumn{node: logicalNode(t, "ts", required, schema.NewTimestampLogicalType(true, schema.TimeUnitNanos), parquet.Types.Int64, -1), values: []int64{1}}),
+		"wide.parquet":  parquetColumns(t, parquetColumn{node: logicalNode(t, "n", required, schema.NewDecimalLogicalType(18, 10), parquet.Types.Int64, -1), values: []int64{1}}),
 	}
 	objects(t, files)
 	client := start(t)

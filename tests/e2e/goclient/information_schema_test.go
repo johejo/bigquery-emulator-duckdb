@@ -68,7 +68,10 @@ func TestInformationSchema(t *testing.T) {
 				{"id", int64(1), "YES", "INT64"},
 				{"name", int64(2), "YES", "STRING"},
 				{"address", int64(3), "YES", "STRUCT<city STRING, zip STRING>"},
-				{"tags", int64(4), "YES", "ARRAY<STRING>"},
+				// BigQuery reports NO for a REPEATED column, as run 6nuzawjlggta22esmxzj6gw5g7 in
+				// project johejo-sandbox observed for an ARRAY<INT64> column; a STRUCT of an ARRAY
+				// is YES.
+				{"tags", int64(4), "NO", "ARRAY<STRING>"},
 			},
 		},
 		// Columns keep their BigQuery types and modes.

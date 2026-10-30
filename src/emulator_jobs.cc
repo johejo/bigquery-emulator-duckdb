@@ -368,11 +368,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
           StageParquetSources(sources, downloads, parquet_options->enable_list_inference);
       sources = std::move(staged.sources);
       parquet = std::move(staged.columns);
-      if (requested_schema.empty() &&
-          (parquet.HasWideDecimal() ||
-           std::ranges::any_of(parquet.children, [](const auto& column) {
-             return column.edges != ParquetColumn::Edges::kNone;
-           }))) {
+      if (requested_schema.empty()) {
         requested_schema = Prepare(FileReadQuery(read_options, sources, {}, parquet)).schema;
         DetectParquetSchema(requested_schema, parquet, ParseDecimalTargetTypes(config));
       }
