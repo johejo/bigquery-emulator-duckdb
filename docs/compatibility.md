@@ -1,8 +1,8 @@
 # Query and API limits
 
 This page records emulator-specific limits and behavior that the generated [SQL](sql.md),
-[function](functions.md) and [REST](api.md) support tables cannot show. For supported features,
-use BigQuery's documentation for their normal semantics. The tables check execution, not
+[DDL option](options.md), [function](functions.md) and [REST](api.md) support tables cannot
+show. For supported features, use BigQuery's documentation for their normal semantics. The tables check execution, not
 agreement with BigQuery's results or metadata.
 
 Deliberate compatibility exceptions are listed in the [README](../README.md#compatibility).

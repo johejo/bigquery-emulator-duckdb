@@ -4,6 +4,10 @@ SQL follows the path `Server` → `Emulator` → `SqlRuntime` → GoogleSQL anal
 translation → DuckDB execution. REST metadata operations and Storage RPCs use that same
 runtime and native catalog through the application facade.
 
+This page describes the implementation. Client-visible limits are in
+[compatibility.md](compatibility.md) and the [Storage API guide](storage-api.md), and the
+catalogs behind the generated support tables in [tools/restprobe](../tools/restprobe/README.md).
+
 ## SQL runtime and application ownership
 
 [`SqlRuntime`](../src/sql_runtime.h) owns the backend database, project registrations and
@@ -31,8 +35,7 @@ its native catalog and SQL APIs, and calls `ExecuteQuery` without REST job bookk
 It retains GoogleSQL reference compatibility options and the existing parameter/result
 conversion, but installs no external-service providers or callbacks. `just check` verifies
 that both `//:sql_runtime` and `//:compliance_test` have no transitive dependency on the
-facade, load acquisition, extraction or the Cloud Storage SDK. See the
-[separation plan](sql-runtime-separation-plan.md) for validation records.
+facade, load acquisition, extraction or the Cloud Storage SDK.
 
 A query result keeps its rows as the DuckDB chunks of the statement's result, which a job keeps
 for `jobs.getQueryResults`. A row is encoded as BigQuery's JSON cells only when a response reads
@@ -334,74 +337,7 @@ For analysis, `RoutineCatalog` resolves view and routine definitions against the
 and dataset, shares their dependency state and detects recursion. This lets queries use current
 definitions while keeping job-local objects out of persistent dependencies.
 
-## Function type probes
-
-The existing `//:function_probe` enumerates GoogleSQL signatures and builds calls using
-`tools/function_probe_hints.txt`; `tools/restprobe functions` aggregates their outcomes per
-function. That is separate from the specification-driven type coverage in
-[function-types.md](function-types.md).
-
-`tools/functioncoverage` is a Go generator for reviewed classes of type tables and prose domains
-in the saved BigQuery documentation. `just function-types-update` generates
-`tools/function_types.json`, a reviewable list of concrete argument and result types with local
-source pages. It extracts unary INPUT/OUTPUT tables and binary input matrices from mathematical
-and aggregate function pages, with explicit rules for synonyms and optional arguments. Unknown
-table shapes or types fail generation. `domains.go` expands reviewed STRING/BYTES, numeric,
-orderable, array-element and arbitrary-value domains, checking that their source sections exist.
-These prose rules require review when the specification changes; they are not inferred from
-emulator registrations. Generic domains use representative nested structural shapes; their
-limits and other incomplete expansions are stated in the report and catalog notes.
-To expand coverage, add a reviewed extraction or domain rule and its source snapshot, regenerate
-the catalog, and review the concrete signatures. Keep function-specific valid samples in the
-catalog's generation rules and recursive typed samples in `internal/functioncoverage`.
-
-`tools/restprobe function-types` binds data arguments as typed columns, executes every catalog
-form and compares the REST result schema with the documented type, recursively including
-STRUCT fields, repeated fields and RANGE element metadata. Missing samples or analyzer
-rejections remain visible as Untested; functions absent from the catalog are Not enumerated.
-Syntax-like options can explicitly remain literals. A function cannot be Supported when an
-enumerated form is Untested. The JSON catalog stays a single file; Markdown has an overview in
-`docs/function-types.md` and detail pages under `docs/function-types/`, grouped by specification
-page. The overview links directly to each function's details, and detail pages link back to the
-shared coverage notes. `just docs-function-types` regenerates this report set alone;
-`just docs` includes it, and `just docs-check` checks the catalog and every report file for
-freshness offline. `restprobe -check function-types CATALOG FUNCTIONS_FILE OUTPUT_DIR` checks
-without modifying files, including detecting obsolete domain pages; regeneration removes them.
-These probes do not verify result values or establish semantic compatibility.
-
-## Collation probes
-
-`tools/collationcoverage` lists the sections of the saved function, expression and operator
-references that say they support collation; `just collation-operations-update` writes them to
-`tools/collation_operations.json`. `//:function_probe` calls each listed function with a collated
-argument in every signature GoogleSQL marks as using the operation collation, and fails for a
-listed function no call collates, so that the documentation and GoogleSQL's signatures cannot
-drift apart unnoticed. A function whose collated call the emulator rejects is Partial in
-[functions.md](functions.md). The other listed operations, and where a collation can be
-assigned, are the Collation section of `tools/sql_features.txt`.
-
-## DDL option probes
-
-`tools/ddl_options.json` is a snapshot of the option lists in BigQuery's DDL reference. `groups`
-maps each list's section anchor to its options: a name, a GoogleSQL type and SQL sample `values`.
-Each of `contexts` names a statement that takes a group's options, with a `template` holding
-`{option}` once, `setup` statements, and `only` or `exclude` to keep the options a language or
-form takes. `implementation` names the DDL handlers' context in `src/ddl_option_types.cc`.
-
-`internal/ddloptions` checks the catalog's structure and builds one statement per sample, which
-`tools/restprobe options` runs on fresh emulators to generate `docs/options.md`.
-`tests/ddl_options_catalog_test.cc` parses each type and sample with the emulator's analyzer
-settings, and compares types with the handlers' definitions, which must all appear in the catalog.
-
-`just update-ddl-options` refreshes names and types from the reference's snapshot under
-`third_party/bigquery_docs/` with `tools/ddloptions`, keeping samples and contexts. A new option
-has no samples, and a new list a context without a template, so both stay Untested until someone
-adds samples that meet the reference's constraints.
-
-See [compatibility.md](compatibility.md) for query and API limits and
-[storage-api.md](storage-api.md) for Storage client behavior.
-
-### UDF runtimes
+## UDF runtimes
 
 [udf/javascript](../src/udf/javascript/) owns the QuickJS engine, compiled-source cache and
 execution limits. [udf/python](../src/udf/python/) owns Python worker discovery, process management,

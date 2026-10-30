@@ -164,8 +164,8 @@ expected result from one layer to another.
   and process or concurrency behavior in Go. REST details can also be checked with runn's HTTP
   runner in `tests/e2e/rest_*.yml`.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
-  `docs/api.md`, `docs/storage.md`, `docs/sql.md` and `docs/functions.md`; never edit those by
-  hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
+  `docs/api.md`, `docs/storage.md`, `docs/sql.md`, `docs/options.md`, `docs/functions.md` and
+  `docs/function-types*`; never edit those by hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
   from GoogleSQL's signatures and the samples in `tools/function_probe_hints.txt`, and
   `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
   class of forms with an `elements` or `argument` hint that matches their signatures, and extend
@@ -221,9 +221,12 @@ explicitly with `just bigquery-docs-refresh`. See the snapshot directory's READM
 
 Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
 query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage
-and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in
-[docs/architecture.md](docs/architecture.md). The support tables listed above are generated;
-the preambles under `tools/restprobe/` and `tools/storageprobe/` are their handwritten inputs. A
+and limits in [docs/storage-api.md](docs/storage-api.md), implementation details in
+[docs/architecture.md](docs/architecture.md), and the probes' catalogs in
+[tools/restprobe/README.md](tools/restprobe/README.md). Describe the current state; leave plans,
+progress and validation records to pull requests and Git history. The support tables listed
+above are generated; the preambles under `tools/restprobe/` and `tools/storageprobe/` are their
+handwritten inputs. A
 probe's note is a sentence or a link to a section of `docs/compatibility.md` or
 `docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
 probe rejects to the probe. Describe emulator-specific limits and differences; do not restate
