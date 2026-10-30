@@ -222,7 +222,8 @@ explicitly with `just bigquery-docs-refresh`. See the snapshot directory's READM
 Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
 query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage
 and limits in [docs/storage-api.md](docs/storage-api.md), implementation details in
-[docs/architecture.md](docs/architecture.md), and the probes' catalogs in
+[docs/architecture.md](docs/architecture.md), development tools and debugging modes in
+[docs/development.md](docs/development.md), and the probes' catalogs in
 [tools/restprobe/README.md](tools/restprobe/README.md). Describe the current state; leave plans,
 progress and validation records to pull requests and Git history. The support tables listed
 above are generated; the preambles under `tools/restprobe/` and `tools/storageprobe/` are their

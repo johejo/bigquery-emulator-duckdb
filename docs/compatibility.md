@@ -321,9 +321,11 @@ Other argument and result types, packages, external connections, libraries, cont
 vectorized entry points and `SAFE.` calls are unsupported. FLOAT64 results also accept Python
 integers; other non-NULL results require the declared Python type.
 
-Workers have per-call timeouts and per-process address space limits, and are discarded when
-their query execution state is released. There is no shared Python state between query jobs.
-The defaults, configuration and runtime differences are described in
+Workers have per-call timeouts and per-process memory limits, and are discarded when their
+query execution state is released. There is no shared Python state between query jobs. On Linux,
+the memory limit applies to address space above the worker's startup mappings, including Python
+initialization; on macOS the parent checks total resident memory every 10 ms, so short
+allocations can exceed the limit between checks. The defaults and configuration are described in
 [Python UDFs](../README.md#python-udfs).
 
 ### Unsupported forms
@@ -390,6 +392,11 @@ Tables written by another DuckDB client may contain types BigQuery does not have
 - Unmarked BIGNUM columns and nested fields are unsupported. The emulator reserves type aliases
   beginning with `bq_bignumeric_` for its scaled BIGNUMERIC storage.
 - Numeric column metadata that disagrees with the actual DuckDB type is rejected.
+
+Conversely, the emulator's BIGNUMERIC columns store integers in units of 10^-38 under
+`bq_bignumeric_` type aliases. Other DuckDB clients, such as the DuckDB CLI, show those integers,
+and their ordinary numeric operations do not implement BIGNUMERIC semantics; use the emulator to
+read or update those values.
 
 Duplicate result column names are compared without case. Without a destination table, a second
 occurrence gains `_1`, as in BigQuery. Names repeated more than twice, or collisions with renamed
