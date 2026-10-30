@@ -273,20 +273,16 @@ std::optional<Relation> JoinScan(const googlesql::ResolvedJoinScan& join, const 
   return result;
 }
 
-// The body of a recursive WITH entry: DuckDB evaluates UNION [ALL] in WITH RECURSIVE by the
-// same iteration, deduplicating against every earlier row for UNION.
+// The body of a recursive WITH entry, which DuckDB evaluates by the same iteration.
 std::optional<std::string> RecursiveQuery(const googlesql::ResolvedRecursiveScan& recursive,
                                           const std::vector<std::string>& names,
                                           const WithQuery& self, const Scope& scope) {
   if (recursive.recursion_depth_modifier() != nullptr) {
     return Unsupported(scope, "WITH RECURSIVE depth modifier");
   }
-  // UNION compares rows by their columns' collations, which the resolved AST does not record.
-  if (recursive.op_type() != googlesql::ResolvedRecursiveScan::UNION_ALL &&
-      std::ranges::any_of(recursive.column_list(), [](const googlesql::ResolvedColumn& column) {
-        return HasCollation(column.type_annotation_map());
-      })) {
-    return Unsupported(scope, "WITH RECURSIVE UNION DISTINCT with collation");
+  // GoogleSQL accepts UNION DISTINCT, but BigQuery does not.
+  if (recursive.op_type() != googlesql::ResolvedRecursiveScan::UNION_ALL) {
+    throw std::invalid_argument("Only UNION ALL is supported for WITH RECURSIVE.");
   }
   std::vector<std::string> terms;
   for (const auto* item : {recursive.non_recursive_term(), recursive.recursive_term()}) {
@@ -304,9 +300,7 @@ std::optional<std::string> RecursiveQuery(const googlesql::ResolvedRecursiveScan
     }
     terms.push_back("SELECT " + Join(*projections, ", ") + relation->From());
   }
-  return Join(terms, recursive.op_type() == googlesql::ResolvedRecursiveScan::UNION_ALL
-                         ? " UNION ALL "
-                         : " UNION ");
+  return Join(terms, " UNION ALL ");
 }
 
 std::optional<Relation> WithScan(const googlesql::ResolvedWithScan& with, const Scope& scope) {

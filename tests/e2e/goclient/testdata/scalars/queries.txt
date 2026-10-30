@@ -199,10 +199,12 @@ SELECT TO_JSON_STRING(ARRAY(WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL SELECT 
   WHERE n < 3) SELECT n FROM c ORDER BY n))
 => "[1,2,3]"
 
-# UNION DISTINCT stops once an iteration adds no new row.
-SELECT TO_JSON_STRING(ARRAY(WITH RECURSIVE c AS (SELECT 0 AS n UNION DISTINCT
-  SELECT MOD(n + 1, 3) FROM c) SELECT n FROM c ORDER BY n))
-=> "[0,1,2]"
+# BigQuery allows only UNION ALL between a recursive CTE's terms, though GoogleSQL resolves UNION
+# DISTINCT.
+# third_party/bigquery_docs/reference/standard-sql/query-syntax.md
+WITH RECURSIVE c AS (SELECT 0 AS n UNION DISTINCT SELECT MOD(n + 1, 3) FROM c)
+SELECT n FROM c ORDER BY n
+=> error: Only UNION ALL is supported for WITH RECURSIVE.
 
 # A plain entry next to a recursive one, and a recursive term that joins a table and filters
 # through a subquery.

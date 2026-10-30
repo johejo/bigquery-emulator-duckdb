@@ -135,3 +135,16 @@ SELECT (
   )
 )
 => "2"
+
+# A recursive CTE takes only UNION ALL, so no collation applies between its terms.
+WITH RECURSIVE r AS (SELECT COLLATE('a', 'und:ci') AS x UNION DISTINCT SELECT UPPER(x) FROM r)
+SELECT x FROM r
+=> error: Only UNION ALL is supported for WITH RECURSIVE.
+
+WITH RECURSIVE r AS (
+  SELECT x FROM UNNEST([COLLATE('a', 'und:ci'), 'A']) AS x
+  UNION DISTINCT
+  SELECT x FROM r WHERE FALSE
+)
+SELECT COUNT(*) FROM r
+=> error: Only UNION ALL is supported for WITH RECURSIVE.
