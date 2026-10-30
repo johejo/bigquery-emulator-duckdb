@@ -305,3 +305,10 @@ cases:
           method: DELETE
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
     expect: {"job": {"ddlTargetTable": "t", "statementType": "DROP_EXTERNAL_TABLE"}}
+  # BigQuery accepts files missing a column of the schema detected from the last file.
+  - name: last_file_query
+    template: statements
+    vars:
+      setup: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/*'])
+      statement: SELECT * FROM `${project}.${dataset}.t`
+    expect: {"get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}]}, "status": 200, "type": "EXTERNAL"}, "statement": {"jobComplete": true, "status": 200}}

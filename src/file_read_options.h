@@ -18,7 +18,10 @@ struct CsvReadOptions {
   bool quoted_nulls = true;
 };
 struct JsonReadOptions {};
-struct ParquetReadOptions {};
+struct ParquetReadOptions {
+  // External tables allow files to omit nullable columns of the table schema.
+  bool allow_missing_columns = false;
+};
 using FileReadOptions = std::variant<CsvReadOptions, JsonReadOptions, ParquetReadOptions>;
 
 }  // namespace bigquery_emulator_duckdb
