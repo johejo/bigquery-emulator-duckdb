@@ -141,10 +141,8 @@ SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), CAST('+inf' AS FLOAT64))
 SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1, 2), CAST('-inf' AS FLOAT64))
 => error: ST_SnapToGrid argument grid size cannot be +-inf
 
-# Ties, shapes that collapse and vertices that snap together.
-SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.25, -2.25), 0.1)
-=> "POINT(1.2 -2.2)"
-
+# Shapes that collapse and vertices that snap together. Ties depend on the platform; see
+# docs/compatibility.md#geography-values.
 SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('POLYGON((0 0, 0.001 0, 0.001 0.001, 0 0))'), 0.1)
 => "POINT(0 0)"
 

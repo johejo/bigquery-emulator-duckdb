@@ -249,6 +249,10 @@ BigQuery loads as NULL.
   `ST_ASGEOJSON`'s full polygon, are unsupported.
 
 `ST_BOUNDINGBOX` latitude bounds can differ from BigQuery in the last floating-point bit.
+`ST_SNAPTOGRID` rounds a coordinate halfway between grid lines, such as longitude 1.25 on a 0.1
+degree grid, by its value after a round trip through S2's unit vectors, whose last bit depends on
+the platform's math library. BigQuery rounds `ST_GEOGPOINT(1.25, -2.25)` to `POINT(1.2 -2.2)`, as
+the emulator does on x86-64 Linux, while it returns `POINT(1.3 -2.3)` on arm64.
 
 ### RANGE_SESSIONIZE
 
