@@ -50,9 +50,9 @@ BigQuery rejects GEOGRAPHY and JSON values; they are not enumerated.
 | `DATETIME, INT64` | `ARRAY<DATETIME>` | Supported |  |
 | `TIME, INT64` | `ARRAY<TIME>` | Supported |  |
 | `TIMESTAMP, INT64` | `ARRAY<TIMESTAMP>` | Supported |  |
-| `RANGE<DATE>, INT64` | `ARRAY<RANGE<DATE>>` | Unsupported | aggregate or analytic function APPROX_QUANTILES with RANGE |
-| `RANGE<DATETIME>, INT64` | `ARRAY<RANGE<DATETIME>>` | Unsupported | aggregate or analytic function APPROX_QUANTILES with RANGE |
-| `RANGE<TIMESTAMP>, INT64` | `ARRAY<RANGE<TIMESTAMP>>` | Unsupported | aggregate or analytic function APPROX_QUANTILES with RANGE |
+| `RANGE<DATE>, INT64` | `ARRAY<RANGE<DATE>>` | Supported |  |
+| `RANGE<DATETIME>, INT64` | `ARRAY<RANGE<DATETIME>>` | Supported |  |
+| `RANGE<TIMESTAMP>, INT64` | `ARRAY<RANGE<TIMESTAMP>>` | Supported |  |
 
 ## APPROX_TOP_COUNT
 

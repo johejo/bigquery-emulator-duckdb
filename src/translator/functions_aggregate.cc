@@ -536,7 +536,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  },
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
                  .type_rejections = kApproxQuantileRejections,
              }),
       // histogram() takes only the values; TopCount() applies the count afterwards.

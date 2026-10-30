@@ -107,7 +107,7 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [ANY_VALUE](function-types/aggregate.md#any_value) | 40 | Supported |
 | `APPENDS` | 0 | Not enumerated |
 | [APPROX_COUNT_DISTINCT](function-types/approximate-aggregate.md#approx_count_distinct) | 11 | Supported |
-| [APPROX_QUANTILES](function-types/approximate-aggregate.md#approx_quantiles) | 14 | Partial |
+| [APPROX_QUANTILES](function-types/approximate-aggregate.md#approx_quantiles) | 14 | Supported |
 | [APPROX_TOP_COUNT](function-types/approximate-aggregate.md#approx_top_count) | 11 | Supported |
 | [APPROX_TOP_SUM](function-types/approximate-aggregate.md#approx_top_sum) | 14 | Supported |
 | `ARRAY` | 0 | Not enumerated |
