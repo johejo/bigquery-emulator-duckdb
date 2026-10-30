@@ -400,7 +400,7 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   const bool all = set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL ||
                    set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_ALL;
   // GoogleSQL accepts these forms, but BigQuery only supports DISTINCT for them.
-  if (all && scope.context.functions.bigquery_query_forms()) {
+  if (all && scope.context.functions.restrictions().intersect_except_distinct_only) {
     const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL
                                  ? "INTERSECT"
                                  : "EXCEPT";

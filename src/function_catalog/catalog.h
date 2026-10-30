@@ -81,15 +81,21 @@ struct FunctionEntry {
   std::vector<AggregateRule> aggregates = {};
 };
 
+// Which forms the translator rejects that GoogleSQL accepts but BigQuery does not. Defaults keep
+// GoogleSQL's forms.
+struct QueryRestrictions {
+  // INTERSECT and EXCEPT take only DISTINCT.
+  bool intersect_except_distinct_only = false;
+};
+
 // A catalog owns its entries; registered names and targets must outlive it.
 // The application assembles a catalog before passing it to the translator.
 class Catalog {
  public:
-  // `bigquery_query_forms` rejects query forms GoogleSQL accepts but BigQuery does not.
-  Catalog(TimestampPrecision precision, bool bigquery_query_forms)
-      : timestamp_precision_(precision), bigquery_query_forms_(bigquery_query_forms) {}
+  Catalog(TimestampPrecision precision, QueryRestrictions restrictions)
+      : timestamp_precision_(precision), restrictions_(restrictions) {}
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
-  [[nodiscard]] bool bigquery_query_forms() const { return bigquery_query_forms_; }
+  [[nodiscard]] const QueryRestrictions& restrictions() const { return restrictions_; }
   void Add(std::string_view name, FunctionEntry entry);
   // Composition omits service-dependent forms whose backend capability is absent.
   void Remove(std::string_view name);
@@ -110,7 +116,7 @@ class Catalog {
 
  private:
   TimestampPrecision timestamp_precision_;
-  bool bigquery_query_forms_;
+  QueryRestrictions restrictions_;
   std::unordered_map<std::string_view, FunctionEntry> functions_;
 };
 

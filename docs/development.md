@@ -64,8 +64,9 @@ does not.
 | SAFE.JSON_KEYS | `TypeUse::kRejectsSafe` in [functions_backend.cc](../src/translator/functions_backend.cc) | Rejects | [JSON_KEYS](../third_party/bigquery_docs/reference/standard-sql/json_functions.md) does not exclude SAFE |
 | STRUCT<> or an anonymous field in a query's result | [analyzer.cc](../src/analyzer.cc) `CheckEmptyStructs` and `CheckResultColumns` | Rejects | [STRUCT<>](../third_party/bigquery_docs/reference/standard-sql/data-types.md) is a listed type, without the restriction |
 
-A form that `googlesql` accepts is rejected under BigQuery's options, which set
-`bigquery_query_forms`; end-to-end tests check that rejection.
+A form that `googlesql` accepts has its own flag in `functions_duckdb::Options`, such as
+`intersect_except_distinct_only`, which BigQuery's options set; end-to-end tests check that
+rejection.
 
 `shell --duckdb` runs the input as DuckDB SQL on the emulator's database instead of as query
 jobs. Each project is a catalog, and `bq_geography_text` shows the S2 vertices of a stored
