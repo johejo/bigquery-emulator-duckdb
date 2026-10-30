@@ -686,7 +686,10 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
       sql = std::format("SELECT {} WHERE false UNION ALL BY NAME {}", Join(nulls, ", "), sql);
     }
   } else {
-    sql = std::format("SELECT * FROM read_parquet({})", files);
+    const bool allow_missing = std::get<ParquetReadOptions>(options).allow_missing_columns;
+    const std::string reader =
+        std::format("read_parquet({}{})", files, allow_missing ? ", union_by_name=true" : "");
+    sql = "SELECT * FROM " + reader;
     std::vector<std::string> shaped;
     for (const ParquetColumn& column : parquet.children) {
       if (column.Reshaped()) {
@@ -695,7 +698,15 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
       }
     }
     if (!shaped.empty()) {
-      sql = std::format("SELECT * REPLACE ({}) FROM read_parquet({})", Join(shaped, ", "), files);
+      sql = std::format("SELECT * REPLACE ({}) FROM {}", Join(shaped, ", "), reader);
+    }
+    if (allow_missing && !schema.empty()) {
+      // Include even columns absent from every file, without adding a row.
+      std::vector<std::string> nulls;
+      std::ranges::transform(schema, std::back_inserter(nulls), [](const FieldSchema& field) {
+        return "NULL AS " + QuoteIdentifier(field.name);
+      });
+      sql = std::format("SELECT {} WHERE false UNION ALL BY NAME {}", Join(nulls, ", "), sql);
     }
   }
   if (!schema.empty() && csv == nullptr) {

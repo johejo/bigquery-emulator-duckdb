@@ -231,6 +231,9 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       // detect for it, so that no incompatible column is silently cast to the declared type.
       for (const auto& field : schema) {
         const auto* column = columns.Child(field.name);
+        if (column == nullptr && field.mode == FieldMode::kNullable) {
+          continue;
+        }
         if (column == nullptr || DetectedType(Element(metadata, *column), *column) != field.type ||
             (field.mode == FieldMode::kRequired &&
              DetectedMode(Element(metadata, *column)) != FieldMode::kRequired)) {
@@ -239,7 +242,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         }
       }
     }
-    return FileReadQuery(ParquetReadOptions{}, sources, schema);
+    return FileReadQuery(ParquetReadOptions{.allow_missing_columns = true}, sources, schema);
   };
 }
 
