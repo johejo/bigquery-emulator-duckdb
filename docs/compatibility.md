@@ -73,7 +73,7 @@ GeoParquet, column name conversions and the options that select other types are 
 Queries require every source file to have each column of the schema.
 
 CSV, JSON, Bigtable, BigLake connections, Hive partitioning, metadata caching,
-`_FILE_NAME`, configuration updates, `ALTER TABLE`, stored views over external tables and time
+Configuration updates, `ALTER TABLE`, stored views over external tables and time
 travel are unsupported. Query dry runs and stored definitions reject external reads rather
 than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
 not read external tables; use a query instead. Writes to external tables are rejected.

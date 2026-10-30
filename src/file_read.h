@@ -12,7 +12,7 @@
 namespace bigquery_emulator_duckdb {
 
 // One concrete source, after wildcard expansion. Format staging replaces only path, keeping
-// uri available for source attribution (including future _FILE_NAME support). The caller owns
+// uri available for source attribution, including _FILE_NAME. The caller owns
 // the TemporaryFiles that keep path alive; uri is never a generated temporary path.
 struct FileSource {
   std::string uri;

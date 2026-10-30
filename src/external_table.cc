@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "src/api_error.h"
+#include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
 #include "src/file_read_options.h"
@@ -242,7 +243,16 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         }
       }
     }
-    return FileReadQuery(ParquetReadOptions{.allow_missing_columns = true}, sources, schema);
+    std::vector<std::string> reads;
+    std::ranges::transform(sources, std::back_inserter(reads), [&schema](const FileSource& source) {
+      return "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
+             FileReadQuery(ParquetReadOptions{.allow_missing_columns = true}, {source}, schema) +
+             ") AS source";
+    });
+    if (reads.empty()) {
+      throw ApiError::Invalid("External table source URIs match no files");
+    }
+    return Join(reads, " UNION ALL ");
   };
 }
 

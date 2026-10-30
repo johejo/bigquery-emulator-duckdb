@@ -115,6 +115,15 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
       return status;
     }
   }
+  if (const auto description = simple_table->Describe();
+      description && description->metadata.external_data) {
+    if (absl::Status status = simple_table->AddColumn(std::make_unique<googlesql::SimpleColumn>(
+            normalized.at(2), "_FILE_NAME", googlesql::types::StringType(),
+            /*is_pseudo_column=*/true));
+        !status.ok()) {
+      return status;
+    }
+  }
   *table = simple_table.get();
   tables_.emplace(normalized, std::move(simple_table));
   return absl::OkStatus();
