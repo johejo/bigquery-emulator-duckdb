@@ -29,6 +29,7 @@
 #include "src/connection_id.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/function_catalog/catalog.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
@@ -393,10 +394,13 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
       {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},
       {googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT, " INTERSECT "},
       {googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT, " EXCEPT "},
+      {googlesql::ResolvedSetOperationScan::INTERSECT_ALL, " INTERSECT ALL "},
+      {googlesql::ResolvedSetOperationScan::EXCEPT_ALL, " EXCEPT ALL "},
   });
+  const bool all = set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL ||
+                   set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_ALL;
   // GoogleSQL accepts these forms, but BigQuery only supports DISTINCT for them.
-  if (set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL ||
-      set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_ALL) {
+  if (all && scope.context.functions.restrictions().intersect_except_distinct_only) {
     const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL
                                  ? "INTERSECT"
                                  : "EXCEPT";
@@ -445,6 +449,9 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   if (set.op_type() == googlesql::ResolvedSetOperationScan::UNION_ALL || !keys) {
     result.sql = Join(parts, op->second);
     return result;
+  }
+  if (all) {
+    return Unsupported(scope, "INTERSECT ALL and EXCEPT ALL of INTERVAL or collated columns");
   }
   // Each distinct row is the first input row of its keys, as BigQuery returns it.
   const auto key = [&](int i, const std::string& sql) {

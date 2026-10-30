@@ -60,7 +60,11 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
   if (functions != nullptr) {
     return *functions;
   }
-  functions = std::make_unique<function_catalog::Catalog>(options.timestamp_precision);
+  functions = std::make_unique<function_catalog::Catalog>(
+      options.timestamp_precision,
+      function_catalog::QueryRestrictions{
+          .intersect_except_distinct_only = options.intersect_except_distinct_only,
+      });
   translator::AddBuiltinFunctions(*functions);
   functions->Add("COLLATE",
                  {

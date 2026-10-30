@@ -31,6 +31,8 @@ struct Options {
   bool json_preserve_negative_zero = false;
   // The translator restricts COLLATE specifications to und:ci and the empty specification.
   bool collate_und_ci_only = false;
+  // The translator rejects INTERSECT ALL and EXCEPT ALL.
+  bool intersect_except_distinct_only = false;
   googlesql_collation::Options collation = {};
 
   std::strong_ordering operator<=>(const Options&) const = default;
