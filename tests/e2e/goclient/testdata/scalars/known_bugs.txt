@@ -116,10 +116,6 @@ SELECT ARRAY(SELECT VARIANCE(DISTINCT x) OVER () FROM UNNEST([1, 1, 3]) AS x)
 !> error: Analytic function variance does not support DISTINCT.
 
 # BigQuery's answers to unverified/function_types.txt.
-# COUNT takes arrays of INTERVAL values.
-SELECT COUNT(a) FROM UNNEST([STRUCT([INTERVAL 1 DAY] AS a), STRUCT(CAST(NULL AS ARRAY<INTERVAL>))])
-!> "1"
-
 # APPROX_TOP_COUNT and APPROX_TOP_SUM reject every STRUCT and ARRAY value, naming STRUCT or ARRAY
 # even when a field or element is a RANGE or INTERVAL.
 SELECT ARRAY_LENGTH(APPROX_TOP_COUNT(s, 2))

@@ -346,7 +346,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .type = googlesql::TYPE_INTERVAL,
                      .arguments = kIntervalKey,
                  },
-                 {.function = "count"},
+                 {.function = "count", .carries = true},
              },
              {
                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},

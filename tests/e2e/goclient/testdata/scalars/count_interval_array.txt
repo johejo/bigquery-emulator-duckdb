@@ -1,0 +1,36 @@
+# COUNT ignores NULL arrays, not empty arrays or arrays with NULL elements.
+# Source: third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md.
+
+# BigQuery's answer to unverified/function_types.txt: COUNT takes arrays of INTERVAL values.
+SELECT COUNT(a) FROM UNNEST([STRUCT([INTERVAL 1 DAY] AS a), STRUCT(CAST(NULL AS ARRAY<INTERVAL>))])
+=> "1"
+
+SELECT COUNT(a) FROM (
+  SELECT [INTERVAL 1 MONTH] AS a
+  UNION ALL SELECT [INTERVAL 30 DAY]
+  UNION ALL SELECT ARRAY<INTERVAL>[]
+  UNION ALL SELECT ARRAY<INTERVAL>[NULL]
+  UNION ALL SELECT CAST(NULL AS ARRAY<INTERVAL>)
+)
+=> "4"
+
+SELECT COUNT(a) FROM (
+  SELECT CAST(NULL AS ARRAY<INTERVAL>) AS a
+)
+=> "0"
+
+SELECT COUNT(a) FROM (
+  SELECT [i] AS a FROM UNNEST(ARRAY<INTERVAL>[]) AS i
+)
+=> "0"
+
+SELECT ARRAY(
+  SELECT COUNT(a) OVER (ORDER BY n ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)
+  FROM (
+    SELECT 1 AS n, [INTERVAL 1 MONTH] AS a
+    UNION ALL SELECT 2, CAST(NULL AS ARRAY<INTERVAL>)
+    UNION ALL SELECT 3, ARRAY<INTERVAL>[]
+    UNION ALL SELECT 4, ARRAY<INTERVAL>[NULL]
+  ) ORDER BY n
+)
+=> [{"v":"1"},{"v":"1"},{"v":"1"},{"v":"2"}]

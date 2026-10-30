@@ -200,7 +200,7 @@ COUNT(*) is not a typed form and is not enumerated.
 | `ARRAY<DATETIME>` | `INT64` | Supported |  |
 | `ARRAY<TIME>` | `INT64` | Supported |  |
 | `ARRAY<TIMESTAMP>` | `INT64` | Supported |  |
-| `ARRAY<INTERVAL>` | `INT64` | Unsupported | aggregate or analytic function COUNT with INTERVAL |
+| `ARRAY<INTERVAL>` | `INT64` | Supported |  |
 | `ARRAY<GEOGRAPHY>` | `INT64` | Supported |  |
 | `ARRAY<JSON>` | `INT64` | Supported |  |
 | `ARRAY<RANGE<DATE>>` | `INT64` | Supported |  |
