@@ -78,14 +78,9 @@ neither clearly applies.
 
 ### Registering a function
 
-`src/emulator_functions.cc` assembles the application's registry from the builtin definitions in
-`src/translator/functions.cc` and feature providers such as the geography adapter. The shared
-registry model and rule expansion live in `src/function_catalog/`; translators receive the
-assembled catalog from their callers and do not select or register feature adapters.
-`functions_template.cc`, `functions_backend.cc` and `functions_aggregate.cc` hold the builtin
-rule tables. Each function is
-registered under one of these spellings; its rules may still spell overloads with different
-backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
+[architecture.md](docs/architecture.md#translator) describes how the registry is assembled.
+Each function is registered under one of these spellings; its rules may still spell overloads
+with different backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
 
 - **As is** (`PlainFunctions`) or **renamed** (`FunctionNames`): a DuckDB function with the same
   semantics.
@@ -192,13 +187,11 @@ expected result from one layer to another.
 
 Take each expected value from BigQuery's documentation, from GoogleSQL's compliance test data
 where the reference implementation agrees with BigQuery, or from BigQuery itself. Never copy the
-emulator's output. Agents do not run queries on BigQuery: a case no source settles goes in
-`tests/e2e/goclient/testdata/unverified/*.txt`, split by feature, whose answers maintainers fill in with
-`just bigquery-answers`. `just reference` shows what the reference implementation answers, as a
-lead for what to check, never as an expected value. REST and BigQuery Storage gRPC cases go in
-`tests/e2e/goclient/testdata/unverified/*.api.yaml` (legacy `*.api.json` is also supported), using the
-[bqanswers scenario format](tools/bqanswers/README.md); the same `just bigquery-answers` command
-records their selected responses. Validate these files locally with `just bigquery-answers-validate`.
+emulator's output. Agents do not run queries on BigQuery: a SQL, REST or Storage gRPC case no
+source settles goes in
+[`tests/e2e/goclient/testdata/unverified/`](tests/e2e/goclient/testdata/unverified/README.md),
+split by feature, for maintainers to answer. `just reference` shows what the reference
+implementation answers, as a lead for what to check, never as an expected value.
 
 When BigQuery's documentation and an observed BigQuery answer disagree, comment on the test case
 with the discrepancy and a link to the documentation. Keep the observation's context so a future
@@ -213,11 +206,11 @@ alone does not require removing existing support.
 For BigQuery specification lookups, prefer saved Markdown under `third_party/bigquery_docs/`.
 Source URLs in its manifest are attribution and update metadata, not instructions to browse.
 When citing a new official BigQuery page, run `just bigquery-docs-sync` after adding the citing
-file to Git, then commit the snapshot, manifest and localized citation together. Acquisition
-uses ADC by default, or `DEVELOPERKNOWLEDGE_API_KEY` when set; never replace a citation with a
-local path before its snapshot exists. Local citations link to the whole file, without `#` anchors.
-`just bigquery-docs-check` validates citations offline; refresh snapshots only
-explicitly with `just bigquery-docs-refresh`. See the snapshot directory's README for details.
+file to Git, then commit the snapshot, manifest and localized citation together; never replace
+a citation with a local path before its snapshot exists. Refresh snapshots only explicitly, with
+`just bigquery-docs-refresh`.
+The snapshot directory's README covers authentication and the citation rules
+`just bigquery-docs-check` enforces.
 
 Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
 query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage

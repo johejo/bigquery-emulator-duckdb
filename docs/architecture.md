@@ -118,6 +118,8 @@ uses of physical representations such as graph STRUCTs or BIGNUMERIC values. Rul
 is the same for all backends; GEOGRAPHY support is a type attribute, independent of the backend
 reported in the function support table.
 
+The builtin rule tables are in `functions_template.cc`, `functions_backend.cc` and
+`functions_aggregate.cc` under [src/translator/](../src/translator/).
 Literal rule tables use [static definitions](../src/function_catalog/static_definitions.h): a
 `constexpr` tuple owns each function's overload array beside its name and attributes. A separate
 `constexpr` table takes views only after that tuple reaches static storage, so no view points into
@@ -131,8 +133,8 @@ the resolved AST definitions remain private to the implementation source. Its sh
 function handlers, keeping query translation independent of the builtin function definitions.
 
 [emulator_functions.cc](../src/emulator_functions.cc) assembles the application's catalog from
-[builtin definitions](../src/translator/functions.cc) and feature providers, one for each choice
-of the backend functions' options, so that BigQuery's and GoogleSQL's semantics can translate
+[builtin definitions](../src/translator/functions.cc) and feature providers, such as the geography
+adapter, one for each choice of the backend functions' options, so that BigQuery's and GoogleSQL's semantics can translate
 differently. The application registers COLLATE's handler here, keeping the translator independent
 of the collation library. It checks the literal specification during translation, before DuckDB can
 prune an expression or skip its evaluation; BigQuery's catalog takes only `und:ci` and the empty
