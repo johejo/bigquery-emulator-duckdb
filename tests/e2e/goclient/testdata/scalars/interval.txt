@@ -623,14 +623,44 @@ SELECT CAST(AVG(DISTINCT i) AS STRING)
 FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 30 DAY, INTERVAL 2 DAY]) AS i
 => "0-0 16 0:0:0"
 
-# BigQuery rejects these over INTERVAL values although GoogleSQL accepts them. Source: BigQuery's
-# answers.
+# BigQuery rejects GREATEST and LEAST over INTERVAL values although GoogleSQL accepts them.
+# Source: BigQuery's answers, reconfirmed for one and two arguments, equal lengths in either
+# argument order and NULL arguments. This disagrees with the documented orderable-type
+# requirement, which does not exclude INTERVAL:
+# third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
+SELECT CAST(GREATEST(i) AS STRING) FROM (SELECT INTERVAL 2 DAY AS i)
+=> error: Unsupported type in function GREATEST
+
+SELECT CAST(LEAST(i) AS STRING) FROM (SELECT INTERVAL 2 DAY AS i)
+=> error: Unsupported type in function LEAST
+
+SELECT CAST(GREATEST(a, b) AS STRING) FROM (SELECT INTERVAL 2 DAY AS a, INTERVAL 3 DAY AS b)
+=> error: Unsupported type in function GREATEST
+
+SELECT CAST(LEAST(a, b) AS STRING) FROM (SELECT INTERVAL 2 DAY AS a, INTERVAL 3 DAY AS b)
+=> error: Unsupported type in function LEAST
+
 SELECT CAST(GREATEST(INTERVAL 1 MONTH, INTERVAL 30 DAY) AS STRING)
 => error: Unsupported type in function GREATEST
+
+SELECT CAST(GREATEST(INTERVAL 30 DAY, INTERVAL 1 MONTH) AS STRING)
+=> error: Unsupported type in function GREATEST
+
+SELECT CAST(LEAST(INTERVAL 1 MONTH, INTERVAL 30 DAY) AS STRING)
+=> error: Unsupported type in function LEAST
 
 SELECT CAST(LEAST(INTERVAL 30 DAY, INTERVAL 1 MONTH) AS STRING)
 => error: Unsupported type in function LEAST
 
+SELECT CAST(GREATEST(INTERVAL 1 DAY, CAST(NULL AS INTERVAL)) AS STRING)
+=> error: Unsupported type in function GREATEST
+
+SELECT CAST(LEAST(INTERVAL 1 DAY, CAST(NULL AS INTERVAL)) AS STRING)
+=> error: Unsupported type in function LEAST
+
+# BigQuery also rejects NULLIF over INTERVAL although GoogleSQL accepts it. Source: BigQuery's
+# answers.
 SELECT CAST(NULLIF(INTERVAL 1 MONTH, INTERVAL 30 DAY) AS STRING)
 => error: Unsupported type in function NULL_IF
 

@@ -318,7 +318,7 @@ Source: [FLOOR](../../third_party/bigquery_docs/reference/standard-sql/mathemati
 
 Source: [GREATEST](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
 
-Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+Same-type scalar inputs and arities one and two are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertypes and larger arities are not yet enumerated.
 
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
@@ -344,8 +344,6 @@ Same-type scalar inputs and arities one and two are enumerated; mixed-type super
 | `TIME, TIME` | `TIME` | Supported |  |
 | `TIMESTAMP` | `TIMESTAMP` | Supported |  |
 | `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
-| `INTERVAL` | `INTERVAL` | Broken | `SELECT GREATEST(a0) AS result FROM (SELECT INTERVAL 2 DAY AS a0)`: Unsupported type in function GREATEST |
-| `INTERVAL, INTERVAL` | `INTERVAL` | Broken | `SELECT GREATEST(a0, a1) AS result FROM (SELECT INTERVAL 2 DAY AS a0, INTERVAL 2 DAY AS a1)`: Unsupported type in function GREATEST |
 | `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
 | `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
 | `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |
@@ -402,7 +400,7 @@ Source: [IS_NAN](../../third_party/bigquery_docs/reference/standard-sql/mathemat
 
 Source: [LEAST](../../third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md).
 
-Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+Same-type scalar inputs and arities one and two are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertypes and larger arities are not yet enumerated.
 
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
@@ -428,8 +426,6 @@ Same-type scalar inputs and arities one and two are enumerated; mixed-type super
 | `TIME, TIME` | `TIME` | Supported |  |
 | `TIMESTAMP` | `TIMESTAMP` | Supported |  |
 | `TIMESTAMP, TIMESTAMP` | `TIMESTAMP` | Supported |  |
-| `INTERVAL` | `INTERVAL` | Broken | `SELECT LEAST(a0) AS result FROM (SELECT INTERVAL 2 DAY AS a0)`: Unsupported type in function LEAST |
-| `INTERVAL, INTERVAL` | `INTERVAL` | Broken | `SELECT LEAST(a0, a1) AS result FROM (SELECT INTERVAL 2 DAY AS a0, INTERVAL 2 DAY AS a1)`: Unsupported type in function LEAST |
 | `RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
 | `RANGE<DATE>, RANGE<DATE>` | `RANGE<DATE>` | Supported |  |
 | `RANGE<DATETIME>` | `RANGE<DATETIME>` | Supported |  |

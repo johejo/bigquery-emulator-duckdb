@@ -214,12 +214,14 @@ end
 note NULLIF Same-type comparable inputs are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertype combinations are not yet enumerated.
 
 page mathematical_functions
-for $T in @orderable
+# BigQuery rejects INTERVAL despite the documented orderable-type requirement; see the
+# observed answers and documentation discrepancy in scalars/interval.txt.
+for $T in @orderable | -INTERVAL
   GREATEST($T[, $T]) -> $T
   LEAST($T[, $T]) -> $T
 end
-note GREATEST Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
-note LEAST Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.
+note GREATEST Same-type scalar inputs and arities one and two are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertypes and larger arities are not yet enumerated.
+note LEAST Same-type scalar inputs and arities one and two are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertypes and larger arities are not yet enumerated.
 RAND() -> FLOAT64
 # BigQuery rejects RANGE values, as tests/e2e/goclient/testdata/scalars/range_bucket.txt shows.
 for $T in @orderable | -@range

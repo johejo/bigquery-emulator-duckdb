@@ -5306,7 +5306,7 @@
     {
       "name": "GREATEST",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
-      "note": "Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.",
+      "note": "Same-type scalar inputs and arities one and two are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertypes and larger arities are not yet enumerated.",
       "signatures": [
         {
           "arguments": [
@@ -5450,19 +5450,6 @@
             "TIMESTAMP"
           ],
           "result": "TIMESTAMP"
-        },
-        {
-          "arguments": [
-            "INTERVAL"
-          ],
-          "result": "INTERVAL"
-        },
-        {
-          "arguments": [
-            "INTERVAL",
-            "INTERVAL"
-          ],
-          "result": "INTERVAL"
         },
         {
           "arguments": [
@@ -9599,7 +9586,7 @@
     {
       "name": "LEAST",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
-      "note": "Same-type scalar inputs and arities one and two are enumerated; mixed-type supertypes and larger arities are not yet enumerated.",
+      "note": "Same-type scalar inputs and arities one and two are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertypes and larger arities are not yet enumerated.",
       "signatures": [
         {
           "arguments": [
@@ -9743,19 +9730,6 @@
             "TIMESTAMP"
           ],
           "result": "TIMESTAMP"
-        },
-        {
-          "arguments": [
-            "INTERVAL"
-          ],
-          "result": "INTERVAL"
-        },
-        {
-          "arguments": [
-            "INTERVAL",
-            "INTERVAL"
-          ],
-          "result": "INTERVAL"
         },
         {
           "arguments": [
