@@ -48,6 +48,12 @@ absl::StatusOr<double> Y(const Geography& geography);
 absl::StatusOr<Geography> SetOperation(const Geography& a, const Geography& b,
                                        S2BooleanOperation::OpType operation);
 absl::StatusOr<Geography> Boundary(const Geography& geography);
+absl::StatusOr<Geography> Buffer(const Geography& geography, double radius_meters,
+                                 double num_seg_quarter_circle, bool use_spheroid,
+                                 const std::string& endcap, const std::string& side);
+absl::StatusOr<Geography> BufferWithTolerance(const Geography& geography, double radius_meters,
+                                              double tolerance_meters, bool use_spheroid,
+                                              const std::string& endcap, const std::string& side);
 absl::StatusOr<Geography> Simplify(const Geography& geography, double tolerance_meters);
 absl::StatusOr<Geography> SnapToGrid(const Geography& geography, double grid_size);
 std::optional<BoundingBox> Bounds(const Geography& geography, const Options& options);

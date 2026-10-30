@@ -171,3 +171,8 @@ SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
   RANGE<DATE> '[2020-01-01, 2020-02-01)', CAST(NULL AS RANGE<DATE>),
   RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']) AS r
 !> error: Array cannot have a null element; error in writing field f0_
+
+# BigQuery's use_spheroid error for ST_BUFFER survives SAFE., which the emulator turns into NULL
+# (geography_buffer.txt).
+SELECT SAFE.ST_BUFFER(ST_GEOGPOINT(1, 2), 100, use_spheroid => TRUE)
+!> error: ST_BUFFER does not yet implement use_spheroid=true.

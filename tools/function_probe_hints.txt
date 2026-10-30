@@ -149,6 +149,10 @@ extra_query S2_COVERINGCELLIDS SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min
 extra_query S2_COVERINGCELLIDS SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_cells => 2147483648)
 note S2_COVERINGCELLIDS See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 elements ^ST_(SIMPLIFY|SNAPTOGRID)\( | geography | GEOGRAPHY
+elements ^ST_(BUFFER|BUFFERWITHTOLERANCE)\( | geography | GEOGRAPHY
+extra_query ST_BUFFER SELECT ST_BUFFER(ST_GEOGPOINT(1, 2), 100, 2, FALSE)
+extra_query ST_BUFFER SELECT ST_BUFFER(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'), 100, endcap => 'FLAT', side => 'LEFT')
+extra_query ST_BUFFERWITHTOLERANCE SELECT ST_BUFFERWITHTOLERANCE(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'), 100, 1, use_spheroid => FALSE, endcap => 'FLAT', side => 'RIGHT')
 argument ^ST_(SIMPLIFY|SNAPTOGRID)\( | DOUBLE | 0.01
 
 # HLL_COUNT functions take a sketch, here HLL_COUNT.INIT's of 0, and a precision from 10 to 24.

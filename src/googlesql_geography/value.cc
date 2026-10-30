@@ -22,6 +22,7 @@
 #include "s2/r2.h"
 #include "s2/s1angle.h"
 #include "s2/s2boolean_operation.h"
+#include "s2/s2buffer_operation.h"
 #include "s2/s2builder.h"
 #include "s2/s2builderutil_closed_set_normalizer.h"
 #include "s2/s2builderutil_s2point_vector_layer.h"
@@ -700,6 +701,20 @@ absl::StatusOr<Geography> Snap(const Geography& geography,
     return absl::InternalError("S2Builder failed: " + std::string(error.message()));
   }
   return Read(output);
+}
+
+absl::StatusOr<Geography> BufferGeography(const Geography& geography,
+                                          const S2BufferOperation::Options& options) {
+  S2Polygon polygon;
+  S2BufferOperation operation(std::make_unique<s2builderutil::S2PolygonLayer>(&polygon), options);
+  MutableS2ShapeIndex index;
+  AddShapes(geography, index);
+  operation.AddShapeIndex(index);
+  S2Error error;
+  if (!operation.Build(&error)) {
+    return absl::InternalError("S2BufferOperation failed: " + std::string(error.message()));
+  }
+  return FromPolygon(polygon);
 }
 
 absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,

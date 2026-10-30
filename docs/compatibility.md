@@ -246,6 +246,8 @@ BigQuery loads as NULL.
 - `ST_GEOGFROMTEXT`'s and `ST_GEOGFROMWKB`'s `make_valid = TRUE` are unsupported, as is
   `ST_GEOGFROMGEOJSON`'s `make_valid`.
 - `S2_COVERINGCELLIDS` does not support `max_cells` above 2,147,483,647.
+- `SAFE.ST_BUFFER` and `SAFE.ST_BUFFERWITHTOLERANCE` return NULL for `use_spheroid = TRUE`,
+  where BigQuery fails.
 - Planar polygons with an edge along a pole, including GeoJSON polygons such as
   `ST_ASGEOJSON`'s full polygon, are unsupported.
 

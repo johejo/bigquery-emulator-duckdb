@@ -23,6 +23,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "googlesql/base/status_macros.h"
 #include "s2/mutable_s2shape_index.h"
 #include "s2/r1interval.h"
@@ -31,6 +32,7 @@
 #include "s2/s1chord_angle.h"
 #include "s2/s1interval.h"
 #include "s2/s2boolean_operation.h"
+#include "s2/s2buffer_operation.h"
 #include "s2/s2builder.h"
 #include "s2/s2builderutil_lax_polygon_layer.h"
 #include "s2/s2builderutil_s2point_vector_layer.h"
@@ -621,6 +623,99 @@ absl::StatusOr<Geography> SnapToGrid(const Geography& geography, double grid_siz
                   s2builderutil::IntLatLngSnapFunction::ExponentForMaxSnapRadius(
                       S1Angle::Degrees(grid_size))),
               false);
+}
+
+namespace {
+// BigQuery's error for a NaN or infinite `argument` of `function`.
+absl::Status CheckFinite(double value, std::string_view argument, std::string_view function) {
+  if (std::isnan(value)) {
+    return absl::OutOfRangeError(std::format("{}: Argument {} cannot be NaN", function, argument));
+  }
+  if (std::isinf(value)) {
+    return absl::OutOfRangeError(
+        std::format("{}: Argument {} cannot be +-inf", function, argument));
+  }
+  return absl::OkStatus();
+}
+
+// The options ST_BUFFER and ST_BUFFERWITHTOLERANCE share, which `function` names in errors.
+// BigQuery takes endcap and side in any case.
+absl::StatusOr<S2BufferOperation::Options> BufferOptions(double radius_meters, bool use_spheroid,
+                                                         const std::string& endcap,
+                                                         const std::string& side,
+                                                         const std::string& function) {
+  if (use_spheroid) {
+    return absl::OutOfRangeError(function + " does not yet implement use_spheroid=true.");
+  }
+  GOOGLESQL_RETURN_IF_ERROR(CheckFinite(radius_meters, "buffer_radius_meters", function));
+  S2BufferOperation::Options options(S2Earth::MetersToAngle(radius_meters));
+  const std::string endcap_style = absl::AsciiStrToUpper(endcap);
+  if (endcap_style == "ROUND") {
+    options.set_end_cap_style(S2BufferOperation::EndCapStyle::ROUND);
+  } else if (endcap_style == "FLAT") {
+    options.set_end_cap_style(S2BufferOperation::EndCapStyle::FLAT);
+  } else {
+    return absl::OutOfRangeError(std::format(
+        "{}: Supported end cap style are 'ROUND' or 'FLAT'. Argument was '{}'.", function, endcap));
+  }
+  const std::string line_side = absl::AsciiStrToUpper(side);
+  if (line_side == "BOTH") {
+    options.set_polyline_side(S2BufferOperation::PolylineSide::BOTH);
+  } else if (line_side == "LEFT") {
+    options.set_polyline_side(S2BufferOperation::PolylineSide::LEFT);
+  } else if (line_side == "RIGHT") {
+    options.set_polyline_side(S2BufferOperation::PolylineSide::RIGHT);
+  } else {
+    return absl::OutOfRangeError(
+        std::format("{}: Supported line sides are 'LEFT', 'RIGHT' or 'BOTH'. Argument was '{}'.",
+                    function, side));
+  }
+  return options;
+}
+}  // namespace
+
+// BigQuery approximates a quarter circle with `num_seg_quarter_circle` segments, as S2's circle
+// segments of a whole circle: a buffered point is a regular polygon of four times as many sides.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): follows the SQL argument order.
+absl::StatusOr<Geography> Buffer(const Geography& geography, double radius_meters,
+                                 double num_seg_quarter_circle, bool use_spheroid,
+                                 const std::string& endcap, const std::string& side) {
+  GOOGLESQL_ASSIGN_OR_RETURN(S2BufferOperation::Options options,
+                             BufferOptions(radius_meters, use_spheroid, endcap, side, "ST_BUFFER"));
+  GOOGLESQL_RETURN_IF_ERROR(
+      CheckFinite(num_seg_quarter_circle, "num_seg_quarter_circle", "ST_BUFFER"));
+  // BigQuery's error says at least 0.5, but it rejects 0.5 too.
+  if (num_seg_quarter_circle <= 0.5 || num_seg_quarter_circle >= 392.5) {
+    return absl::OutOfRangeError(
+        "ST_BUFFER: Number of quarter circle segments out of range. Number of quarter circle "
+        "segments must be at least 0.5 and less than 392.5.");
+  }
+  // set_circle_segments, without its rounding up of the error fraction past 1 near 0.5 segments,
+  // which S2 checks in debug builds.
+  options.set_error_fraction(
+      std::min(1.0, 1 - std::cos(std::numbers::pi / (4 * num_seg_quarter_circle)) + 1e-15));
+  return BufferGeography(geography, options);
+}
+
+// BigQuery's tolerance is S2's error fraction of the radius, which fails below S2's minimum,
+// including the minimum itself and any negative radius, and is 1 from a tolerance of the radius on.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): follows the SQL argument order.
+absl::StatusOr<Geography> BufferWithTolerance(const Geography& geography, double radius_meters,
+                                              double tolerance_meters, bool use_spheroid,
+                                              const std::string& endcap, const std::string& side) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      S2BufferOperation::Options options,
+      BufferOptions(radius_meters, use_spheroid, endcap, side, "ST_BUFFERWITHTOLERANCE"));
+  GOOGLESQL_RETURN_IF_ERROR(
+      CheckFinite(tolerance_meters, "tolerance_meters", "ST_BUFFERWITHTOLERANCE"));
+  const double fraction = tolerance_meters / radius_meters;
+  if (!(fraction > S2BufferOperation::Options::kMinErrorFraction)) {
+    return absl::OutOfRangeError(
+        "ST_BUFFERWITHTOLERANCE: Error tolerance is too small. Tolerance must be at least 0.0001 "
+        "percent of the buffer radius.");
+  }
+  options.set_error_fraction(std::min(1.0, fraction));
+  return BufferGeography(geography, options);
 }
 
 absl::StatusOr<Geography> Boundary(const Geography& geography) {

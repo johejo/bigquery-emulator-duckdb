@@ -520,6 +520,12 @@ const Definitions& GeographyDefinitions() {
                         EachRow<SetOperation<S2BooleanOperation::OpType::DIFFERENCE>>);
     definitions->Scalar("bq_st_boundary", {kGeography}, kGeography,
                         EachRow<Call<googlesql_geography::Boundary>>);
+    definitions->Scalar("bq_st_buffer",
+                        {kGeography, kDouble, kDouble, kBoolean, kVarchar, kVarchar}, kGeography,
+                        EachRow<Call<googlesql_geography::Buffer>>);
+    definitions->Scalar("bq_st_bufferwithtolerance",
+                        {kGeography, kDouble, kDouble, kBoolean, kVarchar, kVarchar}, kGeography,
+                        EachRow<Call<googlesql_geography::BufferWithTolerance>>);
     definitions->Scalar("bq_st_simplify", {kGeography, kDouble}, kGeography,
                         EachRow<Call<googlesql_geography::Simplify>>);
     definitions->Scalar("bq_st_snaptogrid", {kGeography, kDouble}, kGeography,
@@ -689,6 +695,8 @@ GeographyFunctions() {
   static constexpr std::string_view kFromTextDefaults[] = {"false", "false", "false"};
   static constexpr std::string_view kGeohashDefaults[] = {"20"};
   static constexpr std::string_view kCellIdDefaults[] = {"30"};
+  static constexpr std::string_view kBufferDefaults[] = {"8.0", "false", "'ROUND'", "'BOTH'"};
+  static constexpr std::string_view kBufferWithToleranceDefaults[] = {"false", "'ROUND'", "'BOTH'"};
   static constexpr std::string_view kCoveringDefaults[] = {"0", "30", "8", "0.0"};
   static constexpr auto kRulesBacking = std::tuple{
       Define("ST_GEOGPOINT", {{.arity = 2, .spelling = "bq_st_geogpoint($1, $2)"}},
@@ -776,6 +784,24 @@ GeographyFunctions() {
       Define("ST_DIFFERENCE", {{.arity = 2, .spelling = "bq_st_difference($1, $2)"}},
              {.uses = kUses}),
       Define("ST_BOUNDARY", {{.arity = 1, .spelling = "bq_st_boundary($1)"}}, {.uses = kUses}),
+      Define("ST_BUFFER",
+             {
+                 {
+                     .arity = {2, 6},
+                     .spelling = "bq_st_buffer($1, $2, $3, $4, $5, $6)",
+                     .defaults = kBufferDefaults,
+                 },
+             },
+             {.uses = kUses}),
+      Define("ST_BUFFERWITHTOLERANCE",
+             {
+                 {
+                     .arity = {3, 6},
+                     .spelling = "bq_st_bufferwithtolerance($1, $2, $3, $4, $5, $6)",
+                     .defaults = kBufferWithToleranceDefaults,
+                 },
+             },
+             {.uses = kUses}),
       Define("ST_SIMPLIFY", {{.arity = 2, .spelling = "bq_st_simplify($1, $2)"}}, {.uses = kUses}),
       Define("ST_SNAPTOGRID", {{.arity = 2, .spelling = "bq_st_snaptogrid($1, $2)"}},
              {.uses = kUses}),
