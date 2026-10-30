@@ -78,14 +78,9 @@ neither clearly applies.
 
 ### Registering a function
 
-`src/emulator_functions.cc` assembles the application's registry from the builtin definitions in
-`src/translator/functions.cc` and feature providers such as the geography adapter. The shared
-registry model and rule expansion live in `src/function_catalog/`; translators receive the
-assembled catalog from their callers and do not select or register feature adapters.
-`functions_template.cc`, `functions_backend.cc` and `functions_aggregate.cc` hold the builtin
-rule tables. Each function is
-registered under one of these spellings; its rules may still spell overloads with different
-backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
+[architecture.md](docs/architecture.md#translator) describes how the registry is assembled.
+Each function is registered under one of these spellings; its rules may still spell overloads
+with different backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
 
 - **As is** (`PlainFunctions`) or **renamed** (`FunctionNames`): a DuckDB function with the same
   semantics.
@@ -164,10 +159,10 @@ expected result from one layer to another.
   and process or concurrency behavior in Go. REST details can also be checked with runn's HTTP
   runner in `tests/e2e/rest_*.yml`.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
-  `docs/api.md`, `docs/storage.md`, `docs/sql.md` and `docs/functions.md`; never edit those by
-  hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
-  from GoogleSQL's signatures and the samples in `tools/function_probe_hints.txt`, and
-  `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
+  `docs/api.md`, `docs/storage.md`, `docs/sql.md`, `docs/options.md`, `docs/functions.md` and
+  `docs/function-types*`; never edit those by hand, and commit them regenerated when their
+  inputs change. `//:function_probe` builds calls from GoogleSQL's signatures and the samples in
+  `tools/function_probe_hints.txt`, and `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
   class of forms with an `elements` or `argument` hint that matches their signatures, and extend
   the probe only for what hints cannot express. Probe the forms BigQuery runs, whether it
   documents them or answers an unverified case; a form it rejects, such as GoogleSQL syntax it
@@ -192,13 +187,11 @@ expected result from one layer to another.
 
 Take each expected value from BigQuery's documentation, from GoogleSQL's compliance test data
 where the reference implementation agrees with BigQuery, or from BigQuery itself. Never copy the
-emulator's output. Agents do not run queries on BigQuery: a case no source settles goes in
-`tests/e2e/goclient/testdata/unverified/*.txt`, split by feature, whose answers maintainers fill in with
-`just bigquery-answers`. `just reference` shows what the reference implementation answers, as a
-lead for what to check, never as an expected value. REST and BigQuery Storage gRPC cases go in
-`tests/e2e/goclient/testdata/unverified/*.api.yaml` (legacy `*.api.json` is also supported), using the
-[bqanswers scenario format](tools/bqanswers/README.md); the same `just bigquery-answers` command
-records their selected responses. Validate these files locally with `just bigquery-answers-validate`.
+emulator's output. Agents do not run queries on BigQuery: a SQL, REST or Storage gRPC case no
+source settles goes in
+[`tests/e2e/goclient/testdata/unverified/`](tests/e2e/goclient/testdata/unverified/README.md),
+split by feature, for maintainers to answer. `just reference` shows what the reference
+implementation answers, as a lead for what to check, never as an expected value.
 
 When BigQuery's documentation and an observed BigQuery answer disagree, comment on the test case
 with the discrepancy and a link to the documentation. Keep the observation's context so a future
@@ -213,19 +206,22 @@ alone does not require removing existing support.
 For BigQuery specification lookups, prefer saved Markdown under `third_party/bigquery_docs/`.
 Source URLs in its manifest are attribution and update metadata, not instructions to browse.
 When citing a new official BigQuery page, run `just bigquery-docs-sync` after adding the citing
-file to Git, then commit the snapshot, manifest and localized citation together. Acquisition
-uses ADC by default, or `DEVELOPERKNOWLEDGE_API_KEY` when set; never replace a citation with a
-local path before its snapshot exists. Local citations link to the whole file, without `#` anchors.
-`just bigquery-docs-check` validates citations offline; refresh snapshots only
-explicitly with `just bigquery-docs-refresh`. See the snapshot directory's README for details.
+file to Git, then commit the snapshot, manifest and localized citation together; never replace
+a citation with a local path before its snapshot exists. Refresh snapshots only explicitly, with
+`just bigquery-docs-refresh`.
+The snapshot directory's README covers authentication and the citation rules
+`just bigquery-docs-check` enforces.
 
 Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
 query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage
-and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in
-[docs/architecture.md](docs/architecture.md). The support tables listed above are generated;
-the preambles under `tools/restprobe/` and `tools/storageprobe/` are their handwritten inputs. A
-probe's note is a sentence or a link to a section of `docs/compatibility.md` or
-`docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
+and limits in [docs/storage-api.md](docs/storage-api.md), implementation details in
+[docs/architecture.md](docs/architecture.md), development tools and debugging modes in
+[docs/development.md](docs/development.md), and the probes' catalogs in
+[tools/restprobe/README.md](tools/restprobe/README.md). Describe the current state; leave plans,
+progress and validation records to pull requests and Git history. The support tables listed
+above are generated; the preambles under `tools/restprobe/` and `tools/storageprobe/` are their
+handwritten inputs. A probe's note is a sentence or a link to a section of
+`docs/compatibility.md` or `docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
 probe rejects to the probe. Describe emulator-specific limits and differences; do not restate
 BigQuery's normal semantics for supported features or narrate their implementation.
 
