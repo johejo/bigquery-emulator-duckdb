@@ -1285,26 +1285,26 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                               "len(_s) + 1) - _r)))[1])[1]",
               },
           }),
-      // DuckDB's string_agg and array_to_string() take only a constant delimiter, so elements
-      // are concatenated with ||, starting from NULL when the delimiter or NULL text is NULL.
-
+      // DuckDB's string_agg takes only a constant delimiter, so STRING elements after the first
+      // get the delimiter as a prefix and are joined with an empty one. string_agg takes no BLOB,
+      // so BYTES are concatenated with ||, starting from NULL when the delimiter or NULL text is
+      // NULL; this copies the result for each element, taking time quadratic in its length.
       Define("ARRAY_TO_STRING",
              {
                  {
                      .arity = 2,
-                     .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
-                                 "_a, _e, _i: "
-                                 "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                                 "CASE WHEN $2 IS NULL THEN NULL ELSE '' END)",
+                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL ELSE "
+                                 "coalesce(list_aggr(list_transform(list_filter($1, lambda _e: _e "
+                                 "IS NOT NULL), lambda _e, _i: CASE WHEN _i = 1 THEN _e ELSE $2 || "
+                                 "_e END), 'string_agg', ''), '') END",
                      .conditions = kStringDelimiter,
                  },
                  {
                      .arity = 3,
-                     .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, "
-                                 "$3)), lambda _a, "
-                                 "_e, _i: "
-                                 "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                                 "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE '' END)",
+                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL OR $3 IS NULL THEN NULL ELSE "
+                                 "coalesce(list_aggr(list_transform($1, lambda _e, _i: CASE WHEN "
+                                 "_i = 1 THEN coalesce(_e, $3) ELSE $2 || coalesce(_e, $3) END), "
+                                 "'string_agg', ''), '') END",
                      .conditions = kStringDelimiter,
                  },
                  {

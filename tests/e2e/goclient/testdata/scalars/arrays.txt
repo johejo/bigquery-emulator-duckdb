@@ -71,6 +71,12 @@ SELECT ARRAY_TO_STRING(a, d, n) FROM (SELECT ['coffee', 'tea', 'milk', NULL] AS 
 SELECT ARRAY_TO_STRING(a, d) FROM (SELECT [b'prefix', b'middle', b'suffix', b'\x00'] AS a, b'--' AS d)
 => "cHJlZml4LS1taWRkbGUtLXN1ZmZpeC0tAA=="
 
+SELECT ARRAY_TO_STRING(a, d) FROM (SELECT [b'coffee', NULL, b'tea'] AS a, b'--' AS d)
+=> "Y29mZmVlLS10ZWE="
+
+SELECT ARRAY_TO_STRING(a, d, n) FROM (SELECT [b'cake', b'pie', NULL] AS a, b'--' AS d, b'MISSING' AS n)
+=> "Y2FrZS0tcGllLS1NSVNTSU5H"
+
 SELECT ARRAY_FIRST([4, 5])
 => "4"
 
