@@ -85,7 +85,7 @@ struct FunctionEntry {
 // The application assembles a catalog before passing it to the translator.
 class Catalog {
  public:
-  explicit Catalog(TimestampPrecision precision, bool recursive_union_all_only = false)
+  explicit Catalog(TimestampPrecision precision, bool recursive_union_all_only)
       : timestamp_precision_(precision), recursive_union_all_only_(recursive_union_all_only) {}
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
   // Whether a recursive CTE joins its terms only with UNION ALL, as in BigQuery.
