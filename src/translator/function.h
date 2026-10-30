@@ -4,7 +4,6 @@
 #include <string>
 #include <string_view>
 
-#include "src/timestamp_precision.h"
 #include "src/translator/context.h"
 
 namespace googlesql {
@@ -28,12 +27,13 @@ bool HasBigNumeric(const googlesql::Type* type);
 bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call);
 
 // `value`, the SQL of a value of `type`, as a query returns it in the column `column`, or with
-// `stored` as a table stores it: an ARRAY with a NULL element fails, as in BigQuery, and unless
-// `stored`, each GEOGRAPHY in it, at any depth, is turned into the WKT BigQuery returns for it.
+// `stored` as a table stores it: an ARRAY with a NULL element fails where `functions` has
+// BigQuery's restriction, and unless `stored`, each GEOGRAPHY in it, at any depth, is turned into
+// the WKT BigQuery returns for it.
 // Until then, an ARRAY may hold NULL, and a GEOGRAPHY, also in tables, keeps the form queries hold
 // it in (see src/googlesql_geography_duckdb/codec.h).
-std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, bool stored, TimestampPrecision precision);
+std::string ResultValue(const function_catalog::Catalog& functions, const std::string& value,
+                        const googlesql::Type* type, std::string_view column, bool stored);
 
 // `value`, the SQL of a value of `type` that a statement writes to the column `field`. DuckDB's
 // cast to a parameterized NUMERIC or BIGNUMERIC rounds halfway values away from zero, so the value

@@ -175,9 +175,21 @@ bool HasResultForm(const googlesql::Type* type, bool stored) {
   return !stored && type->IsGeography();
 }
 
-std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, bool stored, TimestampPrecision precision,
+// What a NULL element of an ARRAY written to `column` becomes: an error under BigQuery's
+// restriction.
+std::string NullElement(const Catalog& functions, std::string_view column) {
+  return functions.restrictions().arrays_without_null_elements
+             ? "error(" +
+                   QuoteLiteral("Array cannot have a null element; error in writing field " +
+                                std::string(column)) +
+                   ")"
+             : "NULL";
+}
+
+std::string ResultValue(const Catalog& functions, const std::string& value,
+                        const googlesql::Type* type, std::string_view column, bool stored,
                         int depth) {
+  const TimestampPrecision precision = functions.timestamp_precision();
   if (precision == TimestampPrecision::kNanoseconds && type->IsTimestamp()) {
     return "CAST(" + value + " AS bq_timestamp_nanos)";
   }
@@ -192,11 +204,8 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
   const std::string name = "_result" + std::to_string(depth);
   if (type->IsArray()) {
     return "list_transform(" + value + ", lambda " + name + ": CASE WHEN " + name +
-           " IS NULL THEN error(" +
-           QuoteLiteral("Array cannot have a null element; error in writing field " +
-                        std::string(column)) +
-           ") ELSE " +
-           ResultValue(name, type->AsArray()->element_type(), column, stored, precision,
+           " IS NULL THEN " + NullElement(functions, column) + " ELSE " +
+           ResultValue(functions, name, type->AsArray()->element_type(), column, stored,
                        depth + 1) +
            " END)";
   }
@@ -206,8 +215,9 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
   fields.reserve(names.size());
   for (int i = 0; i < structure->num_fields(); ++i) {
     fields.push_back(QuoteIdentifier(names.at(i)) + " := " +
-                     ResultValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
-                                 structure->field(i).type, column, stored, precision, depth + 1));
+                     ResultValue(functions,
+                                 "struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
+                                 structure->field(i).type, column, stored, depth + 1));
   }
   return "list_transform([" + value + "], lambda " + name + ": CASE WHEN " + name +
          " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
@@ -215,9 +225,9 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
 
 }  // namespace
 
-std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, bool stored, TimestampPrecision precision) {
-  return ResultValue(value, type, column, stored, precision, 0);
+std::string ResultValue(const Catalog& functions, const std::string& value,
+                        const googlesql::Type* type, std::string_view column, bool stored) {
+  return ResultValue(functions, value, type, column, stored, 0);
 }
 
 namespace {
@@ -237,10 +247,7 @@ std::optional<std::string> RoundedValue(const Catalog& functions, const std::str
       return std::nullopt;
     }
     return "coalesce(list_transform(" + value + ", lambda " + name + ": CASE WHEN " + name +
-           " IS NULL THEN error(" +
-           QuoteLiteral("Array cannot have a null element; error in writing field " +
-                        std::string(column)) +
-           ") ELSE " + *element + " END), [])";
+           " IS NULL THEN " + NullElement(functions, column) + " ELSE " + *element + " END), [])";
   }
   if (type->IsStruct()) {
     const auto* structure = type->AsStruct();
@@ -290,9 +297,8 @@ std::optional<std::string> RoundedValue(const Catalog& functions, const std::str
 std::optional<std::string> WrittenValue(const Catalog& functions, const std::string& value,
                                         const googlesql::Type* type, const FieldSchema& field,
                                         bool assignment) {
-  const auto rounded = RoundedToEven(
-      functions, ResultValue(value, type, field.name, true, functions.timestamp_precision()), type,
-      field);
+  const auto rounded =
+      RoundedToEven(functions, ResultValue(functions, value, type, field.name, true), type, field);
   return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, field, assignment))
                  : std::nullopt;
 }

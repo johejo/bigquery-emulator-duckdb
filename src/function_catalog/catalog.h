@@ -86,6 +86,8 @@ struct FunctionEntry {
 struct QueryRestrictions {
   // INTERSECT and EXCEPT take only DISTINCT.
   bool intersect_except_distinct_only = false;
+  // Query results and written values hold no ARRAY with a NULL element.
+  bool arrays_without_null_elements = false;
 };
 
 // A catalog owns its entries; registered names and targets must outlive it.

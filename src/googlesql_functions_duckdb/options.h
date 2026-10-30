@@ -33,6 +33,8 @@ struct Options {
   bool collate_und_ci_only = false;
   // The translator rejects INTERSECT ALL and EXCEPT ALL.
   bool intersect_except_distinct_only = false;
+  // Query results and written values fail on an ARRAY with a NULL element.
+  bool arrays_without_null_elements = false;
   googlesql_collation::Options collation = {};
 
   std::strong_ordering operator<=>(const Options&) const = default;
