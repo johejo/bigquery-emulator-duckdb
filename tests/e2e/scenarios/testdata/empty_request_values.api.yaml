@@ -274,8 +274,7 @@ cases:
           method: GET
           path: /bigquery/v2/projects/${project}/jobs/${second_job}?location=US
         until: {/body/status/state: DONE}
-        # The emulator also gives this error a location, which BigQuery leaves out
-        # (known_bugs/job_error_result.api.yaml).
+        # job_error_result.api.yaml checks the complete errorResult, including the absent location.
         observe:
           reason: /body/status/errorResult/reason
           message: /body/status/errorResult/message

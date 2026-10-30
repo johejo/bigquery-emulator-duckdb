@@ -274,11 +274,13 @@ void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
   if (result.affected_rows >= 0) {
     response["numDmlAffectedRows"] = std::to_string(result.affected_rows);
   }
+  if (result.has_rows || !result.schema.empty()) {
+    response["schema"] = result.SchemaToJson();
+  }
   if (!result.has_rows) {
     response["totalRows"] = "0";
     return;
   }
-  response["schema"] = result.SchemaToJson();
   response["totalRows"] = std::to_string(result.rows.size());
   const auto total = static_cast<int64_t>(result.rows.size());
   const int64_t begin = std::clamp<int64_t>(page.start_index, 0, total);
