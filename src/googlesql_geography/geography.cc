@@ -588,6 +588,41 @@ absl::StatusOr<Geography> SetOperation(const Geography& a, const Geography& b,
   return result;
 }
 
+absl::StatusOr<Geography> Simplify(const Geography& geography, double tolerance_meters) {
+  if (!std::isfinite(tolerance_meters)) {
+    return absl::OutOfRangeError("Simplification tolerance should be a finite value.");
+  }
+  if (tolerance_meters < 0) {
+    return absl::OutOfRangeError(
+        "Simplification tolerance must be greater or equal than zero meters.");
+  }
+  // BigQuery's limit is S2Builder's, 70 degrees or about 7784 kilometers.
+  const S1Angle radius = S2Earth::MetersToAngle(tolerance_meters);
+  if (radius > S2Builder::SnapFunction::kMaxSnapRadius()) {
+    return absl::OutOfRangeError("Simplification tolerance cannot exceed 7800 kilometers.");
+  }
+  if (tolerance_meters == 0) {
+    return geography;
+  }
+  return Snap(geography, s2builderutil::IdentitySnapFunction(radius), true);
+}
+
+absl::StatusOr<Geography> SnapToGrid(const Geography& geography, double grid_size) {
+  if (std::isnan(grid_size)) {
+    return absl::OutOfRangeError("ST_SnapToGrid argument grid size cannot be NaN");
+  }
+  if (std::isinf(grid_size)) {
+    return absl::OutOfRangeError("ST_SnapToGrid argument grid size cannot be +-inf");
+  }
+  // BigQuery snaps to the grid of S2's exponent for the size as a snap radius, 10^-n degrees with
+  // 0 <= n <= 10, which moves no vertex for a size of zero or less.
+  return Snap(geography,
+              s2builderutil::IntLatLngSnapFunction(
+                  s2builderutil::IntLatLngSnapFunction::ExponentForMaxSnapRadius(
+                      S1Angle::Degrees(grid_size))),
+              false);
+}
+
 absl::StatusOr<Geography> Boundary(const Geography& geography) {
   std::vector<Geography> parts;
   for (const std::vector<S2Point>& line : geography.lines) {

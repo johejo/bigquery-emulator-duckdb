@@ -12,6 +12,7 @@
 #include "s2/mutable_s2shape_index.h"
 #include "s2/r2.h"
 #include "s2/s2boolean_operation.h"
+#include "s2/s2builder.h"
 #include "s2/s2latlng.h"
 #include "s2/s2point.h"
 #include "s2/s2polygon.h"
@@ -156,6 +157,12 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
 // that cross gain the vertex where they do. Points follow S2CellId order, and linestrings and
 // polygons the order of the parts they came from.
 absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts);
+
+// `geography` rebuilt by S2Builder with `snap_function`, where `simplify` also replaces chains of
+// edges whose removed vertices stay within the snap radius with one edge. Degenerate polygon
+// shells become lines or points, and degenerate lines become points.
+absl::StatusOr<Geography> Snap(const Geography& geography,
+                               const S2Builder::SnapFunction& snap_function, bool simplify);
 
 // A closed point set operation on two shape indexes already snapped together. Degenerate
 // polygon shells become lines or points, and degenerate lines become points.

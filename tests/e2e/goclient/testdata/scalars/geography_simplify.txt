@@ -1,0 +1,165 @@
+## ST_SIMPLIFY and ST_SNAPTOGRID
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md
+# The examples of ST_SIMPLIFY, its statement that a zero tolerance has no effect, and
+# ST_SNAPTOGRID's description, which snaps each vertex to a longitude/latitude grid of 10^n degrees.
+# BigQuery answered the rest.
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('LINESTRING(0 0, 0.05 0, 0.1 0, 0.15 0, 2 0)'), 1)
+=> "LINESTRING(0 0, 2 0)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POLYGON((0 0, 0.1 0, 0.1 0.1, 0 0))'), 1000)
+=> "POLYGON((0 0, 0.1 0, 0.1 0.1, 0 0))"
+
+# A large enough tolerance lowers the dimension.
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POLYGON((0 0, 0.1 0, 0.1 0.1, 0 0))'), 10000)
+=> "LINESTRING(0 0, 0.1 0.1)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POLYGON((0 0, 0.1 0, 0.1 0.1, 0 0))'), 100000)
+=> "POINT(0 0)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('LINESTRING(0 0, 0.05 0, 0.1 0, 0.15 0, 2 0)'), 0)
+=> "LINESTRING(0 0, 0.05 0, 0.1 0, 0.15 0, 2 0)"
+
+SELECT ST_SIMPLIFY(NULL, 1)
+=> null
+
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), NULL)
+=> null
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.26, 2.34), 0.1)
+=> "POINT(1.3 2.3)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('LINESTRING(0.123456 1.987654, 3.14159 2.71828)'), 0.01)
+=> "LINESTRING(0.12 1.99, 3.14 2.72)"
+
+SELECT ST_SNAPTOGRID(NULL, 0.1)
+=> null
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1, 2), NULL)
+=> null
+
+# ST_SIMPLIFY's errors.
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), -1)
+=> error: Simplification tolerance must be greater or equal than zero meters.
+
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), CAST('NaN' AS FLOAT64))
+=> error: Simplification tolerance should be a finite value.
+
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), 7700000)
+=> "POINT(1 2)"
+
+# The limit is about 7784 kilometers.
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), 7790000)
+=> error: Simplification tolerance cannot exceed 7800 kilometers.
+
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), 7800000)
+=> error: Simplification tolerance cannot exceed 7800 kilometers.
+
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), 7900000)
+=> error: Simplification tolerance cannot exceed 7800 kilometers.
+
+SELECT ST_SIMPLIFY(ST_GEOGPOINT(1, 2), CAST('+inf' AS FLOAT64))
+=> error: Simplification tolerance should be a finite value.
+
+# Which vertex a collapsed shape keeps, and shapes simplified together.
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POLYGON((0.1 0.1, 0 0, 0.1 0, 0.1 0.1))'), 100000)
+=> "POINT(0 0)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('LINESTRING(0 0, 0.05 0.0000001, 1 0)'), 10)
+=> "LINESTRING(0 0, 1 0)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(5 5), LINESTRING(0 0, 0.05 0.000001, 1 0), POLYGON((10 10, 11 10, 11 11, 10 10)))'), 10)
+=> "GEOMETRYCOLLECTION(POINT(5 5), LINESTRING(0 0, 1 0), POLYGON((10 10, 11 10, 11 11, 10 10)))"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(0.5 0.00001), LINESTRING(0 0, 1 0))'), 10)
+=> "LINESTRING(0 0, 0.5 1e-05, 1 0)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('MULTILINESTRING((0 0, 0.5 0.00001, 1 0), (0.5 0.00001, 0.5 1))'), 10)
+=> "MULTILINESTRING((0 0, 0.5 1e-05, 1 0), (0.5 1e-05, 0.5 1))"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0.4 0.4, 0.4 0.41, 0.41 0.4, 0.4 0.4))'), 2000)
+=> "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('MULTIPOLYGON(((0 0, 1 0, 1 1, 0 0)), ((1.001 0, 2 0, 2 1, 1.001 0)))'), 1000)
+=> "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 0)), ((1 0, 2 0, 2 1, 1 0)))"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('MULTIPOINT(0 0, 0.00001 0)'), 10)
+=> "POINT(0 0)"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POINT EMPTY'), 10)
+=> "GEOMETRYCOLLECTION EMPTY"
+
+SELECT ST_SIMPLIFY(ST_GEOGFROMTEXT('POLYGON((0 0, 0.05 0.0000001, 1 0, 1 1, 0 0))'), 10)
+=> "POLYGON((0 0, 1 0, 1 1, 0 0))"
+
+SELECT ST_ASTEXT(ST_SIMPLIFY(ST_GEOGFROMTEXT('LINESTRING(0 0, 0.05 0.0000001, 1 0)'), 0.001))
+=> "LINESTRING(0 0, 0.05 1e-07, 1 0)"
+
+# Other grid sizes round to the largest 10^-n not above sqrt(2) times the size.
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0.05)
+=> "POINT(1.23 2.35)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0.003)
+=> "POINT(1.235 2.346)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0.0007)
+=> "POINT(1.2346 2.3457)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0.08)
+=> "POINT(1.2 2.3)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0.0075)
+=> "POINT(1.23 2.35)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0.8)
+=> "POINT(1 2)"
+
+# The documentation says the grid size is rounded to 10^n with -10 < n < 0, but BigQuery
+# snaps a grid size of 1 or more to whole degrees. See ST_SNAPTOGRID in
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md.
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 1)
+=> "POINT(1 2)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 10)
+=> "POINT(1 2)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 1e-10)
+=> "POINT(1.234567 2.345678)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), 0)
+=> "POINT(1.234567 2.345678)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), -0.1)
+=> "POINT(1.234567 2.345678)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), CAST('NaN' AS FLOAT64))
+=> error: ST_SnapToGrid argument grid size cannot be NaN
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1.234567, 2.345678), CAST('+inf' AS FLOAT64))
+=> error: ST_SnapToGrid argument grid size cannot be +-inf
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(1, 2), CAST('-inf' AS FLOAT64))
+=> error: ST_SnapToGrid argument grid size cannot be +-inf
+
+# Shapes that collapse and vertices that snap together. Ties depend on the platform; see
+# docs/compatibility.md#geography-values.
+SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('POLYGON((0 0, 0.001 0, 0.001 0.001, 0 0))'), 0.1)
+=> "POINT(0 0)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('POLYGON((0 0, 0.3 0, 0.3 0.04, 0 0))'), 0.1)
+=> "LINESTRING(0 0, 0.3 0)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('LINESTRING(0 0, 0.01 0.01, 1 1)'), 0.1)
+=> "LINESTRING(0 0, 1 1)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('MULTIPOINT(0.01 0.01, 0.02 0.02)'), 0.1)
+=> "POINT(0 0)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(0.51 0.01), LINESTRING(0 0, 1 0))'), 0.1)
+=> "LINESTRING(0 0, 0.5 0, 1 0)"
+
+SELECT ST_SNAPTOGRID(ST_GEOGPOINT(179.96, 89.96), 0.1)
+=> "POINT(180 90)"
+
+SELECT ST_X(ST_SNAPTOGRID(ST_GEOGPOINT(0.123456789, 0), 0.0001))
+=> "0.12350000000000001"

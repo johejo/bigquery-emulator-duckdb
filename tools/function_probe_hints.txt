@@ -148,6 +148,8 @@ elements ^S2_COVERINGCELLIDS\( | geography | GEOGRAPHY
 extra_query S2_COVERINGCELLIDS SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => 4, max_level => 8, max_cells => 8, buffer => 1000)
 extra_query S2_COVERINGCELLIDS SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_cells => 2147483648)
 note S2_COVERINGCELLIDS See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
+elements ^ST_(SIMPLIFY|SNAPTOGRID)\( | geography | GEOGRAPHY
+argument ^ST_(SIMPLIFY|SNAPTOGRID)\( | DOUBLE | 0.01
 
 # HLL_COUNT functions take a sketch, here HLL_COUNT.INIT's of 0, and a precision from 10 to 24.
 argument ^HLL_COUNT\.(EXTRACT|MERGE|MERGE_PARTIAL)\( | BYTES | FROM_HEX('087010011802200882070b1001180f20143203a2a721')
