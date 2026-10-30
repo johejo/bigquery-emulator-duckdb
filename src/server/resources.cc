@@ -49,7 +49,11 @@ json ProjectResource(const json& resource, const ResourceMask& mask) {
 }
 
 json ErrorProto(const ApiError& error) {
-  return json{{"reason", error.reason()}, {"location", "query"}, {"message", error.what()}};
+  json result{{"reason", error.reason()}, {"message", error.what()}};
+  if (!error.location().empty()) {
+    result["location"] = error.location();
+  }
+  return result;
 }
 
 json TableReferenceJson(const TableReference& table) {

@@ -33,23 +33,33 @@ class ApiError : public std::runtime_error {
 
   // This error with `message` in place of its own.
   [[nodiscard]] ApiError WithMessage(const std::string& message) const {
-    return {http_status_, reason_, message};
+    return {http_status_, reason_, message, location_};
+  }
+
+  // This error with `new_location`, or no location when it is empty, in its ErrorProto.
+  [[nodiscard]] ApiError WithLocation(std::string_view new_location) const {
+    return {http_status_, reason_, what(), new_location};
   }
 
   [[nodiscard]] int http_status() const { return http_status_; }
   [[nodiscard]] std::string_view reason() const { return reason_; }
+  [[nodiscard]] const std::string& location() const { return location_; }
 
  private:
   // Private so that every error goes through one of the named factories above; `reason` and
   // `message` cannot be mixed up at a call site that never names them.
   ApiError(int http_status,
            std::string_view reason,  // NOLINT(bugprone-easily-swappable-parameters)
-           const std::string& message)
-      : std::runtime_error(message), http_status_(http_status), reason_(reason) {}
+           const std::string& message, std::string_view error_location = "query")
+      : std::runtime_error(message),
+        http_status_(http_status),
+        reason_(reason),
+        location_(error_location) {}
 
   int http_status_;
-  // A string literal, so that copying an error cannot throw.
+  // A string literal supplied by the factory, with no per-error allocation.
   std::string_view reason_;
+  std::string location_;
 };
 
 }  // namespace bigquery_emulator_duckdb
