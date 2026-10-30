@@ -155,7 +155,7 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [COSINE_DISTANCE](function-types/mathematical.md#cosine_distance) | 3 | Supported |
 | [COT](function-types/mathematical.md#cot) | 4 | Supported |
 | [COTH](function-types/mathematical.md#coth) | 4 | Supported |
-| [COUNT](function-types/aggregate.md#count) | 40 | Partial |
+| [COUNT](function-types/aggregate.md#count) | 40 | Supported |
 | [COUNTIF](function-types/aggregate.md#countif) | 1 | Supported |
 | [COVAR_POP](function-types/statistical-aggregate.md#covar_pop) | 16 | Supported |
 | [COVAR_SAMP](function-types/statistical-aggregate.md#covar_samp) | 16 | Supported |
