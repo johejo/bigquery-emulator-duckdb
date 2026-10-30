@@ -112,31 +112,6 @@
         }
       }
     },
-    "insert_object_access": {
-      "project": "johejo-sandbox",
-      "run": "kb4pshlnlga2topmkr3zwxjpk4",
-      "steps": {
-        "insert": {
-          "error": {
-            "body": {
-              "error": {
-                "code": 400,
-                "errors": [
-                  {
-                    "domain": "global",
-                    "message": "An access entry must have exactly one of userByEmail, groupByEmail, domain, specialGroup defined, view, routine, or dataset.",
-                    "reason": "invalid"
-                  }
-                ],
-                "message": "An access entry must have exactly one of userByEmail, groupByEmail, domain, specialGroup defined, view, routine, or dataset.",
-                "status": "INVALID_ARGUMENT"
-              }
-            },
-            "status": 400
-          }
-        }
-      }
-    },
     "insert_snake_case_field": {
       "project": "johejo-sandbox",
       "run": "kb4pshlnlga2topmkr3zwxjpk4",
@@ -188,15 +163,6 @@
             },
             "status": 400
           }
-        }
-      }
-    },
-    "insert_unknown_access_field": {
-      "project": "johejo-sandbox",
-      "run": "kb4pshlnlga2topmkr3zwxjpk4",
-      "steps": {
-        "insert": {
-          "status": 200
         }
       }
     },

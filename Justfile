@@ -101,9 +101,11 @@ reference sql:
 bigquery-answers project path=(justfile_directory() + "/tests/e2e/goclient/testdata/unverified"):
     go run ./tools/bqanswers -bucket {{ quote(env("BQANSWERS_BUCKET", "")) }} {{ quote(project) }} {{ quote(path) }}
 
-# Checks SQL case formats and API scenarios without authentication, requests or modifying answers.
-bigquery-answers-validate path=(justfile_directory() + "/tests/e2e/goclient/testdata/unverified"):
-    go run ./tools/bqanswers -validate unused {{ quote(path) }}
+# Checks unverified cases and promoted API scenarios without authentication, requests or modifying answers.
+bigquery-answers-validate path="":
+    paths=({{ quote(justfile_directory() + "/tests/e2e/goclient/testdata/unverified") }} {{ quote(justfile_directory() + "/tests/e2e/scenarios/testdata") }}); \
+    if [[ -n {{ quote(path) }} ]]; then paths=({{ quote(path) }}); fi; \
+    for path in "${paths[@]}"; do go run ./tools/bqanswers -validate unused "$path"; done
 
 [positional-arguments]
 run *args:

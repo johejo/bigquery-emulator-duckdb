@@ -21,7 +21,8 @@ SQL files keep the existing query / `?>` format described in
 Offline validation checks that every SQL case has a query and a `?>` marker, parameters are JSON
 objects, and recorded answers are JSON or `error: ` messages. It checks the case format, not SQL
 syntax. All files are validated before authentication or answer collection. `just check` includes
-this validation for the unverified directory.
+this validation for both the unverified directory and promoted scenarios in
+`tests/e2e/scenarios/testdata/`. An explicit path restricts validation to that file or directory.
 API scenarios use YAML with JSON-compatible values; JSON objects can be embedded directly.
 Legacy JSON scenarios remain supported. Observations are collected from BigQuery; they are not
 assertions against guessed results. Filled answers are skipped on subsequent runs. For YAML,
