@@ -320,6 +320,8 @@ void SqlRuntime::WriteView(TableReference table, const json& definition,
       throw ApiError::Internal("CREATE VIEW was not translated to a view");
     }
     ViewDefinition view = *translation.view;
+    // REST-created views report explicit modes, unlike views created through DDL.
+    SetModesGiven(view.schema);
     view.metadata = metadata;
     // A replaced view keeps the expiration `metadata` gives it.
     backend_.ExecuteDdl(

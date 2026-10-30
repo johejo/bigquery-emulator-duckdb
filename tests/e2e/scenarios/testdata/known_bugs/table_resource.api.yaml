@@ -2,11 +2,10 @@ version: 1
 # Recorded on BigQuery in project johejo-sandbox, run sekw35nji45hayi63jydi2zl74; the answers
 # sidecar keeps the observations. These cases of ../table_resource.api.yaml show what
 # tables.insert takes, but the emulator answers them otherwise for reasons of their own: it cannot
-# create a table without a schema, which BigQuery does, and it leaves out the NULLABLE mode of a
-# view's columns, which BigQuery reports.
+# create a table without a schema, which BigQuery does.
 description: >-
   tables.insert cases with unknown fields, numbers for strings and null fields that the emulator
-  answers otherwise: it rejects tables without a schema and omits the mode of view columns.
+  answers otherwise: it rejects tables without a schema.
 vars:
   dataset: e2e_${run}_${case}
 templates:
@@ -136,16 +135,6 @@ cases:
         tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t, unknownField: 1}
     expect:
       insert: {status: 200}
-  - name: insert_unknown_view_field
-    template: insert_schema
-    vars:
-      body:
-        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
-        view: {query: SELECT 1 AS x, useLegacySql: false, unknownField: 1}
-    expect:
-      insert:
-        status: 200
-        schema: {fields: [{name: x, type: INTEGER, mode: NULLABLE}]}
   - name: insert_number_description
     template: insert
     vars:

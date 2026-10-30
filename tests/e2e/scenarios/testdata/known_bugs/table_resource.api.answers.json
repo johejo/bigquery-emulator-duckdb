@@ -95,24 +95,6 @@
           "status": 200
         }
       }
-    },
-    "insert_unknown_view_field": {
-      "project": "johejo-sandbox",
-      "run": "sekw35nji45hayi63jydi2zl74",
-      "steps": {
-        "insert": {
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "x",
-                "type": "INTEGER"
-              }
-            ]
-          },
-          "status": 200
-        }
-      }
     }
   }
 }
