@@ -85,8 +85,11 @@ struct FunctionEntry {
 // The application assembles a catalog before passing it to the translator.
 class Catalog {
  public:
-  explicit Catalog(TimestampPrecision precision) : timestamp_precision_(precision) {}
+  explicit Catalog(TimestampPrecision precision, bool recursive_union_all_only = false)
+      : timestamp_precision_(precision), recursive_union_all_only_(recursive_union_all_only) {}
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
+  // Whether a recursive CTE joins its terms only with UNION ALL, as in BigQuery.
+  [[nodiscard]] bool recursive_union_all_only() const { return recursive_union_all_only_; }
   void Add(std::string_view name, FunctionEntry entry);
   // Composition omits service-dependent forms whose backend capability is absent.
   void Remove(std::string_view name);
@@ -107,6 +110,7 @@ class Catalog {
 
  private:
   TimestampPrecision timestamp_precision_;
+  bool recursive_union_all_only_;
   std::unordered_map<std::string_view, FunctionEntry> functions_;
 };
 

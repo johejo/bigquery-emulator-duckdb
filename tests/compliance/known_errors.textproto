@@ -355,30 +355,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects UNION DISTINCT in WITH RECURSIVE, which GoogleSQL accepts"
-  label: "with_recursive_test:by_name_multiple_inputs_in_non_recursive_term_union_distinct"
-  label: "with_recursive_test:by_name_pipe_set_op_union_distinct"
-  label: "with_recursive_test:by_name_union_distinct"
-  label: "with_recursive_test:recursive_query_distinct_nan_values"
-  label: "with_recursive_test:recursive_query_distinct_nested_in_non_recursive_term"
-  label: "with_recursive_test:recursive_query_distinct_nested_in_recursive_term"
-  label: "with_recursive_test:recursive_query_distinct_non_determinism"
-  label: "with_recursive_test:recursive_query_distinct_struct_column"
-  label: "with_recursive_test:recursive_query_distinct_subquery"
-  label: "with_recursive_test:recursive_query_fib_distinct"
-  label: "with_recursive_test:recursive_query_non_recursive_term_empty_union_distinct"
-  label: "with_recursive_test:strict_corresponding_multiple_inputs_in_non_recursive_term_union_distinct"
-  label: "with_recursive_test:strict_corresponding_pipe_set_op_union_distinct"
-  label: "with_recursive_test:strict_corresponding_union_distinct"
-  label: "with_recursive_test:with_recursive_union_distinct_flight_list"
-  label: "with_recursive_test:with_recursive_union_distinct_multiple_columns"
-  label: "with_recursive_test:with_recursive_union_distinct_multiple_rows_each_term"
-  label: "with_recursive_test:with_recursive_union_distinct_multiple_rows_non_recursive_term"
-  label: "with_recursive_test:with_recursive_union_distinct_simple"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects IS DISTINCT FROM over STRUCTs, which GoogleSQL accepts"
   label: "comparison_functions_test:is_distinct_empty_structs"
   label: "comparison_functions_test:is_distinct_nan_struct"

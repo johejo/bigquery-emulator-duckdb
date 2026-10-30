@@ -31,6 +31,8 @@ struct Options {
   bool json_preserve_negative_zero = false;
   // The translator restricts COLLATE specifications to und:ci and the empty specification.
   bool collate_und_ci_only = false;
+  // The translator rejects UNION DISTINCT between a recursive CTE's terms.
+  bool recursive_union_all_only = false;
   googlesql_collation::Options collation = {};
 
   std::strong_ordering operator<=>(const Options&) const = default;
