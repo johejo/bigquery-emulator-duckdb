@@ -205,8 +205,8 @@ Source: [ARRAY_TO_STRING](../../third_party/bigquery_docs/reference/standard-sql
 
 | Input types | Return type | Status | Notes |
 | --- | --- | --- | --- |
-| `ARRAY<STRING>, STRING` | `STRING` | Broken | `SELECT ARRAY_TO_STRING(a0, a1) AS result FROM (SELECT ARRAY<STRING>[CAST('abc' AS STRING)] AS a0, CAST('abc' AS STRING) AS a1)`: Binder Error: The "arg" argument in function "string_agg" must be a constant expression |
-| `ARRAY<STRING>, STRING, STRING` | `STRING` | Broken | `SELECT ARRAY_TO_STRING(a0, a1, a2) AS result FROM (SELECT ARRAY<STRING>[CAST('abc' AS STRING)] AS a0, CAST('abc' AS STRING) AS a1, CAST('abc' AS STRING) AS a2)`: Binder Error: The "arg" argument in function "string_agg" must be a constant expression |
+| `ARRAY<STRING>, STRING` | `STRING` | Supported |  |
+| `ARRAY<STRING>, STRING, STRING` | `STRING` | Supported |  |
 | `ARRAY<BYTES>, BYTES` | `BYTES` | Supported |  |
 | `ARRAY<BYTES>, BYTES, BYTES` | `BYTES` | Supported |  |
 

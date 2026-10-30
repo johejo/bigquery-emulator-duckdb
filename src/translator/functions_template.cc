@@ -1285,47 +1285,47 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                               "len(_s) + 1) - _r)))[1])[1]",
               },
           }),
-      // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
-      // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
+      // DuckDB's string_agg and array_to_string() take only a constant delimiter, so elements
+      // are concatenated with ||, starting from NULL when the delimiter or NULL text is NULL.
 
-      Define(
-          "ARRAY_TO_STRING",
-          {
-              {
-                  .arity = 2,
-                  .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                              "ELSE list_aggr($1, 'string_agg', $2) END",
-                  .conditions = kStringDelimiter,
-              },
-              {
-                  .arity = 3,
-                  .spelling = "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN "
-                              "'' "
-                              "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
-                              "'string_agg', $2) END",
-                  .conditions = kStringDelimiter,
-              },
-              // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
-              // ||, starting from NULL when the delimiter or NULL text is NULL.
-              {
-                  .arity = 2,
-                  .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
-                              "_a, _e, _i: "
-                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                              "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
-                  .conditions = kBytesDelimiter,
-              },
-              {
-                  .arity = 3,
-                  .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, "
-                              "$3)), lambda _a, "
-                              "_e, _i: "
-                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE CAST('' "
-                              "AS BLOB) END)",
-                  .conditions = kBytesDelimiter,
-              },
-          }),
+      Define("ARRAY_TO_STRING",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
+                                 "_a, _e, _i: "
+                                 "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                                 "CASE WHEN $2 IS NULL THEN NULL ELSE '' END)",
+                     .conditions = kStringDelimiter,
+                 },
+                 {
+                     .arity = 3,
+                     .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, "
+                                 "$3)), lambda _a, "
+                                 "_e, _i: "
+                                 "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                                 "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE '' END)",
+                     .conditions = kStringDelimiter,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
+                                 "_a, _e, _i: "
+                                 "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                                 "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
+                     .conditions = kBytesDelimiter,
+                 },
+                 {
+                     .arity = 3,
+                     .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, "
+                                 "$3)), lambda _a, "
+                                 "_e, _i: "
+                                 "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                                 "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL ELSE CAST('' "
+                                 "AS BLOB) END)",
+                     .conditions = kBytesDelimiter,
+                 },
+             }),
       // generate_series() has no floating point overload, and returns an empty list for a zero
       // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
 

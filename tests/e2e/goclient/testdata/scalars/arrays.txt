@@ -59,6 +59,18 @@ SELECT ARRAY_TO_STRING(['a', 'b'], NULL)
 SELECT ARRAY_TO_STRING(['a', 'b'], ',', NULL)
 => null
 
+# The delimiter and NULL text need not be constants; NULL elements and their preceding delimiter
+# are omitted without NULL text:
+# third_party/bigquery_docs/reference/standard-sql/array_functions.md
+SELECT ARRAY_TO_STRING(a, d) FROM (SELECT ['coffee', NULL, 'tea'] AS a, '--' AS d)
+=> "coffee--tea"
+
+SELECT ARRAY_TO_STRING(a, d, n) FROM (SELECT ['coffee', 'tea', 'milk', NULL] AS a, '--' AS d, 'MISSING' AS n)
+=> "coffee--tea--milk--MISSING"
+
+SELECT ARRAY_TO_STRING(a, d) FROM (SELECT [b'prefix', b'middle', b'suffix', b'\x00'] AS a, b'--' AS d)
+=> "cHJlZml4LS1taWRkbGUtLXN1ZmZpeC0tAA=="
+
 SELECT ARRAY_FIRST([4, 5])
 => "4"
 
