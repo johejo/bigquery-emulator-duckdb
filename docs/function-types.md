@@ -119,7 +119,7 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [ARRAY_LENGTH](function-types/array.md#array_length) | 20 | Supported |
 | [ARRAY_REVERSE](function-types/array.md#array_reverse) | 20 | Supported |
 | [ARRAY_SLICE](function-types/array.md#array_slice) | 20 | Supported |
-| [ARRAY_TO_STRING](function-types/array.md#array_to_string) | 4 | Broken |
+| [ARRAY_TO_STRING](function-types/array.md#array_to_string) | 4 | Supported |
 | [ASCII](function-types/string.md#ascii) | 2 | Supported |
 | [ASIN](function-types/mathematical.md#asin) | 4 | Supported |
 | [ASINH](function-types/mathematical.md#asinh) | 4 | Supported |
