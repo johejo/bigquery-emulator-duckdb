@@ -65,6 +65,7 @@
 #include "s2/s2shape_measures.h"
 #include "src/googlesql_geography/options.h"
 #include "src/googlesql_geography/value.h"
+#include "third_party/core_math/core_math.h"
 
 namespace googlesql_geography {
 
@@ -690,10 +691,10 @@ absl::StatusOr<Geography> Buffer(const Geography& geography, double radius_meter
         "ST_BUFFER: Number of quarter circle segments out of range. Number of quarter circle "
         "segments must be at least 0.5 and less than 392.5.");
   }
-  // set_circle_segments, without its rounding up of the error fraction past 1 near 0.5 segments,
-  // which S2 checks in debug builds.
+  // set_circle_segments, with correctly rounded cos as BigQuery's vertices show, and without its
+  // rounding up of the error fraction past 1 near 0.5 segments, which S2 checks in debug builds.
   options.set_error_fraction(
-      std::min(1.0, 1 - std::cos(std::numbers::pi / (4 * num_seg_quarter_circle)) + 1e-15));
+      std::min(1.0, 1 - cr_cos(std::numbers::pi / (4 * num_seg_quarter_circle)) + 1e-15));
   return BufferGeography(geography, options);
 }
 

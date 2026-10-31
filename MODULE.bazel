@@ -13,6 +13,7 @@ bazel_dep(name = "googlesql", version = "2026.10.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "cli11", version = "2.7.2")
+bazel_dep(name = "core_math")
 
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 
@@ -61,6 +62,19 @@ archive_override(
     integrity = "sha256-0vpNvkSknhubrxJ/FSLCGe3nhFwjselx3zfOZ1OG8v0=",
     strip_prefix = "bazel-compile-commands-extractor-078ba7675c05bea2666c92d9a8abe200d8547655",
     urls = ["https://github.com/helly25/bazel-compile-commands-extractor/archive/078ba7675c05bea2666c92d9a8abe200d8547655.tar.gz"],
+)
+
+# Correctly rounded math functions for converting between degrees and S2Point, and for S2's
+# buffering, whose patched s2geometry depends on it; see third_party/core_math.
+archive_override(
+    module_name = "core_math",
+    build_file = "//third_party/core_math:BUILD.core_math.bazel",
+    integrity = "sha256-UsrYRF+HKsXxaamASlpcfOl8EVnG1dIDExxoWGJp3HY=",
+    patch_cmds = [
+        "printf 'module(name = \"core_math\")\\nbazel_dep(name = \"rules_cc\", version = \"0.2.22\")\\n' > MODULE.bazel",
+    ],
+    strip_prefix = "core-math-e3f1fcc7daf46c61332357fac591e19e88902926",
+    urls = ["https://gitlab.inria.fr/core-math/core-math/-/archive/e3f1fcc7daf46c61332357fac591e19e88902926/core-math-e3f1fcc7daf46c61332357fac591e19e88902926.tar.gz"],
 )
 
 archive_override(
@@ -114,6 +128,7 @@ single_version_override(
     patches = [
         "//third_party/s2geometry:throw_delegate.patch",
         "//third_party/s2geometry:covering_order.patch",
+        "//third_party/s2geometry:buffer_libm.patch",
     ],
 )
 
@@ -162,16 +177,6 @@ http_archive(
     sha256 = "44ab42e16926e95f7641d286bc90d739ab1c16886114d7cc5bc7a9f905c5edf8",
     strip_prefix = "cpp-httplib-0.63.0",
     urls = ["https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.63.0.tar.gz"],
-)
-
-# Correctly rounded atan2, sin and cos for converting between degrees and S2Point; see
-# third_party/core_math.
-http_archive(
-    name = "core_math",
-    build_file = "//third_party/core_math:BUILD.core_math.bazel",
-    sha256 = "52cad8445f872ac5f169a9804a5a5c7ce97c1159c6d5d203131c68586269dc76",
-    strip_prefix = "core-math-e3f1fcc7daf46c61332357fac591e19e88902926",
-    urls = ["https://gitlab.inria.fr/core-math/core-math/-/archive/e3f1fcc7daf46c61332357fac591e19e88902926/core-math-e3f1fcc7daf46c61332357fac591e19e88902926.tar.gz"],
 )
 
 # Prebuilt static libduckdb per platform, linked into the binary; //third_party/duckdb selects the

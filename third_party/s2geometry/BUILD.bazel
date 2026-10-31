@@ -1,4 +1,5 @@
 exports_files([
+    "buffer_libm.patch",
     "covering_order.patch",
     "throw_delegate.patch",
 ])

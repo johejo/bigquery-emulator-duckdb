@@ -6,5 +6,12 @@ under the MIT license. Geography coordinates convert between degrees and `S2Poin
 differ: glibc's `atan2` turns the longitude 9 of a point to 9 exactly, where BigQuery and
 correctly rounded `atan2` give one bit above it.
 
-`BUILD.core_math.bazel` builds those sources from the commit pinned in `MODULE.bazel`, and
-`core_math.h` declares them, since upstream has no header.
+S2's buffering also steps around circles with its `cr_acos`, `cr_tan` and `cr_sin`, through
+[an s2geometry patch](../s2geometry/README.md), and `ST_BUFFER` takes its segments' error with
+`cr_cos`: macOS's math library moves a vertex of a buffered linestring's round end cap where
+BigQuery and correctly rounded functions agree.
+
+`MODULE.bazel` overrides the `core_math` module with the pinned commit, which
+`BUILD.core_math.bazel` builds and a generated `MODULE.bazel` declares, so that the patched
+s2geometry module can depend on it. `core_math.h` declares the functions, since upstream has no
+header.
