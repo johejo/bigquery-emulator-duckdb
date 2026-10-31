@@ -5,7 +5,7 @@ version: 1
 # A query result reports the collation of each collated field, also inside a RECORD. A table
 # created from a collated query, a query's destination table and a view keep the collations of
 # their columns. BigQuery also answers CREATE TABLE AS SELECT and CREATE VIEW with the schema they
-# create, which known_bugs/collation.api.yaml covers.
+# create, which ddl_result_schema.api.yaml covers.
 description: >-
   The collations a query result's schema reports, and the schemas that keep them: a table created
   from a collated query, a query's destination table and a view over collated columns.

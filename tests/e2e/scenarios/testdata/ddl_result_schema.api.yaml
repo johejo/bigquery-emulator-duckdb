@@ -1,8 +1,8 @@
 version: 1
 # Recorded on BigQuery in project johejo-sandbox, run l363n2yqs7fv7idu23nyuidffo; the answers
 # sidecar keeps the observations. BigQuery answers CREATE TABLE AS SELECT and CREATE VIEW in
-# jobs.query with the schema of the table or view they create, which the emulator leaves out of
-# DDL responses. ../collation.api.yaml checks the schemas the table and the view keep.
+# jobs.query with the schema of the table or view they create. collation.api.yaml checks the
+# schemas the table and the view keep.
 description: >-
   The schema jobs.query returns for a CREATE TABLE AS SELECT and a CREATE VIEW of collated columns.
 vars:

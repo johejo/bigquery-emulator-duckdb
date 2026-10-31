@@ -810,6 +810,13 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       RoutineError(translation, error);
       throw;
     }
+    // These DDL responses describe the created resource without producing a result set.
+    // Read the stored schema so inherited defaults and metadata agree with tables.get.
+    if (translation.table && translation.table->as_select) {
+      result.schema = TableSchema(backend, translation.table->table);
+    } else if (translation.view && !translation.view->materialized) {
+      result.schema = TableSchema(backend, translation.view->table);
+    }
   } else if (translation.ddl_target_routine.has_value()) {
     try {
       backend.Execute(translation.sql, setup);

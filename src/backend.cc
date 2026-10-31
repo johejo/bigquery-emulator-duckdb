@@ -164,7 +164,10 @@ void RunSetup(duckdb_connection connection, const std::vector<std::string>& setu
 
 json QueryResult::SchemaToJson() const {
   std::vector<FieldSchema> given = schema;
-  SetModesGiven(given);
+  // Result sets report explicit modes; DDL reports the created resource's schema as stored.
+  if (has_rows) {
+    SetModesGiven(given);
+  }
   return bigquery_emulator_duckdb::SchemaToJson(given);
 }
 

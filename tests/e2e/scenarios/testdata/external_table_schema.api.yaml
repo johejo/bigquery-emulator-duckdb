@@ -2,8 +2,8 @@ version: 1
 # Recorded on BigQuery in project johejo-sandbox, run s5rfwap3udv2nbrpb2g6smeloe, with sources in
 # the bucket johejo-sandbox-us; the answers sidecar keeps the observations. jobs.get's
 # ddlOperationPerformed, which the emulator reports for no DDL statement, is left out of
-# drop_external_statement_type, as is the empty schema of ddl_detected's jobs.query response,
-# which the emulator leaves out of DDL responses (see known_bugs/collation.api.yaml).
+# drop_external_statement_type, as is the empty schema of ddl_detected's jobs.query response:
+# the emulator omits schemas for CREATE EXTERNAL TABLE.
 description: >-
   Schema detection of Parquet external tables, CREATE OR REPLACE EXTERNAL TABLE and DROP EXTERNAL
   TABLE, with sources in a Cloud Storage bucket.
