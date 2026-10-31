@@ -86,6 +86,10 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
     functions->AddAggregates(name, definition, function_catalog::Translation::kAggregate,
                              function_catalog::Implementation::kS2);
   }
+  for (const auto& [name, definition] : geography_duckdb::GeographyAnalytics()) {
+    functions->AddAggregates(name, definition, function_catalog::Translation::kAnalytic,
+                             function_catalog::Implementation::kS2);
+  }
   return *functions;
 }
 

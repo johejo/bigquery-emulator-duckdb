@@ -5,6 +5,7 @@ package(features = ["layering_check"])
 cc_library(
     name = "googlesql_geography",
     srcs = [
+        "cluster.cc",
         "geography.cc",
         "geojson.cc",
         "input.cc",

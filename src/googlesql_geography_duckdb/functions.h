@@ -14,4 +14,8 @@ GeographyFunctions();
 std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
 GeographyAggregates();
 
+// Analytic functions that compute one result per geography in a partition.
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
+GeographyAnalytics();
+
 }  // namespace bigquery_emulator_duckdb::geography_duckdb

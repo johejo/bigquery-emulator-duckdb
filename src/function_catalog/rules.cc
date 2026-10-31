@@ -277,6 +277,7 @@ AggregateRule Own(const StaticAggregateRule& rule) {
       .collated = rule.collated,
       .finish = rule.finish,
       .finish_after_scan = rule.finish_after_scan,
+      .partition_results = rule.partition_results,
       .order_by_argument_error = rule.order_by_argument_error,
       .constant_arguments = {rule.constant_arguments.begin(), rule.constant_arguments.end()},
   };

@@ -672,6 +672,36 @@ const Definitions& GeographyDefinitions() {
       Register(connection, name, {list.get()}, geography.get(),
                EachRow<[](const Arguments& args) { return CentroidAggregate(args.Strings(0)); }>);
     });
+    definitions->Custom("bq_st_clusterdbscan", [](duckdb_connection connection, const char* name,
+                                                  const Options& /*options*/) {
+      const LogicalType geography(duckdb_create_logical_type(kGeography));
+      const LogicalType list(duckdb_create_list_type(geography.get()));
+      const LogicalType bigint(duckdb_create_logical_type(kBigint));
+      const LogicalType number(duckdb_create_logical_type(kDouble));
+      const LogicalType result(duckdb_create_list_type(bigint.get()));
+      Register(
+          connection, name,
+          std::vector<duckdb_logical_type>{list.get(), number.get(), bigint.get()}, result.get(),
+          EachRow<[](const Arguments& args) -> absl::StatusOr<std::vector<std::optional<int64_t>>> {
+            const auto entry = VectorElement<duckdb_list_entry>(args.Vector(0), args.Row());
+            auto* const child = duckdb_list_vector_get_child(args.Vector(0));
+            std::vector<IndexedGeography> values;
+            values.reserve(entry.length);
+            for (idx_t i = 0; i < entry.length; ++i) {
+              const auto row = entry.offset + i;
+              auto* validity = duckdb_vector_get_validity(child);
+              if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
+                // NULL and empty inputs are both noise and contribute no neighbors.
+                values.emplace_back(Geography{});
+                continue;
+              }
+              GOOGLESQL_ASSIGN_OR_RETURN(auto value,
+                                         DecodeIndexedGeography(VectorString(child, row)));
+              values.push_back(std::move(value));
+            }
+            return googlesql_geography::ClusterDBSCAN(values, args.Double(1), args.Int(2));
+          }>);
+    });
     definitions->Custom(kExtent, RegisterBounds<true>);
     return definitions;
   }();
@@ -1018,6 +1048,32 @@ GeographyAggregates() {
   };
   static constexpr auto kAggregates = DefinitionViews(kAggregatesBacking);
   return kAggregates;
+}
+
+std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
+GeographyAnalytics() {
+  static constexpr std::string_view kValue[] = {"$1"};
+  static constexpr auto kBacking = std::tuple{
+      Define("ST_CLUSTERDBSCAN",
+             {
+                 {
+                     .function = "list",
+                     .type = googlesql::TYPE_GEOGRAPHY,
+                     .arguments = kValue,
+                     .distinct = AggregateRule::Distinct::kUnsupported,
+                     .finish =
+                         [](const std::string& sql, const std::vector<std::string>& arguments,
+                            const std::string& /*tail*/) {
+                           return "bq_st_clusterdbscan(" + sql + ", " + arguments.at(1) + ", " +
+                                  arguments.at(2) + ")";
+                         },
+                     .partition_results = true,
+                 },
+             },
+             {.uses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsSafe}}),
+  };
+  static constexpr auto kDefinitions = DefinitionViews(kBacking);
+  return kDefinitions;
 }
 
 void RegisterGeographyFunctions(duckdb_connection connection,
