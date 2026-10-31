@@ -695,7 +695,11 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
                                      Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
   std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_, std::defer_lock);
-  if (translation.statement_type == "DROP_SCHEMA") {
+  // CREATE responses read the stored schema after committing the DDL. Keep another
+  // request's expiration sweep from dropping the relation before that read completes.
+  if (translation.statement_type == "DROP_SCHEMA" ||
+      (translation.table && translation.table->as_select) ||
+      (translation.view && !translation.view->materialized)) {
     expiration_lock.lock();
   }
   std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);

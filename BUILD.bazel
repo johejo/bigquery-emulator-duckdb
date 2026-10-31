@@ -1910,6 +1910,7 @@ cc_test(
     deps = [
         ":api_error",
         ":backend",
+        ":field_schema",
         ":location",
         ":project",
         ":sql_runtime",

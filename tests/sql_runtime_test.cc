@@ -15,6 +15,7 @@
 
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/field_schema.h"
 #include "src/location.h"
 #include "src/project.h"
 
@@ -47,6 +48,49 @@ TEST(SqlRuntimeTest, ConcurrentScriptsAndReturnedResultsHaveIndependentLifetimes
   for (std::size_t i = 0; i < kClients; ++i) {
     ASSERT_EQ(results.at(i).rows.size(), 1);
     EXPECT_EQ(results.at(i).rows.Int64(0, 0), i);
+  }
+}
+
+// Catalog reads in another dataset may expire a newly committed relation while its CREATE
+// response is still being assembled. Exercise that overlap without relying on wall-clock waits.
+TEST(SqlRuntimeTest, ConcurrentExpirationDoesNotFailCreateResponses) {
+  constexpr std::size_t kClients = 8;
+  constexpr std::size_t kCreates = 64;
+  SqlRuntime runtime("", std::vector<Project>{{.project_id = "runtime"}});
+  for (std::size_t i = 0; i < kClients; ++i) {
+    runtime.CreateDataset(
+        {.project_id = "runtime", .dataset_id = "expiration_" + std::to_string(i)});
+  }
+  std::barrier ready(static_cast<std::ptrdiff_t>(kClients));
+  std::array<std::future<void>, kClients> pending;
+  for (std::size_t i = 0; i < kClients; ++i) {
+    pending.at(i) = std::async(std::launch::async, [&, i] {
+      const std::string dataset = "expiration_" + std::to_string(i);
+      ready.arrive_and_wait();
+      for (std::size_t n = 0; n < kCreates; ++n) {
+        QueryRequest request;
+        request.project_id = "runtime";
+        request.query = "CREATE " + std::string(n % 2 == 0 ? "VIEW " : "TABLE ") + dataset +
+                        ".expired_" + std::to_string(n) +
+                        " OPTIONS (expiration_timestamp = TIMESTAMP '2001-01-01 00:00:00 UTC')"
+                        " AS SELECT CAST(7 AS INT64) AS value";
+        QueryJob metadata;
+        JobLocation location;
+        const QueryResult result = runtime.ExecuteQuery(std::move(request), metadata, location);
+        ASSERT_EQ(result.schema.size(), 1);
+        EXPECT_EQ(result.schema.front().name, "value");
+        EXPECT_EQ(result.schema.front().type, FieldType::kInteger);
+      }
+    });
+  }
+  for (auto& future : pending) {
+    EXPECT_NO_THROW(future.get());
+  }
+  for (std::size_t i = 0; i < kClients; ++i) {
+    EXPECT_TRUE(
+        runtime
+            .ListTables({.project_id = "runtime", .dataset_id = "expiration_" + std::to_string(i)})
+            .empty());
   }
 }
 
