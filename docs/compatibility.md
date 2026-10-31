@@ -434,8 +434,6 @@ Graph DDL rejects:
 
 `GRAPH_TABLE` and GQL queries reject:
 
-- An element in an edge path that cannot be narrowed to one element table. Node-only paths
-  can match multiple element tables, including `(n:Person|Account)` and an unlabeled `(n)`.
 - Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.
 - The GQL `CALL` statement and SQL/PGQ's `COLUMNS` clause.
 - Graph elements or paths in query results.
