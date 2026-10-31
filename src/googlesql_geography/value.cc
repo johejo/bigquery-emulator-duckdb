@@ -621,6 +621,22 @@ absl::StatusOr<Geography> SnapPolygon(const std::vector<std::vector<S2Point>>& r
     return absl::OutOfRangeError(std::string(failed) +
                                  "Invalid polygon: " + std::string(error.message()));
   }
+  // Shared vertices are allowed, but a shared edge between nondegenerate rings is not.
+  // Use the snapped interiors, so collapsed shells and holes have no boundary to reject.
+  absl::flat_hash_set<std::pair<S2Point, S2Point>> edges;
+  for (const S2Polygon& interior : interiors) {
+    for (int i = 0; i < interior.num_loops(); ++i) {
+      const S2Loop& loop = *interior.loop(i);
+      for (int j = 0; j < loop.num_vertices(); ++j) {
+        const S2Point& a = loop.vertex(j);
+        const S2Point& b = loop.vertex(j + 1);
+        if (a != b && !edges.emplace(std::min(a, b), std::max(a, b)).second) {
+          return absl::OutOfRangeError(std::string(failed) +
+                                       "Shape 0 has one or more edges with interior on the right.");
+        }
+      }
+    }
+  }
   for (size_t i = 1; i < interiors.size(); ++i) {
     bool valid = interiors.front().Contains(interiors.at(i));
     for (size_t j = 1; j < i; ++j) {
@@ -683,28 +699,11 @@ absl::StatusOr<Geography> RepairPolygon(const std::vector<std::vector<S2Point>>&
   S2Builder::Options options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)));
   options.set_split_crossing_edges(true);
   S2Builder builder(options);
-  BooleanResult output;
-  using LineLayer = s2builderutil::S2PolylineVectorLayer;
-  LineLayer::Options line_options;
-  line_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
-  line_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
-  line_options.set_duplicate_edges(LineLayer::Options::DuplicateEdges::MERGE);
-  builder.StartLayer(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
-  for (const auto& ring : input) {
-    for (const auto& vertex : ring) {
-      builder.AddPoint(vertex);
-    }
-  }
-  // Retain the boundary separately: edges and vertices not covered by the repaired polygon
-  // are its lower-dimensional components. The union below removes covered boundaries.
-  builder.StartLayer(std::make_unique<LineLayer>(&output.lines, line_options));
-  for (const auto& ring : input) {
-    builder.AddLoop(ring);
-  }
+  // Repair discards degenerate input edges rather than preserving them as lines or points.
+  S2Polygon polygon;
   s2builderutil::S2PolygonLayer::Options polygon_options(S2Builder::EdgeType::UNDIRECTED);
   polygon_options.set_validate(true);
-  builder.StartLayer(
-      std::make_unique<s2builderutil::S2PolygonLayer>(&output.polygon, polygon_options));
+  builder.StartLayer(std::make_unique<s2builderutil::S2PolygonLayer>(&polygon, polygon_options));
   for (const auto& ring : input) {
     builder.AddLoop(ring);
   }
@@ -712,12 +711,11 @@ absl::StatusOr<Geography> RepairPolygon(const std::vector<std::vector<S2Point>>&
   if (!builder.Build(&error)) {
     return absl::OutOfRangeError(std::string(failed) + std::string(error.message()));
   }
-  const Geography boundary = Read(output);
+  // Canonicalize touching holes into separate shells where the repaired interior has islands.
   MutableS2ShapeIndex polygon_index;
-  MutableS2ShapeIndex boundary_index;
-  AddShapes(FromPolygon(output.polygon), polygon_index);
-  AddShapes({.points = boundary.points, .lines = boundary.lines, .polygons = {}}, boundary_index);
-  return ClosedSetOperation(polygon_index, boundary_index, S2BooleanOperation::OpType::UNION);
+  const MutableS2ShapeIndex empty_index;
+  AddShapes(FromPolygon(polygon), polygon_index);
+  return ClosedSetOperation(polygon_index, empty_index, S2BooleanOperation::OpType::UNION);
 }
 
 absl::StatusOr<Geography> BufferGeography(const Geography& geography,

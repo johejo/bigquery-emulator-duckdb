@@ -1,33 +1,33 @@
-# Repairing intersecting rings, overlaps, repeated edges and collapsed rings needs observed
-# BigQuery answers beyond the documented self-intersecting polygon example.
+# BigQuery answers recorded in unverified/geography_make_valid.txt and promoted after verification.
+# Repairing intersecting rings, overlaps, repeated edges and collapsed rings.
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (3 1, 5 1, 5 3, 3 3, 3 1))', make_valid => TRUE)
-?>
+=> "MULTIPOLYGON(((4 3.00045614916728, 4 4, 0 4, 0 0, 4 0, 4 1.00015229710421, 3 1, 3 3, 4 3.00045614916728)), ((4 1.00015229710421, 5 1, 5 3, 4 3.00045614916728, 4 1.00015229710421)))"
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 6 0, 6 6, 0 6, 0 0), (1 1, 4 1, 4 4, 1 4, 1 1), (2 2, 5 2, 5 5, 2 5, 2 2))', make_valid => TRUE)
-?>
+=> "MULTIPOLYGON(((0 0, 6 0, 6 6, 0 6, 0 0), (4 2.00060890987204, 4 1, 1 1, 1 4, 2 4.00121485184589, 2 5, 5 5, 5 2, 4 2.00060890987204)), ((4 4, 2 4.00121485184589, 2 2, 4 2.00060890987204, 4 4)))"
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 0, 0 1, 0 0))', make_valid => TRUE)
-?>
+=> "GEOMETRYCOLLECTION EMPTY"
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0 0, 0 0, 0 0))', make_valid => TRUE)
-?>
+=> "GEOMETRYCOLLECTION EMPTY"
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1))', make_valid => TRUE)
-?>
+=> "POLYGON((0 0, 1 0, 0 1, 0 0))"
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 -1, 2 1, 2 -1, 0 1))', planar => TRUE, make_valid => TRUE)
-?>
+=> "MULTIPOLYGON(((0 -1, 1 0, 0 1, 0 -1)), ((1 0, 2 -1, 2 1, 1 0)))"
 
 SELECT ST_GEOGFROMGEOJSON('{"type":"GeometryCollection","geometries":[{"type":"Polygon","coordinates":[[[0,-1],[2,1],[2,-1],[0,1],[0,-1]]]},{"type":"Point","coordinates":[9,9]}]}', make_valid => TRUE)
-?>
+=> "GEOMETRYCOLLECTION(POINT(9 9), MULTIPOLYGON(((0 -1, 1 0, 0 1, 0 -1)), ((1 0, 2 -1, 2 1, 1 0))))"
 
-# Snapping without make_valid: holes that touch at an edge or a vertex, and a shell with
+# Snapping without make_valid: holes that share an edge with the shell, and a shell with
 # holes whose entire interior collapses at micrometer precision.
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (0 1, 1 1, 1 2, 0 2, 0 1))')
-?>
+=> error: ST_GeogFromText failed: Shape 0 has one or more edges with interior on the right.
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (0 0, 1 1, 0 2, 0 0))')
-?>
+=> error: ST_GeogFromText failed: Shape 0 has one or more edges with interior on the right.
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0.000000000001 0, 0.000000000001 0.000000000001, 0 0.000000000001, 0 0), (0.0000000000002 0.0000000000002, 0.0000000000004 0.0000000000002, 0.0000000000002 0.0000000000004, 0.0000000000002 0.0000000000002))')
-?>
+=> "POINT(0 0)"
