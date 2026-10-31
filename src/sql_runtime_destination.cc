@@ -141,7 +141,8 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
     throw ApiError::NotFound("Not found: Table " + TableName(destination));
   }
   if (existing.has_value() && write == WriteDisposition::kWriteEmpty && existing->num_rows > 0) {
-    throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
+    // A destination conflict is not an error located in the query text.
+    throw ApiError::Duplicate("Already Exists: Table " + TableName(destination)).WithLocation("");
   }
   if (existing.has_value() && write != WriteDisposition::kWriteTruncate) {
     CheckWritableTable(backend_, destination);

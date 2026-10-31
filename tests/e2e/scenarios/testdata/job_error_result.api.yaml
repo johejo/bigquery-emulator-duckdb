@@ -1,12 +1,10 @@
 version: 1
 # Recorded on BigQuery in project johejo-sandbox, run eorttcsidcpquia6yq64cswijt, as the
-# query_job_empty_dispositions case of ../empty_request_values.api.yaml; the answers sidecar keeps
+# query_job_empty_dispositions case of empty_request_values.api.yaml; the answers sidecar keeps
 # the observations. BigQuery's errorResult for a query job whose WRITE_EMPTY destination already
-# has rows carries only a reason and a message, but the emulator gives every job error the
-# location "query".
+# has rows carries only a reason and a message.
 description: >-
-  The errorResult of a query job rejected for writing to a nonempty WRITE_EMPTY destination,
-  which the emulator gives a location BigQuery leaves out.
+  The errorResult of a query job rejected for writing to a nonempty WRITE_EMPTY destination.
 vars:
   dataset: e2e_${run}_${case}
 cases:
