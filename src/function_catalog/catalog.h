@@ -86,6 +86,8 @@ struct FunctionEntry {
 struct QueryRestrictions {
   // INTERSECT and EXCEPT take only DISTINCT.
   bool intersect_except_distinct_only = false;
+  // DISTINCT set operations take no STRUCT columns.
+  bool distinct_set_operations_without_structs = false;
   // Query results and written values hold no ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
 };
