@@ -1,0 +1,100 @@
+## GEOGRAPHY clustering
+# Source: third_party/bigquery_docs/reference/standard-sql/geography_functions.md#st_clusterdbscan
+# The documented mixed-geometry example. Compare membership rather than relying on an
+# unspecified numbering order between disconnected clusters.
+
+WITH Geos AS (SELECT 1 row_id, ST_GEOGFROMTEXT('POINT EMPTY') geo UNION ALL SELECT 2, ST_GEOGFROMTEXT('MULTIPOINT(1 1, 2 2, 4 4, 5 2)') UNION ALL SELECT 3, ST_GEOGFROMTEXT('POINT(14 15)') UNION ALL SELECT 4, ST_GEOGFROMTEXT('LINESTRING(40 1, 42 34, 44 39)') UNION ALL SELECT 5, ST_GEOGFROMTEXT('POLYGON((40 2, 40 1, 41 2, 40 2))')), clustered AS (SELECT row_id, ST_CLUSTERDBSCAN(geo, 1e5, 1) OVER () c FROM Geos) SELECT COUNT(DISTINCT c) = 3 AND COUNTIF(row_id = 1 AND c IS NULL) = 1 AND MAX(IF(row_id = 4, c, NULL)) = MAX(IF(row_id = 5, c, NULL)) AND MIN(c) = 0 AND MAX(c) = 2 FROM clustered
+=> "true"
+
+# Core neighborhoods include the current row and count duplicate rows, not distinct shapes.
+SELECT COUNTIF(c = 0) FROM (SELECT ST_CLUSTERDBSCAN(g, 0, 3) OVER () c FROM UNNEST([ST_GEOGPOINT(0, 0), ST_GEOGPOINT(0, 0), ST_GEOGPOINT(0, 0)]) g)
+=> "3"
+
+SELECT COUNTIF(c IS NULL) FROM (SELECT ST_CLUSTERDBSCAN(g, 0, 4) OVER () c FROM UNNEST([ST_GEOGPOINT(0, 0), ST_GEOGPOINT(0, 0), ST_GEOGPOINT(0, 0)]) g)
+=> "3"
+
+# Empty geographies cannot join a cluster even when the minimum is zero.
+SELECT COUNTIF(c IS NULL) FROM (SELECT ST_CLUSTERDBSCAN(g, 1000000, 0) OVER () c FROM UNNEST([ST_GEOGFROMTEXT('POINT EMPTY'), ST_GEOGFROMTEXT('LINESTRING EMPTY')]) g)
+=> "2"
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 0, 0) OVER () FROM UNNEST([1])
+=> "0"
+
+# At this scale, equatorial points spaced by one degree are neighbors at 120 km;
+# the endpoints are borders, and the two middle core points connect them all.
+SELECT COUNTIF(c = 0) FROM (SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(x, 0), 120000, 3) OVER () c FROM UNNEST([0, 1, 2, 3]) x)
+=> "4"
+
+# No core means noise, even though every point has another neighbor.
+SELECT COUNTIF(c IS NULL) FROM (SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(x, 0), 120000, 4) OVER () c FROM UNNEST([0, 1, 2, 3]) x)
+=> "4"
+
+# Each partition starts numbering at zero. Exercise a named window and another analytic
+# function in the same scan, including a NULL partition key.
+SELECT COUNTIF(c = 0 AND n = 2) FROM (SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 0, 2) OVER w c, COUNT(*) OVER w n FROM UNNEST([1, 1, CAST(NULL AS INT64), NULL]) p WINDOW w AS (PARTITION BY p))
+=> "4"
+
+# A border between two core components does not merge those components. The four
+# duplicates at each end make the inner points core; the middle point has only three
+# neighbors and may belong to either component.
+WITH clustered AS (SELECT x, ST_CLUSTERDBSCAN(ST_GEOGPOINT(x, 0), 120000, 4) OVER () c FROM UNNEST([0, 0, 0, 0, 1, 2, 3, 4, 4, 4, 4]) x) SELECT COUNT(DISTINCT c) = 2 AND COUNTIF(c IS NULL) = 0 AND COUNT(DISTINCT IF(x <= 1, c, NULL)) = 1 AND COUNT(DISTINCT IF(x >= 3, c, NULL)) = 1 FROM clustered
+=> "true"
+
+# Two clustering calls with different partitions preserve the identity of duplicate rows.
+SELECT COUNTIF(local_id = 0 AND global_id = 0) FROM (SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 0, 2) OVER (PARTITION BY p) local_id, ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 0, 4) OVER () global_id FROM UNNEST([1, 1, 2, 2]) p)
+=> "4"
+
+# Empty input stays empty rather than manufacturing one output row.
+SELECT COUNT(*) FROM (SELECT ST_CLUSTERDBSCAN(g, 1, 1) OVER () c FROM UNNEST(ARRAY<GEOGRAPHY>[]) g)
+=> "0"
+
+# Source: BigQuery answers collected by the maintainer.
+# NULL inputs are noise and do not contribute to the neighborhood count.
+# For analyzer errors, match the message without GoogleSQL's diagnostic location formatting.
+
+SELECT ARRAY_AGG(STRUCT(i, c) ORDER BY i) FROM (SELECT i, ST_CLUSTERDBSCAN(g, 0, 2) OVER () c FROM UNNEST([ST_GEOGPOINT(0, 0), CAST(NULL AS GEOGRAPHY), ST_GEOGPOINT(0, 0)]) g WITH OFFSET i)
+=> [{"v":{"f":[{"v":"0"},{"v":"0"}]}},{"v":{"f":[{"v":"1"},{"v":null}]}},{"v":{"f":[{"v":"2"},{"v":"0"}]}}]
+
+SELECT ST_CLUSTERDBSCAN(CAST(NULL AS GEOGRAPHY), 1, 1) OVER () FROM UNNEST([1])
+=> null
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), CAST('NaN' AS FLOAT64), 1) OVER () FROM UNNEST([1])
+=> error contains: Argument 2 to ST_CLUSTERDBSCAN must be at least 0
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), CAST('+inf' AS FLOAT64), 1) OVER () FROM UNNEST([1])
+=> "0"
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), CAST('-inf' AS FLOAT64), 1) OVER () FROM UNNEST([1])
+=> error contains: Argument 2 to ST_CLUSTERDBSCAN must be at least 0
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), -1, 1) OVER () FROM UNNEST([1])
+=> error contains: Argument 2 to ST_CLUSTERDBSCAN must be at least 0
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 1, -1) OVER () FROM UNNEST([1])
+=> error contains: Argument 3 to ST_CLUSTERDBSCAN must be at least 0
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), CAST(NULL AS FLOAT64), 1) OVER () FROM UNNEST([1])
+=> error contains: Argument 2 to ST_CLUSTERDBSCAN must be non-NULL
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 1, CAST(NULL AS INT64)) OVER () FROM UNNEST([1])
+=> error contains: Argument 3 to ST_CLUSTERDBSCAN must be non-NULL
+
+SELECT SAFE.ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), 1, 1) OVER () FROM UNNEST([1])
+=> error: SAFE is unsupported with analytic function st_clusterdbscan
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(0, 0), x, 1) OVER () FROM UNNEST([1.0, 2.0]) x
+=> error contains: Argument 2 to ST_CLUSTERDBSCAN must be a literal or query parameter
+
+# ORDER BY does not turn this into cumulative clustering.
+SELECT ARRAY_AGG(STRUCT(x, c) ORDER BY x) FROM (SELECT x, ST_CLUSTERDBSCAN(ST_GEOGPOINT(x, 0), 120000, 3) OVER (ORDER BY x) c FROM UNNEST([0, 1, 2, 3]) x)
+=> [{"v":{"f":[{"v":"0"},{"v":"0"}]}},{"v":{"f":[{"v":"1"},{"v":"0"}]}},{"v":{"f":[{"v":"2"},{"v":"0"}]}},{"v":{"f":[{"v":"3"},{"v":"0"}]}}]
+
+SELECT ST_CLUSTERDBSCAN(ST_GEOGPOINT(x, 0), 120000, 1) OVER (ORDER BY x ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM UNNEST([0, 1]) x
+=> error contains: Window framing clause is not allowed for analytic function st_clusterdbscan
+
+# Zero-radius neighborhoods include a point in a linestring's interior.
+SELECT ARRAY_AGG(STRUCT(i, c) ORDER BY i) FROM (SELECT i, ST_CLUSTERDBSCAN(g, 0, 2) OVER () c FROM UNNEST([ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0)'), ST_GEOGPOINT(1, 0)]) g WITH OFFSET i)
+=> [{"v":{"f":[{"v":"0"},{"v":"0"}]}},{"v":{"f":[{"v":"1"},{"v":"0"}]}}]
+
+SELECT COUNT(DISTINCT c) FROM (SELECT ST_CLUSTERDBSCAN(g, ST_DISTANCE(ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 0)), 2) OVER () c FROM UNNEST([ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 0)]) g)
+=> error contains: Argument 2 to ST_CLUSTERDBSCAN must be a literal or query parameter

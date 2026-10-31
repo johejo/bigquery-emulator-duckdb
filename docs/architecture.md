@@ -125,6 +125,11 @@ Literal rule tables use [static definitions](../src/function_catalog/static_defi
 `constexpr` table takes views only after that tuple reaches static storage, so no view points into
 a temporary or requires dynamic allocation. Registration copies these definitions into the catalog.
 
+Analytic rules with `partition_results` return an array with one element per input row.
+The translator materializes input row identities, groups and computes each partition once,
+then expands the result arrays and joins them back by identity. `ST_CLUSTERDBSCAN` uses this
+path rather than repeating its clustering over a window's collected list on every row.
+
 The common catalog also owns `ScalarCall`'s AST accessors and
 [resolved_access](../src/function_catalog/resolved_access.h), which reads arguments, types and
 literals for handlers. Feature providers can use them without depending on the translator;
