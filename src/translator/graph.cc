@@ -314,6 +314,37 @@ namespace {
 std::optional<Relation> FlatGraphPath(
     const std::vector<const googlesql::ResolvedGraphElementScan*>& input,
     const googlesql::GraphPathType* path_type, const Scope& scope) {
+  if (input.size() == 1 && input.front()->Is<googlesql::ResolvedGraphNodeScan>() &&
+      input.front()->target_element_table_list_size() > 1) {
+    const auto& element = *input.front();
+    if (!element.hint_list().empty() || element.column_list_size() != 1) {
+      return Unsupported(scope, "graph node hints or columns");
+    }
+    Relation result;
+    std::vector<std::string> branches;
+    for (const auto* table : element.target_element_table_list()) {
+      auto node = googlesql::MakeResolvedGraphNodeScan();
+      // Each branch uses the resolver's common property set, including typed NULLs for
+      // properties absent from this table. Keep table identities and duplicate rows.
+      node->set_column_list(element.column_list());
+      node->set_target_element_table_list({table});
+      auto branch = FlatGraphPath({node.get()}, path_type, scope);
+      if (!branch) {
+        return std::nullopt;
+      }
+      result.columns = std::move(branch->columns);
+      branches.push_back("(" + branch->sql + ")");
+    }
+    result.sql = Join(branches, " UNION ALL ");
+    if (element.filter_expr() != nullptr) {
+      const auto filter = GraphFilter(*element.filter_expr(), scope, result.columns);
+      if (!filter) {
+        return std::nullopt;
+      }
+      result.sql = "SELECT q.*" + result.From() + " WHERE " + *filter;
+    }
+    return result;
+  }
   auto elements = input;
   std::vector<std::unique_ptr<googlesql::ResolvedGraphNodeScan>> inferred;
   for (size_t i = 0; i < elements.size(); ++i) {

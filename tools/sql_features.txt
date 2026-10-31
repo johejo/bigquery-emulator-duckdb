@@ -19,6 +19,8 @@ setup INSERT d.u (id, v) VALUES (1, 10), (3, 30)
 
 setup CREATE PROPERTY GRAPH d.g NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name)) EDGE TABLES (d.t AS friendships KEY (id) SOURCE KEY (id) REFERENCES t (id) DESTINATION KEY (id) REFERENCES t (id) LABEL Knows NO PROPERTIES)
 
+setup CREATE PROPERTY GRAPH d.g_nodes NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name), d.u KEY (id) LABEL Account PROPERTIES (id, v))
+
 section Graphs
 
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
@@ -26,6 +28,9 @@ query `CREATE PROPERTY GRAPH` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED;
 query `CREATE PROPERTY GRAPH` | CREATE OR REPLACE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n) RETURN n.id, LABELS(n) AS labels)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Person|Account) RETURN n.name, n.v)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH p = (n WHERE n.id = 1) RETURN PATH_LENGTH(p) AS length)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (p:Person) RETURN p.id)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a.name, b.id)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:Person) RETURN a.id AS src, b.id AS dst)
@@ -49,6 +54,7 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person) RETURN a IS NOT DESTINATION e AS is_not_destination)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person), (b:Person), (c:Person) WHERE SAME(a, b, c) RETURN ALL_DIFFERENT(a, b, c) AS different)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) WHERE ALL_DIFFERENT(e, f) RETURN SAME(e, f) AS same_edge)
+query GQL queries | GRAPH d.g_nodes MATCH (n:Person|Account) RETURN n.id, n.name
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.name ORDER BY p.name
 query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) FILTER WHERE a.id <> b.id LET n = b.id + 1 RETURN a.name, n
 query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a, COUNT(*) AS n GROUP BY a NEXT RETURN a.name, n

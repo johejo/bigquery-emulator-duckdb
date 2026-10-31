@@ -1,0 +1,53 @@
+# BigQuery's documented FinGraph matches all nodes with (n) or (n:Person|Account).
+# Missing properties are NULL; the label union exposes both tables' properties.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT ARRAY_AGG(id ORDER BY id) FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n) RETURN n.id AS id)
+=> [{"v":"1"},{"v":"2"},{"v":"3"},{"v":"7"},{"v":"16"},{"v":"20"}]
+SELECT ARRAY_AGG(id ORDER BY id) FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account) RETURN n.id AS id)
+=> [{"v":"1"},{"v":"2"},{"v":"3"},{"v":"7"},{"v":"16"},{"v":"20"}]
+SELECT name FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account {id: 1}) RETURN n.name AS name)
+=> "Alex"
+SELECT name FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account {id: 7}) RETURN n.name AS name)
+=> null
+SELECT nick_name FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account WHERE n.id = 7) RETURN n.nick_name AS nick_name)
+=> "Vacation Fund"
+SELECT nick_name FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account WHERE n.id = 1) RETURN n.nick_name AS nick_name)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n) WHERE n.id = 7 RETURN LABELS(n) AS result)
+=> [{"v":"Account"}]
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n) WHERE n.id = 1 RETURN LABELS(n) AS result)
+=> [{"v":"Person"}]
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account WHERE n.name IS NULL) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account WHERE n.id = 999) RETURN COUNT(*) AS result)
+=> "0"
+GRAPH scalar_fingraph.FinGraph MATCH (n:Person|Account) RETURN COUNT(*) AS result
+=> "6"
+
+# Node-only paths retain the selected node and its label and properties.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH p = (n:Person|Account WHERE n.id = 7) RETURN PATH_LENGTH(p) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH p = (n:Person|Account WHERE n.id = 7) RETURN PATH_FIRST(p).nick_name AS result)
+=> "Vacation Fund"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH p = (n:Person|Account WHERE n.id = 1) RETURN PATH_LAST(p).nick_name AS result)
+=> null
+
+# Shared variables match element identities, not just the visible property set.
+# The two aliases of Person in AliasedNodes have the same keys and properties but distinct identities.
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n), (n) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n) RETURN COUNT(DISTINCT n) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n), (m) WHERE SAME(n, m) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n), (n:Person) RETURN COUNT(*) AS result)
+=> "3"
+
+# Multi-table edge paths remain unsupported; this change only expands node-only paths.
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->(m) RETURN COUNT(*) AS result)
+=> error contains: The emulator does not support
