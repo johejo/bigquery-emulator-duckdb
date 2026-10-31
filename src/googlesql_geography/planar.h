@@ -14,6 +14,6 @@ namespace googlesql_geography {
 absl::StatusOr<Geography> PlanarLine(const std::vector<R2Point>& positions,
                                      std::string_view failed);
 absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>& rings,
-                                        std::string_view failed);
+                                        std::string_view failed, bool make_valid = false);
 
 }  // namespace googlesql_geography

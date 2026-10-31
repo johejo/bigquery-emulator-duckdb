@@ -1,0 +1,41 @@
+# Source: ST_GEOGFROMTEXT's invalid, unclosed bow-tie example in
+# third_party/bigquery_docs/reference/standard-sql/geography_functions.md.
+SELECT ST_GEOGFROMTEXT(wkt, make_valid => TRUE) FROM UNNEST(['POLYGON((0 -1, 2 1, 2 -1, 0 1))']) AS wkt
+=> "MULTIPOLYGON(((0 -1, 1 0, 0 1, 0 -1)), ((1 0, 2 -1, 2 1, 1 0)))"
+
+SELECT SAFE.ST_GEOGFROMTEXT(wkt) FROM UNNEST(['POLYGON((0 -1, 2 1, 2 -1, 0 1))']) AS wkt
+=> null
+
+# The same coordinates encoded as little-endian WKB. ST_GEOGFROMWKB documents the same repair.
+SELECT ST_GEOGFROMWKB(wkb, make_valid => TRUE) FROM UNNEST(['010300000001000000040000000000000000000000000000000000f0bf0000000000000040000000000000f03f0000000000000040000000000000f0bf0000000000000000000000000000f03f']) AS wkb
+=> "MULTIPOLYGON(((0 -1, 1 0, 0 1, 0 -1)), ((1 0, 2 -1, 2 1, 1 0)))"
+
+SELECT ST_GEOGFROMWKB(FROM_HEX(wkb), make_valid => TRUE) FROM UNNEST(['010300000001000000040000000000000000000000000000000000f0bf0000000000000040000000000000f03f0000000000000040000000000000f0bf0000000000000000000000000000f03f']) AS wkb
+=> "MULTIPOLYGON(((0 -1, 1 0, 0 1, 0 -1)), ((1 0, 2 -1, 2 1, 1 0)))"
+
+# GeoJSON's planar edges can be tessellated; check the documented repair's topology, not its WKT.
+SELECT ST_GEOMETRYTYPE(ST_GEOGFROMGEOJSON(geojson, make_valid => TRUE)) FROM UNNEST(['{"type":"Polygon","coordinates":[[[0,-1],[2,1],[2,-1],[0,1],[0,-1]]]}']) AS geojson
+=> "ST_MultiPolygon"
+
+# The same documented invalid ring remains invalid without repair.
+SELECT SAFE.ST_GEOGFROMTEXT(wkt, make_valid => FALSE) FROM UNNEST(['POLYGON((0 -1, 2 1, 2 -1, 0 1))']) AS wkt
+=> null
+
+# make_valid does not affect valid points, empty inputs or SQL NULL.
+SELECT ST_GEOGFROMTEXT('POINT(1 2)', make_valid => TRUE)
+=> "POINT(1 2)"
+
+SELECT ST_GEOGFROMGEOJSON('{"type":"Point","coordinates":[1,2]}', make_valid => FALSE)
+=> "POINT(1 2)"
+
+SELECT ST_GEOGFROMGEOJSON('{"type":"Point","coordinates":[1,2]}', make_valid => TRUE)
+=> "POINT(1 2)"
+
+SELECT ST_ISEMPTY(ST_GEOGFROMTEXT('POLYGON EMPTY', make_valid => TRUE))
+=> "true"
+
+SELECT ST_GEOGFROMTEXT(CAST(NULL AS STRING), make_valid => TRUE)
+=> null
+
+SELECT SAFE.ST_GEOGFROMGEOJSON('{"type":"Point","coordinates":[0,91]}', make_valid => TRUE)
+=> null

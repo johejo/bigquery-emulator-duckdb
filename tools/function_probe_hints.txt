@@ -113,6 +113,7 @@ extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POINT(1 2)', make_valid => T
 note ST_GEOGFROMTEXT See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 values geojson_text | '{"type": "Point", "coordinates": [3, 5]}' | '{"type": "GeometryCollection", "geometries": []}' | '{"type": "LineString", "coordinates": [[0, 0], [1, 1]]}' | '{"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [0, 1], [0, 0]]]}' | '{"type": "MultiPolygon", "coordinates": [[[[0, 0], [1, 0], [0, 1], [0, 0]]], [[[5, 5], [6, 5], [5, 6], [5, 5]]]]}' | '{"type": "GeometryCollection", "geometries": [{"type": "Point", "coordinates": [9, 9]}, {"type": "LineString", "coordinates": [[0, 0], [1, 1]]}]}'
 elements ^ST_GEOGFROMGEOJSON\( | geojson_text | STRING
+extra_query ST_GEOGFROMGEOJSON SELECT ST_GEOGFROMGEOJSON('{"type":"Polygon","coordinates":[[[0,0],[1,0],[0,1]]]}', make_valid => TRUE)
 # ST_GEOGFROM reads a STRING as WKT, GeoJSON or hex-encoded WKB, and BYTES as WKB.
 values geogfrom_text | 'POINT(3 5)' | '{"type": "Point", "coordinates": [3, 5]}' | '010100000000000000000000400000000000001040'
 elements ^ST_GEOGFROM\( | geogfrom_text | STRING

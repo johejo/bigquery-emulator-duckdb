@@ -18,6 +18,6 @@ namespace googlesql_geography {
 // longitude/latitude coordinates to within 10 meters, as ReadWkb's planar edges are.
 absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented = false,
                                   std::string_view failed = "ST_GeogFromText failed: ",
-                                  bool planar = false);
+                                  bool planar = false, bool make_valid = false);
 
 }  // namespace googlesql_geography

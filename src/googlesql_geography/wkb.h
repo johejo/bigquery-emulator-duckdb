@@ -17,7 +17,8 @@ namespace googlesql_geography {
 // the decoded coordinates, without normalizing longitudes or converting through a text format.
 absl::StatusOr<Geography> ReadWkb(std::string_view bytes,
                                   std::string_view failed = "ST_GeogFromWKB failed: ",
-                                  bool oriented = false, bool planar = false);
+                                  bool oriented = false, bool planar = false,
+                                  bool make_valid = false);
 
 // The little-endian WKB of `geography`: one point, linestring or polygon, a MULTIPOINT,
 // MULTILINESTRING or MULTIPOLYGON of more than one, and a GEOMETRYCOLLECTION of each of them where
