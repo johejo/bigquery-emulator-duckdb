@@ -37,6 +37,17 @@ NODE TABLES (scalar_graph.Person AS Authors KEY (id) LABEL Author,
 EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Authors (id)
   DESTINATION KEY (dst) REFERENCES Readers (id));
 
+-- Aliases of an edge table have distinct element identities, just like node aliases.
+-- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+CREATE PROPERTY GRAPH scalar_graph.AliasedEdges
+NODE TABLES (scalar_graph.Person KEY (id))
+EDGE TABLES (
+  scalar_graph.Knows AS FirstEdges KEY (id) SOURCE KEY (src) REFERENCES Person (id)
+    DESTINATION KEY (dst) REFERENCES Person (id) LABEL FirstKnows,
+  scalar_graph.Knows AS SecondEdges KEY (id) SOURCE KEY (src) REFERENCES Person (id)
+    DESTINATION KEY (dst) REFERENCES Person (id) LABEL SecondKnows
+);
+
 -- Person, account, ownership and transfer rows from BigQuery's documented FinGraph example,
 -- without its TIMESTAMP columns.
 -- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md

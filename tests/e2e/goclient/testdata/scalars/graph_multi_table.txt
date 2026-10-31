@@ -48,6 +48,91 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n), (m) WHERE SA
 SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n), (n:Person) RETURN COUNT(*) AS result)
 => "3"
 
-# Multi-table edge paths remain unsupported; this change only expands node-only paths.
-SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->(m) RETURN COUNT(*) AS result)
-=> error contains: The emulator does not support
+# The documented unlabeled directed and any-direction edge matches return 8 and 16 rows.
+# Reverse traversal and a label union match the same eight directed edges.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->(m) RETURN COUNT(e.id) AS result)
+=> "8"
+GRAPH scalar_fingraph.FinGraph MATCH ()-[e]-() RETURN COUNT(e.id) AS result
+=> "16"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)<-[e]-(m) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person|Account)-[e:Owns|Transfers]->(m:Person|Account) RETURN COUNT(*) AS result)
+=> "8"
+
+# The documented fixture has three ownership edges and five transfers. Properties absent
+# from an element table are NULL, including inside the replaced scan's own filter.
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n WHERE n.name IS NOT NULL)-[e]->(m) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n WHERE n.name IS NULL)-[e]->(m) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e WHERE e.amount IS NULL]->(m) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e WHERE e.amount IS NOT NULL]->(m) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->(m) RETURN COUNTIF('Owns' IN UNNEST(LABELS(e))) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->(m) RETURN COUNTIF(n IS SOURCE OF e AND m IS DESTINATION OF e) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)<-[e]-(m) RETURN COUNTIF(m IS SOURCE OF e AND n IS DESTINATION OF e) AS result)
+=> "8"
+
+# Shared variables and consecutive edges retain table identities across UNION branches.
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->(m), (n)-[e]->(m) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person)-[:Owns]->(m)-[e]->(q) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[:Owns]->(m)-[:Owns]->(q) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person)-[e]->(m:Person) RETURN COUNT(*) AS result)
+=> "0"
+
+# Named paths retain the common property set and traversal order.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH p = (n)-[e]->(m) RETURN COUNTIF(PATH_LENGTH(p) = 1) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH p = (n WHERE n.id = 1)-[e]->(m) RETURN PATH_FIRST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH p = (n WHERE n.id = 1)-[e]->(m) RETURN PATH_LAST(p).nick_name AS result)
+=> "Vacation Fund"
+
+# The small fixture's Knows edges include parallel edges and a self-loop. The loop emits
+# once in an any-direction match, but twice between Authors and Readers: those are distinct
+# element tables even when their base rows and keys coincide.
+# Self-loop deduplication agrees with GoogleSQL's graph_table.test self_edge_deduped.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n)-[e]-(m) RETURN COUNT(*) AS result)
+=> "9"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n)-[e WHERE e.id = 12]-(m) RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n WHERE n.id = 1)-[e]-(m WHERE m.id = 2) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n)-[e WHERE e.id = 12]-(m) RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH p = (n)-[e WHERE e.id = 12]-(m) RETURN COUNTIF(IS_ACYCLIC(p)) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n)-[e]->(n) RETURN COUNT(*) AS result)
+=> "0"
+
+# Edge table aliases also remain distinct, even when they share their base rows.
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedEdges MATCH (n)-[e:FirstKnows|SecondKnows]->(m) RETURN COUNT(DISTINCT e) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedEdges MATCH (n)-[e]->(m), (n)-[e]->(m) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedEdges MATCH (n)-[e WHERE e.id = 12]-(m) RETURN COUNT(*) AS result)
+=> "2"
+
+# Composition with OPTIONAL MATCH preserves a node with no outgoing edges.
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person WHERE n.id = 3) OPTIONAL MATCH (n)-[e]->(m) RETURN e.id AS result)
+=> null
+
+# Bounded repetition composes by element identity across table branches. FinGraph has
+# eight one-edge walks and twelve two-edge walks; zero repetitions add its six nodes.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->{1,2}(m) RETURN COUNT(*) AS result)
+=> "20"
+SELECT result FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n)-[e]->{0,2}(m) RETURN COUNT(*) AS result)
+=> "26"

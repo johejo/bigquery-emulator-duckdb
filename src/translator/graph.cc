@@ -314,21 +314,70 @@ namespace {
 std::optional<Relation> FlatGraphPath(
     const std::vector<const googlesql::ResolvedGraphElementScan*>& input,
     const googlesql::GraphPathType* path_type, const Scope& scope) {
-  if (input.size() == 1 && input.front()->Is<googlesql::ResolvedGraphNodeScan>() &&
-      input.front()->target_element_table_list_size() > 1) {
-    const auto& element = *input.front();
+  // Choose edge tables first so their endpoint references narrow the node branches.
+  // Each branch keeps the resolver's common property set and the original table identity.
+  size_t split = input.size();
+  for (size_t i = 0; i < input.size(); ++i) {
+    if (input.at(i)->target_element_table_list_size() > 1) {
+      split = i;
+      if (input.at(i)->Is<googlesql::ResolvedGraphEdgeScan>()) {
+        break;
+      }
+    }
+  }
+  if (split != input.size()) {
+    const auto& element = *input.at(split);
     if (!element.hint_list().empty() || element.column_list_size() != 1) {
-      return Unsupported(scope, "graph node hints or columns");
+      return Unsupported(scope, "graph element hints or columns");
+    }
+    auto candidates = element.target_element_table_list();
+    if (element.Is<googlesql::ResolvedGraphNodeScan>()) {
+      for (const int offset : {-1, 1}) {
+        const auto adjacent = static_cast<int>(split) + offset;
+        if (adjacent < 0 || std::cmp_greater_equal(adjacent, input.size())) {
+          continue;
+        }
+        const auto& edge = *input.at(adjacent)->GetAs<googlesql::ResolvedGraphEdgeScan>();
+        const auto* table = edge.target_element_table_list(0)->AsEdgeTable();
+        const auto* source = table->GetSourceNodeTable()->GetReferencedNodeTable();
+        const auto* destination = table->GetDestNodeTable()->GetReferencedNodeTable();
+        const auto* endpoint =
+            (offset == 1) == (edge.orientation() != googlesql::ResolvedGraphEdgeScan::LEFT)
+                ? source
+                : destination;
+        std::erase_if(candidates, [&](const auto* candidate) {
+          return edge.orientation() == googlesql::ResolvedGraphEdgeScan::ANY
+                     ? candidate != source && candidate != destination
+                     : candidate != endpoint;
+        });
+      }
+      // Retain one impossible branch to produce a correctly typed empty relation.
+      // EndpointMatch emits FALSE for its incompatible table reference.
+      if (candidates.empty()) {
+        candidates.push_back(element.target_element_table_list(0));
+      }
     }
     Relation result;
     std::vector<std::string> branches;
-    for (const auto* table : element.target_element_table_list()) {
-      auto node = googlesql::MakeResolvedGraphNodeScan();
-      // Each branch uses the resolver's common property set, including typed NULLs for
-      // properties absent from this table. Keep table identities and duplicate rows.
-      node->set_column_list(element.column_list());
-      node->set_target_element_table_list({table});
-      auto branch = FlatGraphPath({node.get()}, path_type, scope);
+    for (const auto* table : candidates) {
+      std::unique_ptr<googlesql::ResolvedGraphElementScan> selected;
+      if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
+        const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
+        if (!edge.lhs_hint_list().empty() || !edge.rhs_hint_list().empty() ||
+            edge.cost_expr() != nullptr) {
+          return Unsupported(scope, "graph edge hints or costs");
+        }
+        auto scan = googlesql::MakeResolvedGraphEdgeScan();
+        scan->set_orientation(edge.orientation());
+        selected = std::move(scan);
+      } else {
+        selected = googlesql::MakeResolvedGraphNodeScan();
+      }
+      selected->set_column_list(element.column_list());
+      selected->set_target_element_table_list({table});
+      auto elements = input;
+      elements.at(split) = selected.get();
+      auto branch = FlatGraphPath(elements, path_type, scope);
       if (!branch) {
         return std::nullopt;
       }
@@ -336,6 +385,8 @@ std::optional<Relation> FlatGraphPath(
       branches.push_back("(" + branch->sql + ")");
     }
     result.sql = Join(branches, " UNION ALL ");
+    // Apply the replaced scan's filter after its properties have been projected,
+    // including typed NULLs for properties absent from the selected table.
     if (element.filter_expr() != nullptr) {
       const auto filter = GraphFilter(*element.filter_expr(), scope, result.columns);
       if (!filter) {
@@ -345,51 +396,7 @@ std::optional<Relation> FlatGraphPath(
     }
     return result;
   }
-  auto elements = input;
-  std::vector<std::unique_ptr<googlesql::ResolvedGraphNodeScan>> inferred;
-  for (size_t i = 0; i < elements.size(); ++i) {
-    const auto& element = *elements.at(i);
-    if (!element.Is<googlesql::ResolvedGraphNodeScan>() ||
-        element.target_element_table_list_size() == 1) {
-      continue;
-    }
-    if (!element.hint_list().empty()) {
-      return Unsupported(scope, "graph node hints");
-    }
-    auto candidates = element.target_element_table_list();
-    for (const int offset : {-1, 1}) {
-      const auto adjacent = static_cast<int>(i) + offset;
-      if (adjacent < 0 || std::cmp_greater_equal(adjacent, elements.size()) ||
-          !elements.at(adjacent)->Is<googlesql::ResolvedGraphEdgeScan>()) {
-        continue;
-      }
-      const auto& edge = *elements.at(adjacent)->GetAs<googlesql::ResolvedGraphEdgeScan>();
-      if (edge.target_element_table_list_size() != 1) {
-        continue;
-      }
-      const auto* table = edge.target_element_table_list(0)->AsEdgeTable();
-      const auto* source = table->GetSourceNodeTable()->GetReferencedNodeTable();
-      const auto* destination = table->GetDestNodeTable()->GetReferencedNodeTable();
-      const auto* endpoint =
-          (offset == 1) == (edge.orientation() != googlesql::ResolvedGraphEdgeScan::LEFT)
-              ? source
-              : destination;
-      std::erase_if(candidates, [&](const auto* candidate) {
-        return edge.orientation() == googlesql::ResolvedGraphEdgeScan::ANY
-                   ? candidate != source && candidate != destination
-                   : candidate != endpoint;
-      });
-    }
-    if (candidates.size() != 1) {
-      return Unsupported(scope, "graph patterns without a single table and label");
-    }
-    auto node = googlesql::MakeResolvedGraphNodeScan();
-    node->set_column_list(element.column_list());
-    node->set_target_element_table_list(candidates);
-    // Keep the original filter: the inferred table only narrows impossible endpoints.
-    elements.at(i) = node.get();
-    inferred.push_back(std::move(node));
-  }
+  const auto& elements = input;
   Relation result;
   std::vector<std::string> outputs;
   std::vector<std::string> projections;
