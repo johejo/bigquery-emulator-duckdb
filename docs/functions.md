@@ -52,7 +52,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 64 | 5 | 2 | 0 |
+| [Geography functions](#geography-functions) | 66 | 3 | 2 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -263,8 +263,8 @@ functions.
 | [`ST_EXTERIORRING`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_GEOGFROM`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_GEOGFROMGEOJSON`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
-| [`ST_GEOGFROMTEXT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMTEXT with make_valid set to TRUE. |
-| [`ST_GEOGFROMWKB`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMWKB with make_valid set to TRUE. |
+| [`ST_GEOGFROMTEXT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
+| [`ST_GEOGFROMWKB`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
 | [`ST_GEOGPOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_GEOGPOINTFROMGEOHASH`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_GEOHASH`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
