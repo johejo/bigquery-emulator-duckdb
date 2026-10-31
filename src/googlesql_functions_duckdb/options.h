@@ -33,6 +33,8 @@ struct Options {
   bool collate_und_ci_only = false;
   // The translator rejects INTERSECT ALL and EXCEPT ALL.
   bool intersect_except_distinct_only = false;
+  // Window PARTITION BY rejects STRUCT and ARRAY keys.
+  bool scalar_window_partition_keys_only = false;
   // DISTINCT set operations reject STRUCT columns.
   bool distinct_set_operations_without_structs = false;
   // Query results and written values fail on an ARRAY with a NULL element.
