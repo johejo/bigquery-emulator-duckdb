@@ -47,12 +47,15 @@ absl::StatusOr<Geography> PlanarLine(const std::vector<R2Point>& positions,
 }
 
 absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>& rings,
-                                        std::string_view failed) {
+                                        std::string_view failed, bool make_valid) {
   if (rings.empty()) {
     return absl::OutOfRangeError(std::string(failed) + "Polygon should have shell");
   }
   std::vector<std::vector<S2Point>> loops;
-  for (const auto& positions : rings) {
+  for (auto positions : rings) {
+    if (make_valid && positions.size() >= 3 && positions.front() != positions.back()) {
+      positions.push_back(positions.front());
+    }
     if (positions.size() < 4) {
       return absl::OutOfRangeError(
           std::string(failed) + "Polygon loop should have at least four vertices, but only had " +
@@ -79,7 +82,8 @@ absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>&
       std::ranges::reverse(loop);
     }
   }
-  return BuildPolygon(loops, failed, /*oriented=*/true);
+  const auto result = BuildPolygon(loops, failed, /*oriented=*/true);
+  return make_valid && !result.ok() ? RepairPolygon(loops, failed) : result;
 }
 
 }  // namespace googlesql_geography

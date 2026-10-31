@@ -71,12 +71,12 @@ absl::StatusOr<std::vector<R2Point>> ReadPositions(const json& positions) {
   return result;
 }
 
-absl::StatusOr<Geography> ReadPoint(const json& coordinates) {
+absl::StatusOr<Geography> ReadPoint(const json& coordinates, bool /*make_valid*/) {
   GOOGLESQL_ASSIGN_OR_RETURN(const R2Point position, ReadPosition(coordinates));
   return PointGeography(Projection().Unproject(position));
 }
 
-absl::StatusOr<Geography> ReadLine(const json& coordinates) {
+absl::StatusOr<Geography> ReadLine(const json& coordinates, bool /*make_valid*/) {
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<R2Point> positions, ReadPositions(coordinates));
   return PlanarLine(positions, kGeoJsonFailed);
 }
@@ -84,20 +84,20 @@ absl::StatusOr<Geography> ReadLine(const json& coordinates) {
 // A polygon is the region its rings enclose on the plane. Each loop runs as the ring does, and
 // where the ring runs clockwise, in reverse as S2Loop::Invert reverses it, so that the region it
 // adds or removes lies on its left.
-absl::StatusOr<Geography> ReadPolygon(const json& coordinates) {
+absl::StatusOr<Geography> ReadPolygon(const json& coordinates, bool make_valid) {
   std::vector<std::vector<R2Point>> rings;
   for (const json& ring : coordinates) {
     GOOGLESQL_ASSIGN_OR_RETURN(auto positions, ReadPositions(ring));
     rings.push_back(std::move(positions));
   }
-  return PlanarPolygon(rings, kGeoJsonFailed);
+  return PlanarPolygon(rings, kGeoJsonFailed, make_valid);
 }
 
 // A geometry type other than GeometryCollection, whose coordinates are one part as `read` reads
 // it, or an array of them where it is `multipart`.
 struct GeometryType {
   std::string_view name;
-  absl::StatusOr<Geography> (*read)(const json&);
+  absl::StatusOr<Geography> (*read)(const json&, bool);
   bool multipart;
 };
 
@@ -112,7 +112,7 @@ constexpr std::array kGeometryTypes = {
 };
 
 // Adds the parts of `geometry` to `parts`, each built on its own.
-absl::Status ReadGeometry(const json& geometry, std::vector<Geography>& parts) {
+absl::Status ReadGeometry(const json& geometry, std::vector<Geography>& parts, bool make_valid) {
   if (!geometry.is_object()) {
     return Failed("Expected JSON object");
   }
@@ -146,17 +146,17 @@ absl::Status ReadGeometry(const json& geometry, std::vector<Geography>& parts) {
   }
   if (known == kGeometryTypes.end()) {
     for (const json& item : *items) {
-      GOOGLESQL_RETURN_IF_ERROR(ReadGeometry(item, parts));
+      GOOGLESQL_RETURN_IF_ERROR(ReadGeometry(item, parts, make_valid));
     }
     return absl::OkStatus();
   }
   if (!known->multipart) {
-    GOOGLESQL_ASSIGN_OR_RETURN(Geography part, known->read(*items));
+    GOOGLESQL_ASSIGN_OR_RETURN(Geography part, known->read(*items, make_valid));
     parts.push_back(std::move(part));
     return absl::OkStatus();
   }
   for (const json& item : *items) {
-    GOOGLESQL_ASSIGN_OR_RETURN(Geography part, known->read(item));
+    GOOGLESQL_ASSIGN_OR_RETURN(Geography part, known->read(item, make_valid));
     parts.push_back(std::move(part));
   }
   return absl::OkStatus();
@@ -247,10 +247,10 @@ absl::StatusOr<json> Parse(std::string_view text) {
 
 }  // namespace
 
-absl::StatusOr<Geography> ReadGeoJson(std::string_view text) {
+absl::StatusOr<Geography> ReadGeoJson(std::string_view text, bool make_valid) {
   GOOGLESQL_ASSIGN_OR_RETURN(const json geometry, Parse(text));
   std::vector<Geography> parts;
-  GOOGLESQL_RETURN_IF_ERROR(ReadGeometry(geometry, parts));
+  GOOGLESQL_RETURN_IF_ERROR(ReadGeometry(geometry, parts, make_valid));
   if (parts.empty()) {
     return Geography{};
   }

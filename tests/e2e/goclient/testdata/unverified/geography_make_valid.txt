@@ -1,0 +1,33 @@
+# Repairing intersecting rings, overlaps, repeated edges and collapsed rings needs observed
+# BigQuery answers beyond the documented self-intersecting polygon example.
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (3 1, 5 1, 5 3, 3 3, 3 1))', make_valid => TRUE)
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 6 0, 6 6, 0 6, 0 0), (1 1, 4 1, 4 4, 1 4, 1 1), (2 2, 5 2, 5 5, 2 5, 2 2))', make_valid => TRUE)
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 0, 0 1, 0 0))', make_valid => TRUE)
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0 0, 0 0, 0 0))', make_valid => TRUE)
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1))', make_valid => TRUE)
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 -1, 2 1, 2 -1, 0 1))', planar => TRUE, make_valid => TRUE)
+?>
+
+SELECT ST_GEOGFROMGEOJSON('{"type":"GeometryCollection","geometries":[{"type":"Polygon","coordinates":[[[0,-1],[2,1],[2,-1],[0,1],[0,-1]]]},{"type":"Point","coordinates":[9,9]}]}', make_valid => TRUE)
+?>
+
+# Snapping without make_valid: holes that touch at an edge or a vertex, and a shell with
+# holes whose entire interior collapses at micrometer precision.
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (0 1, 1 1, 1 2, 0 2, 0 1))')
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (0 0, 1 1, 0 2, 0 0))')
+?>
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0.000000000001 0, 0.000000000001 0.000000000001, 0 0.000000000001, 0 0), (0.0000000000002 0.0000000000002, 0.0000000000004 0.0000000000002, 0.0000000000002 0.0000000000004, 0.0000000000002 0.0000000000002))')
+?>

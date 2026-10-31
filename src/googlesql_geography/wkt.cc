@@ -264,12 +264,13 @@ absl::Status ReadGeometry(WktReader& reader, std::vector<Part>& parts) {
 }  // namespace
 
 absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented, std::string_view failed,
-                                  bool planar) {
+                                  bool planar, bool make_valid) {
   WktReader reader(text, failed);
   std::vector<Part> parts;
   GOOGLESQL_RETURN_IF_ERROR(ReadGeometry(reader, parts));
   GOOGLESQL_RETURN_IF_ERROR(reader.End());
-  return planar ? BuildPlanarParts(parts, failed) : BuildParts(std::move(parts), oriented, failed);
+  return planar ? BuildPlanarParts(parts, failed, make_valid)
+                : BuildParts(std::move(parts), oriented, failed, make_valid);
 }
 
 }  // namespace googlesql_geography

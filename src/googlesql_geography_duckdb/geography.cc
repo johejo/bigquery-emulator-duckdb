@@ -170,20 +170,16 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
     return absl::OutOfRangeError(
         "ST_GeogFromText failed: Options make_valid and oriented are not compatible.");
   }
-  if (args.Bool(3)) {
-    return absl::UnimplementedError(
-        "The emulator does not support ST_GEOGFROMTEXT with make_valid set to TRUE");
-  }
   GOOGLESQL_ASSIGN_OR_RETURN(
       const Geography geography,
       googlesql_geography::ReadWkt(args.String(0), args.Bool(1),
-                                   "ST_GeogFromText failed: ", args.Bool(2)));
+                                   "ST_GeogFromText failed: ", args.Bool(2), args.Bool(3)));
   return EncodeGeography(geography);
 }
 
 absl::StatusOr<std::string> GeogFromGeoJson(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
-                             googlesql_geography::ReadGeoJson(args.String(0)));
+                             googlesql_geography::ReadGeoJson(args.String(0), args.Bool(1)));
   return EncodeGeography(geography);
 }
 
@@ -208,15 +204,16 @@ absl::StatusOr<std::string> GeogFromOrientedWkb(const Arguments& args) {
         "ST_GeogFromWKB: Options planar and oriented are not compatible.; in planar WKB "
         "geography; error in ST_GeogFromWKB expression");
   }
-  if (args.Bool(3)) {
-    return absl::UnimplementedError(
-        "The emulator does not support ST_GEOGFROMWKB with make_valid set to TRUE");
+  if (args.Bool(1) && args.Bool(3)) {
+    return absl::OutOfRangeError(
+        "ST_GeogFromWKB failed: Options make_valid and oriented are not compatible.");
   }
   const auto geography =
-      kHex ? googlesql_geography::ReadHexWkb(
-                 args.String(0), "ST_GeogFromWKBHex failed: ", args.Bool(1), args.Bool(2))
+      kHex ? googlesql_geography::ReadHexWkb(args.String(0),
+                                             "ST_GeogFromWKBHex failed: ", args.Bool(1),
+                                             args.Bool(2), args.Bool(3))
            : googlesql_geography::ReadWkb(args.String(0), "ST_GeogFromWKB failed: ", args.Bool(1),
-                                          args.Bool(2));
+                                          args.Bool(2), args.Bool(3));
   if (!geography.ok()) {
     return geography.status();
   }
@@ -444,7 +441,8 @@ const Definitions& GeographyDefinitions() {
                         EachRow<Call<googlesql_geography::GeogPoint>>);
     definitions->Scalar("bq_st_geogfromtext", {kVarchar, kBoolean, kBoolean, kBoolean}, kGeography,
                         EachRow<GeogFromText>);
-    definitions->Scalar("bq_st_geogfromgeojson", {kVarchar}, kGeography, EachRow<GeogFromGeoJson>);
+    definitions->Scalar("bq_st_geogfromgeojson", {kVarchar, kBoolean}, kGeography,
+                        EachRow<GeogFromGeoJson>);
     // ST_GEOGFROMWKB and ST_GEOGFROM read BYTES as WKB, and ST_GEOGFROMWKB reads a STRING as its
     // hex and ST_GEOGFROM as WKT, GeoJSON or hex WKB.
     {
@@ -710,7 +708,11 @@ GeographyFunctions() {
                  },
              },
              {.uses = kUses}),
-      Define("ST_GEOGFROMGEOJSON", {{.arity = 1, .spelling = "bq_st_geogfromgeojson($1)"}},
+      Define("ST_GEOGFROMGEOJSON",
+             {
+                 {.arity = 1, .spelling = "bq_st_geogfromgeojson($1, FALSE)"},
+                 {.arity = 2, .spelling = "bq_st_geogfromgeojson($1, $2)"},
+             },
              {.uses = kUses}),
       Define("ST_GEOGPOINTFROMGEOHASH",
              {{.arity = 1, .spelling = "bq_st_geogpointfromgeohash($1)"}}, {.uses = kUses}),
