@@ -49,7 +49,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const googlesql::ResolvedAggregateFunctionCall* aggregate,
                                          const std::string& over, const Scope& scope,
                                          const Columns& columns, const std::string& having = "",
-                                         std::vector<std::string>* intermediates = nullptr) {
+                                         std::vector<std::string>* intermediates = nullptr,
+                                         const std::string& partition_order = "") {
   const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   // A graph value's STRUCT is equal to another exactly when their identities are, so functions
@@ -67,8 +68,10 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
   if (functions.HasTypeUse(name, TypeUse::kRejectsSafe) &&
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
-    throw std::invalid_argument("SAFE is unsupported with aggregate function " +
-                                call.function()->Name());
+    throw std::invalid_argument(
+        std::string("SAFE is unsupported with ") +
+        (call.Is<googlesql::ResolvedAnalyticFunctionCall>() ? "analytic" : "aggregate") +
+        " function " + call.function()->Name());
   }
   if (functions.HasTypeUse(name, TypeUse::kRejectsDistinct) && call.distinct()) {
     throw std::invalid_argument("Aggregate function " + name +
@@ -95,7 +98,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (entry == nullptr ||
       (entry->translation != Translation::kAggregate &&
        entry->translation != Translation::kAnalytic) ||
-      (entry->translation == Translation::kAnalytic && over.empty())) {
+      (entry->translation == Translation::kAnalytic && over.empty() && partition_order.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
   const auto type_of = [&](std::size_t argument) {
@@ -119,7 +122,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     return Unsupported(scope, "aggregate or analytic function " + name + " with nested collation");
   }
   const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
-    return candidate.collated == !collation->empty() &&
+    return candidate.partition_results == !partition_order.empty() &&
+           candidate.collated == !collation->empty() &&
            (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
            (candidate.distinct != AggregateRule::Distinct::kRequired || call.distinct()) &&
            std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
@@ -245,6 +249,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return std::nullopt;
     }
     order = " ORDER BY " + *items;
+  } else if (!partition_order.empty()) {
+    order = " ORDER BY " + partition_order;
   } else if (const std::string items = AggregateOrder(*rule, arguments); !items.empty()) {
     order = " ORDER BY " + items;
   }
@@ -335,15 +341,14 @@ std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& 
   }
 }
 
-std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup& group,
-                                  const googlesql::ResolvedWindowFrame* frame, const Scope& scope,
-                                  const Columns& columns) {
-  std::vector<std::string> window;
+std::optional<std::vector<std::string>> PartitionKeys(
+    const googlesql::ResolvedAnalyticFunctionGroup& group, const Scope& scope,
+    const Columns& columns) {
+  std::vector<std::string> keys;
   if (const auto* partition = group.partition_by(); partition != nullptr) {
     if (!partition->hint_list().empty()) {
       return std::nullopt;
     }
-    std::vector<std::string> keys;
     for (int i = 0; i < partition->partition_by_list_size(); ++i) {
       const auto& ref = partition->partition_by_list(i);
       const auto collation = partition->collation_list().empty()
@@ -353,7 +358,8 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
         return std::nullopt;
       }
       if (HasGraph(ref->type())) {
-        return Unsupported(scope, "PARTITION BY with graph values");
+        Unsupported(scope, "PARTITION BY with graph values");
+        return std::nullopt;
       }
       if (scope.context.functions.restrictions().scalar_window_partition_keys_only &&
           (ref->type()->IsStruct() || ref->type()->IsArray())) {
@@ -362,7 +368,8 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
                                     " is unsupported");
       }
       if (HasInterval(ref->type()) && !ref->type()->IsInterval()) {
-        return Unsupported(scope, "PARTITION BY with INTERVAL");
+        Unsupported(scope, "PARTITION BY with INTERVAL");
+        return std::nullopt;
       }
       const auto key = Expression(*ref, scope, columns);
       if (!key) {
@@ -371,7 +378,20 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
       keys.push_back(CollationKey(ref->type()->IsInterval() ? IntervalKey(*key) : *key, *collation,
                                   ref->type()));
     }
-    window.push_back("PARTITION BY " + Join(keys, ", "));
+  }
+  return keys;
+}
+
+std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup& group,
+                                  const googlesql::ResolvedWindowFrame* frame, const Scope& scope,
+                                  const Columns& columns) {
+  std::vector<std::string> window;
+  const auto keys = PartitionKeys(group, scope, columns);
+  if (!keys) {
+    return std::nullopt;
+  }
+  if (!keys->empty()) {
+    window.push_back("PARTITION BY " + Join(*keys, ", "));
   }
   if (const auto* ordering = group.order_by(); ordering != nullptr) {
     if (!ordering->hint_list().empty()) {
@@ -926,11 +946,83 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   return result;
 }
 
+namespace {
+
+bool HasPartitionResults(const googlesql::ResolvedAnalyticFunctionCall& call, const Scope& scope) {
+  const auto* entry = scope.context.functions.Find(
+      ToUpperAscii(call.function()->FullName(/*include_group=*/false)));
+  return IsBuiltinFunction(*call.function()) && entry != nullptr &&
+         entry->translation == Translation::kAnalytic &&
+         std::ranges::any_of(entry->aggregates,
+                             [](const AggregateRule& rule) { return rule.partition_results; });
+}
+
+// Materialize the input identity and the grouped result once. Computing an array-valued finish
+// over list(...) OVER (...) on every row would repeat the whole partition's computation.
+bool PartitionResults(Relation& input, const googlesql::ResolvedAnalyticFunctionGroup& group,
+                      const googlesql::ResolvedAnalyticFunctionCall& call, int output_id,
+                      const Scope& scope) {
+  if (call.window_frame() != nullptr) {
+    Unsupported(scope, "partition-result analytic function with a window frame");
+    return false;
+  }
+  const auto keys = PartitionKeys(group, scope, input.columns);
+  if (!keys) {
+    return false;
+  }
+  const std::string row = scope.context.FreshName("_partition_row");
+  std::string order;
+  if (const auto* ordering = group.order_by(); ordering != nullptr) {
+    if (!ordering->hint_list().empty()) {
+      return false;
+    }
+    const auto items = OrderItems(ordering->order_by_item_list(), scope, input.columns);
+    if (!items) {
+      return false;
+    }
+    order = *items + ", ";
+  }
+  order += "q." + row;
+  const auto values = NonScalarCall(call, nullptr, "", scope, input.columns, "", nullptr, order);
+  if (!values) {
+    return false;
+  }
+  const std::string source = scope.context.FreshName("_partition_input");
+  const std::string grouped = scope.context.FreshName("_partition_groups");
+  const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
+  if (!type) {
+    return false;
+  }
+  input.sql = "WITH " + source + " AS MATERIALIZED (SELECT q.*, row_number() OVER () AS " + row +
+              input.From() + "), " + grouped + " AS MATERIALIZED (SELECT list(q." + row +
+              " ORDER BY " + order + ") AS ids, " + *values + " AS vals FROM " + source + " AS q" +
+              (keys->empty() ? "" : " GROUP BY " + Join(*keys, ", ")) +
+              ") SELECT q.*, CAST(p.val AS " + *type + ") AS " + ColumnName(output_id) + " FROM " +
+              source + " AS q JOIN (SELECT unnest(ids) AS id, unnest(vals) AS val FROM " + grouped +
+              ") AS p ON q." + row + " = p.id";
+  input.columns.emplace(output_id, "q." + ColumnName(output_id));
+  return true;
+}
+
+}  // namespace
+
 std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& analytic,
                                      const Scope& scope) {
   auto result = Scan(*analytic.input_scan(), scope);
   if (!result) {
     return std::nullopt;
+  }
+  for (const auto& group : analytic.function_group_list()) {
+    for (const auto& computed : group->analytic_function_list()) {
+      if (!computed->expr()->Is<googlesql::ResolvedAnalyticFunctionCall>()) {
+        return std::nullopt;
+      }
+      const auto* call = computed->expr()->GetAs<googlesql::ResolvedAnalyticFunctionCall>();
+      if (HasPartitionResults(*call, scope) &&
+          !PartitionResults(*result, *group, *call, computed->column().column_id(), scope)) {
+        return std::nullopt;
+      }
+    }
   }
   const Columns input_columns = result->columns;
   std::vector<std::string> projections = {"q.*"};
@@ -942,6 +1034,9 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         return std::nullopt;
       }
       const auto* call = computed->expr()->GetAs<googlesql::ResolvedAnalyticFunctionCall>();
+      if (HasPartitionResults(*call, scope)) {
+        continue;
+      }
       // GoogleSQL takes PARTITION BY and SAFE with TF_IDF, which BigQuery rejects after analysis.
       if (IsBuiltinFunction(*call->function()) && call->function()->Name() == "tf_idf") {
         if (group->partition_by() != nullptr) {
