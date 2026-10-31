@@ -4,10 +4,12 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 cc_library(
     name = "core_math",
     srcs = [
+        "src/binary64/acos/acos.c",
         "src/binary64/atan2/atan2.c",
         "src/binary64/atan2/tint.h",
         "src/binary64/cos/cos.c",
         "src/binary64/sin/sin.c",
+        "src/binary64/tan/tan.c",
     ],
     visibility = ["//visibility:public"],
 )

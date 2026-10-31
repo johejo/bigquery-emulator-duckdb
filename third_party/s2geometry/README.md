@@ -14,3 +14,9 @@ libc++'s order, not libstdc++'s; a valid covering can otherwise differ from BigQ
 keeps this order independent of the build platform. The observed cases, including symmetric lines,
 polygons, buffers and mixed geometries, are in
 `tests/e2e/goclient/testdata/scalars/geography_covering*.txt`.
+
+`buffer_libm.patch` makes `S2BufferOperation` compute its step angles with CORE-MATH's correctly
+rounded `acos`, `tan` and `sin` rather than the platform's math library. A step one bit off moves
+the vertices of a buffered linestring's round end cap, as macOS's library does, while BigQuery's
+answers match correctly rounded functions; see [CORE-MATH](../core_math/README.md) and
+`tests/e2e/goclient/testdata/scalars/geography_buffer.txt`.

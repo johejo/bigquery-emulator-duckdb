@@ -1,0 +1,95 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -273,6 +273,7 @@ cc_library(
+         "//s2/util/task:status_macros",
+         "//s2/util/units",
+         "@abseil-cpp//absl/base",
++        "@core_math",
+         "@abseil-cpp//absl/container:btree",
+         "@abseil-cpp//absl/container:flat_hash_set",
+         "@abseil-cpp//absl/flags:flag",
+diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -9,6 +9,7 @@ module(
+ 
+ bazel_dep(name = "abseil-cpp", version = "20260107.1")
+ bazel_dep(name = "bazel_skylib", version = "1.9.0")
++bazel_dep(name = "core_math")
+ bazel_dep(name = "rules_cc", version = "0.2.17")
+ 
+ # Added as regular dependencies instead of dev_dependency to make presubmit tests pass.
+diff --git a/s2/s2buffer_operation.cc b/s2/s2buffer_operation.cc
+--- a/s2/s2buffer_operation.cc
++++ b/s2/s2buffer_operation.cc
+@@ -82,6 +82,14 @@
+ #include "s2/s2winding_operation.h"
+ #include "s2/util/math/mathutil.h"
+ 
++// CORE-MATH's correctly rounded functions, which BigQuery's buffers match where the platform's
++// math library can differ in the last bit.
++extern "C" {
++double cr_acos(double x);
++double cr_sin(double x);
++double cr_tan(double x);
++}
++
+ using s2pred::DBL_ERR;
+ using std::ceil;
+ using std::make_unique;
+@@ -142,6 +150,12 @@ static constexpr S1Angle kMinRequestedError = S1Angle::Radians(2 * DBL_ERR);
+ static constexpr S1Angle kMaxAbsoluteInterpolationError =
+     S2::kGetPointOnLineError + S2::kGetPointOnRayPerpendicularError;
+ 
++// S1ChordAngle(angle), with correctly rounded sin.
++static S1ChordAngle CorrectlyRoundedChordAngle(S1Angle angle) {
++  double length = 2 * cr_sin(0.5 * min(M_PI, angle.radians()));
++  return S1ChordAngle::FromLength2(length * length);
++}
++
+ S2BufferOperation::Options::Options()
+     : snap_function_(
+           make_unique<s2builderutil::IdentitySnapFunction>(S1Angle::Zero())) {
+@@ -305,21 +319,22 @@ void S2BufferOperation::Init(unique_ptr<S2Builder::Layer> result_layer,
+     // as well take advantage of that.
+     abs_radius_ = S1ChordAngle::Straight();
+   } else {
+-    abs_radius_ = S1ChordAngle(abs_radius);
++    abs_radius_ = CorrectlyRoundedChordAngle(abs_radius);
+     S1Angle vertex_step = GetMaxEdgeSpan(abs_radius, requested_error);
+-    vertex_step_ = S1ChordAngle(vertex_step);
++    vertex_step_ = CorrectlyRoundedChordAngle(vertex_step);
+ 
+     // We take extra care to ensure that points are buffered as regular
+     // polygons.  The step angle is adjusted up slightly to ensure that we
+     // don't wind up with a tiny extra edge.
+-    point_step_ = S1ChordAngle::Radians(
+-        2 * M_PI / ceil(2 * M_PI / vertex_step.radians()) + 1e-15);
++    point_step_ = CorrectlyRoundedChordAngle(S1Angle::Radians(
++        2 * M_PI / ceil(2 * M_PI / vertex_step.radians()) + 1e-15));
+ 
+     // Edges are buffered only if the buffer radius (including permissible
+     // error) is less than 90 degrees.
+     S1Angle edge_radius = S1Angle::Radians(M_PI_2) - abs_radius;
+     if (edge_radius > max_error) {
+-      edge_step_ = S1ChordAngle(GetMaxEdgeSpan(edge_radius, requested_error));
++      edge_step_ = CorrectlyRoundedChordAngle(
++          GetMaxEdgeSpan(edge_radius, requested_error));
+     }
+   }
+ 
+@@ -349,9 +364,11 @@ S1Angle S2BufferOperation::GetMaxEdgeSpan(S1Angle radius,
+   S1Angle min_radius = radius - requested_error;
+   ABSL_DCHECK_GE(min_radius, S1Angle::Zero());
+   if (radius.radians() < M_PI_2) {
+-    step = min(step, S1Angle::Radians(2 * acos(tan(min_radius) / tan(radius))));
++    step = min(step, S1Angle::Radians(2 * cr_acos(cr_tan(min_radius.radians()) /
++                                                         cr_tan(radius.radians()))));
+   } else if (min_radius.radians() > M_PI_2) {
+-    step = min(step, S1Angle::Radians(2 * acos(tan(radius) / tan(min_radius))));
++    step = min(step, S1Angle::Radians(2 * cr_acos(cr_tan(radius.radians()) /
++                                                         cr_tan(min_radius.radians()))));
+   }
+   return step;
+ }

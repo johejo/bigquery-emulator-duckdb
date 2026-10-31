@@ -12,6 +12,7 @@
 #include "s2/mutable_s2shape_index.h"
 #include "s2/r2.h"
 #include "s2/s2boolean_operation.h"
+#include "s2/s2buffer_operation.h"
 #include "s2/s2builder.h"
 #include "s2/s2latlng.h"
 #include "s2/s2point.h"
@@ -163,6 +164,12 @@ absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts);
 // shells become lines or points, and degenerate lines become points.
 absl::StatusOr<Geography> Snap(const Geography& geography,
                                const S2Builder::SnapFunction& snap_function, bool simplify);
+
+// The polygon S2BufferOperation makes of `geography` with `options`: the points within the radius
+// of it, or with a negative radius its polygons without the points within the radius of their
+// complement. Points and linestrings make nothing where the radius is zero or negative.
+absl::StatusOr<Geography> BufferGeography(const Geography& geography,
+                                          const S2BufferOperation::Options& options);
 
 // A closed point set operation on two shape indexes already snapped together. Degenerate
 // polygon shells become lines or points, and degenerate lines become points.
