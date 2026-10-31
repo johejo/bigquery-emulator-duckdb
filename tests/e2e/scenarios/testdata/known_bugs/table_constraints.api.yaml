@@ -2,8 +2,7 @@ version: 1
 # Recorded on BigQuery in project johejo-sandbox, run ahjpbnimu3gaa5n7mq3w4pvcah; the answers
 # sidecar keeps the observations.
 description: >-
-  Primary key cases the emulator answers otherwise: it drops foreign keys, and reports analyzer
-  errors with a caret rather than BigQuery's "at [line:column]".
+  Foreign key metadata the emulator drops rather than storing and returning.
 vars:
   dataset: e2e_${run}_${case}
 cases:
@@ -53,34 +52,3 @@ cases:
             - name: fk$1
               referencedTable: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
               columnReferences: [{referencingColumn: a, referencedColumn: a}]
-  - name: missing_primary_key_column
-    steps:
-      - name: create_dataset
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/datasets
-          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
-      - name: statement
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: CREATE TABLE `${project}.${dataset}.t` (a INT64, PRIMARY KEY (c) NOT ENFORCED)
-            useLegacySql: false
-            location: US
-        expectFailure: true
-        observe:
-          status: /status
-          reason: /body/error/errors/0/reason
-          message: /body/error/message
-    cleanup:
-      - name: delete_dataset
-        rest:
-          method: DELETE
-          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
-    expect:
-      statement:
-        status: 400
-        reason: invalidQuery
-        message: >-
-          Unsupported primary key column c either does not exist or is a pseudocolumn at [1:114]
