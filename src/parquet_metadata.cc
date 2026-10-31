@@ -468,7 +468,7 @@ bool ParquetColumn::IsInteger() const {
 }
 
 bool ParquetColumn::Reshaped() const {
-  return kind == Kind::kMap || unwrapped || null_elements ||
+  return kind == Kind::kMap || (kind == Kind::kList && nullable) || unwrapped || null_elements ||
          std::ranges::any_of(children, [](const ParquetColumn& child) { return child.Reshaped(); });
 }
 

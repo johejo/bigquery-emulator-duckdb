@@ -21,6 +21,8 @@ struct JsonReadOptions {};
 struct ParquetReadOptions {
   // External tables allow files to omit nullable columns of the table schema.
   bool allow_missing_columns = false;
+  // External reads preserve NULL LIST elements; loads reject them.
+  bool allow_null_list_elements = false;
 };
 using FileReadOptions = std::variant<CsvReadOptions, JsonReadOptions, ParquetReadOptions>;
 

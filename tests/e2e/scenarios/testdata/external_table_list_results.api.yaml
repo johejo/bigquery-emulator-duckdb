@@ -1,0 +1,54 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run iructtexigygfohu3llll6h3ax;
+# the answers sidecar retains the observation.
+description: >-
+  Direct query-result serialization rejects NULL elements of external Parquet LISTs, although
+  external_table_lists records that TO_JSON_STRING preserves those elements.
+vars:
+  dataset: bqa_${run}_${case}
+  # The nested fixture from external_table_lists.api.yaml: l is [5, NULL] and NULL.
+  parquet: UEFSMRUAFR4VHiwVBBUAFQYVBhwAAAADAAAAAwIAAQAAAAAAAAAVABUeFR4sFQQVABUGFQYcAAAAAwAAAAMCAAIAAAAAAAAAFQAVOBU4LBUGFQAVBhUGHAAAAAIAAAADAgIAAAADAwEAAAAAAAAAAgAAAAAAAAAVABU6FTosFQYVABUGFQYcAAAAAgAAAAMCAwAAAAMKAAMAAAAAAAAABAAAAAAAAAAVABUqFSosFQYVABUGFQYcAAAAAgAAAAMCAwAAAAMLAAUAAAAAAAAAFQQZrEgGc2NoZW1hFQgANQIYAXMVBAAVBCUCGAF4ABUEJQIYAXkAFQQlBBgBcgA1BBgBZxUCABUEJQIYAXgANQIYAWwVAhUGTDwAAAA1BBgEbGlzdBUCABUEJQIYB2VsZW1lbnQAFgQZHBlcJggcFQQZJQAGGSgBcwF4FQAWBBZEFkQmCEkcFQAVABUCAAAAJkwcFQQZJQAGGSgBcwF5FQAWBBZEFkQmTEkcFQAVABUCAAAAJpABHBUEGSUABhkYAXIVABYGFl4WXiaQAUkcFQAVABUCAAAAJu4BHBUEGSUABhkoAWcBeBUAFgYWYBZgJu4BSRwVABUAFQIAAAAmzgIcFQQZJQAGGTgBbARsaXN0B2VsZW1lbnQVABYGFlAWUCbOAkkcFQAVABUCAAAAFpYDFgQmCBaWAxQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBlcHAAAHAAAHAAAHAAAHAAAAGkBAABQQVIx
+cases:
+  - name: nullable_array_result
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/source.parquet', base64: '${parquet}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (l ARRAY<INT64>) OPTIONS (format = 'PARQUET', uris = ['gs://${bucket}/${run}/${case}/source.parquet'], enable_list_inference = true)
+        observe: {jobComplete: /body/jobComplete, errors: /body/errors}
+      - name: query
+        expectFailure: true
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT l FROM `${project}.${dataset}.t` ORDER BY ARRAY_LENGTH(l) DESC
+        observe: {status: /status, message: /body/error/message, reason: /body/error/errors/0/reason}
+    expect:
+      create: {jobComplete: true}
+      query:
+        status: 400
+        message: Array cannot have a null element; error in writing field l
+        reason: invalidQuery
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/source.parquet'}
