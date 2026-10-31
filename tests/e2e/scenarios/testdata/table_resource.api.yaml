@@ -132,6 +132,16 @@ templates:
           method: DELETE
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
 cases:
+  - name: insert_unknown_view_field
+    template: insert_schema
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        view: {query: SELECT 1 AS x, useLegacySql: false, unknownField: 1}
+    expect:
+      insert:
+        status: 200
+        schema: {fields: [{name: x, type: INTEGER, mode: NULLABLE}]}
   - name: insert_unknown_schema_field
     template: insert_schema
     vars:
