@@ -432,10 +432,14 @@ CREATE TEMP TABLE c (n INT64, label STRING) AS SELECT a * 10, b FROM scalars.t W
 SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM c ORDER BY n))
 => "[{\"n\":10,\"label\":\"x\"},{\"n\":20,\"label\":\"yy\"},{\"n\":30,\"label\":\"あ\"}]"
 
-# BigQuery rejects STRUCT partition keys and DISTINCT set operations over STRUCTs, and supports
-# only DISTINCT for INTERSECT and EXCEPT. These errors also apply without INTERVAL fields.
+# BigQuery rejects STRUCT and ARRAY partition keys and DISTINCT set operations over STRUCTs,
+# and supports only DISTINCT for INTERSECT and EXCEPT. These errors also apply without INTERVAL
+# fields. Partition keys: third_party/bigquery_docs/reference/standard-sql/data-types.md
 SELECT COUNT(*) OVER (PARTITION BY s) FROM UNNEST([STRUCT(1 AS i)]) AS s
 => error: Partitioning by expressions of type STRUCT is unsupported
+
+SELECT COUNT(*) OVER (PARTITION BY a) FROM UNNEST([STRUCT([1, 2] AS a)])
+=> error: Partitioning by expressions of type ARRAY is unsupported
 
 SELECT STRUCT(1 AS i) UNION DISTINCT SELECT STRUCT(2 AS i)
 => error: Type STRUCT is not supported in UNION DISTINCT operation

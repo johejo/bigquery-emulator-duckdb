@@ -72,13 +72,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects ARRAY and STRUCT partition keys, which GoogleSQL accepts"
-  label: "analytic_partitionby_orderby_test:partitionby_array"
-  label: "analytic_partitionby_orderby_test:partitionby_struct"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects INTERVAL * FLOAT64, which GoogleSQL accepts"
   label: "interval_test:multiply_double"
   label: "interval_test:multiply_double_without_nanos_feature"
