@@ -44,6 +44,7 @@ enum class DdlOptionId : uint8_t {
   kStrictMode,
   kFormat,
   kUris,
+  kEnableListInference,
 };
 std::string_view DdlOptionContextName(DdlOptionContext context);
 std::string_view DdlOptionName(DdlOptionId option);

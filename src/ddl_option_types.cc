@@ -48,10 +48,12 @@ constexpr auto kNames = std::to_array<std::pair<I, std::string_view>>({
     {I::kStrictMode, "strict_mode"},
     {I::kFormat, "format"},
     {I::kUris, "uris"},
+    {I::kEnableListInference, "enable_list_inference"},
 });
 constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kCreateExternalTable, .name = I::kFormat, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kUris, .type = kStrings},
+    {.context = C::kCreateExternalTable, .name = I::kEnableListInference, .type = kBool},
     {.context = C::kCreateExternalTable, .name = I::kDescription, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kExpirationTimestamp, .type = kTimestamp},
     {.context = C::kCreateTable, .name = I::kDescription, .type = kString},

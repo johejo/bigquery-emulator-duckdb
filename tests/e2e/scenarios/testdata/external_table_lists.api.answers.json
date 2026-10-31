@@ -1,0 +1,1215 @@
+{
+  "version": 1,
+  "cases": {
+    "api_explicit_nullable_elements": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/api_explicit_nullable_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/api_explicit_nullable_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"l\":[5,null]}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"l\":[]}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "api_false": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": false
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/api_false/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "NULLABLE",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": false
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/api_false/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "NULLABLE",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "api_nullable_elements": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/api_nullable_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/api_nullable_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":[]}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":[5,null]}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_default": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "jobComplete": true,
+          "status": 200
+        },
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_6j3o3ew4bilgadbalh2ee2d6y4_ddl_default.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_default/source.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_default/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "NULLABLE",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "options": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_default/source.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_explicit_nullable_elements": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "jobComplete": true,
+          "status": 200
+        },
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_6j3o3ew4bilgadbalh2ee2d6y4_ddl_explicit_nullable_elements.t`\nOPTIONS(\n  enable_list_inference=true,\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_explicit_nullable_elements/source.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_explicit_nullable_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "options": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "enable_list_inference"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_explicit_nullable_elements/source.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"l\":[5,null]}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"l\":[]}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_false": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "jobComplete": true,
+          "status": 200
+        },
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_6j3o3ew4bilgadbalh2ee2d6y4_ddl_false.t`\nOPTIONS(\n  enable_list_inference=false,\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_false/source.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "parquetOptions": {
+              "enableListInference": false
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_false/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "NULLABLE",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "options": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "enable_list_inference"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_false/source.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_null_option": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "jobComplete": true,
+          "status": 200
+        },
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_6j3o3ew4bilgadbalh2ee2d6y4_ddl_null_option.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_null_option/source.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_null_option/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "REQUIRED",
+                        "name": "element",
+                        "type": "INTEGER"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "list",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "l",
+                "type": "RECORD"
+              }
+            ]
+          }
+        },
+        "options": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_null_option/source.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":null},\"l\":{\"list\":[{\"element\":2}]}}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_nullable_elements": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "jobComplete": true,
+          "status": 200
+        },
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_6j3o3ew4bilgadbalh2ee2d6y4_ddl_nullable_elements.t`\nOPTIONS(\n  enable_list_inference=true,\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_nullable_elements/source.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_nullable_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "r",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "g",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "options": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "enable_list_inference"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_nullable_elements/source.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":[]}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":[5,null]}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ddl_required_elements": {
+      "project": "johejo-sandbox",
+      "run": "6j3o3ew4bilgadbalh2ee2d6y4",
+      "steps": {
+        "create": {
+          "jobComplete": true,
+          "status": 200
+        },
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_6j3o3ew4bilgadbalh2ee2d6y4_ddl_required_elements.t`\nOPTIONS(\n  enable_list_inference=true,\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_required_elements/source.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "parquetOptions": {
+              "enableListInference": true
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_required_elements/source.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "x",
+                    "type": "INTEGER"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "l",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "options": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "enable_list_inference"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/6j3o3ew4bilgadbalh2ee2d6y4/ddl_required_elements/source.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"s\":{\"x\":1,\"y\":null},\"l\":[2]}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
