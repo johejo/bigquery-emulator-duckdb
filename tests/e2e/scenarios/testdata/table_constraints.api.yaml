@@ -811,3 +811,38 @@ cases:
       fixture: {}
       completed_query: {}
       table: {}
+  - name: missing_primary_key_column
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            # The recorded query put c at [1:114]. Keep it on its own line so the
+            # location does not depend on the project or generated dataset's length.
+            query: |-
+              CREATE TABLE `${project}.${dataset}.t` (a INT64, PRIMARY KEY (
+              c) NOT ENFORCED)
+            useLegacySql: false
+            location: US
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      statement:
+        status: 400
+        reason: invalidQuery
+        message: >-
+          Unsupported primary key column c either does not exist or is a pseudocolumn at [2:1]

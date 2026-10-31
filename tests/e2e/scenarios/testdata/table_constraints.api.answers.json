@@ -1,6 +1,34 @@
 {
   "version": 1,
   "cases": {
+    "missing_primary_key_column": {
+      "project": "johejo-sandbox",
+      "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
+      "steps": {
+        "fixture": {},
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Unsupported primary key column c either does not exist or is a pseudocolumn at [1:114]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Unsupported primary key column c either does not exist or is a pseudocolumn at [1:114]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
     "added_primary_key_column_case": {
       "project": "johejo-sandbox",
       "run": "ahjpbnimu3gaa5n7mq3w4pvcah",
