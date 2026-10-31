@@ -56,7 +56,7 @@ does not.
 | ARRAY arguments of aggregate functions with DISTINCT | [analyzer.cc](../src/analyzer.cc) `CheckDistinctArguments` | Rejects | [Groupable types](../third_party/bigquery_docs/reference/standard-sql/data-types.md): ARRAY only in GROUP BY and SELECT DISTINCT |
 | STRUCT columns in DISTINCT set operations | [scan.cc](../src/translator/scan.cc) `SetOperationScan` | Accepts | Groupable types, as above |
 | ARRAY columns in DISTINCT set operations | [scan.cc](../src/translator/scan.cc) `SetOperationScan` | Rejects | Groupable types, as above |
-| STRUCT and ARRAY in a window's PARTITION BY | [aggregate.cc](../src/translator/aggregate.cc) | Rejects | Groupable types, as above |
+| STRUCT and ARRAY in a window's PARTITION BY | [aggregate.cc](../src/translator/aggregate.cc) | Accepts, except keys containing INTERVAL or graph values | Groupable types, as above |
 | Type parameters in CAST | [analyzer.cc](../src/analyzer.cc) `CheckCastTypeParameters` | Rejects | [Parameterized types](../third_party/bigquery_docs/reference/standard-sql/data-types.md) only for columns and script variables |
 | INTERVAL * FLOAT64 | `$MULTIPLY` in [functions_template.cc](../src/translator/functions_template.cc) | Rejects | [Multiplication](../third_party/bigquery_docs/reference/standard-sql/interval_functions.md) by an integer |
 | HAVING modifiers and null-respecting ARRAY_AGG in PIVOT | Not located | Rejects | [PIVOT](../third_party/bigquery_docs/reference/standard-sql/query-syntax.md) takes only aggregates that ignore NULL inputs |

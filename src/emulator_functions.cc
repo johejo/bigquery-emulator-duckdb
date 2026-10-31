@@ -64,6 +64,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
       options.timestamp_precision,
       function_catalog::QueryRestrictions{
           .intersect_except_distinct_only = options.intersect_except_distinct_only,
+          .scalar_window_partition_keys_only = options.scalar_window_partition_keys_only,
           .distinct_set_operations_without_structs =
               options.distinct_set_operations_without_structs,
           .arrays_without_null_elements = options.arrays_without_null_elements,

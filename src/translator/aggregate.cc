@@ -355,7 +355,8 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
       if (HasGraph(ref->type())) {
         return Unsupported(scope, "PARTITION BY with graph values");
       }
-      if (ref->type()->IsStruct() || ref->type()->IsArray()) {
+      if (scope.context.functions.restrictions().scalar_window_partition_keys_only &&
+          (ref->type()->IsStruct() || ref->type()->IsArray())) {
         throw std::invalid_argument(std::string("Partitioning by expressions of type ") +
                                     (ref->type()->IsStruct() ? "STRUCT" : "ARRAY") +
                                     " is unsupported");
