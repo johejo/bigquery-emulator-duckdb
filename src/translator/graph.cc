@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/strings.h"
@@ -217,10 +219,9 @@ std::optional<std::string> CreatePropertyGraph(
   for (const bool edge : {false, true}) {
     for (const auto& element : edge ? create.edge_table_list() : create.node_table_list()) {
       if (!element->input_scan()->Is<googlesql::ResolvedTableScan>() ||
-          element->label_name_list_size() != 1 || element->dynamic_label() != nullptr ||
+          element->label_name_list().empty() || element->dynamic_label() != nullptr ||
           element->dynamic_properties() != nullptr) {
-        return Unsupported(
-            scope, "graph element tables with views, multiple labels or dynamic properties");
+        return Unsupported(scope, "graph element tables with views or dynamic properties");
       }
       const auto& table = *element->input_scan()->GetAs<googlesql::ResolvedTableScan>();
       if (table.for_system_time_expr() != nullptr || !table.hint_list().empty()) {
@@ -269,7 +270,7 @@ std::optional<std::string> CreatePropertyGraph(
                                 QuoteIdentifier(ref->node_table_identifier()), *native_node_keys);
         }
       }
-      std::vector<std::string> properties;
+      std::map<std::string, std::string> properties;
       std::vector<std::string> native_properties;
       for (const auto& property : element->property_definition_list()) {
         const auto column = Key(*property->expr(), table, false);
@@ -280,20 +281,32 @@ std::optional<std::string> CreatePropertyGraph(
             property->expr()->type_annotation_map() != nullptr) {
           return Unsupported(scope, "computed properties, measures or property options");
         }
-        properties.push_back(*column + " AS " +
-                             googlesql::ToIdentifierLiteral(property->property_declaration_name()));
+        properties.emplace(
+            absl::AsciiStrToLower(property->property_declaration_name()),
+            *column + " AS " +
+                googlesql::ToIdentifierLiteral(property->property_declaration_name()));
         native_properties.push_back(*native_column + " AS " +
                                     QuoteIdentifier(property->property_declaration_name()));
       }
-      const std::string label = element->label_name_list(0);
-      sql += std::format(
-          " LABEL {}{}", googlesql::ToIdentifierLiteral(label),
-          properties.empty() ? " NO PROPERTIES" : " PROPERTIES (" + Join(properties, ", ") + ")");
-      native +=
-          std::format("{} LABEL {}",
-                      properties.empty() ? " NO PROPERTIES"
-                                         : " PROPERTIES (" + Join(native_properties, ", ") + ")",
-                      QuoteIdentifier(label));
+      for (const auto& name : element->label_name_list()) {
+        const auto label = std::ranges::find_if(create.label_list(), [&](const auto& candidate) {
+          return absl::EqualsIgnoreCase(candidate->name(), name);
+        });
+        std::vector<std::string> exposed;
+        std::ranges::transform(
+            (*label)->property_declaration_name_list(), std::back_inserter(exposed),
+            [&](const auto& property) { return properties.at(absl::AsciiStrToLower(property)); });
+        sql += std::format(
+            " LABEL {}{}", googlesql::ToIdentifierLiteral(name),
+            exposed.empty() ? " NO PROPERTIES" : " PROPERTIES (" + Join(exposed, ", ") + ")");
+      }
+      // DuckPGQ only registers the backing tables; matches use the saved GoogleSQL
+      // definition above, including every label and its own exposed property set.
+      native += std::format("{} LABEL {}",
+                            native_properties.empty()
+                                ? " NO PROPERTIES"
+                                : " PROPERTIES (" + Join(native_properties, ", ") + ")",
+                            QuoteIdentifier(element->label_name_list(0)));
       (edge ? sql_edges : sql_nodes).push_back(sql);
       (edge ? native_edges : native_nodes).push_back(native);
     }
@@ -318,7 +331,7 @@ std::optional<Relation> FlatGraphPath(
   // Each branch keeps the resolver's common property set and the original table identity.
   size_t split = input.size();
   for (size_t i = 0; i < input.size(); ++i) {
-    if (input.at(i)->target_element_table_list_size() > 1) {
+    if (input.at(i)->target_element_table_list_size() != 1) {
       split = i;
       if (input.at(i)->Is<googlesql::ResolvedGraphEdgeScan>()) {
         break;
@@ -331,6 +344,25 @@ std::optional<Relation> FlatGraphPath(
       return Unsupported(scope, "graph element hints or columns");
     }
     auto candidates = element.target_element_table_list();
+    const bool empty = candidates.empty();
+    if (empty) {
+      // An unsatisfiable static label expression still needs a typed relation.
+      // Borrow a backing table only to build its shape, then discard all rows.
+      if (element.Is<googlesql::ResolvedGraphNodeScan>()) {
+        absl::flat_hash_set<const googlesql::GraphNodeTable*> tables;
+        if (!scope.property_graph->GetNodeTables(tables).ok() || tables.empty()) {
+          return Unsupported(scope, "graph patterns without node tables");
+        }
+        candidates.push_back(*tables.begin());
+      } else {
+        absl::flat_hash_set<const googlesql::GraphEdgeTable*> tables;
+        if (!scope.property_graph->GetEdgeTables(tables).ok() || tables.empty()) {
+          return Unsupported(scope, "graph patterns without edge tables");
+        }
+        candidates.push_back(*tables.begin());
+      }
+    }
+    const auto* fallback = candidates.front();
     if (element.Is<googlesql::ResolvedGraphNodeScan>()) {
       for (const int offset : {-1, 1}) {
         const auto adjacent = static_cast<int>(split) + offset;
@@ -338,6 +370,9 @@ std::optional<Relation> FlatGraphPath(
           continue;
         }
         const auto& edge = *input.at(adjacent)->GetAs<googlesql::ResolvedGraphEdgeScan>();
+        if (edge.target_element_table_list().empty()) {
+          continue;
+        }
         const auto* table = edge.target_element_table_list(0)->AsEdgeTable();
         const auto* source = table->GetSourceNodeTable()->GetReferencedNodeTable();
         const auto* destination = table->GetDestNodeTable()->GetReferencedNodeTable();
@@ -354,7 +389,7 @@ std::optional<Relation> FlatGraphPath(
       // Retain one impossible branch to produce a correctly typed empty relation.
       // EndpointMatch emits FALSE for its incompatible table reference.
       if (candidates.empty()) {
-        candidates.push_back(element.target_element_table_list(0));
+        candidates.push_back(fallback);
       }
     }
     Relation result;
@@ -385,6 +420,9 @@ std::optional<Relation> FlatGraphPath(
       branches.push_back("(" + branch->sql + ")");
     }
     result.sql = Join(branches, " UNION ALL ");
+    if (empty) {
+      result.sql = "SELECT q.*" + result.From() + " WHERE FALSE";
+    }
     // Apply the replaced scan's filter after its properties have been projected,
     // including typed NULLs for properties absent from the selected table.
     if (element.filter_expr() != nullptr) {
@@ -411,7 +449,7 @@ std::optional<Relation> FlatGraphPath(
     const auto& element = *elements.at(index);
     if (element.target_element_table_list_size() != 1 || !element.hint_list().empty() ||
         element.column_list_size() != 1) {
-      return Unsupported(scope, "graph patterns without a single table and label");
+      return Unsupported(scope, "graph patterns without a single table");
     }
     const auto& column = element.column_list(0);
     const std::string variable = ElementAlias(element);
@@ -451,10 +489,13 @@ std::optional<Relation> FlatGraphPath(
       }
     }
     absl::flat_hash_set<const googlesql::GraphElementLabel*> labels;
-    if (!element_table->GetLabels(labels).ok() || labels.size() != 1) {
-      return Unsupported(scope, "graph element tables without one static label");
+    if (!element_table->GetLabels(labels).ok() || labels.empty()) {
+      return Unsupported(scope, "graph element tables without static labels");
     }
-    const auto label = (*labels.begin())->Name();
+    std::vector<std::string> label_names;
+    std::ranges::transform(labels, std::back_inserter(label_names),
+                           [](const auto* label) { return QuoteLiteral(label->Name()); });
+    std::ranges::sort(label_names);
     std::vector<std::string> fields;
     for (const auto& property : column.type()->AsGraphElement()->property_types()) {
       const std::string name = QuoteIdentifier(property.name);
@@ -490,7 +531,7 @@ std::optional<Relation> FlatGraphPath(
       return std::format(
           "struct_pack(\"$id\" := {}{}, \"$labels\" := [{}], "
           "\"$properties\" := struct_pack({}))",
-          identity, endpoints, QuoteLiteral(label), Join(properties, ", "));
+          identity, endpoints, Join(label_names, ", "), Join(properties, ", "));
     };
     projections.push_back(pack(fields) + " AS " + ColumnName(column.column_id()));
     const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();

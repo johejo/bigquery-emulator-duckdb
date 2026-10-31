@@ -1,0 +1,60 @@
+# Static labels belong to elements, not separate copies of those elements. AND, OR,
+# NOT and wildcard label expressions follow the documented label-expression semantics.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+# The rows are the existing Person, Account, Knows and Owns fixture with extra labels.
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person|Entity) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:person&nAMED) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Entity&!Person) RETURN n.id AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person&Account) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:%) RETURN COUNT(DISTINCT n) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Named WHERE n.name = 'Alex') RETURN n.name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person|Account WHERE n.id = 7) RETURN n.name AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person|Account WHERE n.id = 1) RETURN n.kind AS result)
+=> null
+
+# LABELS returns every label with its original case. Sort explicitly: array order
+# is not specified. Properties remain available through named path elements.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
+SELECT ARRAY(SELECT label FROM UNNEST(labels) AS label ORDER BY label) FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Named WHERE n.name = 'Alex') RETURN LABELS(n) AS labels)
+=> [{"v":"Entity"},{"v":"Named"},{"v":"Person"}]
+SELECT ARRAY(SELECT label FROM UNNEST(labels) AS label ORDER BY label) FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH ()-[e:Knows WHERE e.id = 10]->() RETURN LABELS(e) AS labels)
+=> [{"v":"Knows"},{"v":"Relation"}]
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH p = (n:Named WHERE n.name = 'Alex') RETURN PATH_FIRST(p).name AS result)
+=> "Alex"
+SELECT ARRAY(SELECT label FROM UNNEST(labels) AS label ORDER BY label) FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH p = (n:Named WHERE n.name = 'Alex') RETURN LABELS(PATH_LAST(p)) AS labels)
+=> [{"v":"Entity"},{"v":"Named"},{"v":"Person"}]
+
+# Edges also carry overlapping labels, including a shared label with no properties.
+# Any-direction matches deduplicate the self-loop, not distinct parallel edges.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH ()-[e:Knows|Relation]->() RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH ()-[e:Knows&Relation]->() RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH ()-[e:Knows&Owns]->() RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person) OPTIONAL MATCH (n)-[e:Knows&Owns]->() RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH ()-[e:Relation&!Knows]->() RETURN e.account_id AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH ()-[e:Knows|Relation]-() RETURN COUNT(*) AS result)
+=> "9"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person), (n:Named) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (a)-[e:Knows]->(b), (a)-[e:Relation]->(b) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (n:Person&Named WHERE n.id = 3) OPTIONAL MATCH (n)-[e:Relation]->() RETURN COUNT(e) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.MultiLabels MATCH (a:Person)-[e:Knows&Relation WHERE e.id = 12]->{1,2}(b:Named) RETURN MAX(ARRAY_LENGTH(e)) AS result)
+=> "2"
+GRAPH scalar_graph.MultiLabels MATCH (n:Entity&Named) RETURN COUNT(*) AS result
+=> "3"

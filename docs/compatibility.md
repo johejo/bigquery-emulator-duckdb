@@ -431,7 +431,7 @@ Graph DDL rejects:
 - Keys of type FLOAT64, BIGNUMERIC, INTERVAL, RANGE, GEOGRAPHY, JSON, ARRAY or STRUCT, and keys
   other than columns.
 - Computed properties, measures and property options.
-- More than one label per element table, views as element tables, and graph options.
+- Views as element tables and graph options.
 - `OR REPLACE` and `IF NOT EXISTS` in `CREATE PROPERTY GRAPH`, and `IF EXISTS` in
   `DROP PROPERTY GRAPH`.
 - Edges whose endpoint nodes do not exist when the graph is created.
