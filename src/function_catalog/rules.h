@@ -184,6 +184,9 @@ struct BasicAggregateRule : AggregateOptions {
   // A finish containing a subquery needs its aggregate result in a preceding SELECT.
   // DuckDB cannot bind constant aggregates or correlated windows inside that subquery.
   bool finish_after_scan = false;
+  // An analytic call computes one result array per whole partition, with one element per
+  // input row. The translator groups once, then restores rows by internal identity.
+  bool partition_results = false;
   // Reject ORDER BY of the first argument alone, or any ORDER BY with DISTINCT, with this
   // error. Other order keys, including ones combined with the first argument, remain allowed.
   std::string_view order_by_argument_error = {};

@@ -23,6 +23,9 @@ struct BoundingBox {
 // SQL NULL arguments are handled by the caller. Optional results express NULL produced
 // by the function itself, for example the distance to an empty geography. Functions that query
 // their arguments' shapes as they are, such as the distances, take an IndexedGeography.
+// One cluster ID per input row; noise, including empty shapes, has no ID.
+absl::StatusOr<std::vector<std::optional<int64_t>>> ClusterDBSCAN(
+    const std::vector<IndexedGeography>& geographies, double epsilon, int64_t minimum_geographies);
 absl::StatusOr<Geography> GeogPoint(double longitude, double latitude);
 absl::StatusOr<std::optional<double>> Azimuth(const Geography& a, const Geography& b);
 absl::StatusOr<std::optional<double>> Angle(const Geography& a, const Geography& b,
