@@ -72,18 +72,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects STRUCT columns in DISTINCT set operations, which GoogleSQL accepts"
-  label: "except_intersect_queries_test:except_distinct_datatype_struct"
-  label: "except_intersect_queries_test:except_distinct_struct_subquery"
-  label: "except_intersect_queries_test:intersect_distinct_datatype_struct"
-  label: "except_intersect_queries_test:intersect_distinct_struct_subquery"
-  label: "struct_queries_test:struct_union_distinct"
-  label: "struct_queries_test:struct_union_distinct_null"
-  label: "value_table_queries_test:value_table_struct_union"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects ARRAY and STRUCT partition keys, which GoogleSQL accepts"
   label: "analytic_partitionby_orderby_test:partitionby_array"
   label: "analytic_partitionby_orderby_test:partitionby_struct"

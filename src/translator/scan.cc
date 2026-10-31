@@ -421,7 +421,10 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   bool keys = false;
   std::vector<Collation> collations;
   for (const auto& column : set.column_list()) {
-    if (distinct && (column.type()->IsStruct() || column.type()->IsArray())) {
+    if (distinct &&
+        (column.type()->IsArray() ||
+         (column.type()->IsStruct() &&
+          scope.context.functions.restrictions().distinct_set_operations_without_structs))) {
       const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT
                                    ? "UNION DISTINCT"
                                    : "INTERSECT DISTINCT or EXCEPT DISTINCT";
@@ -430,7 +433,7 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
                                   " is not supported in " + name + " operation");
     }
     collations.push_back(ColumnCollation(column.type_annotation_map()));
-    keys = keys || column.type()->IsInterval() || !collations.back().empty();
+    keys = keys || HasInterval(column.type()) || !collations.back().empty();
     names.push_back(ColumnName(column.column_id()));
     result.columns.emplace(column.column_id(), "q." + names.back());
   }
@@ -455,9 +458,8 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   }
   // Each distinct row is the first input row of its keys, as BigQuery returns it.
   const auto key = [&](int i, const std::string& sql) {
-    return set.column_list(i).type()->IsInterval()
-               ? IntervalKey(sql)
-               : CollationKey(sql, collations.at(i), set.column_list(i).type());
+    const auto* type = set.column_list(i).type();
+    return CollationKey(IntervalKey(type, sql), collations.at(i), type);
   };
   std::vector<std::string> compared;
   std::vector<std::string> keyed;

@@ -175,6 +175,30 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
       stdin: *semantics
     test: current.exit_code == 0 && current.stdout == '{"chr":"1","bounds":"unexpanded"}' + "\n"
+  # Mode selection keeps BigQuery's STRUCT set-operation restriction out of GoogleSQL.
+  # INTERVAL equality follows the compliance cases cited in scalars/interval.txt; NULL STRUCTs
+  # remain distinct from non-NULL STRUCTs whose fields are NULL.
+  semantics_struct_sets_googlesql:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: &struct_sets |
+        WITH a AS (
+          SELECT s FROM UNNEST([CAST(NULL AS STRUCT<i INTERVAL>),
+                                STRUCT<i INTERVAL>(NULL),
+                                STRUCT(INTERVAL 1 MONTH AS i),
+                                STRUCT(INTERVAL 30 DAY AS i)]) AS s),
+        b AS (SELECT STRUCT(INTERVAL 30 DAY AS i) AS s)
+        SELECT (SELECT COUNT(*) FROM (SELECT s FROM a UNION DISTINCT SELECT s FROM b)) AS u,
+               (SELECT COUNT(*) FROM (SELECT s FROM a INTERSECT DISTINCT SELECT s FROM b)) AS i,
+               (SELECT COUNT(*) FROM (SELECT s FROM a EXCEPT DISTINCT SELECT s FROM b)) AS e;
+    test: current.exit_code == 0 && current.stdout == '{"u":"3","i":"1","e":"2"}' + "\n"
+  semantics_struct_sets_bigquery:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
+      stdin: *struct_sets
+    test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "Type STRUCT is not supported"
   # GoogleSQL's nanosecond precision spans the full TIMESTAMP range, not TIMESTAMP_NS's
   # 1677–2262 interval. These epoch values are -1ns and +1ns.
   semantics_nanosecond_values:
