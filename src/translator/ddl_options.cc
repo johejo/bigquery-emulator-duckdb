@@ -387,6 +387,12 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    if (decoded && external && decoded->id == DdlOptionId::kEnableListInference) {
+      if (!decoded->value.is_null()) {
+        metadata.external_data->enable_list_inference = decoded->value.bool_value();
+      }
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kUris) {
       if (decoded->value.is_null()) {
         return Unsupported(scope, "NULL external table uris");

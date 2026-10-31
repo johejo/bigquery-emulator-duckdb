@@ -80,7 +80,12 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
   if (external) {
     std::vector<std::string> uris;
     std::ranges::transform(external->uris, std::back_inserter(uris), StringOptionValue);
-    ddl += "\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
+    ddl += "\nOPTIONS(\n";
+    if (external->enable_list_inference.has_value()) {
+      ddl += std::string("  enable_list_inference=") +
+             (*external->enable_list_inference ? "true" : "false") + ",\n";
+    }
+    ddl += "  format=\"PARQUET\",\n  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
   }
   return ddl + ";";
 }
@@ -289,6 +294,13 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
         std::vector<std::string> uris;
         std::ranges::transform(metadata->external_data->uris, std::back_inserter(uris),
                                StringOptionValue);
+        if (metadata->external_data->enable_list_inference.has_value()) {
+          options.push_back({
+              .name = "enable_list_inference",
+              .type = "BOOL",
+              .value = *metadata->external_data->enable_list_inference ? "true" : "false",
+          });
+        }
         options.push_back({.name = "format", .type = "STRING", .value = "\"PARQUET\""});
         options.push_back({
             .name = "uris",

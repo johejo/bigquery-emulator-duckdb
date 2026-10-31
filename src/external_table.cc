@@ -175,10 +175,10 @@ std::string Folded(std::string_view name) {
   return folded;
 }
 
-// The field BigQuery detects for `column` of `metadata`, without list inference: a group is a
-// RECORD, a MAP the RECORD of its repeated key_value group, a repeated field REPEATED, and another
-// field REQUIRED or NULLABLE as the file declares it. None for a field of a type or name the
-// emulator does not detect.
+// The field BigQuery detects for `column` of `metadata`: LIST inference is already applied by
+// ParquetColumns. A group is a RECORD, a MAP the RECORD of its repeated key_value group, a repeated
+// field REPEATED, and another field REQUIRED or NULLABLE as the file declares it. None for a field
+// of a type or name the emulator does not detect.
 std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const ParquetColumn& column) {
   if (!StandardColumnName(column.name)) {
     return std::nullopt;
@@ -268,7 +268,8 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
   // BigQuery takes the schema of the alphabetically last file, by its whole path.
   const FileSource& last = *std::ranges::max_element(sources, {}, &FileSource::uri);
   const ThriftValue metadata = SourceMetadata(last);
-  const ParquetColumn columns = ParquetColumns(metadata, false);
+  const ParquetColumn columns =
+      ParquetColumns(metadata, definition.enable_list_inference.value_or(false));
   std::vector<FieldSchema> schema;
   std::set<std::string> names;
   for (const ParquetColumn& column : columns.children) {
@@ -297,7 +298,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     std::vector<std::string> reads;
     for (const auto& source : sources) {
       const ThriftValue metadata = SourceMetadata(source);
-      const auto columns = ParquetColumns(metadata, false);
+      const auto columns =
+          ParquetColumns(metadata, definition.enable_list_inference.value_or(false));
       // Do not inherit load's coercions: a source column must have the type BigQuery would
       // detect for it, so that no incompatible column is silently cast to the declared type.
       for (const auto& field : schema) {
@@ -318,8 +320,12 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       }
       // Each source is read with its own columns, which put back what DuckDB unwraps.
       reads.push_back("SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-                      FileReadQuery(ParquetReadOptions{.allow_missing_columns = true}, {source},
-                                    read_schema, columns) +
+                      FileReadQuery(
+                          ParquetReadOptions{
+                              .allow_missing_columns = true,
+                              .allow_null_list_elements = true,
+                          },
+                          {source}, read_schema, columns) +
                       ") AS source");
     }
     if (reads.empty()) {

@@ -86,6 +86,7 @@ const ResourceMask& TableFields() {
                           "externalDataConfiguration.sourceFormat",
                           "externalDataConfiguration.sourceUris",
                           "externalDataConfiguration.autodetect",
+                          "externalDataConfiguration.parquetOptions.enableListInference",
                           "externalDataConfiguration.schema.fields.name",
                           "externalDataConfiguration.schema.fields.type",
                           "externalDataConfiguration.schema.fields.mode",

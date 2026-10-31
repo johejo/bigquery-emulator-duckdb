@@ -421,6 +421,10 @@ json TableMetadata::ToJson() const {
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
     }
+    if (external_data->enable_list_inference.has_value()) {
+      fields["externalDataConfiguration"]["parquetOptions"]["enableListInference"] =
+          *external_data->enable_list_inference;
+    }
   }
   if (creation_time != 0) {
     fields["creationTime"] = std::to_string(creation_time);
@@ -556,7 +560,7 @@ TableMetadata TableMetadataFromJson(const json& table) {
     }
     for (const auto& [name, value] : config.items()) {
       if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
-          name != "autodetect") {
+          name != "autodetect" && name != "parquetOptions") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
@@ -568,6 +572,22 @@ TableMetadata TableMetadataFromJson(const json& table) {
       throw ApiError::Invalid("externalDataConfiguration.sourceUris must not be empty");
     }
     metadata.external_data.emplace();
+    if (config.contains("parquetOptions")) {
+      const auto& options = config["parquetOptions"];
+      if (!options.is_object()) {
+        throw ApiError::Invalid("externalDataConfiguration.parquetOptions must be an object");
+      }
+      for (const auto& [name, value] : options.items()) {
+        if (name != "enableListInference") {
+          throw ApiError::Unsupported("externalDataConfiguration.parquetOptions." + name);
+        }
+        if (!value.is_boolean()) {
+          throw ApiError::Invalid(
+              "externalDataConfiguration.parquetOptions.enableListInference must be a boolean");
+        }
+        metadata.external_data->enable_list_inference = value.get<bool>();
+      }
+    }
     if (config.contains("autodetect")) {
       if (!config["autodetect"].is_boolean()) {
         throw ApiError::Invalid("externalDataConfiguration.autodetect must be a boolean");

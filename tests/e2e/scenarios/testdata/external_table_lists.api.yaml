@@ -1,0 +1,173 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run 6j3o3ew4bilgadbalh2ee2d6y4;
+# the answers sidecar retains the observations. External reads preserve NULL LIST elements,
+# unlike loads, and a NULL enable_list_inference option is omitted from metadata.
+description: >-
+  LIST inference for Parquet external tables: nullable elements, schema modes, option metadata,
+  and explicit schemas, independently recorded on BigQuery.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  # Same fixture as external_table_nested.api.yaml: rows include a NULL LIST and [5, NULL].
+  # Schema: optional s{x,y}, repeated r, repeated g{x}, optional l(LIST){repeated list{optional element}}.
+  nested: UEFSMRUAFR4VHiwVBBUAFQYVBhwAAAADAAAAAwIAAQAAAAAAAAAVABUeFR4sFQQVABUGFQYcAAAAAwAAAAMCAAIAAAAAAAAAFQAVOBU4LBUGFQAVBhUGHAAAAAIAAAADAgIAAAADAwEAAAAAAAAAAgAAAAAAAAAVABU6FTosFQYVABUGFQYcAAAAAgAAAAMCAwAAAAMKAAMAAAAAAAAABAAAAAAAAAAVABUqFSosFQYVABUGFQYcAAAAAgAAAAMCAwAAAAMLAAUAAAAAAAAAFQQZrEgGc2NoZW1hFQgANQIYAXMVBAAVBCUCGAF4ABUEJQIYAXkAFQQlBBgBcgA1BBgBZxUCABUEJQIYAXgANQIYAWwVAhUGTDwAAAA1BBgEbGlzdBUCABUEJQIYB2VsZW1lbnQAFgQZHBlcJggcFQQZJQAGGSgBcwF4FQAWBBZEFkQmCEkcFQAVABUCAAAAJkwcFQQZJQAGGSgBcwF5FQAWBBZEFkQmTEkcFQAVABUCAAAAJpABHBUEGSUABhkYAXIVABYGFl4WXiaQAUkcFQAVABUCAAAAJu4BHBUEGSUABhkoAWcBeBUAFgYWYBZgJu4BSRwVABUAFQIAAAAmzgIcFQQZJQAGGTgBbARsaXN0B2VsZW1lbnQVABYGFlAWUCbOAkkcFQAVABUCAAAAFpYDFgQmCBaWAxQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBlcHAAAHAAAHAAAHAAAHAAAAGkBAABQQVIx
+  # REQUIRED LIST of REQUIRED elements, and a REQUIRED STRUCT with a REQUIRED leaf.
+  required: UEFSMRUAFRAVECwVAhUAFQYVBhwAAAABAAAAAAAAABUAFQwVDCwVAhUAFQYVBhwAAAACAAAAAgAVABUoFSgsFQIVABUGFQYcAAAAAgAAAAIAAgAAAAIBAgAAAAAAAAAVBBl8SAZzY2hlbWEVBAA1ABgBcxUEABUEJQAYAXgAFQQlAhgBeQA1ABgBbBUCFQZMPAAAADUEGARsaXN0FQIAFQQlABgHZWxlbWVudAAWAhkcGTwmCBwVBBklAAYZKAFzAXgVABYCFjYWNiYISRwVABUAFQIAAAAmPhwVBBklAAYZKAFzAXkVABYCFjIWMiY+SRwVABUAFQIAAAAmcBwVBBklAAYZOAFsBGxpc3QHZWxlbWVudBUAFgIWThZOJnBJHBUAFQAVAgAAABa2ARYCJggWtgEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZPBwAABwAABwAAAD/AAAAUEFSMQ==
+templates:
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/source.parquet', base64: '${contents}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${columns} OPTIONS (format = 'PARQUET', uris = ['${prefix}/source.parquet']${option})
+        observe: {status: /status, errors: /body/errors, jobComplete: /body/jobComplete}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {schema: /body/schema, external: /body/externalDataConfiguration}
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe: {rows: /body/rows, errors: /body/errors, jobComplete: /body/jobComplete}
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe: {rows: /body/rows, errors: /body/errors, jobComplete: /body/jobComplete}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t) AS value FROM `${project}.${dataset}.t` t ORDER BY value
+        observe: {rows: /body/rows, schema: /body/schema, errors: /body/errors, jobComplete: /body/jobComplete}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/source.parquet'}
+  api:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/source.parquet', base64: '${contents}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${table}'
+        observe: {schema: /body/schema, external: /body/externalDataConfiguration, status: /status}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {schema: /body/schema, external: /body/externalDataConfiguration}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t) AS value FROM `${project}.${dataset}.t` t ORDER BY value
+        observe: {rows: /body/rows, schema: /body/schema, errors: /body/errors, jobComplete: /body/jobComplete}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/source.parquet'}
+cases:
+  - name: ddl_default
+    template: ddl
+    vars: {contents: '${nested}', columns: '', option: ''}
+    expect: {"create": {"jobComplete": true, "status": 200}, "ddl": {"jobComplete": true, "rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"${prefix}/source.parquet\"]\n);"}]}]}, "get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "NULLABLE", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "NULLABLE", "name": "l", "type": "RECORD"}]}}, "options": {"jobComplete": true, "rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/source.parquet\"]"}]}]}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: ddl_false
+    template: ddl
+    vars: {contents: '${nested}', columns: '', option: ', enable_list_inference = false'}
+    expect: {"create": {"jobComplete": true, "status": 200}, "ddl": {"jobComplete": true, "rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  enable_list_inference=false,\n  format=\"PARQUET\",\n  uris=[\"${prefix}/source.parquet\"]\n);"}]}]}, "get": {"external": {"autodetect": true, "parquetOptions": {"enableListInference": false}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "NULLABLE", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "NULLABLE", "name": "l", "type": "RECORD"}]}}, "options": {"jobComplete": true, "rows": [{"f": [{"v": "enable_list_inference"}, {"v": "BOOL"}, {"v": "false"}]}, {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/source.parquet\"]"}]}]}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: ddl_nullable_elements
+    template: ddl
+    vars: {contents: '${nested}', columns: '', option: ', enable_list_inference = true'}
+    expect: {"create": {"jobComplete": true, "status": 200}, "ddl": {"jobComplete": true, "rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  enable_list_inference=true,\n  format=\"PARQUET\",\n  uris=[\"${prefix}/source.parquet\"]\n);"}]}]}, "get": {"external": {"autodetect": true, "parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}}, "options": {"jobComplete": true, "rows": [{"f": [{"v": "enable_list_inference"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/source.parquet\"]"}]}]}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":[]}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":[5,null]}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: ddl_required_elements
+    template: ddl
+    vars: {contents: '${required}', columns: '', option: ', enable_list_inference = true'}
+    expect: {"create": {"jobComplete": true, "status": 200}, "ddl": {"jobComplete": true, "rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  enable_list_inference=true,\n  format=\"PARQUET\",\n  uris=[\"${prefix}/source.parquet\"]\n);"}]}]}, "get": {"external": {"autodetect": true, "parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "REQUIRED", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}}, "options": {"jobComplete": true, "rows": [{"f": [{"v": "enable_list_inference"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/source.parquet\"]"}]}]}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":{\"x\":1,\"y\":null},\"l\":[2]}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: ddl_explicit_nullable_elements
+    template: ddl
+    vars: {contents: '${nested}', columns: '(l ARRAY<INT64>)', option: ', enable_list_inference = true'}
+    expect: {"create": {"jobComplete": true, "status": 200}, "ddl": {"jobComplete": true, "rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  enable_list_inference=true,\n  format=\"PARQUET\",\n  uris=[\"${prefix}/source.parquet\"]\n);"}]}]}, "get": {"external": {"parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}}, "options": {"jobComplete": true, "rows": [{"f": [{"v": "enable_list_inference"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/source.parquet\"]"}]}]}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"l\":[5,null]}"}]}, {"f": [{"v": "{\"l\":[]}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: ddl_null_option
+    template: ddl
+    vars: {contents: '${required}', columns: '', option: ', enable_list_inference = NULL'}
+    expect: {"create": {"jobComplete": true, "status": 200}, "ddl": {"jobComplete": true, "rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"${prefix}/source.parquet\"]\n);"}]}]}, "get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "REQUIRED", "name": "s", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "REQUIRED", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "REQUIRED", "name": "l", "type": "RECORD"}]}}, "options": {"jobComplete": true, "rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/source.parquet\"]"}]}]}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":{\"x\":1,\"y\":null},\"l\":{\"list\":[{\"element\":2}]}}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: api_nullable_elements
+    template: api
+    vars:
+      contents: '${nested}'
+      table:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/source.parquet']
+          parquetOptions: {enableListInference: true}
+    expect: {"create": {"external": {"parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":[]}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":[5,null]}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: api_false
+    template: api
+    vars:
+      contents: '${nested}'
+      table:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/source.parquet']
+          parquetOptions: {enableListInference: false}
+    expect: {"create": {"external": {"parquetOptions": {"enableListInference": false}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "NULLABLE", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "NULLABLE", "name": "l", "type": "RECORD"}]}, "status": 200}, "get": {"external": {"parquetOptions": {"enableListInference": false}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "INTEGER"}], "mode": "NULLABLE", "name": "s", "type": "RECORD"}, {"mode": "REPEATED", "name": "r", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "g", "type": "RECORD"}, {"fields": [{"fields": [{"mode": "NULLABLE", "name": "element", "type": "INTEGER"}], "mode": "REPEATED", "name": "list", "type": "RECORD"}], "mode": "NULLABLE", "name": "l", "type": "RECORD"}]}}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"s\":null,\"r\":[],\"g\":[],\"l\":null}"}]}, {"f": [{"v": "{\"s\":{\"x\":1,\"y\":2},\"r\":[1,2],\"g\":[{\"x\":3},{\"x\":4}],\"l\":{\"list\":[{\"element\":5},{\"element\":null}]}}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}
+  - name: api_explicit_nullable_elements
+    template: api
+    vars:
+      contents: '${nested}'
+      table:
+        tableReference: {tableId: t}
+        schema: {fields: [{name: l, type: INTEGER, mode: REPEATED}]}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/source.parquet']
+          parquetOptions: {enableListInference: true}
+    expect: {"create": {"external": {"parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"parquetOptions": {"enableListInference": true}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/source.parquet"]}, "schema": {"fields": [{"mode": "REPEATED", "name": "l", "type": "INTEGER"}]}}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "{\"l\":[5,null]}"}]}, {"f": [{"v": "{\"l\":[]}"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "value", "type": "STRING"}]}}}

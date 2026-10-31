@@ -309,7 +309,8 @@
       },
       {
         "name": "enable_list_inference",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false", "NULL"]
       },
       {
         "name": "enable_logical_types",

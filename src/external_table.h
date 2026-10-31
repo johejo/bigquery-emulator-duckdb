@@ -10,10 +10,9 @@
 namespace bigquery_emulator_duckdb {
 
 // The schema BigQuery detects for the Parquet sources of `definition`: the columns of the
-// alphabetically last file, a group as a RECORD and a repeated field as REPEATED, so that a LIST
-// or MAP group is a RECORD of its repeated field, and other fields REQUIRED or NULLABLE as the
-// file declares them. Downloads the sources. Throws ApiError::Unsupported for a column whose type
-// or name is not emulated.
+// alphabetically last file, with LIST inference as configured, a group as a RECORD, a repeated
+// field as REPEATED, and other fields REQUIRED or NULLABLE as the file declares them. Downloads
+// the sources. Throws ApiError::Unsupported for a column whose type or name is not emulated.
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
                                                  GcsClient client);
 

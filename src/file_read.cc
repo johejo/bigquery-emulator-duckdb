@@ -311,18 +311,19 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
 }
 
 // The DuckDB value `sql` of `column` in the shape BigQuery loads it, with each unwrapped STRUCT
-// put back around the field DuckDB reads in its place, a NULL list empty and a null element of a
-// list an error. A lambda takes the name _p and its `depth`. An `element` of a list is a repeated
-// group, which is never NULL.
+// put back around the field DuckDB reads in its place and a NULL list empty. Loads reject NULL
+// LIST elements; external reads preserve them. A lambda takes the name _p and its `depth`.
+// `element` distinguishes list elements from nullable STRUCT fields.
 std::string ParquetShape(const std::string& sql, const ParquetColumn& column, int depth,
-                         bool element) {
+                         bool element, bool allow_null_elements) {
   if (!column.Reshaped()) {
     return sql;
   }
   if (column.kind == ParquetColumn::Kind::kList) {
     const std::string name = "_p" + std::to_string(depth);
-    std::string value = ParquetShape(name, column.children.front(), depth + 1, true);
-    if (column.null_elements) {
+    std::string value =
+        ParquetShape(name, column.children.front(), depth + 1, true, allow_null_elements);
+    if (column.null_elements && !allow_null_elements) {
       value = std::format(
           "CASE WHEN {} IS NULL THEN error({}) ELSE {} END", name,
           QuoteLiteral("Array cannot have a null element; error in writing field " + column.name),
@@ -343,7 +344,7 @@ std::string ParquetShape(const std::string& sql, const ParquetColumn& column, in
       fields.push_back(
           std::format("{} := {}", QuoteIdentifier(child->name),
                       ParquetShape(std::format("struct_extract({}, {})", name, QuoteLiteral(part)),
-                                   *child, depth + 1, false)));
+                                   *child, depth + 1, false, allow_null_elements)));
     }
     return std::format(
         "CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1} := list_transform(map_entries({0}), "
@@ -360,7 +361,7 @@ std::string ParquetShape(const std::string& sql, const ParquetColumn& column, in
         column.unwrapped ? sql
                          : std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name));
     fields.push_back(std::format("{} := {}", QuoteIdentifier(child.name),
-                                 ParquetShape(value, child, depth, false)));
+                                 ParquetShape(value, child, depth, false, allow_null_elements)));
   }
   std::string packed = std::format("struct_pack({})", Join(fields, ", "));
   if (element && column.unwrapped) {
@@ -728,7 +729,11 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     for (const ParquetColumn& column : parquet.children) {
       if (column.Reshaped()) {
         const std::string name = QuoteIdentifier(column.name);
-        shaped.push_back(std::format("{} AS {}", ParquetShape(name, column, 0, false), name));
+        shaped.push_back(std::format(
+            "{} AS {}",
+            ParquetShape(name, column, 0, false,
+                         std::get<ParquetReadOptions>(options).allow_null_list_elements),
+            name));
       }
     }
     if (!shaped.empty()) {

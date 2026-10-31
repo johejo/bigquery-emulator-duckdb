@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "cases": {
+    "nullable_array_result": {
+      "project": "johejo-sandbox",
+      "run": "iructtexigygfohu3llll6h3ax",
+      "steps": {
+        "create": {
+          "jobComplete": true
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Array cannot have a null element; error in writing field l",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Array cannot have a null element; error in writing field l",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}
