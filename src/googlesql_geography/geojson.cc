@@ -3,16 +3,19 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "googlesql/base/status_macros.h"
+#include "googlesql/common/json_parser.h"
 #include "nlohmann/json.hpp"
 #include "s2/r2.h"
 #include "src/googlesql_geography/planar.h"
@@ -228,6 +231,31 @@ absl::StatusOr<json> Parse(std::string_view text) {
       return failed("Parser terminated before end of string", position);
     }
     if (says("invalid number")) {
+      // BigQuery consumes the longest floating-point prefix, including a trailing decimal
+      // point, before diagnosing a bad delimiter. Both JSON parsers instead reject the number
+      // itself. Replace that prefix with a valid number of the same width and let GoogleSQL
+      // diagnose the grammar after it; retain the original text in the error's context.
+      double number = 0;
+      const auto [end, code] =
+          std::from_chars(text.data() + position, text.data() + text.size(), number);
+      if (code == std::errc{} && end < text.data() + text.size()) {
+        std::string syntax = WithoutTrailingCommas(text);
+        std::fill(syntax.begin() + static_cast<std::ptrdiff_t>(position),
+                  syntax.begin() + (end - text.data()), ' ');
+        syntax.at(position) = '0';
+        const absl::Status status = googlesql::JSONParser(syntax).Parse();
+        const std::string_view diagnostic = status.message();
+        constexpr std::string_view kLocation = " at Character ";
+        const size_t location = diagnostic.rfind(kLocation);
+        if (location != std::string_view::npos) {
+          size_t offset = 0;
+          const auto parsed = std::from_chars(diagnostic.data() + location + kLocation.size(),
+                                              diagnostic.data() + diagnostic.size(), offset);
+          if (parsed.ec == std::errc{}) {
+            return failed(diagnostic.substr(0, location), std::min(offset, text.size()));
+          }
+        }
+      }
       return failed("Could not parse number", position);
     }
     if (says("object key")) {

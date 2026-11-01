@@ -33,6 +33,7 @@ cc_library(
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/common:json_parser",
         "@nlohmann_json//:json",
     ],
     linkstatic = True,

@@ -38,6 +38,8 @@ func readQueryCases(t *testing.T, path string) []queryCase {
 	var sql []string
 	start := 0
 	scanner := bufio.NewScanner(file)
+	// Tessellated GeoJSON answers can exceed Scanner's default 64 KiB token limit.
+	scanner.Buffer(nil, 16<<20)
 	for line := 1; scanner.Scan(); line++ {
 		text := scanner.Text()
 		switch {

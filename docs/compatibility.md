@@ -242,7 +242,11 @@ BigQuery loads as NULL.
 ### GEOGRAPHY values
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
-- `ST_ASGEOJSON` is unsupported for shapes that cross the antimeridian or touch a pole.
+- `ST_ASGEOJSON` splits lines and polygons at the antimeridian and closes polygons enclosing
+  a pole along the map boundary. Tessellated coordinates can differ from BigQuery in their
+  last digits; clipped polygon order, ring starts and boundary vertices can also differ, and
+  lines through a pole can have different intermediate vertices. Some polygon cuts touching a
+  pole and degenerate antimeridian cuts are unsupported.
 - `S2_COVERINGCELLIDS` does not support `max_cells` above 2,147,483,647.
 - `SAFE.ST_BUFFER` and `SAFE.ST_BUFFERWITHTOLERANCE` return NULL for `use_spheroid = TRUE`,
   where BigQuery fails.
