@@ -704,9 +704,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("JSON_KEYS",
              {
                  Json(3, "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])"),
-             },
-             {
-                 .uses = {TypeUse::kRejectsSafe},
              }),
 
       Define("JSON_STRIP_NULLS",

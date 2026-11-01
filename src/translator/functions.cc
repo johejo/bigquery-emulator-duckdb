@@ -387,7 +387,11 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
     functions.AddRules(name, definition, Implementation::kSQL);
   }
   for (const auto& [name, definition] : StaticBackendRules()) {
-    functions.AddRules(name, definition, Implementation::kGoogleSQL);
+    auto selected = definition;
+    if (name == "JSON_KEYS" && functions.restrictions().json_keys_rejects_safe) {
+      selected.uses |= {TypeUse::kRejectsSafe};
+    }
+    functions.AddRules(name, selected, Implementation::kGoogleSQL);
   }
   for (const auto& [name, function] : kFunctionNames) {
     functions.Add(name, {

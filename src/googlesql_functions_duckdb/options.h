@@ -29,6 +29,8 @@ struct Options {
   // of a negative zero.
   bool json_strict_numbers = false;
   bool json_preserve_negative_zero = false;
+  // JSON_KEYS rejects the SAFE. prefix.
+  bool json_keys_rejects_safe = false;
   // The translator restricts COLLATE specifications to und:ci and the empty specification.
   bool collate_und_ci_only = false;
   // The translator rejects INTERSECT ALL and EXCEPT ALL.

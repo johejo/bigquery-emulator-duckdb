@@ -1404,17 +1404,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects SAFE.JSON_KEYS; GoogleSQL returns NULL for its errors"
-  label: "code:safe_error_mode__safe_json_keys_JSON_<@@@a@@:1@>_INT64_0_STRING_NULL"
-  label: "code:safe_error_mode__safe_json_keys_JSON_<@@@a@@:1@>_INT64_1_STRING_<invalid>"
-  label: "code:safe_error_mode__safe_json_keys_JSON_<@@@a@@:1@>_INT64_NULL_STRING_<invalid>"
-  label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_-1"
-  label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_0"
-  label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_1_STRING_<invalid>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "DuckDB v2 rejects invalid UTF-8 in SQL literals before the backend can report the expected runtime error"
   label: "code:LikeWithCollationPatternBinary_STRING_<>_STRING_<@xc2>"
   label: "code:LikeWithCollationPatternBinary_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8%>"
