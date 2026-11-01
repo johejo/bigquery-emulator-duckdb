@@ -1,0 +1,146 @@
+# Inline CALL examples and semantics from BigQuery's GQL statement reference.
+# Expected tables are reduced to one cell, with deterministic ordering.
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN a.id AS account_id
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, account_id), ',' ORDER BY p.name) AS result
+=> "Alex:7,Dana:20,Lee:16"
+
+# Omitting p from the scope list makes the inner p independent of the outer p.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL () {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN a.id AS account_id
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, account_id), ',' ORDER BY p.name, account_id) AS result
+=> "Alex:7,Alex:16,Alex:20,Dana:7,Dana:16,Dana:20,Lee:7,Lee:16,Lee:20"
+
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN COUNT(a) AS num_accounts
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, num_accounts), ',' ORDER BY p.name) AS result
+=> "Alex:1,Dana:1,Lee:1"
+
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL () {
+  MATCH (n:Person)
+  RETURN COUNT(n) AS total_persons
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, total_persons), ',' ORDER BY p.name) AS result
+=> "Alex:3,Dana:3,Lee:3"
+
+# Documented filtered transfer example: a CALL can return multiple rows per person.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)-[t:Transfers]->()
+  WHERE t.amount > 50
+  RETURN a.id AS account_id, t.amount
+}
+RETURN STRING_AGG(FORMAT('%s:%d:%d', p.name, account_id, amount), ',' ORDER BY p.name, amount DESC) AS result
+=> "Alex:7:300,Alex:7:100,Dana:20:500,Dana:20:200,Lee:16:300"
+
+# OPTIONAL CALL's documented transfer example, including its timestamp properties.
+GRAPH scalar_fingraph.FinGraph
+MATCH (p:Person)
+OPTIONAL CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)-[t:Transfers]->()
+  RETURN a.id AS account_id, t.amount AS transfer_amount, DATE(t.create_time) AS transfer_date
+}
+RETURN STRING_AGG(FORMAT('%s:%d:%g:%s', p.name, account_id, transfer_amount, CAST(transfer_date AS STRING)), ',' ORDER BY p.name, transfer_date DESC) AS result
+=> "Alex:7:100:2020-10-04,Alex:7:300:2020-08-29,Dana:20:200:2020-10-17,Dana:20:500:2020-10-04,Lee:16:300:2020-09-25"
+
+# The reference specifies that zero inner rows exclude an input row for CALL,
+# but preserve it with NULL outputs for OPTIONAL CALL. This fixture has only Alex's account.
+GRAPH scalar_graph.FinGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN a.id AS account_id
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, account_id), ',' ORDER BY p.name) AS result
+=> "Alex:7"
+
+GRAPH scalar_graph.FinGraph
+MATCH (p:Person)
+OPTIONAL CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN a.id AS account_id
+}
+RETURN STRING_AGG(CONCAT(p.name, ':', IFNULL(CAST(account_id AS STRING), 'NULL')), ',' ORDER BY p.name) AS result
+=> "Alex:7,Dana:NULL,Lee:NULL"
+
+# Aggregation still returns a row when its correlated match is empty.
+GRAPH scalar_graph.FinGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN COUNT(a) AS num_accounts
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, num_accounts), ',' ORDER BY p.name) AS result
+=> "Alex:1,Dana:0,Lee:0"
+
+# ORDER BY and LIMIT belong to each invocation, not to the combined result.
+# Amounts are from the documented filtered transfer table above.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(:Account)-[t:Transfers]->()
+  RETURN t.amount AS amount ORDER BY amount DESC LIMIT 1
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, amount), ',' ORDER BY p.name) AS result
+=> "Alex:300,Dana:500,Lee:300"
+
+# FOR duplicates the working rows. CALL must preserve their multiplicity.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+FOR tag IN ['x', 'y'] WITH OFFSET
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN a.id AS account_id
+}
+RETURN STRING_AGG(FORMAT('%s:%s:%d', p.name, tag, account_id), ',' ORDER BY p.name, tag) AS result
+=> "Alex:x:7,Alex:y:7,Dana:x:20,Dana:y:20,Lee:x:16,Lee:y:16"
+
+# Nested CALLs have separate working tables and correlate to their immediate caller.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  CALL (a) {
+    MATCH (a)-[t:Transfers]->()
+    RETURN t.amount AS amount ORDER BY amount DESC LIMIT 1
+  }
+  RETURN amount
+}
+RETURN STRING_AGG(FORMAT('%s:%d', p.name, amount), ',' ORDER BY p.name) AS result
+=> "Alex:300,Dana:500,Lee:300"
+
+# CALL can be the first statement; it must not require an existing working table.
+GRAPH scalar_graph.TransferGraph
+CALL () {
+  MATCH (p:Person)
+  RETURN p
+}
+RETURN STRING_AGG(p.name, ',' ORDER BY p.name) AS result
+=> "Alex,Dana,Lee"
+
+# The documented column-name conflict rules reject an output alias already in scope.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  RETURN a.id AS p
+}
+RETURN p
+=> error contains: already exists

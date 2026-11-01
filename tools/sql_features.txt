@@ -72,6 +72,8 @@ query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id ORDER BY p.id SKIP 1
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id UNION ALL MATCH (p:Person) RETURN p.id
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id INTERSECT DISTINCT MATCH (p:Person)-[:Knows]->(:Person) RETURN p.id
 query GQL queries | GRAPH d.g MATCH (p:Person) CALL (p) { MATCH (p)-[:Knows]->(q:Person) RETURN q.id AS friend_id } RETURN p.id, friend_id
+query GQL queries | GRAPH d.g MATCH (p:Person) OPTIONAL CALL (p) { MATCH (p)-[:Knows]->(q:Person) RETURN q.id AS friend_id } RETURN p.id, friend_id
+query GQL queries | GRAPH d.g MATCH ANY CHEAPEST (a:Person)-[e:Knows COST 1]->(b:Person) RETURN a.id
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
 note GQL queries | [Graph limits](compatibility.md#graphs).

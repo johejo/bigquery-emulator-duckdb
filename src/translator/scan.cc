@@ -738,7 +738,41 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     return linear.graph_input ? std::optional<Relation>(*linear.graph_input) : std::nullopt;
   }
   if (scan.Is<googlesql::ResolvedGraphCallScan>()) {
-    return Unsupported(scope, "the GQL CALL statement");
+    const auto& call = *scan.GetAs<googlesql::ResolvedGraphCallScan>();
+    if (!call.subquery()->Is<googlesql::ResolvedGraphTableScan>()) {
+      return Unsupported(scope, "GQL CALL of a table-valued function");
+    }
+    const auto input = Scan(*call.input_scan(), scope);
+    if (!input) {
+      return std::nullopt;
+    }
+    const auto left = QuoteIdentifier(scope.context.FreshName("call_input"));
+    const auto right = QuoteIdentifier(scope.context.FreshName("call_result"));
+    Scope nested = scope;
+    // The inline query has its own working table; only declared correlated columns
+    // can see the caller. Fresh aliases also keep nested CALLs from shadowing it.
+    nested.graph_input.reset();
+    for (const auto& parameter : call.parameter_list()) {
+      const int id = parameter->column().column_id();
+      nested.outer[id] = left + "." + ColumnName(id);
+    }
+    const auto subquery = Scan(*call.subquery(), nested);
+    if (!subquery) {
+      return std::nullopt;
+    }
+    Relation result;
+    std::vector<std::string> projections;
+    for (const auto& column : call.column_list()) {
+      const int id = column.column_id();
+      const auto& alias = input->columns.contains(id) ? left : right;
+      projections.push_back(alias + "." + ColumnName(id) + " AS " + ColumnName(id));
+      result.columns.emplace(id, "q." + ColumnName(id));
+    }
+    result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
+                 " FROM (" + input->sql + ") AS " + left +
+                 (call.optional() ? " LEFT JOIN LATERAL (" : " INNER JOIN LATERAL (") +
+                 subquery->sql + ") AS " + right + " ON TRUE";
+    return result;
   }
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
     return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
