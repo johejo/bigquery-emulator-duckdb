@@ -215,7 +215,7 @@ func TestMaterializedViewRejectsInvalidDefinitions(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 	if _, _, err := runScript(t, client, dataset.DatasetID,
-		"CREATE TABLE source (id INT64); CREATE FUNCTION go_materialized_view_errors.udf(x INT64) AS (x + 1)"); err != nil {
+		"CREATE TABLE source (id INT64, word STRING COLLATE 'und:ci'); CREATE FUNCTION go_materialized_view_errors.udf(x INT64) AS (x + 1)"); err != nil {
 		t.Fatal(err)
 	}
 	for _, query := range []string{
@@ -228,6 +228,9 @@ func TestMaterializedViewRejectsInvalidDefinitions(t *testing.T) {
 		"SELECT id, COUNT(*) AS n FROM source GROUP BY id HAVING COUNT(*) > 1",
 		"SELECT STRING_AGG(CAST(id AS STRING)) AS s FROM source",
 		"SELECT id FROM source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()",
+		// Collated aggregate sort keys are forbidden even though MV columns may be collated.
+		// third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+		"SELECT ARRAY_AGG(id ORDER BY word) AS ids FROM source",
 	} {
 		if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE MATERIALIZED VIEW invalid AS "+query); err == nil {
 			t.Errorf("accepted invalid MV definition: %s", query)

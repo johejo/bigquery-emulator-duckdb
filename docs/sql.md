@@ -18,15 +18,15 @@ rejected.
 - **Unsupported**: the emulator rejects every query as unsupported.
 - **Broken**: a query translates but fails on DuckDB, which is a bug.
 
-| Section | Supported | Partial | Unsupported |
-| --- | --- | --- | --- |
-| [Graphs](#graphs) | 0 | 4 | 0 |
-| [Queries](#queries) | 34 | 2 | 0 |
-| [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 23 | 10 | 0 |
-| [Collation](#collation) | 14 | 0 | 1 |
-| [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
-| [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
+| Section | Supported | Partial |
+| --- | --- | --- |
+| [Graphs](#graphs) | 0 | 4 |
+| [Queries](#queries) | 34 | 2 |
+| [DML](#dml) | 9 | 0 |
+| [DDL](#ddl) | 23 | 10 |
+| [Collation](#collation) | 15 | 0 |
+| [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
+| [INFORMATION_SCHEMA](#information_schema) | 11 | 0 |
 
 ## Graphs
 
@@ -147,7 +147,7 @@ rejected.
 | Table default collation | Supported |  |
 | Dataset default collation | Supported |  |
 | Collated views | Supported |  |
-| Collated materialized views | Unsupported |  |
+| Collated materialized views | Supported |  |
 | Collated table functions | Supported |  |
 
 ## Multi-statement queries

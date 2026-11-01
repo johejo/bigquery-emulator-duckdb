@@ -117,9 +117,6 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
       return std::nullopt;
     }
     const googlesql::AnnotationMap* annotations = output->column().type_annotation_map();
-    if (materialized && HasCollation(annotations)) {
-      return Unsupported(scope, "materialized view column collation");
-    }
     auto field = BigQueryFieldSchema(output->name(), output->column().type());
     if (!field.ok()) {
       return Unsupported(scope, field.status().message());
