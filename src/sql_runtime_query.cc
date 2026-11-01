@@ -162,7 +162,8 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
     columns[folded(schema.at(i).name)].push_back(i);
   }
   for (const auto& [name, indexes] : columns) {
-    if (indexes.size() == 1) {
+    // Only GoogleSQL can return anonymous value-table fields; keep their empty names.
+    if (name.empty() || indexes.size() == 1) {
       continue;
     }
     FieldSchema& duplicate = schema.at(indexes.at(1));
@@ -435,6 +436,7 @@ TranslatedStatement SqlRuntime::Translate(
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = system_variables,
+      .restrict_struct_results = functions_.restrictions().restrict_struct_results,
   };
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {

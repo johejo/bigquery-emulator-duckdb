@@ -43,6 +43,8 @@ struct Options {
   bool distinct_comparisons_without_structs = false;
   // Query results and written values fail on an ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
+  // Query results reject empty STRUCTs and anonymous fields of STRUCT value tables.
+  bool restrict_struct_results = false;
   googlesql_collation::Options collation = {};
 
   std::strong_ordering operator<=>(const Options&) const = default;

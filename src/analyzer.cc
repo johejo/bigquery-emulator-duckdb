@@ -156,7 +156,8 @@ std::optional<std::vector<FieldSchema>> ResultSchema(
   const std::vector<const googlesql::AnnotationMap*> annotations = ResultAnnotations(query);
   std::vector<FieldSchema> schema;
   for (const auto& [name, type] : ResultColumns(query)) {
-    absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(name, type);
+    absl::StatusOr<FieldSchema> field =
+        BigQueryFieldSchema(name, type, /*allow_empty_structs=*/true);
     if (!field.ok()) {
       return std::nullopt;
     }
@@ -510,9 +511,10 @@ absl::Status CheckEmptyStructs(const std::string& path, const googlesql::Type* t
   return absl::OkStatus();
 }
 
-// BigQuery rejects a query whose result has a column without a name, as a value table of structs
-// with an anonymous field has, or a STRUCT<>.
-absl::Status CheckResultColumns(const googlesql::ResolvedStatement& statement) {
+// Check result naming limits in both modes. BigQuery additionally rejects anonymous fields of
+// STRUCT value tables and empty STRUCTs in results; GoogleSQL can return them.
+absl::Status CheckResultColumns(const googlesql::ResolvedStatement& statement,
+                                bool restrict_struct_results) {
   if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return absl::OkStatus();
   }
@@ -536,6 +538,9 @@ absl::Status CheckResultColumns(const googlesql::ResolvedStatement& statement) {
     }
   }
   for (const auto& [name, type] : columns) {
+    if (!restrict_struct_results) {
+      continue;
+    }
     if (name.empty()) {
       return absl::InvalidArgumentError(
           "Invalid field name \"\". Fields must contain the allowed characters, and be at most 300 "
@@ -686,7 +691,8 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
       !distinct.ok()) {
     throw std::runtime_error(std::string(distinct.message()));
   }
-  if (const absl::Status columns = CheckResultColumns(*analyzer_output->resolved_statement());
+  if (const absl::Status columns = CheckResultColumns(*analyzer_output->resolved_statement(),
+                                                      settings.restrict_struct_results);
       !columns.ok()) {
     throw std::runtime_error(std::string(columns.message()));
   }
@@ -729,7 +735,8 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
   GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
   GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
   GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArguments(*analyzer_output->resolved_statement()));
-  GOOGLESQL_RETURN_IF_ERROR(CheckResultColumns(*analyzer_output->resolved_statement()));
+  GOOGLESQL_RETURN_IF_ERROR(
+      CheckResultColumns(*analyzer_output->resolved_statement(), settings.restrict_struct_results));
   return AnalyzerResult(std::move(analyzer_output));
 }
 

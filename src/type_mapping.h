@@ -84,8 +84,10 @@ absl::StatusOr<std::string> GoogleSqlTypeName(const FieldSchema& field,
 // The inverse of GoogleSqlType: describes a column of GoogleSQL type `type` the way BigQuery
 // reports it in a TableSchema. Struct fields without a name get BigQuery's `_field_n`. Fails
 // for a type BigQuery has no TableFieldSchema for, such as an array of arrays or STRUCT<>.
+// GoogleSQL query results can opt in to describing empty STRUCTs, including nested ones.
 absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
-                                                const googlesql::Type* type);
+                                                const googlesql::Type* type,
+                                                bool allow_empty_structs = false);
 
 // Field names for a nonempty DuckDB struct. Preserve names when they are distinct and nonempty;
 // otherwise use positional internal names for every field. GoogleSQL retains the original names.

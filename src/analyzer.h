@@ -43,6 +43,8 @@ struct AnalyzerSettings {
   const googlesql::ScriptExecutor* script = nullptr;
   // Additional system variables owned by the emulator rather than ScriptExecutor.
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
+  // BigQuery rejects empty STRUCT results and anonymous fields of STRUCT value tables.
+  bool restrict_struct_results = true;
 };
 
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so

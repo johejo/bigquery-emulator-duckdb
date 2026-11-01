@@ -467,7 +467,8 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
 }
 
 absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
-                                                const googlesql::Type* type) {
+                                                const googlesql::Type* type,
+                                                bool allow_empty_structs) {
   FieldSchema field;
   field.name = name;
   if (type->IsArray()) {
@@ -477,11 +478,15 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
       return absl::InvalidArgumentError("Unsupported result type: an array of arrays");
     }
   }
-  absl::StatusOr<FieldType> field_type = BigQueryFieldType(type);
-  if (!field_type.ok()) {
-    return field_type.status();
+  if (allow_empty_structs && type->IsStruct()) {
+    field.type = FieldType::kRecord;
+  } else {
+    absl::StatusOr<FieldType> field_type = BigQueryFieldType(type);
+    if (!field_type.ok()) {
+      return field_type.status();
+    }
+    field.type = *field_type;
   }
-  field.type = *field_type;
   if (type->IsRange()) {
     absl::StatusOr<FieldType> element = BigQueryFieldType(type->AsRange()->element_type());
     if (!element.ok()) {
@@ -495,7 +500,7 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
       const std::string& child_name = struct_fields.at(i).name;
       absl::StatusOr<FieldSchema> child =
           BigQueryFieldSchema(child_name.empty() ? "_field_" + std::to_string(i + 1) : child_name,
-                              struct_fields.at(i).type);
+                              struct_fields.at(i).type, allow_empty_structs);
       if (!child.ok()) {
         return child.status();
       }
