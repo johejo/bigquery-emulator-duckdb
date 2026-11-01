@@ -19,17 +19,19 @@ setup INSERT d.u (id, v) VALUES (1, 10), (3, 30)
 
 setup CREATE PROPERTY GRAPH d.g NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name)) EDGE TABLES (d.t AS friendships KEY (id) SOURCE KEY (id) REFERENCES t (id) DESTINATION KEY (id) REFERENCES t (id) LABEL Knows NO PROPERTIES)
 
-setup CREATE PROPERTY GRAPH d.g_nodes NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name), d.u KEY (id) LABEL Account PROPERTIES (id, v)) EDGE TABLES (d.t AS person_edges KEY (id) SOURCE KEY (id) REFERENCES t (id) DESTINATION KEY (id) REFERENCES t (id) LABEL Knows NO PROPERTIES, d.u AS account_edges KEY (id) SOURCE KEY (id) REFERENCES u (id) DESTINATION KEY (id) REFERENCES u (id) LABEL Transfers PROPERTIES (v))
+setup CREATE PROPERTY GRAPH d.g_nodes NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name) LABEL Entity PROPERTIES (id), d.u KEY (id) LABEL Account PROPERTIES (id, v) LABEL Entity PROPERTIES (id)) EDGE TABLES (d.t AS person_edges KEY (id) SOURCE KEY (id) REFERENCES t (id) DESTINATION KEY (id) REFERENCES t (id) LABEL Knows NO PROPERTIES LABEL Relation NO PROPERTIES, d.u AS account_edges KEY (id) SOURCE KEY (id) REFERENCES u (id) DESTINATION KEY (id) REFERENCES u (id) LABEL Transfers PROPERTIES (v) LABEL Relation NO PROPERTIES)
 
 section Graphs
 
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `CREATE PROPERTY GRAPH` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.u)
+query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name) LABEL Entity PROPERTIES (id))
 query `CREATE PROPERTY GRAPH` | CREATE OR REPLACE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n) RETURN n.id, LABELS(n) AS labels)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Person|Account) RETURN n.name, n.v)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Entity&!Person)-[e:Relation&Transfers]->(m:Account) RETURN n.id, e.v, LABELS(m) AS labels)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH p = (n WHERE n.id = 1) RETURN PATH_LENGTH(p) AS length)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (a)-[e]->(b) RETURN a.id AS src, b.id AS dst, LABELS(e) AS labels)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (a:Person|Account)-[e:Knows|Transfers]-(b) RETURN a.name, b.v AS node_value, e.v AS edge_value)

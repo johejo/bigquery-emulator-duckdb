@@ -48,6 +48,28 @@ EDGE TABLES (
     DESTINATION KEY (dst) REFERENCES Person (id) LABEL SecondKnows
 );
 
+-- Labels expose different property sets on the same element. Entity and Relation are
+-- shared across element tables; overlapping label unions must not duplicate elements.
+-- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+CREATE PROPERTY GRAPH scalar_graph.MultiLabels
+NODE TABLES (
+  scalar_graph.Person KEY (id)
+    LABEL Person PROPERTIES (id, name)
+    LABEL Entity PROPERTIES (id)
+    LABEL Named PROPERTIES (name),
+  scalar_graph.Account KEY (id)
+    LABEL Account PROPERTIES (id, kind)
+    LABEL entity PROPERTIES (ID)
+)
+EDGE TABLES (
+  scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Person (id)
+    DESTINATION KEY (dst) REFERENCES Person (id)
+    LABEL Knows PROPERTIES (id) LABEL Relation NO PROPERTIES,
+  scalar_graph.Owns KEY (id, account_id) SOURCE KEY (id) REFERENCES Person (id)
+    DESTINATION KEY (account_id) REFERENCES Account (id)
+    LABEL Owns PROPERTIES (account_id) LABEL Relation NO PROPERTIES
+);
+
 -- Person, account, ownership and transfer rows from BigQuery's documented FinGraph example,
 -- without its TIMESTAMP columns.
 -- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
