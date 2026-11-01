@@ -30,6 +30,8 @@ void AddBigQueryFunctionDeclarations(googlesql::SimpleCatalog& catalog) {
               },
               /*context_id=*/static_cast<int64_t>(0)),
       }));
+  googlesql::FunctionArgumentTypeOptions orderable;
+  orderable.set_must_support_ordering();
   for (const char* name : {"max_by", "min_by"}) {
     catalog.AddOwnedFunction(new googlesql::Function(
         name, kBigQueryGroup, googlesql::Function::AGGREGATE,
@@ -38,7 +40,7 @@ void AddBigQueryFunctionDeclarations(googlesql::SimpleCatalog& catalog) {
                 googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
                 {
                     googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
-                    googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_2),
+                    googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_2, orderable),
                 },
                 /*context_id=*/static_cast<int64_t>(0)),
         },

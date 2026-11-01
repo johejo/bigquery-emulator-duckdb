@@ -302,3 +302,13 @@ SELECT APPROX_COUNT_DISTINCT(g) FROM UNNEST([ST_GEOGPOINT(1, 2), ST_GEOGPOINT(1,
 
 SELECT ARRAY_LENGTH(APPROX_QUANTILES(g, 2)) FROM UNNEST([ST_GEOGPOINT(1, 2)]) AS g
 => error contains: Argument 1 to APPROX_QUANTILES must support ordering; Type GEOGRAPHY does not
+
+# MAX_BY and MIN_BY require an orderable second argument.
+SELECT MIN_BY(x, y) FROM UNNEST([STRUCT(1 AS x, STRUCT(2 AS f) AS y), (2, STRUCT(1))])
+=> error contains: must support ordering; Type STRUCT<f INT64> does not
+
+SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, [2] AS y), (2, [1])])
+=> error contains: must support ordering; Type ARRAY<INT64> does not
+
+SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, ST_GEOGPOINT(1, 2) AS y)])
+=> error contains: must support ordering; Type GEOGRAPHY does not
