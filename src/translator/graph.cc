@@ -22,6 +22,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
+#include "src/language_options.h"
 #include "src/references.h"
 #include "src/table_path.h"
 #include "src/translated_statement.h"
@@ -181,6 +182,21 @@ std::optional<std::string> GraphFilter(const googlesql::ResolvedExpr& expr, cons
   return Expression(expr, scope, columns);
 }
 
+// Each query analyzes the saved definition again, so a computed property may read only the
+// element table's columns and call only built-in functions.
+bool PortableProperty(const googlesql::ResolvedNode& node) {
+  if (node.Is<googlesql::ResolvedSubqueryExpr>() || node.Is<googlesql::ResolvedParameter>() ||
+      node.Is<googlesql::ResolvedSystemVariable>() || node.Is<googlesql::ResolvedConstant>() ||
+      node.Is<googlesql::ResolvedArgumentRef>() ||
+      (node.Is<googlesql::ResolvedFunctionCallBase>() &&
+       !IsBuiltinFunction(*node.GetAs<googlesql::ResolvedFunctionCallBase>()->function()))) {
+    return false;
+  }
+  std::vector<const googlesql::ResolvedNode*> children;
+  node.GetChildNodes(&children);
+  return std::ranges::all_of(children, [](const auto* child) { return PortableProperty(*child); });
+}
+
 }  // namespace
 
 std::optional<std::string> CreatePropertyGraph(
@@ -274,19 +290,23 @@ std::optional<std::string> CreatePropertyGraph(
       std::vector<std::string> native_properties;
       for (const auto& property : element->property_definition_list()) {
         const auto column = Key(*property->expr(), table, false);
-        const auto native_column = Key(*property->expr(), table, true);
-        if (!column || !native_column ||
+        if ((!column && !PortableProperty(*property->expr())) ||
             !DuckDbType(property->expr()->type(), scope.context.timestamp_precision) ||
             !property->options_list().empty() || property->is_measure() ||
             property->expr()->type_annotation_map() != nullptr) {
-          return Unsupported(scope, "computed properties, measures or property options");
+          return Unsupported(scope,
+                             "measures, property options or computed properties that call "
+                             "user-defined functions or read parameters, variables or constants");
         }
         properties.emplace(
             absl::AsciiStrToLower(property->property_declaration_name()),
-            *column + " AS " +
+            column.value_or("(" + property->sql() + ")") + " AS " +
                 googlesql::ToIdentifierLiteral(property->property_declaration_name()));
-        native_properties.push_back(*native_column + " AS " +
-                                    QuoteIdentifier(property->property_declaration_name()));
+        // DuckPGQ properties are columns; queries read computed ones from the saved definition.
+        if (const auto native_column = Key(*property->expr(), table, true)) {
+          native_properties.push_back(*native_column + " AS " +
+                                      QuoteIdentifier(property->property_declaration_name()));
+        }
       }
       for (const auto& name : element->label_name_list()) {
         const auto label = std::ranges::find_if(create.label_list(), [&](const auto& candidate) {
@@ -327,6 +347,13 @@ namespace {
 std::optional<Relation> FlatGraphPath(
     const std::vector<const googlesql::ResolvedGraphElementScan*>& input,
     const googlesql::GraphPathType* path_type, const Scope& scope) {
+  // Joins below connect each edge to the nodes on either side of it.
+  for (size_t i = 0; i < input.size(); ++i) {
+    if (input.size() % 2 == 0 ||
+        input.at(i)->Is<googlesql::ResolvedGraphEdgeScan>() != (i % 2 == 1)) {
+      return Unsupported(scope, "graph paths with adjacent node or edge patterns");
+    }
+  }
   // Choose edge tables first so their endpoint references narrow the node branches.
   // Each branch keeps the resolver's common property set and the original table identity.
   size_t split = input.size();
@@ -512,15 +539,16 @@ std::optional<Relation> FlatGraphPath(
         continue;
       }
       const auto value = definition->GetValueExpression();
-      if (!value.ok() || !(*value)->Is<googlesql::ResolvedCatalogColumnRef>()) {
-        return Unsupported(scope, "graph properties other than columns");
+      if (!value.ok()) {
+        return Unsupported(scope, "graph property definitions");
       }
-      const auto* source = (*value)->GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
-      outputs.push_back(
-          std::format("{} AS {}",
-                      StoredColumn(variable + "." + QuoteIdentifier(source->Name()),
-                                   source->GetType(), scope.context.timestamp_precision),
-                      output));
+      Scope property_scope = scope;
+      property_scope.graph_element_table = variable;
+      const auto sql = Expression(**value, property_scope, {});
+      if (!sql) {
+        return std::nullopt;
+      }
+      outputs.push_back(std::format("{} AS {}", *sql, output));
       fields.push_back(std::format("{} := q.{}", name, output));
     }
     if (fields.empty()) {
@@ -772,6 +800,14 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
     }
     result->sql = "SELECT q.*" + result->From() + " WHERE " + *filter;
   }
+  // A quantified subpath's mode, like its filter, applies to each repetition.
+  if (mode == googlesql::ResolvedGraphPathMode::TRAIL ||
+      mode == googlesql::ResolvedGraphPathMode::ACYCLIC) {
+    const std::string values =
+        mode == googlesql::ResolvedGraphPathMode::TRAIL ? "q._graph_edges" : "q._graph_nodes";
+    result->sql = "SELECT q.*" + result->From() + " WHERE list_unique(" + values + ") = length(" +
+                  values + ")";
+  }
   if (path.quantifier() != nullptr) {
     const auto& quantifier = *path.quantifier();
     // BigQuery documents bounded quantification. Do not invent a stopping point
@@ -881,13 +917,6 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
       }
       result->sql = "(" + result->sql + ") UNION ALL " + Join(zero_rows, " UNION ALL ");
     }
-  }
-  if (mode == googlesql::ResolvedGraphPathMode::TRAIL ||
-      mode == googlesql::ResolvedGraphPathMode::ACYCLIC) {
-    const std::string values =
-        mode == googlesql::ResolvedGraphPathMode::TRAIL ? "q._graph_edges" : "q._graph_nodes";
-    result->sql = "SELECT q.*" + result->From() + " WHERE list_unique(" + values + ") = length(" +
-                  values + ")";
   }
   if (path.search_prefix() != nullptr) {
     // Select independently for each pair of element identities, after matching

@@ -7,6 +7,7 @@
 #include "absl/status/status.h"
 #include "absl/types/span.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/simple_catalog_util.h"
 #include "src/catalog.h"
 #include "src/language_options.h"
@@ -22,6 +23,20 @@ class GraphCatalog : public googlesql::SimpleCatalog {
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
                          const FindOptions& options) override {
     return parent_.FindTable(path, table, options);
+  }
+  // Computed properties call only built-in functions, whose meaning does not depend on the
+  // default dataset of the query that loads the graph.
+  absl::Status FindFunction(const absl::Span<const std::string>& path,
+                            const googlesql::Function** function,
+                            const FindOptions& options) override {
+    if (const auto status = parent_.FindFunction(path, function, options); !status.ok()) {
+      return status;
+    }
+    if (!IsBuiltinFunction(**function)) {
+      *function = nullptr;
+      return absl::NotFoundError("Graph properties call only built-in functions");
+    }
+    return absl::OkStatus();
   }
 
  private:

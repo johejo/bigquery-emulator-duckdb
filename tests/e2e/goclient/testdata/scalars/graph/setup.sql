@@ -68,6 +68,21 @@ EDGE TABLES (
     LABEL Owns PROPERTIES (account_id) LABEL Relation NO PROPERTIES
 );
 
+-- Properties defined by expressions over the element table's columns.
+-- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+CREATE PROPERTY GRAPH scalar_graph.ComputedProperties
+NODE TABLES (
+  scalar_graph.Person KEY (id)
+    LABEL Person PROPERTIES (id, 1000 + id AS code, UPPER(name) AS upper_name, 'person' AS kind),
+  scalar_graph.Account KEY (id)
+    LABEL Account PROPERTIES (id, CONCAT(kind, '!') AS kind)
+)
+EDGE TABLES (
+  scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Person (id)
+    DESTINATION KEY (dst) REFERENCES Person (id)
+    LABEL Knows PROPERTIES (id, IF(src = dst, NULL, dst - src) AS delta)
+);
+
 -- Person, account, ownership and transfer rows from BigQuery's documented FinGraph example,
 -- without its TIMESTAMP columns.
 -- third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md

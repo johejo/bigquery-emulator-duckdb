@@ -1,0 +1,71 @@
+version: 1
+description: >-
+  Record whether one row of an edge table whose endpoints reference non-key node columns is one
+  edge or one edge per pair of endpoint nodes, as TRAIL and SAME observe it. The graph reference
+  does not say. GoogleSQL's reference implementation counts one edge per pair, and the emulator
+  one edge per row. Requires an Enterprise or Enterprise Plus reservation.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  edge:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.Account` AS
+              SELECT 1 AS id, 'checking' AS kind UNION ALL SELECT 2, 'savings'
+              UNION ALL SELECT 3, 'checking';
+              CREATE TABLE `${project}.${dataset}.CanTransfer` AS
+              SELECT 'checking' AS src_kind, 'savings' AS dst_kind
+              UNION ALL SELECT 'savings', 'checking';
+              CREATE PROPERTY GRAPH `${project}.${dataset}.g`
+              NODE TABLES (`${project}.${dataset}.Account` AS Account KEY (id))
+              EDGE TABLES (`${project}.${dataset}.CanTransfer` AS CanTransfer
+                KEY (src_kind, dst_kind)
+                SOURCE KEY (src_kind) REFERENCES Account (kind)
+                DESTINATION KEY (dst_kind) REFERENCES Account (kind));
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.g`
+                ${query})
+              ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+        observe:
+          error: /body/error
+          errors: /body/errors
+          rows: /body/rows
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: trail
+    template: edge
+    vars:
+      query: >-
+        MATCH TRAIL (a)-[e1]->(b)-[e2]->(c)-[e3]->(d)
+        RETURN a.id AS a, b.id AS b, c.id AS c, d.id AS d) AS t
+  - name: same
+    template: edge
+    vars:
+      query: >-
+        MATCH (a)-[e1]->(b), (c)-[e2]->(d)
+        RETURN a.id AS a, b.id AS b, c.id AS c, d.id AS d, SAME(e1, e2) AS same) AS t

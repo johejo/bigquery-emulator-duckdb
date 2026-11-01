@@ -441,7 +441,8 @@ Graph DDL rejects:
 
 - Keys of type FLOAT64, BIGNUMERIC, INTERVAL, RANGE, GEOGRAPHY, JSON, ARRAY or STRUCT, and keys
   other than columns.
-- Computed properties, measures and property options.
+- Measures, property options, and computed properties that call user-defined functions or read
+  query parameters, system variables or named constants.
 - Views as element tables and graph options.
 - `OR REPLACE` and `IF NOT EXISTS` in `CREATE PROPERTY GRAPH`, and `IF EXISTS` in
   `DROP PROPERTY GRAPH`.
@@ -450,6 +451,7 @@ Graph DDL rejects:
 `GRAPH_TABLE` and GQL queries reject:
 
 - Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.
+- Adjacent node patterns, such as `(a)(b)`.
 - GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
   `COLUMNS` clause.
 - Graph elements or paths in query results.
