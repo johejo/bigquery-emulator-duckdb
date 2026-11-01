@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -82,6 +84,13 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     std::vector<std::string> uris;
     std::ranges::transform(external->uris, std::back_inserter(uris), StringOptionValue);
     ddl += "\nOPTIONS(\n";
+    const auto flag = [&ddl](std::string_view name, const std::optional<bool>& value) {
+      if (value) {
+        ddl += std::format("  {}={},\n", name, *value ? "true" : "false");
+      }
+    };
+    flag("allow_jagged_rows", external->allow_jagged_rows);
+    flag("allow_quoted_newlines", external->allow_quoted_newlines);
     if (external->enable_list_inference.has_value()) {
       ddl += std::string("  enable_list_inference=") +
              (*external->enable_list_inference ? "true" : "false") + ",\n";
@@ -89,10 +98,19 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     if (external->field_delimiter) {
       ddl += "  field_delimiter=" + StringOptionValue(*external->field_delimiter) + ",\n";
     }
+    // BigQuery's DDL leaves out null_markers and the default quote.
+    if (external->null_marker) {
+      ddl += "  null_marker=" + StringOptionValue(*external->null_marker) + ",\n";
+    }
+    flag("preserve_ascii_control_characters", external->preserve_ascii_control_characters);
+    if (external->quote && *external->quote != "\"") {
+      ddl += "  quote=" + StringOptionValue(*external->quote) + ",\n";
+    }
     // tables.get reports skipLeadingRows 0, but the DDL leaves it out.
     if (external->skip_leading_rows.value_or(0) != 0) {
       ddl += "  skip_leading_rows=" + std::to_string(*external->skip_leading_rows) + ",\n";
     }
+    flag("ignore_unknown_values", external->ignore_unknown_values);
     ddl += "  format=" + StringOptionValue(external->format) + ",\n  uris=[" +
            absl::StrJoin(uris, ", ") + "]\n)";
   }
@@ -311,6 +329,28 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
           });
         }
         const auto& external = *metadata->external_data;
+        // BigQuery lists the CSV options a table sets, other than null_markers.
+        const auto flag = [&options](std::string_view name, const std::optional<bool>& value) {
+          if (value) {
+            options.push_back(
+                {.name = std::string(name), .type = "BOOL", .value = *value ? "true" : "false"});
+          }
+        };
+        flag("allow_jagged_rows", external.allow_jagged_rows);
+        flag("allow_quoted_newlines", external.allow_quoted_newlines);
+        flag("ignore_unknown_values", external.ignore_unknown_values);
+        flag("preserve_ascii_control_characters", external.preserve_ascii_control_characters);
+        if (external.null_marker) {
+          options.push_back({
+              .name = "null_marker",
+              .type = "STRING",
+              .value = StringOptionValue(*external.null_marker),
+          });
+        }
+        if (external.quote) {
+          options.push_back(
+              {.name = "quote", .type = "STRING", .value = StringOptionValue(*external.quote)});
+        }
         if (external.field_delimiter) {
           options.push_back({
               .name = "field_delimiter",

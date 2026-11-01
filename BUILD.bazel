@@ -982,6 +982,7 @@ cc_library(
     srcs = ["src/table_comments.cc"],
     hdrs = ["src/table_comments.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [":csv_records"],
     deps = [
         ":api_error",
         ":duckdb_sql",
@@ -1076,6 +1077,7 @@ cc_library(
     srcs = ["src/job_options.cc"],
     hdrs = ["src/job_options.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [":csv_records"],
     deps = [
         ":api_error",
         ":extract_options",
@@ -1116,6 +1118,23 @@ cc_library(
     hdrs = ["src/csv_records.h"],
     copts = ["-std=c++20"],
     implementation_deps = [":api_error"],
+)
+
+cc_library(
+    name = "csv_stage",
+    srcs = ["src/csv_stage.cc"],
+    hdrs = ["src/csv_stage.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":csv_records",
+    ],
+    deps = [
+        ":field_schema",
+        ":file_read",
+        ":file_read_options",
+        ":temporary_files",
+    ],
 )
 
 cc_library(
@@ -1231,6 +1250,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":csv_detect",
+        ":csv_stage",
         ":duckdb_catalog",
         ":duckdb_sql",
         ":extract",
@@ -1746,6 +1766,8 @@ cc_library(
     deps = [
         ":api_error",
         ":csv_detect",
+        ":csv_records",
+        ":csv_stage",
         ":duckdb_sql",
         ":field_schema",
         ":file_read",
@@ -1991,6 +2013,7 @@ cc_test(
         ":backend_error",
         ":builtin_function_options",
         ":catalog",
+        ":csv_stage",
         ":default_dataset",
         ":emulator_functions",
         ":field_schema",

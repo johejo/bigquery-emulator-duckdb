@@ -38,8 +38,13 @@ Loads and extracts also accept local paths. Their limits are:
 - Query and load jobs cannot partition or cluster their destination table. Loads reject
   `destinationTableProperties`, and replacement of an existing table with `autodetect` for
   formats other than CSV.
+- CSV loads take `quote`, a single ASCII character other than a line break or the delimiter,
+  `allowQuotedNewlines`, `allowJaggedRows`, `ignoreUnknownValues`, `nullMarker`, `nullMarkers` and
+  `preserveAsciiControlCharacters`; an empty value of a non-STRING column with `nullMarkers` is
+  unsupported. Other CSV options are unsupported.
 - CSV schema detection, which a load also performs when neither it nor its destination gives a
-  schema, takes one file, and rejects header names with a form feed or vertical tab.
+  schema, takes one file, rejects header names with a form feed or vertical tab, and takes none
+  of the options above.
 - Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns.
   BIGNUMERIC Parquet output uses `DECIMAL(76, 38)` with `BYTE_ARRAY` rather than
   `FIXED_LEN_BYTE_ARRAY`.
@@ -78,9 +83,10 @@ REPEATED column and field of the schema.
 
 CSV takes a flat schema of the scalar types listed above, given or detected as
 [loads detect it](#loads-extracts-and-copies). It supports
-`skip_leading_rows` / `csvOptions.skipLeadingRows` and a single ASCII
-`field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL.
-Other CSV options are unsupported.
+`skip_leading_rows` / `csvOptions.skipLeadingRows`, a single ASCII
+`field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL, and the
+[CSV options](#loads-extracts-and-copies) loads take. Schema detection does not take a quote,
+quoted line breaks or NULL markers. Other CSV options are unsupported.
 
 JSON requires an explicit schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, TIME
 or TIMESTAMP fields, RECORDs of those fields, or repeated fields of those types. Scalar values must

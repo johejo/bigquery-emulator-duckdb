@@ -14,6 +14,8 @@
 
 #include "src/api_error.h"
 #include "src/csv_detect.h"
+#include "src/csv_records.h"
+#include "src/csv_stage.h"
 #include "src/duckdb_sql.h"
 #include "src/external_json.h"
 #include "src/field_schema.h"
@@ -266,6 +268,21 @@ std::optional<int> CsvSkipLeadingRows(const GcsExternalData& definition) {
   return static_cast<int>(*definition.skip_leading_rows);
 }
 
+// The reader settings of a CSV table's options other than its delimiter and leading rows.
+CsvReadOptions CsvOptions(const GcsExternalData& definition) {
+  return {
+      .quote =
+          ParseCsvQuote(definition.quote.value_or("\""), definition.field_delimiter.value_or(",")),
+      .allow_quoted_newlines = definition.allow_quoted_newlines.value_or(false),
+      .allow_jagged_rows = definition.allow_jagged_rows.value_or(false),
+      .ignore_unknown_values = definition.ignore_unknown_values.value_or(false),
+      .null_marker = definition.null_marker,
+      .null_markers = definition.null_markers,
+      .preserve_ascii_control_characters =
+          definition.preserve_ascii_control_characters.value_or(false),
+  };
+}
+
 }  // namespace
 
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
@@ -353,14 +370,13 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         continue;
       }
       if (csv) {
-        ValidateCsvRecords(source, delimiter.front());
+        CsvReadOptions options = CsvOptions(definition);
+        options.skip_leading_rows = skip_leading_rows;
+        options.field_delimiter = delimiter;
         reads.push_back("SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-                        FileReadQuery(
-                            CsvReadOptions{
-                                .skip_leading_rows = skip_leading_rows,
-                                .field_delimiter = delimiter,
-                            },
-                            {source}, read_schema) +
+                        FileReadQuery(options,
+                                      StageCsvSources({source}, options, read_schema, files),
+                                      read_schema) +
                         ") AS source");
         continue;
       }

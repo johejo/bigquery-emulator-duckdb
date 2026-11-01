@@ -10,6 +10,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/csv_records.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/gcs_uri.h"
@@ -137,7 +138,21 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
           })) {
         throw ApiError::Invalid("CSV external tables do not support nested or repeated fields");
       }
-    } else if (external.skip_leading_rows || external.field_delimiter) {
+      if (external.quote) {
+        ParseCsvQuote(*external.quote, external.field_delimiter.value_or(","));
+      }
+      CheckCsvNullMarkers(external.null_marker.has_value(), external.null_markers.has_value());
+      // Detection reads values with the default quote and NULL markers.
+      if (external.autodetect.value_or(false) &&
+          (external.quote || external.allow_quoted_newlines || external.null_marker ||
+           external.null_markers)) {
+        throw ApiError::Unsupported(
+            "quote, allow_quoted_newlines and NULL markers with CSV schema auto-detection");
+      }
+    } else if (external.skip_leading_rows || external.field_delimiter || external.quote ||
+               external.allow_quoted_newlines || external.allow_jagged_rows ||
+               external.null_marker || external.null_markers ||
+               external.preserve_ascii_control_characters || external.ignore_unknown_values) {
       throw ApiError::Unsupported("CSV options on non-CSV external tables");
     }
     const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);

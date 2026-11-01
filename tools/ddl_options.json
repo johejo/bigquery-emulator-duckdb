@@ -282,11 +282,13 @@
     "external_table_option_list": [
       {
         "name": "allow_jagged_rows",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false"]
       },
       {
         "name": "allow_quoted_newlines",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false"]
       },
       {
         "name": "bigtable_options",
@@ -353,7 +355,8 @@
       },
       {
         "name": "ignore_unknown_values",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false"]
       },
       {
         "name": "json_extension",
@@ -372,11 +375,13 @@
       },
       {
         "name": "null_marker",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'\\\\N'", "'NULL'", "''"]
       },
       {
         "name": "null_markers",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['\\\\N', 'NA']", "['']"]
       },
       {
         "name": "object_metadata",
@@ -384,7 +389,8 @@
       },
       {
         "name": "preserve_ascii_control_characters",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false"]
       },
       {
         "name": "projection_fields",
@@ -392,7 +398,8 @@
       },
       {
         "name": "quote",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'\"'", "\"'\"", "''"]
       },
       {
         "name": "reference_file_schema_uri",
@@ -1900,14 +1907,14 @@
       "name": "CREATE EXTERNAL TABLE",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "exclude": ["format", "uris", "field_delimiter", "skip_leading_rows"],
+      "exclude": ["format", "uris", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})"
     },
     {
       "name": "CREATE EXTERNAL TABLE CSV",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "only": ["field_delimiter", "skip_leading_rows"],
+      "only": ["field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], {option})"
     },
     {

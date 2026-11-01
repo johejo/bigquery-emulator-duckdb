@@ -15,8 +15,10 @@ std::string_view FileFormatName(FileFormat format);
 FileFormat ParseLoadFormat(const nlohmann::json& configuration);
 
 struct CsvLoadOptions {
-  int skip_leading_rows = 0;
-  std::string field_delimiter = ",";
+  CsvReadOptions read;
+  // Whether the job sets an option other than skipLeadingRows and fieldDelimiter, which schema
+  // auto-detection does not take.
+  bool detection_options = false;
 };
 struct JsonLoadOptions {};
 struct ParquetLoadOptions {
@@ -24,6 +26,9 @@ struct ParquetLoadOptions {
 };
 using LoadOptions = std::variant<CsvLoadOptions, JsonLoadOptions, ParquetLoadOptions>;
 LoadOptions ParseLoadOptions(FileFormat format, const nlohmann::json& configuration);
+// Throws ApiError::Invalid for the CSV options BigQuery rejects with jobs.insert rather than in
+// the job: a quote of several characters, and nullMarker with nullMarkers.
+void CheckLoadRequest(const nlohmann::json& configuration);
 std::vector<std::string> ParseLoadSourceUris(const nlohmann::json& configuration);
 // Decimal inference only consults known string entries; other entries are ignored.
 std::vector<DecimalTargetType> ParseDecimalTargetTypes(const nlohmann::json& configuration);

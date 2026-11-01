@@ -22,6 +22,13 @@ struct GcsExternalData {
   std::string format = "PARQUET";
   std::optional<int64_t> skip_leading_rows = std::nullopt;
   std::optional<std::string> field_delimiter = std::nullopt;
+  std::optional<std::string> quote = std::nullopt;
+  std::optional<bool> allow_quoted_newlines = std::nullopt;
+  std::optional<bool> allow_jagged_rows = std::nullopt;
+  std::optional<std::string> null_marker = std::nullopt;
+  std::optional<std::vector<std::string>> null_markers = std::nullopt;
+  std::optional<bool> preserve_ascii_control_characters = std::nullopt;
+  std::optional<bool> ignore_unknown_values = std::nullopt;
   bool operator==(const GcsExternalData&) const = default;
 };
 

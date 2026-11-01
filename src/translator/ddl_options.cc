@@ -405,6 +405,55 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    if (decoded && external && decoded->id == DdlOptionId::kQuote) {
+      if (!decoded->value.is_null()) {
+        metadata.external_data->quote = decoded->value.string_value();
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kNullMarker) {
+      if (!decoded->value.is_null()) {
+        metadata.external_data->null_marker = decoded->value.string_value();
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kNullMarkers) {
+      if (!decoded->value.is_null()) {
+        auto& markers = metadata.external_data->null_markers.emplace();
+        for (int i = 0; i < decoded->value.num_elements(); ++i) {
+          if (decoded->value.element(i).is_null()) {
+            return Unsupported(scope, "NULL elements of null_markers");
+          }
+          markers.push_back(decoded->value.element(i).string_value());
+        }
+      }
+      continue;
+    }
+    std::optional<bool> GcsExternalData::* flag = nullptr;
+    if (decoded && external) {
+      switch (decoded->id) {
+        case DdlOptionId::kAllowQuotedNewlines:
+          flag = &GcsExternalData::allow_quoted_newlines;
+          break;
+        case DdlOptionId::kAllowJaggedRows:
+          flag = &GcsExternalData::allow_jagged_rows;
+          break;
+        case DdlOptionId::kPreserveAsciiControlCharacters:
+          flag = &GcsExternalData::preserve_ascii_control_characters;
+          break;
+        case DdlOptionId::kIgnoreUnknownValues:
+          flag = &GcsExternalData::ignore_unknown_values;
+          break;
+        default:
+          break;
+      }
+    }
+    if (flag != nullptr) {
+      if (!decoded->value.is_null()) {
+        (*metadata.external_data).*flag = decoded->value.bool_value();
+      }
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kEnableListInference) {
       if (!decoded->value.is_null()) {
         metadata.external_data->enable_list_inference = decoded->value.bool_value();

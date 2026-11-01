@@ -20,7 +20,7 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
   const auto line_break = [&] { return contents.at(i) == '\n' || contents.at(i) == '\r'; };
   const auto line_end = [&] { return i >= contents.size() || line_break(); };
   while (i < contents.size() && records.size() < limit) {
-    CsvRecord record;
+    CsvRecord record{.cells = {}, .line = line};
     const size_t record_line = line;
     while (true) {
       CsvCell cell;
@@ -42,17 +42,27 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
               break;
             }
             ++i;
+          } else if (contents.at(i) == '\r' && i + 1 < contents.size() &&
+                     contents.at(i + 1) == '\n') {
+            // A quoted CRLF reads as LF.
+            continue;
           } else if (contents.at(i) == '\n') {
             ++line;
           }
           cell.text += contents.at(i);
         }
+        if (!lenient && !line_end() && contents.at(i) != dialect.delimiter) {
+          throw ApiError::Invalid(std::format(
+              "Error while reading data, error message: Data between close quote character ({}) "
+              "and field separator.; line_number: {}",
+              *dialect.quote, record_line));
+        }
       }
       for (; !line_end() && contents.at(i) != dialect.delimiter; ++i) {
         cell.text += contents.at(i);
       }
-      record.push_back(cell.quoted || !cell.text.empty() ? std::optional(std::move(cell))
-                                                         : std::nullopt);
+      record.cells.push_back(cell.quoted || !cell.text.empty() ? std::optional(std::move(cell))
+                                                               : std::nullopt);
       if (line_end()) {
         break;
       }
@@ -65,11 +75,33 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
       ++i;
     }
     ++line;
-    if (record.size() > 1 || record.front().has_value()) {
+    if (record.cells.size() > 1 || record.cells.front().has_value()) {
       records.push_back(std::move(record));
     }
   }
   return records;
+}
+
+std::optional<char> ParseCsvQuote(const std::string& quote, const std::string& field_delimiter) {
+  if (quote.empty()) {
+    return std::nullopt;
+  }
+  if (quote.size() > 1) {
+    throw ApiError::Invalid("Quote char must be at most a single character.");
+  }
+  const auto c = static_cast<unsigned char>(quote.front());
+  if (c > 127 || c == '\n' || c == '\r' || c == '\0' || quote == field_delimiter) {
+    throw ApiError::Unsupported("the CSV quote " + quote);
+  }
+  return quote.front();
+}
+
+void CheckCsvNullMarkers(bool null_marker, bool null_markers) {
+  if (null_marker && null_markers) {
+    throw ApiError::Invalid(
+        "null_marker and null_markers cannot be used at the same time. Please use null_markers to "
+        "specify the NULL values in your CSV file.");
+  }
 }
 
 }  // namespace bigquery_emulator_duckdb

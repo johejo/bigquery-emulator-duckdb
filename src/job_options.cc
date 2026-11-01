@@ -1,5 +1,7 @@
 #include "src/job_options.h"
 
+#include <algorithm>
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -7,6 +9,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/csv_records.h"
 #include "src/extract_options.h"
 #include "src/file_read_options.h"
 
@@ -43,14 +46,52 @@ FileFormat ParseLoadFormat(const nlohmann::json& config) {
 }
 LoadOptions ParseLoadOptions(FileFormat format, const nlohmann::json& config) {
   switch (format) {
-    case FileFormat::kCsv:
-      return CsvLoadOptions{
-          .skip_leading_rows = config.value("skipLeadingRows", 0),
-          .field_delimiter = config.value("fieldDelimiter", ","),
+    case FileFormat::kCsv: {
+      CsvLoadOptions csv{
+          .read =
+              {
+                  .skip_leading_rows = config.value("skipLeadingRows", 0),
+                  .field_delimiter = config.value("fieldDelimiter", ","),
+                  .allow_quoted_newlines = config.value("allowQuotedNewlines", false),
+                  .allow_jagged_rows = config.value("allowJaggedRows", false),
+                  .ignore_unknown_values = config.value("ignoreUnknownValues", false),
+                  .preserve_ascii_control_characters =
+                      config.value("preserveAsciiControlCharacters", false),
+              },
       };
+      if (config.contains("quote")) {
+        csv.read.quote =
+            ParseCsvQuote(config["quote"].get<std::string>(), csv.read.field_delimiter);
+      }
+      CheckCsvNullMarkers(config.contains("nullMarker"), config.contains("nullMarkers"));
+      if (config.contains("nullMarker")) {
+        csv.read.null_marker = config["nullMarker"].get<std::string>();
+      }
+      if (config.contains("nullMarkers")) {
+        csv.read.null_markers = config["nullMarkers"].get<std::vector<std::string>>();
+      }
+      csv.detection_options =
+          std::ranges::any_of(std::to_array<std::string_view>({
+                                  "quote",
+                                  "allowQuotedNewlines",
+                                  "allowJaggedRows",
+                                  "ignoreUnknownValues",
+                                  "nullMarker",
+                                  "nullMarkers",
+                                  "preserveAsciiControlCharacters",
+                              }),
+                              [&config](std::string_view name) { return config.contains(name); });
+      return csv;
+    }
     case FileFormat::kJson:
+      if (config.value("ignoreUnknownValues", false)) {
+        throw ApiError::Unsupported("ignoreUnknownValues for NEWLINE_DELIMITED_JSON loads");
+      }
       return JsonLoadOptions{};
     case FileFormat::kParquet: {
+      if (config.value("ignoreUnknownValues", false)) {
+        throw ApiError::Unsupported("ignoreUnknownValues for PARQUET loads");
+      }
       const auto options = config.value("parquetOptions", nlohmann::json::object());
       return ParquetLoadOptions{
           .enable_list_inference = options.value("enableListInference", false),
@@ -58,6 +99,12 @@ LoadOptions ParseLoadOptions(FileFormat format, const nlohmann::json& config) {
     }
   }
   return JsonLoadOptions{};
+}
+void CheckLoadRequest(const nlohmann::json& config) {
+  if (config.contains("quote") && config["quote"].get_ref<const std::string&>().size() > 1) {
+    throw ApiError::Invalid("Quote char must be at most a single character.");
+  }
+  CheckCsvNullMarkers(config.contains("nullMarker"), config.contains("nullMarkers"));
 }
 std::vector<std::string> ParseLoadSourceUris(const nlohmann::json& config) {
   const auto uris = config.value("sourceUris", nlohmann::json::array());
