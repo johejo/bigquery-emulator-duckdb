@@ -114,7 +114,8 @@ func probeFunctionTypes(binary, catalogPath, functionsPath, outputDir string, ch
 			}
 		}()
 		if err := parallel(workers, func(int) error {
-			e, err := startEmulator(binary)
+			// SESSION_USER needs an identity to run.
+			e, err := startEmulator(binary, "--session-user", "jdoe@example.com")
 			if err == nil {
 				emulators <- e
 			}

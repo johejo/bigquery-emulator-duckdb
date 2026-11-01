@@ -332,7 +332,7 @@ func argumentForms(text string) ([][]string, error) {
 	return result, nil
 }
 
-// splitArguments splits at commas outside type parameters and quoted samples.
+// splitArguments splits at commas outside type parameters, parentheses and quoted samples.
 func splitArguments(text string) ([]string, error) {
 	args := []string{}
 	start := 0
@@ -352,8 +352,9 @@ func splitArguments(text string) ([]string, error) {
 	return args, err
 }
 
-// scan calls visit with each character outside type parameters and quoted samples until it
-// returns false.
+// scan calls visit with each character outside type parameters, parentheses and quoted samples
+// until it returns false. Parentheses enclose the arguments of a sample's calls, such as
+// AEAD.ENCRYPT(keyset, plaintext, additional_data).
 func scan(text string, visit func(int, byte) bool) error {
 	depth, quoted := 0, false
 	for i := 0; i < len(text); i++ {
@@ -361,16 +362,16 @@ func scan(text string, visit func(int, byte) bool) error {
 		case c == '\'':
 			quoted = !quoted
 		case quoted:
-		case c == '<':
+		case c == '<' || c == '(':
 			depth++
-		case c == '>':
+		case c == '>' || c == ')':
 			depth--
 		case depth == 0 && !visit(i, c):
 			return nil
 		}
 	}
 	if depth != 0 || quoted {
-		return fmt.Errorf("unbalanced type parameters or quotes: %q", text)
+		return fmt.Errorf("unbalanced type parameters, parentheses or quotes: %q", text)
 	}
 	return nil
 }
