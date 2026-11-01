@@ -440,7 +440,8 @@ Graph DDL rejects:
 `GRAPH_TABLE` and GQL queries reject:
 
 - Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.
-- The GQL `CALL` statement and SQL/PGQ's `COLUMNS` clause.
+- GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
+  `COLUMNS` clause.
 - Graph elements or paths in query results.
 - Graph values in comparisons such as `a = b`, grouping sets, `PARTITION BY`, and aggregate or
   analytic functions other than `COUNT`; paths in `GROUP BY`, `DISTINCT` and `COUNT(DISTINCT)`.
