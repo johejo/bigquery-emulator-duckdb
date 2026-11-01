@@ -1,6 +1,61 @@
 {
   "version": 1,
   "cases": {
+    "control_characters": {
+      "project": "johejo-sandbox",
+      "run": "smxwpcc2s6u2up7n2repko64y5",
+      "steps": {
+        "completed_load": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "read": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "612062"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "612062"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "612062"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "610962"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
     "control_default": {
       "project": "johejo-sandbox",
       "run": "5mwkshfb5ydqnfom4xo4egeya6",
@@ -345,6 +400,136 @@
             }
           ],
           "status": 200
+        }
+      }
+    },
+    "external_combined": {
+      "project": "johejo-sandbox",
+      "run": "smxwpcc2s6u2up7n2repko64y5",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "allowJaggedRows": true,
+              "fieldDelimiter": ",",
+              "nullMarker": "NA",
+              "skipLeadingRows": "1"
+            },
+            "ignoreUnknownValues": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_combined/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_smxwpcc2s6u2up7n2repko64y5_external_combined.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  allow_jagged_rows=true,\n  null_marker=\"NA\",\n  skip_leading_rows=1,\n  ignore_unknown_values=true,\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_combined/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "allow_jagged_rows"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "field_delimiter"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\",\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ignore_unknown_values"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "null_marker"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NA\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "skip_leading_rows"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_combined/a.csv\"]"
+                }
+              ]
+            }
+          ]
         }
       }
     },
@@ -745,6 +930,154 @@
             }
           ],
           "status": 200
+        }
+      }
+    },
+    "external_single_quote": {
+      "project": "johejo-sandbox",
+      "run": "smxwpcc2s6u2up7n2repko64y5",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "quote": "'"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_single_quote/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_smxwpcc2s6u2up7n2repko64y5_external_single_quote.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  quote=\"'\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_single_quote/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "quote"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"'\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_single_quote/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "external_skip_zero": {
+      "project": "johejo-sandbox",
+      "run": "smxwpcc2s6u2up7n2repko64y5",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "skipLeadingRows": "0"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_skip_zero/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_smxwpcc2s6u2up7n2repko64y5_external_skip_zero.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_skip_zero/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "skip_leading_rows"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "0"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/smxwpcc2s6u2up7n2repko64y5/external_skip_zero/a.csv\"]"
+                }
+              ]
+            }
+          ]
         }
       }
     },
@@ -1215,6 +1548,50 @@
               ]
             }
           ]
+        }
+      }
+    },
+    "null_markers_empty_integer": {
+      "project": "johejo-sandbox",
+      "run": "smxwpcc2s6u2up7n2repko64y5",
+      "steps": {
+        "completed_load": {
+          "status": {
+            "errorResult": {
+              "message": "Error while reading data, error message: CSV processing encountered too many errors, giving up. Rows: 1; errors: 1; max bad: 0; error percent: 0",
+              "reason": "invalid"
+            },
+            "errors": [
+              {
+                "message": "Error while reading data, error message: CSV processing encountered too many errors, giving up. Rows: 1; errors: 1; max bad: 0; error percent: 0",
+                "reason": "invalid"
+              },
+              {
+                "message": "Error while reading data, error message: Null marker is set to 'NA' but empty value found for field id that is of type different than STRING or BYTES.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 0 column_name: \"id\" column_type: INT64 value: \"\"",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: Table johejo-sandbox:bqa_smxwpcc2s6u2up7n2repko64y5_null_markers_empty_integer.destination was not found in location US",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: Table johejo-sandbox:bqa_smxwpcc2s6u2up7n2repko64y5_null_markers_empty_integer.destination was not found in location US",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
         }
       }
     },

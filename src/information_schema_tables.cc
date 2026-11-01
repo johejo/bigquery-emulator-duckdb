@@ -95,10 +95,10 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       ddl += std::string("  enable_list_inference=") +
              (*external->enable_list_inference ? "true" : "false") + ",\n";
     }
-    if (external->field_delimiter) {
+    // BigQuery's DDL leaves out null_markers and the default field_delimiter and quote.
+    if (external->field_delimiter && *external->field_delimiter != ",") {
       ddl += "  field_delimiter=" + StringOptionValue(*external->field_delimiter) + ",\n";
     }
-    // BigQuery's DDL leaves out null_markers and the default quote.
     if (external->null_marker) {
       ddl += "  null_marker=" + StringOptionValue(*external->null_marker) + ",\n";
     }

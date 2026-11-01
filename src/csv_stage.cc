@@ -38,12 +38,15 @@ void AppendQuoted(std::string& out, std::string_view text) {
   out += '"';
 }
 
-// `text` with each control character other than a tab or line break a space, as BigQuery reads
-// it unless it preserves them.
+// `text` with each control character other than a tab or line break, DEL included, a space, as
+// BigQuery reads it unless it preserves them.
 std::string Printable(std::string text, const CsvReadOptions& options) {
   if (!options.preserve_ascii_control_characters) {
     std::ranges::replace_if(
-        text, [](char c) { return c > '\0' && c < ' ' && c != '\t' && c != '\n' && c != '\r'; },
+        text,
+        [](char c) {
+          return (c > '\0' && c < ' ' && c != '\t' && c != '\n' && c != '\r') || c == '\x7f';
+        },
         ' ');
   }
   return text;
@@ -71,12 +74,9 @@ std::optional<std::string> Value(const std::optional<CsvCell>& cell, const Field
     return std::nullopt;
   }
   if (text.empty() && field.type != FieldType::kString && field.type != FieldType::kBytes) {
-    if (options.null_markers) {
-      throw ApiError::Unsupported("an empty CSV value of a non-STRING column with null_markers");
-    }
     Reject(std::format("Null marker is set to '{}' but empty value found for field {} that is "
                        "of type different than STRING or BYTES.",
-                       *options.null_marker, field.name),
+                       markers.front(), field.name),
            line);
   }
   return Printable(text, options);

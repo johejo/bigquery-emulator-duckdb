@@ -40,8 +40,7 @@ Loads and extracts also accept local paths. Their limits are:
   formats other than CSV.
 - CSV loads take `quote`, a single ASCII character other than a line break or the delimiter,
   `allowQuotedNewlines`, `allowJaggedRows`, `ignoreUnknownValues`, `nullMarker`, `nullMarkers` and
-  `preserveAsciiControlCharacters`; an empty value of a non-STRING column with `nullMarkers` is
-  unsupported. Other CSV options are unsupported.
+  `preserveAsciiControlCharacters`. Other CSV options are unsupported.
 - CSV schema detection, which a load also performs when neither it nor its destination gives a
   schema, takes one file, rejects header names with a form feed or vertical tab, and takes none
   of the options above.

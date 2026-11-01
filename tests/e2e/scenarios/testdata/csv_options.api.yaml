@@ -1,17 +1,20 @@
 version: 1
-# Recorded on BigQuery in project johejo-sandbox, runs 5mwkshfb5ydqnfom4xo4egeya6 (loads) and
-# 6zlqmx3pu5h2goqu5bjvus2npt (external tables, in the bucket johejo-sandbox-us); the answers sidecar
-# keeps the observations. quote_two_characters and null_markers_with_null_marker take their
-# expectations from the same collection's output, which reported jobs.insert rejecting them.
+# Recorded on BigQuery in project johejo-sandbox, runs 5mwkshfb5ydqnfom4xo4egeya6 (loads),
+# 6zlqmx3pu5h2goqu5bjvus2npt (external tables, in the bucket johejo-sandbox-us) and
+# smxwpcc2s6u2up7n2repko64y5 (control_characters, null_markers_empty_integer and the
+# external_metadata cases); the answers sidecar keeps the observations. quote_two_characters and
+# null_markers_with_null_marker take their expectations from the first collection's output, which
+# reported jobs.insert rejecting them.
 # Rejected loads and queries observe only their reason, since BigQuery's messages give byte offsets
 # and columns the emulator does not report.
 # The CSV options of third_party/bigquery_docs/loading-data-cloud-storage-csv.md, shared by load
 # jobs and CSV external tables. Beyond the documentation, BigQuery reads a quote within an
-# unquoted value as text, and a quoted CRLF as LF; a NULL marker matches quoted values too; under
-# nullMarker an empty value is an empty STRING and fails for other types; nullMarkers without ''
-# keep an empty STRING; by default only NUL among control characters fails. tables.get returns the
-# options as given, and INFORMATION_SCHEMA leaves out null_markers and, in its DDL, the default
-# quote.
+# unquoted value as text, and a quoted CRLF as LF; a NULL marker matches quoted values too; an
+# empty value is an empty STRING under nullMarker, and under nullMarkers without '', and fails for
+# other types under either; by default NUL fails and other control characters but tab and line
+# breaks, DEL included, read as spaces. tables.get returns the options as given, and
+# INFORMATION_SCHEMA leaves out null_markers and, in its DDL, the default quote, field_delimiter
+# and skip_leading_rows; TABLE_OPTIONS lists those given.
 description: >-
   CSV quote, allowQuotedNewlines, allowJaggedRows, ignoreUnknownValues, nullMarker, nullMarkers
   and preserveAsciiControlCharacters in load jobs and CSV external tables.
@@ -338,6 +341,67 @@ templates:
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
       - name: delete_source
         gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+  # As external, observing only the metadata.
+  external_metadata:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${external_csv}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
 cases:
   # quote
   - name: quote_single
@@ -446,6 +510,12 @@ cases:
       load_configuration: {load: {destinationTable: '${destination}', sourceFormat: CSV, schema: '${schema}', nullMarkers: ['', NA]}}
       csv: "1,\n,NA\n"
     expect: {"completed_load": {"outputRows": "2", "status": {"state": "DONE"}}, "read": {"rows": [{"f": [{"v": null}, {"v": null}]}, {"f": [{"v": "1"}, {"v": null}]}]}}
+  - name: null_markers_empty_integer
+    template: load_rejected
+    vars:
+      load_configuration: {load: {destinationTable: '${destination}', sourceFormat: CSV, schema: '${schema}', nullMarkers: [NA]}}
+      csv: ",a\n"
+    expect: {"completed_load": {"reason": "invalid"}}
   - name: null_markers_with_null_marker
     template: request_rejected
     vars:
@@ -473,6 +543,13 @@ cases:
       # "1,a\x01b\n"
       csv: MSxhAWIK
     expect: {"completed_load": {"status": {"state": "DONE"}}, "read": {"rows": [{"f": [{"v": "1"}, {"v": "612062"}]}]}}
+  - name: control_characters
+    template: load_bytes
+    vars:
+      load_configuration: {load: {destinationTable: '${destination}', sourceFormat: CSV, schema: '${schema}'}}
+      # "1,a\x0bb\n2,a\x1fb\n3,a\x7fb\n4,\"a\tb\"\n"
+      csv: MSxhC2IKMixhH2IKMyxhf2IKNCwiYQliIgo=
+    expect: {"completed_load": {"status": {"state": "DONE"}}, "read": {"rows": [{"f": [{"v": "1"}, {"v": "612062"}]}, {"f": [{"v": "2"}, {"v": "612062"}]}, {"f": [{"v": "3"}, {"v": "612062"}]}, {"f": [{"v": "4"}, {"v": "610962"}]}]}}
   # External tables: the options as stored, returned and applied by queries.
   - name: external_ddl
     template: external
@@ -545,3 +622,21 @@ cases:
             allowJaggedRows: true
             nullMarkers: ['\N', x]
     expect: {"create": {"status": 200}, "get": {"external": {"csvOptions": {"allowJaggedRows": true, "allowQuotedNewlines": true, "nullMarkers": ["\\N", "x"]}, "ignoreUnknownValues": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  allow_jagged_rows=true,\n  allow_quoted_newlines=true,\n  ignore_unknown_values=true,\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "options": {"rows": [{"f": [{"v": "allow_jagged_rows"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "allow_quoted_newlines"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "ignore_unknown_values"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": null}]}, {"f": [{"v": "2"}, {"v": ""}]}, {"f": [{"v": "3"}, {"v": "a\nb"}]}], "status": 200}}
+  - name: external_single_quote
+    template: external_metadata
+    vars:
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], quote = "'")
+    expect: {"create": {"status": 200}, "get": {"external": {"csvOptions": {"quote": "'"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  quote=\"'\",\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "quote"}, {"v": "STRING"}, {"v": "\"'\""}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}}
+  - name: external_combined
+    template: external_metadata
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV',
+        uris = ['${prefix}/a.csv'], ignore_unknown_values = true, skip_leading_rows = 1,
+        null_marker = 'NA', field_delimiter = ',', allow_jagged_rows = true)
+    expect: {"create": {"status": 200}, "get": {"external": {"csvOptions": {"allowJaggedRows": true, "fieldDelimiter": ",", "nullMarker": "NA", "skipLeadingRows": "1"}, "ignoreUnknownValues": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  allow_jagged_rows=true,\n  null_marker=\"NA\",\n  skip_leading_rows=1,\n  ignore_unknown_values=true,\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "options": {"rows": [{"f": [{"v": "allow_jagged_rows"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "field_delimiter"}, {"v": "STRING"}, {"v": "\",\""}]}, {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "ignore_unknown_values"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "null_marker"}, {"v": "STRING"}, {"v": "\"NA\""}]}, {"f": [{"v": "skip_leading_rows"}, {"v": "INT64"}, {"v": "1"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}}
+  - name: external_skip_zero
+    template: external_metadata
+    vars:
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], skip_leading_rows = 0)
+    expect: {"create": {"status": 200}, "get": {"external": {"csvOptions": {"skipLeadingRows": "0"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "skip_leading_rows"}, {"v": "INT64"}, {"v": "0"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}}
