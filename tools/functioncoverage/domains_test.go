@@ -37,6 +37,18 @@ func TestProseTypeConstraints(t *testing.T) {
 			t.Error("SPLIT delimiter must be literal")
 		}
 	}
+	// GoogleSQL requires non-NULL constants for these arguments, and BigQuery takes only FALSE for
+	// use_spheroid.
+	for name, i := range map[string]int{"HLL_COUNT.INIT": 1, "KLL_QUANTILES.INIT_INT64": 1, "KLL_QUANTILES.MERGE_INT64": 1, "KLL_QUANTILES.EXTRACT_POINT_INT64": 1, "ST_AREA": 1, "ST_DISTANCE": 2} {
+		if !slices.ContainsFunc(functions[name].Signatures, func(s functioncoverage.Signature) bool { return len(s.Arguments) > i }) {
+			t.Errorf("%s lacks argument %d", name, i)
+		}
+		for _, s := range functions[name].Signatures {
+			if len(s.Arguments) > i && !slices.Contains(s.LiteralArguments, i) {
+				t.Errorf("%s argument %d must be literal", name, i)
+			}
+		}
+	}
 	for _, s := range functions["ARRAY_AGG"].Signatures {
 		if strings.HasPrefix(s.Arguments[0], "ARRAY<") {
 			t.Error("ARRAY_AGG cannot take ARRAY")
@@ -134,7 +146,13 @@ note LPAD n
 	if len(got) != 1 || got[0].Note != "n" || !reflect.DeepEqual(got[0].Signatures, want) {
 		t.Fatalf("expanded: %#v", got)
 	}
+	// A sample's calls keep their commas, and its brackets don't make arguments optional.
+	got, err = expandDomains(root, "page string_functions\nLPAD(STRING = CONCAT('a', 'b'), INT64 = ARRAY_LENGTH([1, 2])) -> STRING\nnote LPAD n\n")
+	if err != nil || len(got) != 1 || !reflect.DeepEqual(got[0].Signatures[0].Samples, []string{"CONCAT('a', 'b')", "ARRAY_LENGTH([1, 2])"}) {
+		t.Fatalf("expanded: %#v, %v", got, err)
+	}
 	for _, text := range []string{
+		"page string_functions\nLPAD(STRING = CONCAT('a', INT64) -> STRING",
 		"page string_functions\nLPAD($T) -> STRING",
 		"page string_functions\nfor $T in STRING\nLPAD($T) -> $T",
 		"page string_functions\nend",

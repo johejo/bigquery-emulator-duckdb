@@ -103,6 +103,79 @@
       ]
     },
     {
+      "name": "AEAD.DECRYPT_BYTES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')",
+            "AEAD.ENCRYPT(FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB'), b'abc', b'abc')",
+            "b'abc'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AEAD.DECRYPT_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')",
+            "AEAD.ENCRYPT(FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB'), 'abc', 'abc')",
+            "'abc'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AEAD.ENCRYPT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "STRING",
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')",
+            "",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')",
+            "",
+            ""
+          ]
+        }
+      ]
+    },
+    {
       "name": "ANY_VALUE",
       "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
       "signatures": [
@@ -2557,6 +2630,18 @@
       ]
     },
     {
+      "name": "BAG_OF_WORDS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cterm STRING, count INT64\u003e\u003e"
+        }
+      ]
+    },
+    {
       "name": "BIT_AND",
       "source": "third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md",
       "signatures": [
@@ -4506,6 +4591,42 @@
       ]
     },
     {
+      "name": "DATETIME_BUCKET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time-series-functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATETIME",
+            "INTERVAL"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INTERVAL",
+            "DATETIME"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR",
+            "'2000-12-31 00:00:00'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
       "name": "DATETIME_DIFF",
       "source": "third_party/bigquery_docs/reference/standard-sql/datetime_functions.md",
       "signatures": [
@@ -4610,6 +4731,42 @@
           "samples": [
             "",
             "INTERVAL 2 DAY"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DATE_BUCKET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time-series-functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "DATE",
+            "INTERVAL"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "INTERVAL 2 DAY"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INTERVAL",
+            "DATE"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "INTERVAL 2 DAY",
+            "'2000-12-31'"
           ],
           "literal_arguments": [
             1
@@ -4763,6 +4920,79 @@
           ],
           "literal_arguments": [
             1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DETERMINISTIC_DECRYPT_BYTES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CIGYpMkDEoQBCngKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc1NpdktleRJCEkBKAovGAOp+siYkuWvTYKXRW6V/3Z5en87KNgswc+8TKZUzumbh/qVtCYQ8qHo7li/fYDx43MoBYwbfUPhv3//xGAEQARiBmKTJAyAB')",
+            "DETERMINISTIC_ENCRYPT(FROM_BASE64('CIGYpMkDEoQBCngKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc1NpdktleRJCEkBKAovGAOp+siYkuWvTYKXRW6V/3Z5en87KNgswc+8TKZUzumbh/qVtCYQ8qHo7li/fYDx43MoBYwbfUPhv3//xGAEQARiBmKTJAyAB'), b'abc', b'abc')",
+            "b'abc'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DETERMINISTIC_DECRYPT_STRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "FROM_BASE64('CIGYpMkDEoQBCngKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc1NpdktleRJCEkBKAovGAOp+siYkuWvTYKXRW6V/3Z5en87KNgswc+8TKZUzumbh/qVtCYQ8qHo7li/fYDx43MoBYwbfUPhv3//xGAEQARiBmKTJAyAB')",
+            "DETERMINISTIC_ENCRYPT(FROM_BASE64('CIGYpMkDEoQBCngKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc1NpdktleRJCEkBKAovGAOp+siYkuWvTYKXRW6V/3Z5en87KNgswc+8TKZUzumbh/qVtCYQ8qHo7li/fYDx43MoBYwbfUPhv3//xGAEQARiBmKTJAyAB'), 'abc', 'abc')",
+            "'abc'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DETERMINISTIC_ENCRYPT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "STRING",
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CIGYpMkDEoQBCngKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc1NpdktleRJCEkBKAovGAOp+siYkuWvTYKXRW6V/3Z5en87KNgswc+8TKZUzumbh/qVtCYQ8qHo7li/fYDx43MoBYwbfUPhv3//xGAEQARiBmKTJAyAB')",
+            "",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BYTES",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CIGYpMkDEoQBCngKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc1NpdktleRJCEkBKAovGAOp+siYkuWvTYKXRW6V/3Z5en87KNgswc+8TKZUzumbh/qVtCYQ8qHo7li/fYDx43MoBYwbfUPhv3//xGAEQARiBmKTJAyAB')",
+            "",
+            ""
           ]
         }
       ]
@@ -5502,6 +5732,157 @@
             "RANGE\u003cTIMESTAMP\u003e"
           ],
           "result": "RANGE\u003cTIMESTAMP\u003e"
+        }
+      ]
+    },
+    {
+      "name": "HLL_COUNT.EXTRACT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/hll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64",
+          "samples": [
+            "(SELECT HLL_COUNT.INIT(x) FROM UNNEST([1]) AS x)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HLL_COUNT.INIT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/hll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "15"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "15"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "15"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "15"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "15"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HLL_COUNT.MERGE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/hll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64",
+          "samples": [
+            "(SELECT HLL_COUNT.INIT(x) FROM UNNEST([1]) AS x)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HLL_COUNT.MERGE_PARTIAL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/hll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "(SELECT HLL_COUNT.INIT(x) FROM UNNEST([1]) AS x)"
+          ]
         }
       ]
     },
@@ -9522,6 +9903,340 @@
       ]
     },
     {
+      "name": "KEYS.ADD_KEY_FROM_RAW_BYTES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "STRING",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')",
+            "'AES_GCM'",
+            "b'0123456789012345'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KEYS.KEYSET_FROM_JSON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "KEYS.KEYSET_TO_JSON(FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB'))"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KEYS.KEYSET_LENGTH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "INT64",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KEYS.KEYSET_TO_JSON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "STRING",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KEYS.NEW_KEYSET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "'AEAD_AES_GCM_256'"
+          ],
+          "literal_arguments": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KEYS.ROTATE_KEYSET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "STRING"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "FROM_BASE64('CJmMp4UJEmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIP7Xj33VJoXuk9KMRwXsjkuDmo5P40WUSaVtJAzyve80GAEQARiZjKeFCSAB')",
+            "'AEAD_AES_GCM_256'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.EXTRACT_FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_FLOAT64(x) FROM UNNEST([1.5]) AS x)",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.EXTRACT_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([1]) AS x)",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.EXTRACT_POINT_FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_FLOAT64(x) FROM UNNEST([1.5]) AS x)",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.EXTRACT_POINT_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "FLOAT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([1]) AS x)",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.INIT_FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "note": "The named weight argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1000"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.INIT_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "note": "The named weight argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1000"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.MERGE_FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_FLOAT64(x) FROM UNNEST([1.5]) AS x)",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.MERGE_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([1]) AS x)",
+            "2"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.MERGE_PARTIAL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([1]) AS x)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.MERGE_POINT_FLOAT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_FLOAT64(x) FROM UNNEST([1.5]) AS x)",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "KLL_QUANTILES.MERGE_POINT_INT64",
+      "source": "third_party/bigquery_docs/reference/standard-sql/kll_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES",
+            "FLOAT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "(SELECT KLL_QUANTILES.INIT_INT64(x) FROM UNNEST([1]) AS x)",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
       "name": "LAST_DAY",
       "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
       "note": "The DATETIME form, documented with the datetime functions, is not yet enumerated.",
@@ -12709,6 +13424,42 @@
       ]
     },
     {
+      "name": "S2_CELLIDFROMPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "10"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "S2_COVERINGCELLIDS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named min_level, max_level, max_cells and buffer arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        }
+      ]
+    },
+    {
       "name": "SAFE_ADD",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [
@@ -13283,6 +14034,16 @@
       ]
     },
     {
+      "name": "SESSION_USER",
+      "source": "third_party/bigquery_docs/reference/standard-sql/security_functions.md",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
       "name": "SHA1",
       "source": "third_party/bigquery_docs/reference/standard-sql/hash_functions.md",
       "signatures": [
@@ -13710,6 +14471,1191 @@
       ]
     },
     {
+      "name": "ST_ANGLE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGPOINT(0, 1)",
+            "ST_GEOGPOINT(0, 0)",
+            "ST_GEOGPOINT(1, 0)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_AREA",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "BOOL"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_ASBINARY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "BYTES"
+        }
+      ]
+    },
+    {
+      "name": "ST_ASGEOJSON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "ST_ASTEXT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "ST_AZIMUTH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "ST_GEOGPOINT(3, 4)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_BOUNDARY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_BOUNDINGBOX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRUCT\u003cxmin FLOAT64, ymin FLOAT64, xmax FLOAT64, ymax FLOAT64\u003e"
+        }
+      ]
+    },
+    {
+      "name": "ST_BUFFER",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named endcap and side arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "100"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "100",
+            "8"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64",
+            "FLOAT64",
+            "BOOL"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "100",
+            "8",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_BUFFERWITHTOLERANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named endcap and side arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "100",
+            "25"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64",
+            "FLOAT64",
+            "BOOL"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "100",
+            "25",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_CENTROID",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_CENTROID_AGG",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_CLOSESTPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            ""
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "BOOL"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            "",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_CONTAINS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_CONVEXHULL",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_COVEREDBY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_COVERS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_DIFFERENCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_DIMENSION",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "ST_DISJOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_DISTANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "BOOL"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_DUMP",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "",
+            "0"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_DWITHIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "FLOAT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "",
+            "100"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "FLOAT64",
+            "BOOL"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "",
+            "100",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_ENDPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_EQUALS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_EXTENT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRUCT\u003cxmin FLOAT64, ymin FLOAT64, xmax FLOAT64, ymax FLOAT64\u003e"
+        }
+      ]
+    },
+    {
+      "name": "ST_EXTERIORRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOGFROM",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "'POINT(1 2)'"
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "FROM_HEX('010100000000000000000000400000000000001040')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOGFROMGEOJSON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named make_valid argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "'{\"type\": \"Point\", \"coordinates\": [1, 2]}'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOGFROMTEXT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named oriented, planar and make_valid arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "'POINT(1 2)'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOGFROMWKB",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named oriented, planar and make_valid arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "FROM_HEX('010100000000000000000000400000000000001040')"
+          ]
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "'010100000000000000000000400000000000001040'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOGPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOGPOINTFROMGEOHASH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "'u4pruydqqvj'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOHASH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "10"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_GEOMETRYTYPE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "ST_HAUSDORFFDISTANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named directed argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "ST_HAUSDORFFDWITHIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "note": "The named directed argument is not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "FLOAT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "",
+            "100"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_INTERIORRINGS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_INTERSECTION",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_INTERSECTS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_INTERSECTSBOX",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64",
+            "FLOAT64",
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "0",
+            "0",
+            "10",
+            "10"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_ISCLOSED",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_ISCOLLECTION",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_ISEMPTY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_ISRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_LENGTH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "BOOL"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_LINEINTERPOLATEPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            "0.5"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_LINELOCATEPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            ""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_LINESUBSTRING",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            "0.25",
+            "0.75"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_MAKELINE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "ST_GEOGPOINT(3, 4)"
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ARRAY(SELECT ST_GEOGPOINT(x, x) FROM UNNEST([0, 1]) AS x)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_MAKEPOLYGON",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0, 0 2, 0 0)')"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0, 0 2, 0 0)')",
+            "ARRAY(SELECT ST_GEOGFROMTEXT('LINESTRING(0.2 0.2, 0.4 0.2, 0.2 0.4, 0.2 0.2)'))"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_MAKEPOLYGONORIENTED",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ARRAY(SELECT ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0, 0 1, 0 0)'))"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_MAXDISTANCE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY",
+            "BOOL"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_NPOINTS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "ST_NUMGEOMETRIES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "ST_NUMPOINTS",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "ST_PERIMETER",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')"
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "BOOL"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')",
+            "FALSE"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_POINTN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            "1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_SIMPLIFY",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')",
+            "100"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_SNAPTOGRID",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "FLOAT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "0.01"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_STARTPOINT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ST_TOUCHES",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_UNION",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_UNION_AGG",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        }
+      ]
+    },
+    {
+      "name": "ST_WITHIN",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "GEOGRAPHY"
+          ],
+          "result": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "ST_X",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "ST_Y",
+      "source": "third_party/bigquery_docs/reference/standard-sql/geography_functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "SUBSTR",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -13878,6 +15824,19 @@
       ]
     },
     {
+      "name": "TEXT_ANALYZE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md",
+      "note": "The named analyzer and analyzer_options arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        }
+      ]
+    },
+    {
       "name": "TIME",
       "source": "third_party/bigquery_docs/reference/standard-sql/time_functions.md",
       "signatures": [
@@ -13987,6 +15946,42 @@
           "samples": [
             "",
             "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TIMESTAMP_BUCKET",
+      "source": "third_party/bigquery_docs/reference/standard-sql/time-series-functions.md",
+      "signatures": [
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INTERVAL"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INTERVAL",
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "INTERVAL 2 HOUR",
+            "'2000-12-31 00:00:00+00'"
           ],
           "literal_arguments": [
             1

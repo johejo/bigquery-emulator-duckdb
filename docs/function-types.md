@@ -45,6 +45,18 @@ documentation:
 - [Conversion](../third_party/bigquery_docs/reference/standard-sql/conversion_functions.md) and
   [utility functions](../third_party/bigquery_docs/reference/standard-sql/utility-functions.md):
   PARSE_NUMERIC, PARSE_BIGNUMERIC, GENERATE_UUID and TYPEOF.
+- [Geography functions](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md):
+  scalar and aggregate functions over point, line and polygon samples, with positional optional
+  arguments.
+- [HLL](../third_party/bigquery_docs/reference/standard-sql/hll_functions.md) and
+  [KLL functions](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md):
+  documented input types and sketches they initialize.
+- [AEAD encryption functions](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md):
+  serialized keysets and the ciphertexts they encrypt; Cloud KMS keysets are not enumerated.
+- [Time series](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md),
+  [text analysis](../third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md)
+  and [security functions](../third_party/bigquery_docs/reference/standard-sql/security_functions.md):
+  the bucket functions, TEXT_ANALYZE, BAG_OF_WORDS and SESSION_USER.
 
 Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
 Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
@@ -54,7 +66,8 @@ exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
 could select another overload. Syntax-like options such as rounding modes, SPLIT delimiters,
-JSONPaths, `INTERVAL` steps and date parts remain literals; `DATE_PART` names a date part
+JSONPaths, `INTERVAL` steps, date parts, key types, `use_spheroid` and the constant sketch
+precisions, quantile counts and phi values remain literals; `DATE_PART` names a date part
 keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
 documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
@@ -69,10 +82,11 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **246 of 407 functions**. The remaining **161** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **348 of 407 functions**. The remaining **59** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Details by domain
 
+- [aead-encryption](function-types/aead-encryption.md)
 - [aggregate](function-types/aggregate.md)
 - [approximate-aggregate](function-types/approximate-aggregate.md)
 - [array](function-types/array.md)
@@ -81,15 +95,21 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 - [conversion](function-types/conversion.md)
 - [date](function-types/date.md)
 - [datetime](function-types/datetime.md)
+- [geography](function-types/geography.md)
 - [hash](function-types/hash.md)
+- [hll](function-types/hll.md)
 - [interval](function-types/interval.md)
 - [json](function-types/json.md)
+- [kll](function-types/kll.md)
 - [mathematical](function-types/mathematical.md)
 - [net](function-types/net.md)
 - [range](function-types/range.md)
+- [security](function-types/security.md)
 - [statistical-aggregate](function-types/statistical-aggregate.md)
 - [string](function-types/string.md)
+- [text-analysis](function-types/text-analysis.md)
 - [time](function-types/time.md)
+- [time-series](function-types/time-series.md)
 - [timestamp](function-types/timestamp.md)
 - [utility](function-types/utility.md)
 
@@ -100,9 +120,9 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [ABS](function-types/mathematical.md#abs) | 4 | Supported |
 | [ACOS](function-types/mathematical.md#acos) | 4 | Supported |
 | [ACOSH](function-types/mathematical.md#acosh) | 4 | Supported |
-| `AEAD.DECRYPT_BYTES` | 0 | Not enumerated |
-| `AEAD.DECRYPT_STRING` | 0 | Not enumerated |
-| `AEAD.ENCRYPT` | 0 | Not enumerated |
+| [AEAD.DECRYPT_BYTES](function-types/aead-encryption.md#aeaddecrypt_bytes) | 1 | Supported |
+| [AEAD.DECRYPT_STRING](function-types/aead-encryption.md#aeaddecrypt_string) | 1 | Supported |
+| [AEAD.ENCRYPT](function-types/aead-encryption.md#aeadencrypt) | 2 | Supported |
 | `AGG` | 0 | Not enumerated |
 | [ANY_VALUE](function-types/aggregate.md#any_value) | 40 | Supported |
 | `APPENDS` | 0 | Not enumerated |
@@ -127,7 +147,7 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [ATAN2](function-types/mathematical.md#atan2) | 16 | Supported |
 | [ATANH](function-types/mathematical.md#atanh) | 4 | Supported |
 | [AVG](function-types/aggregate.md#avg) | 5 | Supported |
-| `BAG_OF_WORDS` | 0 | Not enumerated |
+| [BAG_OF_WORDS](function-types/text-analysis.md#bag_of_words) | 1 | Supported |
 | [BIT_AND](function-types/aggregate.md#bit_and) | 1 | Supported |
 | [BIT_COUNT](function-types/bit.md#bit_count) | 2 | Supported |
 | [BIT_OR](function-types/aggregate.md#bit_or) | 1 | Supported |
@@ -169,21 +189,21 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [DATE](function-types/date.md#date) | 4 | Supported |
 | [DATETIME](function-types/datetime.md#datetime) | 5 | Supported |
 | [DATETIME_ADD](function-types/datetime.md#datetime_add) | 1 | Supported |
-| `DATETIME_BUCKET` | 0 | Not enumerated |
+| [DATETIME_BUCKET](function-types/time-series.md#datetime_bucket) | 2 | Supported |
 | [DATETIME_DIFF](function-types/datetime.md#datetime_diff) | 1 | Supported |
 | [DATETIME_SUB](function-types/datetime.md#datetime_sub) | 1 | Supported |
 | [DATETIME_TRUNC](function-types/datetime.md#datetime_trunc) | 3 | Supported |
 | [DATE_ADD](function-types/date.md#date_add) | 1 | Supported |
-| `DATE_BUCKET` | 0 | Not enumerated |
+| [DATE_BUCKET](function-types/time-series.md#date_bucket) | 2 | Supported |
 | [DATE_DIFF](function-types/date.md#date_diff) | 3 | Supported |
 | [DATE_FROM_UNIX_DATE](function-types/date.md#date_from_unix_date) | 1 | Supported |
 | [DATE_SUB](function-types/date.md#date_sub) | 1 | Supported |
 | [DATE_TRUNC](function-types/date.md#date_trunc) | 4 | Supported |
 | `DENSE_RANK` | 0 | Not enumerated |
 | `DESTINATION_NODE_ID` | 0 | Not enumerated |
-| `DETERMINISTIC_DECRYPT_BYTES` | 0 | Not enumerated |
-| `DETERMINISTIC_DECRYPT_STRING` | 0 | Not enumerated |
-| `DETERMINISTIC_ENCRYPT` | 0 | Not enumerated |
+| [DETERMINISTIC_DECRYPT_BYTES](function-types/aead-encryption.md#deterministic_decrypt_bytes) | 1 | Supported |
+| [DETERMINISTIC_DECRYPT_STRING](function-types/aead-encryption.md#deterministic_decrypt_string) | 1 | Supported |
+| [DETERMINISTIC_ENCRYPT](function-types/aead-encryption.md#deterministic_encrypt) | 2 | Supported |
 | [DIV](function-types/mathematical.md#div) | 9 | Supported |
 | `DLP_DETERMINISTIC_DECRYPT` | 0 | Not enumerated |
 | `DLP_DETERMINISTIC_ENCRYPT` | 0 | Not enumerated |
@@ -218,10 +238,10 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [GENERATE_UUID](function-types/utility.md#generate_uuid) | 1 | Supported |
 | [GREATEST](function-types/mathematical.md#greatest) | 30 | Broken |
 | `GROUPING` | 0 | Not enumerated |
-| `HLL_COUNT.EXTRACT` | 0 | Not enumerated |
-| `HLL_COUNT.INIT` | 0 | Not enumerated |
-| `HLL_COUNT.MERGE` | 0 | Not enumerated |
-| `HLL_COUNT.MERGE_PARTIAL` | 0 | Not enumerated |
+| [HLL_COUNT.EXTRACT](function-types/hll.md#hll_countextract) | 1 | Supported |
+| [HLL_COUNT.INIT](function-types/hll.md#hll_countinit) | 10 | Supported |
+| [HLL_COUNT.MERGE](function-types/hll.md#hll_countmerge) | 1 | Supported |
+| [HLL_COUNT.MERGE_PARTIAL](function-types/hll.md#hll_countmerge_partial) | 1 | Supported |
 | [IEEE_DIVIDE](function-types/mathematical.md#ieee_divide) | 16 | Supported |
 | [IF](function-types/conditional.md#if) | 40 | Supported |
 | [IFNULL](function-types/conditional.md#ifnull) | 40 | Supported |
@@ -254,27 +274,27 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [JUSTIFY_DAYS](function-types/interval.md#justify_days) | 1 | Supported |
 | [JUSTIFY_HOURS](function-types/interval.md#justify_hours) | 1 | Supported |
 | [JUSTIFY_INTERVAL](function-types/interval.md#justify_interval) | 1 | Supported |
-| `KEYS.ADD_KEY_FROM_RAW_BYTES` | 0 | Not enumerated |
+| [KEYS.ADD_KEY_FROM_RAW_BYTES](function-types/aead-encryption.md#keysadd_key_from_raw_bytes) | 1 | Supported |
 | `KEYS.KEYSET_CHAIN` | 0 | Not enumerated |
-| `KEYS.KEYSET_FROM_JSON` | 0 | Not enumerated |
-| `KEYS.KEYSET_LENGTH` | 0 | Not enumerated |
-| `KEYS.KEYSET_TO_JSON` | 0 | Not enumerated |
-| `KEYS.NEW_KEYSET` | 0 | Not enumerated |
+| [KEYS.KEYSET_FROM_JSON](function-types/aead-encryption.md#keyskeyset_from_json) | 1 | Supported |
+| [KEYS.KEYSET_LENGTH](function-types/aead-encryption.md#keyskeyset_length) | 1 | Supported |
+| [KEYS.KEYSET_TO_JSON](function-types/aead-encryption.md#keyskeyset_to_json) | 1 | Supported |
+| [KEYS.NEW_KEYSET](function-types/aead-encryption.md#keysnew_keyset) | 1 | Supported |
 | `KEYS.NEW_WRAPPED_KEYSET` | 0 | Not enumerated |
 | `KEYS.REWRAP_KEYSET` | 0 | Not enumerated |
-| `KEYS.ROTATE_KEYSET` | 0 | Not enumerated |
+| [KEYS.ROTATE_KEYSET](function-types/aead-encryption.md#keysrotate_keyset) | 1 | Supported |
 | `KEYS.ROTATE_WRAPPED_KEYSET` | 0 | Not enumerated |
-| `KLL_QUANTILES.EXTRACT_FLOAT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.EXTRACT_INT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.EXTRACT_POINT_FLOAT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.EXTRACT_POINT_INT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.INIT_FLOAT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.INIT_INT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.MERGE_FLOAT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.MERGE_INT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.MERGE_PARTIAL` | 0 | Not enumerated |
-| `KLL_QUANTILES.MERGE_POINT_FLOAT64` | 0 | Not enumerated |
-| `KLL_QUANTILES.MERGE_POINT_INT64` | 0 | Not enumerated |
+| [KLL_QUANTILES.EXTRACT_FLOAT64](function-types/kll.md#kll_quantilesextract_float64) | 1 | Supported |
+| [KLL_QUANTILES.EXTRACT_INT64](function-types/kll.md#kll_quantilesextract_int64) | 1 | Supported |
+| [KLL_QUANTILES.EXTRACT_POINT_FLOAT64](function-types/kll.md#kll_quantilesextract_point_float64) | 1 | Supported |
+| [KLL_QUANTILES.EXTRACT_POINT_INT64](function-types/kll.md#kll_quantilesextract_point_int64) | 1 | Supported |
+| [KLL_QUANTILES.INIT_FLOAT64](function-types/kll.md#kll_quantilesinit_float64) | 2 | Supported |
+| [KLL_QUANTILES.INIT_INT64](function-types/kll.md#kll_quantilesinit_int64) | 2 | Supported |
+| [KLL_QUANTILES.MERGE_FLOAT64](function-types/kll.md#kll_quantilesmerge_float64) | 1 | Supported |
+| [KLL_QUANTILES.MERGE_INT64](function-types/kll.md#kll_quantilesmerge_int64) | 1 | Supported |
+| [KLL_QUANTILES.MERGE_PARTIAL](function-types/kll.md#kll_quantilesmerge_partial) | 1 | Supported |
+| [KLL_QUANTILES.MERGE_POINT_FLOAT64](function-types/kll.md#kll_quantilesmerge_point_float64) | 1 | Supported |
+| [KLL_QUANTILES.MERGE_POINT_INT64](function-types/kll.md#kll_quantilesmerge_point_int64) | 1 | Supported |
 | `LABELS` | 0 | Not enumerated |
 | `LAG` | 0 | Not enumerated |
 | [LAST_DAY](function-types/date.md#last_day) | 2 | Supported |
@@ -363,8 +383,8 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | `ROW_NUMBER` | 0 | Not enumerated |
 | [RPAD](function-types/string.md#rpad) | 4 | Supported |
 | [RTRIM](function-types/string.md#rtrim) | 3 | Supported |
-| `S2_CELLIDFROMPOINT` | 0 | Not enumerated |
-| `S2_COVERINGCELLIDS` | 0 | Not enumerated |
+| [S2_CELLIDFROMPOINT](function-types/geography.md#s2_cellidfrompoint) | 2 | Supported |
+| [S2_COVERINGCELLIDS](function-types/geography.md#s2_coveringcellids) | 1 | Supported |
 | [SAFE_ADD](function-types/mathematical.md#safe_add) | 16 | Supported |
 | `SAFE_CAST` | 0 | Not enumerated |
 | [SAFE_CONVERT_BYTES_TO_STRING](function-types/string.md#safe_convert_bytes_to_string) | 1 | Supported |
@@ -375,7 +395,7 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | `SEARCH` | 0 | Not enumerated |
 | [SEC](function-types/mathematical.md#sec) | 4 | Supported |
 | [SECH](function-types/mathematical.md#sech) | 4 | Supported |
-| `SESSION_USER` | 0 | Not enumerated |
+| [SESSION_USER](function-types/security.md#session_user) | 1 | Supported |
 | [SHA1](function-types/hash.md#sha1) | 2 | Supported |
 | [SHA256](function-types/hash.md#sha256) | 2 | Supported |
 | [SHA512](function-types/hash.md#sha512) | 2 | Supported |
@@ -393,86 +413,86 @@ Type signatures are enumerated for **246 of 407 functions**. The remaining **161
 | [STRING](function-types/timestamp.md#string) | 2 | Supported |
 | [STRING_AGG](function-types/aggregate.md#string_agg) | 4 | Supported |
 | [STRPOS](function-types/string.md#strpos) | 2 | Supported |
-| `ST_ANGLE` | 0 | Not enumerated |
-| `ST_AREA` | 0 | Not enumerated |
-| `ST_ASBINARY` | 0 | Not enumerated |
-| `ST_ASGEOJSON` | 0 | Not enumerated |
-| `ST_ASTEXT` | 0 | Not enumerated |
-| `ST_AZIMUTH` | 0 | Not enumerated |
-| `ST_BOUNDARY` | 0 | Not enumerated |
-| `ST_BOUNDINGBOX` | 0 | Not enumerated |
-| `ST_BUFFER` | 0 | Not enumerated |
-| `ST_BUFFERWITHTOLERANCE` | 0 | Not enumerated |
-| `ST_CENTROID` | 0 | Not enumerated |
-| `ST_CENTROID_AGG` | 0 | Not enumerated |
-| `ST_CLOSESTPOINT` | 0 | Not enumerated |
+| [ST_ANGLE](function-types/geography.md#st_angle) | 1 | Supported |
+| [ST_AREA](function-types/geography.md#st_area) | 2 | Supported |
+| [ST_ASBINARY](function-types/geography.md#st_asbinary) | 1 | Supported |
+| [ST_ASGEOJSON](function-types/geography.md#st_asgeojson) | 1 | Supported |
+| [ST_ASTEXT](function-types/geography.md#st_astext) | 1 | Supported |
+| [ST_AZIMUTH](function-types/geography.md#st_azimuth) | 1 | Supported |
+| [ST_BOUNDARY](function-types/geography.md#st_boundary) | 1 | Supported |
+| [ST_BOUNDINGBOX](function-types/geography.md#st_boundingbox) | 1 | Supported |
+| [ST_BUFFER](function-types/geography.md#st_buffer) | 3 | Supported |
+| [ST_BUFFERWITHTOLERANCE](function-types/geography.md#st_bufferwithtolerance) | 2 | Supported |
+| [ST_CENTROID](function-types/geography.md#st_centroid) | 1 | Supported |
+| [ST_CENTROID_AGG](function-types/geography.md#st_centroid_agg) | 1 | Supported |
+| [ST_CLOSESTPOINT](function-types/geography.md#st_closestpoint) | 2 | Supported |
 | `ST_CLUSTERDBSCAN` | 0 | Not enumerated |
-| `ST_CONTAINS` | 0 | Not enumerated |
-| `ST_CONVEXHULL` | 0 | Not enumerated |
-| `ST_COVEREDBY` | 0 | Not enumerated |
-| `ST_COVERS` | 0 | Not enumerated |
-| `ST_DIFFERENCE` | 0 | Not enumerated |
-| `ST_DIMENSION` | 0 | Not enumerated |
-| `ST_DISJOINT` | 0 | Not enumerated |
-| `ST_DISTANCE` | 0 | Not enumerated |
-| `ST_DUMP` | 0 | Not enumerated |
-| `ST_DWITHIN` | 0 | Not enumerated |
-| `ST_ENDPOINT` | 0 | Not enumerated |
-| `ST_EQUALS` | 0 | Not enumerated |
-| `ST_EXTENT` | 0 | Not enumerated |
-| `ST_EXTERIORRING` | 0 | Not enumerated |
-| `ST_GEOGFROM` | 0 | Not enumerated |
-| `ST_GEOGFROMGEOJSON` | 0 | Not enumerated |
-| `ST_GEOGFROMTEXT` | 0 | Not enumerated |
-| `ST_GEOGFROMWKB` | 0 | Not enumerated |
-| `ST_GEOGPOINT` | 0 | Not enumerated |
-| `ST_GEOGPOINTFROMGEOHASH` | 0 | Not enumerated |
-| `ST_GEOHASH` | 0 | Not enumerated |
-| `ST_GEOMETRYTYPE` | 0 | Not enumerated |
-| `ST_HAUSDORFFDISTANCE` | 0 | Not enumerated |
-| `ST_HAUSDORFFDWITHIN` | 0 | Not enumerated |
-| `ST_INTERIORRINGS` | 0 | Not enumerated |
-| `ST_INTERSECTION` | 0 | Not enumerated |
-| `ST_INTERSECTS` | 0 | Not enumerated |
-| `ST_INTERSECTSBOX` | 0 | Not enumerated |
-| `ST_ISCLOSED` | 0 | Not enumerated |
-| `ST_ISCOLLECTION` | 0 | Not enumerated |
-| `ST_ISEMPTY` | 0 | Not enumerated |
-| `ST_ISRING` | 0 | Not enumerated |
-| `ST_LENGTH` | 0 | Not enumerated |
-| `ST_LINEINTERPOLATEPOINT` | 0 | Not enumerated |
-| `ST_LINELOCATEPOINT` | 0 | Not enumerated |
-| `ST_LINESUBSTRING` | 0 | Not enumerated |
-| `ST_MAKELINE` | 0 | Not enumerated |
-| `ST_MAKEPOLYGON` | 0 | Not enumerated |
-| `ST_MAKEPOLYGONORIENTED` | 0 | Not enumerated |
-| `ST_MAXDISTANCE` | 0 | Not enumerated |
-| `ST_NPOINTS` | 0 | Not enumerated |
-| `ST_NUMGEOMETRIES` | 0 | Not enumerated |
-| `ST_NUMPOINTS` | 0 | Not enumerated |
-| `ST_PERIMETER` | 0 | Not enumerated |
-| `ST_POINTN` | 0 | Not enumerated |
+| [ST_CONTAINS](function-types/geography.md#st_contains) | 1 | Supported |
+| [ST_CONVEXHULL](function-types/geography.md#st_convexhull) | 1 | Supported |
+| [ST_COVEREDBY](function-types/geography.md#st_coveredby) | 1 | Supported |
+| [ST_COVERS](function-types/geography.md#st_covers) | 1 | Supported |
+| [ST_DIFFERENCE](function-types/geography.md#st_difference) | 1 | Supported |
+| [ST_DIMENSION](function-types/geography.md#st_dimension) | 1 | Supported |
+| [ST_DISJOINT](function-types/geography.md#st_disjoint) | 1 | Supported |
+| [ST_DISTANCE](function-types/geography.md#st_distance) | 2 | Supported |
+| [ST_DUMP](function-types/geography.md#st_dump) | 2 | Supported |
+| [ST_DWITHIN](function-types/geography.md#st_dwithin) | 2 | Supported |
+| [ST_ENDPOINT](function-types/geography.md#st_endpoint) | 1 | Supported |
+| [ST_EQUALS](function-types/geography.md#st_equals) | 1 | Supported |
+| [ST_EXTENT](function-types/geography.md#st_extent) | 1 | Supported |
+| [ST_EXTERIORRING](function-types/geography.md#st_exteriorring) | 1 | Supported |
+| [ST_GEOGFROM](function-types/geography.md#st_geogfrom) | 2 | Supported |
+| [ST_GEOGFROMGEOJSON](function-types/geography.md#st_geogfromgeojson) | 1 | Supported |
+| [ST_GEOGFROMTEXT](function-types/geography.md#st_geogfromtext) | 1 | Supported |
+| [ST_GEOGFROMWKB](function-types/geography.md#st_geogfromwkb) | 2 | Supported |
+| [ST_GEOGPOINT](function-types/geography.md#st_geogpoint) | 1 | Supported |
+| [ST_GEOGPOINTFROMGEOHASH](function-types/geography.md#st_geogpointfromgeohash) | 1 | Supported |
+| [ST_GEOHASH](function-types/geography.md#st_geohash) | 2 | Supported |
+| [ST_GEOMETRYTYPE](function-types/geography.md#st_geometrytype) | 1 | Supported |
+| [ST_HAUSDORFFDISTANCE](function-types/geography.md#st_hausdorffdistance) | 1 | Supported |
+| [ST_HAUSDORFFDWITHIN](function-types/geography.md#st_hausdorffdwithin) | 1 | Supported |
+| [ST_INTERIORRINGS](function-types/geography.md#st_interiorrings) | 1 | Supported |
+| [ST_INTERSECTION](function-types/geography.md#st_intersection) | 1 | Supported |
+| [ST_INTERSECTS](function-types/geography.md#st_intersects) | 1 | Supported |
+| [ST_INTERSECTSBOX](function-types/geography.md#st_intersectsbox) | 1 | Supported |
+| [ST_ISCLOSED](function-types/geography.md#st_isclosed) | 1 | Supported |
+| [ST_ISCOLLECTION](function-types/geography.md#st_iscollection) | 1 | Supported |
+| [ST_ISEMPTY](function-types/geography.md#st_isempty) | 1 | Supported |
+| [ST_ISRING](function-types/geography.md#st_isring) | 1 | Supported |
+| [ST_LENGTH](function-types/geography.md#st_length) | 2 | Supported |
+| [ST_LINEINTERPOLATEPOINT](function-types/geography.md#st_lineinterpolatepoint) | 1 | Supported |
+| [ST_LINELOCATEPOINT](function-types/geography.md#st_linelocatepoint) | 1 | Supported |
+| [ST_LINESUBSTRING](function-types/geography.md#st_linesubstring) | 1 | Supported |
+| [ST_MAKELINE](function-types/geography.md#st_makeline) | 2 | Supported |
+| [ST_MAKEPOLYGON](function-types/geography.md#st_makepolygon) | 2 | Supported |
+| [ST_MAKEPOLYGONORIENTED](function-types/geography.md#st_makepolygonoriented) | 1 | Supported |
+| [ST_MAXDISTANCE](function-types/geography.md#st_maxdistance) | 2 | Supported |
+| [ST_NPOINTS](function-types/geography.md#st_npoints) | 1 | Supported |
+| [ST_NUMGEOMETRIES](function-types/geography.md#st_numgeometries) | 1 | Supported |
+| [ST_NUMPOINTS](function-types/geography.md#st_numpoints) | 1 | Supported |
+| [ST_PERIMETER](function-types/geography.md#st_perimeter) | 2 | Supported |
+| [ST_POINTN](function-types/geography.md#st_pointn) | 1 | Supported |
 | `ST_REGIONSTATS` | 0 | Not enumerated |
-| `ST_SIMPLIFY` | 0 | Not enumerated |
-| `ST_SNAPTOGRID` | 0 | Not enumerated |
-| `ST_STARTPOINT` | 0 | Not enumerated |
-| `ST_TOUCHES` | 0 | Not enumerated |
-| `ST_UNION` | 0 | Not enumerated |
-| `ST_UNION_AGG` | 0 | Not enumerated |
-| `ST_WITHIN` | 0 | Not enumerated |
-| `ST_X` | 0 | Not enumerated |
-| `ST_Y` | 0 | Not enumerated |
+| [ST_SIMPLIFY](function-types/geography.md#st_simplify) | 1 | Supported |
+| [ST_SNAPTOGRID](function-types/geography.md#st_snaptogrid) | 1 | Supported |
+| [ST_STARTPOINT](function-types/geography.md#st_startpoint) | 1 | Supported |
+| [ST_TOUCHES](function-types/geography.md#st_touches) | 1 | Supported |
+| [ST_UNION](function-types/geography.md#st_union) | 2 | Supported |
+| [ST_UNION_AGG](function-types/geography.md#st_union_agg) | 1 | Supported |
+| [ST_WITHIN](function-types/geography.md#st_within) | 1 | Supported |
+| [ST_X](function-types/geography.md#st_x) | 1 | Supported |
+| [ST_Y](function-types/geography.md#st_y) | 1 | Supported |
 | [SUBSTR](function-types/string.md#substr) | 4 | Supported |
 | [SUBSTRING](function-types/string.md#substring) | 4 | Supported |
 | [SUM](function-types/aggregate.md#sum) | 5 | Supported |
 | [TAN](function-types/mathematical.md#tan) | 4 | Supported |
 | [TANH](function-types/mathematical.md#tanh) | 4 | Supported |
-| `TEXT_ANALYZE` | 0 | Not enumerated |
+| [TEXT_ANALYZE](function-types/text-analysis.md#text_analyze) | 1 | Supported |
 | `TF_IDF` | 0 | Not enumerated |
 | [TIME](function-types/time.md#time) | 4 | Supported |
 | [TIMESTAMP](function-types/timestamp.md#timestamp) | 6 | Supported |
 | [TIMESTAMP_ADD](function-types/timestamp.md#timestamp_add) | 1 | Supported |
-| `TIMESTAMP_BUCKET` | 0 | Not enumerated |
+| [TIMESTAMP_BUCKET](function-types/time-series.md#timestamp_bucket) | 2 | Supported |
 | [TIMESTAMP_DIFF](function-types/timestamp.md#timestamp_diff) | 1 | Supported |
 | [TIMESTAMP_MICROS](function-types/timestamp.md#timestamp_micros) | 1 | Supported |
 | [TIMESTAMP_MILLIS](function-types/timestamp.md#timestamp_millis) | 1 | Supported |

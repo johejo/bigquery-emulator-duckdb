@@ -45,6 +45,18 @@ documentation:
 - [Conversion](../third_party/bigquery_docs/reference/standard-sql/conversion_functions.md) and
   [utility functions](../third_party/bigquery_docs/reference/standard-sql/utility-functions.md):
   PARSE_NUMERIC, PARSE_BIGNUMERIC, GENERATE_UUID and TYPEOF.
+- [Geography functions](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md):
+  scalar and aggregate functions over point, line and polygon samples, with positional optional
+  arguments.
+- [HLL](../third_party/bigquery_docs/reference/standard-sql/hll_functions.md) and
+  [KLL functions](../third_party/bigquery_docs/reference/standard-sql/kll_functions.md):
+  documented input types and sketches they initialize.
+- [AEAD encryption functions](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md):
+  serialized keysets and the ciphertexts they encrypt; Cloud KMS keysets are not enumerated.
+- [Time series](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md),
+  [text analysis](../third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md)
+  and [security functions](../third_party/bigquery_docs/reference/standard-sql/security_functions.md):
+  the bucket functions, TEXT_ANALYZE, BAG_OF_WORDS and SESSION_USER.
 
 Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
 Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
@@ -54,7 +66,8 @@ exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
 could select another overload. Syntax-like options such as rounding modes, SPLIT delimiters,
-JSONPaths, `INTERVAL` steps and date parts remain literals; `DATE_PART` names a date part
+JSONPaths, `INTERVAL` steps, date parts, key types, `use_spheroid` and the constant sketch
+precisions, quantile counts and phi values remain literals; `DATE_PART` names a date part
 keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
 documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
