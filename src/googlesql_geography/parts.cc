@@ -20,7 +20,8 @@ namespace googlesql_geography {
 namespace {
 
 // The geography of a part whose coordinates are in range, built as BigQuery builds it.
-absl::StatusOr<Geography> Build(const Part& part, bool oriented, std::string_view failed) {
+absl::StatusOr<Geography> Build(const Part& part, bool oriented, std::string_view failed,
+                                bool make_valid) {
   std::vector<std::vector<S2Point>> loops;
   for (const std::vector<Point>& ring : part.rings) {
     std::vector<S2Point>& vertices = loops.emplace_back(ring.size());
@@ -45,17 +46,19 @@ absl::StatusOr<Geography> Build(const Part& part, bool oriented, std::string_vie
       break;
   }
   for (std::vector<S2Point>& loop : loops) {
-    if (loop.size() < 4) {
+    if (loop.size() < (make_valid ? 3 : 4)) {
       return absl::OutOfRangeError(
           std::string(failed) + "Polygon loop should have at least four vertices, but only had " +
           std::to_string(loop.size()));
     }
-    if (loop.front() != loop.back()) {
+    if (!make_valid && loop.front() != loop.back()) {
       return absl::OutOfRangeError(
           std::string(failed) +
           "Polygon loop should be a closed ring (last point the same as first)");
     }
-    loop.pop_back();
+    if (loop.front() == loop.back()) {
+      loop.pop_back();
+    }
   }
   // BuildPolygon stores holes as the regions they remove, whereas an oriented input ring
   // always has the polygon's interior on its left.
@@ -64,13 +67,14 @@ absl::StatusOr<Geography> Build(const Part& part, bool oriented, std::string_vie
       std::ranges::reverse(loops.at(i));
     }
   }
-  return BuildPolygon(loops, failed, oriented);
+  const auto result = BuildPolygon(loops, failed, oriented);
+  return make_valid && !result.ok() ? RepairPolygon(loops, failed) : result;
 }
 
 }  // namespace
 
 absl::StatusOr<Geography> BuildParts(std::vector<Part> parts, bool oriented,
-                                     std::string_view failed) {
+                                     std::string_view failed, bool make_valid) {
   for (Part& part : parts) {
     for (std::vector<Point>& ring : part.rings) {
       for (Point& vertex : ring) {
@@ -86,7 +90,7 @@ absl::StatusOr<Geography> BuildParts(std::vector<Part> parts, bool oriented,
   }
   std::vector<Geography> built;
   for (const Part& part : parts) {
-    GOOGLESQL_ASSIGN_OR_RETURN(Geography geography, Build(part, oriented, failed));
+    GOOGLESQL_ASSIGN_OR_RETURN(Geography geography, Build(part, oriented, failed, make_valid));
     built.push_back(std::move(geography));
   }
   if (built.empty()) {
@@ -95,8 +99,8 @@ absl::StatusOr<Geography> BuildParts(std::vector<Part> parts, bool oriented,
   return Combine(built);
 }
 
-absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts,
-                                           std::string_view failed) {
+absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts, std::string_view failed,
+                                           bool make_valid) {
   std::vector<Geography> built;
   for (const Part& part : parts) {
     std::vector<std::vector<R2Point>> rings;
@@ -124,7 +128,7 @@ absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts,
         geography = PlanarLine(rings.front(), failed);
         break;
       case Part::Type::kPolygon:
-        geography = PlanarPolygon(rings, failed);
+        geography = PlanarPolygon(rings, failed, make_valid);
         break;
       case Part::Type::kFull:
         geography = FullGeography();

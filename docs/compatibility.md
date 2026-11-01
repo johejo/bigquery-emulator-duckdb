@@ -243,10 +243,6 @@ BigQuery loads as NULL.
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
 - `ST_ASGEOJSON` is unsupported for shapes that cross the antimeridian or touch a pole.
-- Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
-  holes that collapse are unsupported.
-- `ST_GEOGFROMTEXT`'s and `ST_GEOGFROMWKB`'s `make_valid = TRUE` are unsupported, as is
-  `ST_GEOGFROMGEOJSON`'s `make_valid`.
 - `S2_COVERINGCELLIDS` does not support `max_cells` above 2,147,483,647.
 - `SAFE.ST_BUFFER` and `SAFE.ST_BUFFERWITHTOLERANCE` return NULL for `use_spheroid = TRUE`,
   where BigQuery fails.

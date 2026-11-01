@@ -143,14 +143,19 @@ absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices);
 // the regions it divides the sphere into, which a hole removes from the shell's. Rings must have
 // three or more distinct vertices and not cross, and holes must lie inside the shell and outside
 // each other; `failed` prefixes the error. Once each ring is valid, vertices within a micrometer
-// of each other snap to the one S2Builder keeps: a hole that collapses is dropped, and a shell
-// without holes that collapses is the linestring or the point it leaves. BigQuery also snaps edges,
-// and rings where they cross or touch at an edge, which is unsupported, as is a shell with holes
-// that collapses. An empty first ring denotes a full shell; its holes must be disjoint and
+// of each other or an edge snap together, splitting edges at shared vertices. Nondegenerate
+// rings may share vertices, but not edges.
+// A hole that collapses is dropped, and a shell that collapses is the linestring or the point
+// it leaves. An empty first ring denotes a full shell; its holes must be disjoint and
 // unnested. Other empty rings are invalid. Where `oriented`, each ring instead encloses the region
 // on its left, however large, as the region a hole removes.
 absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& input,
                                        std::string_view failed, bool oriented = false);
+
+// Repairs possibly self-intersecting polygon rings with the odd winding rule. The rings need
+// not repeat their first vertex. Degenerate input edges are discarded.
+absl::StatusOr<Geography> RepairPolygon(const std::vector<std::vector<S2Point>>& input,
+                                        std::string_view failed);
 
 // The geography of `parts`, each as BuildLine or BuildPolygon builds it, as BigQuery makes a
 // collection: the union of the parts in order, snapped together within a micrometer, where a

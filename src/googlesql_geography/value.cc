@@ -29,17 +29,13 @@
 #include "s2/s2builderutil_s2polygon_layer.h"
 #include "s2/s2builderutil_s2polyline_vector_layer.h"
 #include "s2/s2builderutil_snap_functions.h"
-#include "s2/s2closest_edge_query.h"
-#include "s2/s2closest_point_query.h"
 #include "s2/s2debug.h"
 #include "s2/s2earth.h"
 #include "s2/s2error.h"
 #include "s2/s2latlng.h"
-#include "s2/s2lax_loop_shape.h"
 #include "s2/s2lax_polyline_shape.h"
 #include "s2/s2loop.h"
 #include "s2/s2point.h"
-#include "s2/s2point_index.h"
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2pointutil.h"
 #include "s2/s2polygon.h"
@@ -456,84 +452,10 @@ absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& ring
   return Geography{.points = {}, .lines = {}, .polygons = {std::move(result)}};
 }
 
-// The rings with each vertex moved to the one S2Builder snaps it to with an identity snap function
-// of a micrometer, or nullopt where none moves: BigQuery keeps the vertex S2Builder does. Snapping
-// that collapses a shell with holes, or brings a vertex within a micrometer of an edge, which
-// BigQuery snaps too, is unsupported.
-absl::StatusOr<std::optional<std::vector<std::vector<S2Point>>>> SnapVertices(
-    const std::vector<std::vector<S2Point>>& rings) {
-  const S1Angle radius = S2Earth::MetersToAngle(1e-6);
-  S2Builder builder{S2Builder::Options(s2builderutil::IdentitySnapFunction(radius))};
-  std::vector<S2Point> sites;
-  builder.StartLayer(std::make_unique<s2builderutil::S2PointVectorLayer>(&sites));
-  for (const std::vector<S2Point>& ring : rings) {
-    for (const S2Point& vertex : ring) {
-      builder.AddPoint(vertex);
-    }
-  }
-  S2Error error;
-  if (!builder.Build(&error)) {
-    return absl::InternalError("S2Builder failed: " + std::string(error.message()));
-  }
-  // S2Builder snaps each vertex to the nearest site.
-  S2PointIndex<int> site_index;
-  for (const S2Point& site : sites) {
-    site_index.Add(site, 0);
-  }
-  S2ClosestPointQuery<int> site_query(&site_index);
-  std::vector<std::vector<S2Point>> snapped = rings;
-  bool moved = false;
-  for (std::vector<S2Point>& ring : snapped) {
-    for (S2Point& vertex : ring) {
-      S2ClosestPointQuery<int>::PointTarget target(vertex);
-      const S2Point site = site_query.FindClosestPoint(&target).point();
-      moved = moved || site != vertex;
-      vertex = site;
-    }
-  }
-  if (!moved) {
-    return std::nullopt;
-  }
-  for (std::vector<S2Point>& ring : snapped) {
-    const auto repeated = std::ranges::unique(ring);
-    ring.erase(repeated.begin(), repeated.end());
-    while (ring.size() > 1 && ring.back() == ring.front()) {
-      ring.pop_back();
-    }
-  }
-  // A hole that collapses is dropped, and a shell without holes that collapses is the line or the
-  // point it leaves.
-  std::erase_if(snapped, [&](const std::vector<S2Point>& ring) {
-    return &ring != snapped.data() && ring.size() < 3;
-  });
-  if (!rings.front().empty() && snapped.front().size() < 3) {
-    if (snapped.size() == 1) {
-      return snapped;
-    }
-    return absl::UnimplementedError(
-        "The emulator does not support a polygon shell that BigQuery snaps to a line or a point "
-        "while it has holes");
-  }
-  MutableS2ShapeIndex edges;
-  for (const std::vector<S2Point>& ring : snapped) {
-    edges.Add(std::make_unique<S2LaxClosedPolylineShape>(ring));
-  }
-  S2ClosestEdgeQuery edge_query(&edges);
-  edge_query.mutable_options()->set_inclusive_max_distance(radius);
-  for (const std::vector<S2Point>& ring : snapped) {
-    for (const S2Point& vertex : ring) {
-      S2ClosestEdgeQuery::PointTarget target(vertex);
-      for (const auto& result : edge_query.FindClosestEdges(&target)) {
-        const auto edge = edges.shape(result.shape_id())->edge(result.edge_id());
-        if (edge.v0 != vertex && edge.v1 != vertex) {
-          return absl::UnimplementedError(
-              "The emulator does not support a polygon vertex that BigQuery snaps onto an edge");
-        }
-      }
-    }
-  }
-  return snapped;
-}
+// Defined beside the closed-set output helpers below, so construction and set operations use
+// the same treatment of degenerate shells and holes.
+absl::StatusOr<Geography> SnapPolygon(const std::vector<std::vector<S2Point>>& rings,
+                                      std::string_view failed, bool oriented);
 
 }  // namespace
 
@@ -555,24 +477,7 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
     const absl::Span<const S2Point> vertices = loop->vertices_span();
     normalized.emplace_back(vertices.begin(), vertices.end());
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(const std::optional<std::vector<std::vector<S2Point>>> snapped,
-                             SnapVertices(normalized));
-  absl::StatusOr<Geography> polygon = Assemble(rings, failed, oriented);
-  if (!snapped) {
-    return polygon;
-  }
-  // Where rings cross or touch at an edge, BigQuery snaps them to the point where they meet.
-  if (!polygon.ok()) {
-    return absl::UnimplementedError(
-        "The emulator does not support a polygon whose rings BigQuery snaps where they meet");
-  }
-  if (!rings.front().empty() && snapped->front().size() == 1) {
-    return PointGeography(snapped->front().front());
-  }
-  if (!rings.front().empty() && snapped->front().size() == 2) {
-    return BuildLine(snapped->front());
-  }
-  return Assemble(*snapped, failed, oriented);
+  return SnapPolygon(normalized, failed, oriented);
 }
 
 namespace {
@@ -666,6 +571,92 @@ absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts) {
   return Read(*output);
 }
 
+namespace {
+
+absl::StatusOr<Geography> SnapPolygon(const std::vector<std::vector<S2Point>>& rings,
+                                      std::string_view failed, bool oriented) {
+  S2Builder::Options options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)));
+  options.set_split_crossing_edges(true);
+  S2Builder builder(options);
+  // Snap each ring in the same builder as the result. Checking their interiors afterwards
+  // permits shared boundaries, but not holes outside the shell or overlapping holes.
+  std::vector<S2Polygon> interiors(rings.size());
+  s2builderutil::S2PolygonLayer::Options polygon_options;
+  polygon_options.set_validate(true);
+  for (size_t i = 0; i < rings.size(); ++i) {
+    builder.StartLayer(
+        std::make_unique<s2builderutil::S2PolygonLayer>(&interiors.at(i), polygon_options));
+    builder.AddIsFullPolygonPredicate(S2Builder::IsFullPolygon(rings.at(i).empty()));
+    builder.AddLoop(rings.at(i));
+  }
+  BooleanResult output;
+  using LineLayer = s2builderutil::S2PolylineVectorLayer;
+  LineLayer::Options line_options;
+  line_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
+  line_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+  line_options.set_duplicate_edges(LineLayer::Options::DuplicateEdges::MERGE);
+  std::vector<std::unique_ptr<S2Builder::Layer>> layers;
+  layers.push_back(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
+  layers.push_back(std::make_unique<LineLayer>(&output.lines, line_options));
+  layers.push_back(
+      std::make_unique<s2builderutil::S2PolygonLayer>(&output.polygon, polygon_options));
+  auto normalized = s2builderutil::NormalizeClosedSet(std::move(layers));
+  builder.StartLayer(std::move(normalized.at(0)));
+  builder.StartLayer(std::move(normalized.at(1)));
+  builder.StartLayer(std::move(normalized.at(2)));
+  builder.AddIsFullPolygonPredicate(S2Builder::IsFullPolygon(rings.front().empty()));
+  for (size_t i = 0; i < rings.size(); ++i) {
+    auto ring = rings.at(i);
+    if (i != 0) {
+      std::ranges::reverse(ring);
+    }
+    builder.AddLoop(ring);
+  }
+  S2Error error;
+  if (!builder.Build(&error)) {
+    const auto original = Assemble(rings, failed, oriented);
+    if (!original.ok()) {
+      return original.status();
+    }
+    return absl::OutOfRangeError(std::string(failed) +
+                                 "Invalid polygon: " + std::string(error.message()));
+  }
+  // Shared vertices are allowed, but a shared edge between nondegenerate rings is not.
+  // Use the snapped interiors, so collapsed shells and holes have no boundary to reject.
+  absl::flat_hash_set<std::pair<S2Point, S2Point>> edges;
+  for (const S2Polygon& interior : interiors) {
+    for (int i = 0; i < interior.num_loops(); ++i) {
+      const S2Loop& loop = *interior.loop(i);
+      for (int j = 0; j < loop.num_vertices(); ++j) {
+        const S2Point& a = loop.vertex(j);
+        const S2Point& b = loop.vertex(j + 1);
+        if (a != b && !edges.emplace(std::min(a, b), std::max(a, b)).second) {
+          return absl::OutOfRangeError(std::string(failed) +
+                                       "Shape 0 has one or more edges with interior on the right.");
+        }
+      }
+    }
+  }
+  for (size_t i = 1; i < interiors.size(); ++i) {
+    bool valid = interiors.front().Contains(interiors.at(i));
+    for (size_t j = 1; j < i; ++j) {
+      valid = valid && !interiors.at(j).Intersects(interiors.at(i));
+    }
+    if (!valid) {
+      const auto original = Assemble(rings, failed, oriented);
+      if (!original.ok()) {
+        return original.status();
+      }
+      return absl::OutOfRangeError(std::string(failed) +
+                                   "Invalid polygon: the holes must lie inside the shell and "
+                                   "outside each other");
+    }
+  }
+  return Read(output);
+}
+
+}  // namespace
+
 absl::StatusOr<Geography> Snap(const Geography& geography,
                                const S2Builder::SnapFunction& snap_function, bool simplify) {
   S2Builder::Options options(snap_function);
@@ -701,6 +692,30 @@ absl::StatusOr<Geography> Snap(const Geography& geography,
     return absl::InternalError("S2Builder failed: " + std::string(error.message()));
   }
   return Read(output);
+}
+
+absl::StatusOr<Geography> RepairPolygon(const std::vector<std::vector<S2Point>>& input,
+                                        std::string_view failed) {
+  S2Builder::Options options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)));
+  options.set_split_crossing_edges(true);
+  S2Builder builder(options);
+  // Repair discards degenerate input edges rather than preserving them as lines or points.
+  S2Polygon polygon;
+  s2builderutil::S2PolygonLayer::Options polygon_options(S2Builder::EdgeType::UNDIRECTED);
+  polygon_options.set_validate(true);
+  builder.StartLayer(std::make_unique<s2builderutil::S2PolygonLayer>(&polygon, polygon_options));
+  for (const auto& ring : input) {
+    builder.AddLoop(ring);
+  }
+  S2Error error;
+  if (!builder.Build(&error)) {
+    return absl::OutOfRangeError(std::string(failed) + std::string(error.message()));
+  }
+  // Canonicalize touching holes into separate shells where the repaired interior has islands.
+  MutableS2ShapeIndex polygon_index;
+  const MutableS2ShapeIndex empty_index;
+  AddShapes(FromPolygon(polygon), polygon_index);
+  return ClosedSetOperation(polygon_index, empty_index, S2BooleanOperation::OpType::UNION);
 }
 
 absl::StatusOr<Geography> BufferGeography(const Geography& geography,

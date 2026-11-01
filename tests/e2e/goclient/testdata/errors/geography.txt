@@ -20,9 +20,6 @@ SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((175 0, -175 0, 180 5, 175 0))'))
 SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(0 80, 180 80)'))
 => error contains: The emulator does not support ST_ASGEOJSON of a LINESTRING that touches a pole
 
-SELECT ST_GEOGFROMGEOJSON('{"type": "Point", "coordinates": [1, 2]}', make_valid => TRUE)
-=> error contains: The emulator does not support function ST_GEOGFROMGEOJSON
-
 # BigQuery reads ST_ASGEOJSON's full polygon back as the full polygon. Its edges along the poles
 # collapse to them, which the emulator does not take.
 

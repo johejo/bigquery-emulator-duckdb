@@ -24,9 +24,10 @@ struct Part {
 // lies to the left of its rings; the emulator takes only polygons with a counterclockwise shell
 // and clockwise holes, which enclose the regions it builds. `failed` prefixes the errors.
 absl::StatusOr<Geography> BuildParts(std::vector<Part> parts, bool oriented,
-                                     std::string_view failed);
+                                     std::string_view failed, bool make_valid = false);
 
 // Build WKB's decoded coordinates with planar rather than geodesic edges.
-absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts, std::string_view failed);
+absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts, std::string_view failed,
+                                           bool make_valid = false);
 
 }  // namespace googlesql_geography
