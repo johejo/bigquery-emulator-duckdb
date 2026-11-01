@@ -30,8 +30,7 @@ json ParseComment(const std::optional<std::string>& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
-// Whether `field` or one of its fields has a type or setting that external Parquet reads do not
-// detect.
+// Whether `field` or one of its fields has a type or setting external reads do not support.
 bool UnsupportedExternalField(const FieldSchema& field) {
   return field.max_length || field.precision || field.scale || field.collation ||
          !field.default_value_expression.empty() ||
@@ -112,6 +111,11 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
       throw ApiError::Unsupported("external table storage options");
     }
     const auto& external = *metadata.external_data;
+    if (external.format == "NEWLINE_DELIMITED_JSON") {
+      if (external.autodetect.value_or(false) || external.enable_list_inference) {
+        throw ApiError::Unsupported("JSON external table schema or options");
+      }
+    }
     if (external.format == "CSV") {
       if (external.autodetect.value_or(false)) {
         throw ApiError::Unsupported("CSV external table schema autodetection");

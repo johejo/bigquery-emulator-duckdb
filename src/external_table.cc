@@ -15,6 +15,7 @@
 #include "src/api_error.h"
 #include "src/csv_detect.h"
 #include "src/duckdb_sql.h"
+#include "src/external_json.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
 #include "src/file_read_options.h"
@@ -261,8 +262,8 @@ ThriftValue SourceMetadata(const FileSource& source) {
 
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
                                                  GcsClient client) {
-  if (definition.format == "CSV") {
-    throw ApiError::Unsupported("CSV external tables without an explicit schema");
+  if (definition.format != "PARQUET") {
+    throw ApiError::Unsupported(definition.format + " external tables without an explicit schema");
   }
   TemporaryFiles files;
   const auto sources = StageFileSources(definition.uris, FileFormat::kParquet, client, files);
@@ -297,12 +298,24 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
   return [definition = std::move(definition), schema = std::move(schema),
           client = std::move(client)](TemporaryFiles& files) mutable {
     const bool csv = definition.format == "CSV";
-    const auto sources = StageFileSources(
-        definition.uris, csv ? FileFormat::kCsv : FileFormat::kParquet, client, files);
+    const bool json = definition.format == "NEWLINE_DELIMITED_JSON";
+    const auto sources = StageFileSources(definition.uris,
+                                          csv    ? FileFormat::kCsv
+                                          : json ? FileFormat::kJson
+                                                 : FileFormat::kParquet,
+                                          client, files);
     std::vector<FieldSchema> read_schema;
     std::ranges::transform(schema, std::back_inserter(read_schema), Unenforced);
     std::vector<std::string> reads;
     for (const auto& source : sources) {
+      if (json) {
+        const auto staged = StageExternalJson({source}, schema, files);
+        reads.push_back(
+            "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
+            FileReadQuery(JsonReadOptions{.explicit_schema = true}, staged, read_schema) +
+            ") AS source");
+        continue;
+      }
       if (csv) {
         ValidateCsvRecords(source, definition.field_delimiter.value_or(",").front());
         reads.push_back(

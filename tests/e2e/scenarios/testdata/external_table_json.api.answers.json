@@ -1,0 +1,679 @@
+{
+  "version": 1,
+  "cases": {
+    "large_native_integer": {
+      "project": "johejo-sandbox",
+      "run": "x2zqqdkihspe2pybj7sa2y2yih",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_x2zqqdkihspe2pybj7sa2y2yih_large_native_integer.t`\n(\n  id INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/x2zqqdkihspe2pybj7sa2y2yih/large_native_integer/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/x2zqqdkihspe2pybj7sa2y2yih/large_native_integer/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":\"9007199254740993\"}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "case_variant": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_case_variant.t`\n(\n  id INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/case_variant/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/case_variant/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":1}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "duplicate_key": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/duplicate_key/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_duplicate_key.t, error message: JSON parsing error in row starting at position 0: Multiple definition of field: id. File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/duplicate_key/source.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_duplicate_key.t, error message: JSON parsing error in row starting at position 0: Multiple definition of field: id. File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/duplicate_key/source.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "empty_source": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_empty_source.t`\n(\n  id INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/empty_source/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/empty_source/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "status": 200
+        }
+      }
+    },
+    "explicit_null": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_explicit_null.t`\n(\n  id INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/explicit_null/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/explicit_null/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":null}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "fraction_integer": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/fraction_integer/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_fraction_integer.t, error message: JSON parsing error in row starting at position 0: Could not convert value 'number_value: \t \"1.5\"' to integer. Field: id; Value: 1.5 File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/fraction_integer/source.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_fraction_integer.t, error message: JSON parsing error in row starting at position 0: Could not convert value 'number_value: \t \"1.5\"' to integer. Field: id; Value: 1.5 File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/fraction_integer/source.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "missing_array": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_missing_array.t`\n(\n  id ARRAY\u003cINT64\u003e\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_array/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_array/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":[]}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "missing_nullable": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_missing_nullable.t`\n(\n  id INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_nullable/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_nullable/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":null}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "missing_required": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_required/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_missing_required.t, error message: JSON parsing error in row starting at position 0: Missing required field: id. File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_required/source.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_missing_required.t, error message: JSON parsing error in row starting at position 0: Missing required field: id. File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/missing_required/source.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "null_array": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_null_array.t`\n(\n  id ARRAY\u003cINT64\u003e\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_array/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_array/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":[]}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "null_array_element": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_array_element/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_null_array_element.t, error message: JSON parsing error in row starting at position 0: Only optional fields can be set to NULL. Field: id; Value: NULL File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_array_element/source.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_null_array_element.t, error message: JSON parsing error in row starting at position 0: Only optional fields can be set to NULL. Field: id; Value: NULL File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_array_element/source.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "null_required": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_required/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_null_required.t, error message: JSON parsing error in row starting at position 0: Only optional fields can be set to NULL. Field: id; Value: NULL File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_required/source.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_null_required.t, error message: JSON parsing error in row starting at position 0: Only optional fields can be set to NULL. Field: id; Value: NULL File: gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/null_required/source.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "string_boolean": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_string_boolean.t`\n(\n  id BOOL\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/string_boolean/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/string_boolean/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "BOOLEAN"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":true}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "temporal_numeric": {
+      "project": "johejo-sandbox",
+      "run": "fbtccvjul2xty5ormgyrmxnauk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_fbtccvjul2xty5ormgyrmxnauk_temporal_numeric.t`\n(\n  d DATE,\n  t TIME,\n  ts TIMESTAMP,\n  n NUMERIC\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/temporal_numeric/source.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/fbtccvjul2xty5ormgyrmxnauk/temporal_numeric/source.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "name": "n",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"d\":\"2020-01-02\",\"t\":\"03:04:05.123456\",\"ts\":\"2020-01-02T03:04:05Z\",\"n\":\"1.25\"}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}
