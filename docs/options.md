@@ -326,7 +326,7 @@ the emulator rejected.
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
-| [`format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'AVRO')`; `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'NEWLINE_DELIMITED_JSON')`; `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'ORC')`. |
+| [`format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'AVRO')`; `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], format = 'ORC')`. |
 
 ## CREATE EXTERNAL TABLE uris
 

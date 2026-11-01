@@ -575,8 +575,8 @@ TableMetadata TableMetadataFromJson(const json& table) {
       }
     }
     const std::string format = config.value("sourceFormat", "");
-    if (format != "PARQUET" && format != "CSV") {
-      throw ApiError::Unsupported("external tables other than PARQUET or CSV");
+    if (format != "PARQUET" && format != "CSV" && format != "NEWLINE_DELIMITED_JSON") {
+      throw ApiError::Unsupported("external tables other than PARQUET, CSV or JSON");
     }
     const auto uris = config.value("sourceUris", json::array());
     if (!uris.is_array() || uris.empty()) {

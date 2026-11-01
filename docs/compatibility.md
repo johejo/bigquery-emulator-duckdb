@@ -61,7 +61,8 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ### External tables
 
-GCS external tables support Parquet and CSV through `CREATE EXTERNAL TABLE` or `tables.insert`. Sources
+GCS external tables support Parquet, CSV and newline-delimited JSON through `CREATE EXTERNAL TABLE`
+or `tables.insert`. Sources
 must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A table created
 without a schema, for Parquet, takes the one BigQuery detects from the alphabetically last source file when it
 is created, so creation reads the sources. Columns and their fields must be of the Parquet types
@@ -80,7 +81,16 @@ CSV requires an explicit, flat schema of the scalar types listed above. It suppo
 `field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL.
 CSV schema autodetection and other CSV options are unsupported.
 
-JSON, Bigtable, BigLake connections, Hive partitioning, metadata caching,
+JSON requires an explicit schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, TIME
+or TIMESTAMP fields, RECORDs of those fields, or repeated fields of those types. Scalar values must
+use their native JSON representation, except INT64 also accepts decimal strings, BOOL accepts its
+text spellings, and BYTES requires base64 strings. NUMERIC accepts decimal numbers or strings
+with at most 29 integer digits and nine fractional digits, without exponent notation. DATE and
+TIME accept canonical `YYYY-MM-DD` and `HH:MM:SS[.SSSSSS]` strings, and TIMESTAMP accepts only
+`YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z`. Other scalar types, schema autodetection and additional JSON
+options are unsupported.
+
+Bigtable, BigLake connections, Hive partitioning, metadata caching,
 configuration updates, `ALTER TABLE`, stored views over external tables and time
 travel are unsupported. Query dry runs and stored definitions reject external reads rather
 than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do

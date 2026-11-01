@@ -74,7 +74,7 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
   }
   std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
                     "." + dataset + "." + table + "`";
-  if (!external || external->format == "CSV") {
+  if (!external || external->format != "PARQUET") {
     ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
   }
   if (external) {

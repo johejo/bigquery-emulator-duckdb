@@ -17,7 +17,10 @@ struct CsvReadOptions {
   // Whether a quoted empty value is NULL, as an unquoted one is, rather than an empty STRING.
   bool quoted_nulls = true;
 };
-struct JsonReadOptions {};
+struct JsonReadOptions {
+  // External reads use the declared types, so inference cannot alter STRING values.
+  bool explicit_schema = false;
+};
 struct ParquetReadOptions {
   // External tables allow files to omit nullable columns of the table schema.
   bool allow_missing_columns = false;

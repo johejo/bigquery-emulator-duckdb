@@ -1,0 +1,557 @@
+version: 1
+description: JSON external-read boundaries and metadata recorded on BigQuery in johejo-sandbox; original observations and run identifiers are retained in the answers sidecar.
+vars:
+  columns: (id INT64)
+  contents: eyJpZCI6MX0=
+  dataset: bqa_${run}_${case}
+  uri: gs://${bucket}/${run}/${case}/source.json
+templates:
+  external:
+    cleanup:
+    - name: delete_dataset
+      rest:
+        method: DELETE
+        path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    - gcs:
+        method: DELETE
+        object: ${run}/${case}/source.json
+      name: delete_source
+    steps:
+    - name: dataset
+      rest:
+        body:
+          datasetReference:
+            datasetId: ${dataset}
+          location: US
+        method: POST
+        path: /bigquery/v2/projects/${project}/datasets
+    - gcs:
+        base64: ${contents}
+        method: PUT
+        object: ${run}/${case}/source.json
+      name: source
+    - name: create
+      observe:
+        errors: /body/errors
+        message: /body/error/message
+        status: /status
+      rest:
+        body:
+          location: US
+          query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${columns} OPTIONS (format = 'JSON', uris = ['${uri}'])
+          useLegacySql: false
+        method: POST
+        path: /bigquery/v2/projects/${project}/queries
+    - name: get
+      observe:
+        external: /body/externalDataConfiguration
+        schema: /body/schema
+        status: /status
+      rest:
+        method: GET
+        path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+    - name: query
+      observe:
+        errors: /body/errors
+        message: /body/error/message
+        rows: /body/rows
+        status: /status
+      rest:
+        body:
+          location: US
+          query: SELECT TO_JSON_STRING(t) FROM `${project}.${dataset}.t` AS t ORDER BY 1
+          useLegacySql: false
+        method: POST
+        path: /bigquery/v2/projects/${project}/queries
+    - name: ddl
+      observe:
+        errors: /body/errors
+        rows: /body/rows
+      rest:
+        body:
+          location: US
+          query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+          useLegacySql: false
+        method: POST
+        path: /bigquery/v2/projects/${project}/queries
+  failure:
+    cleanup:
+    - name: delete_dataset
+      rest:
+        method: DELETE
+        path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    - gcs:
+        method: DELETE
+        object: ${run}/${case}/source.json
+      name: delete_source
+    steps:
+    - name: dataset
+      rest:
+        body:
+          datasetReference:
+            datasetId: ${dataset}
+          location: US
+        method: POST
+        path: /bigquery/v2/projects/${project}/datasets
+    - gcs:
+        base64: ${contents}
+        method: PUT
+        object: ${run}/${case}/source.json
+      name: source
+    - name: create
+      observe:
+        errors: /body/errors
+        message: /body/error/message
+        status: /status
+      rest:
+        body:
+          location: US
+          query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${columns} OPTIONS (format = 'JSON', uris = ['${uri}'])
+          useLegacySql: false
+        method: POST
+        path: /bigquery/v2/projects/${project}/queries
+    - name: get
+      observe:
+        external: /body/externalDataConfiguration
+        schema: /body/schema
+        status: /status
+      rest:
+        method: GET
+        path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+    - expectFailure: true
+      name: query
+      observe:
+        reason: /body/error/errors/0/reason
+        status: /status
+      rest:
+        body:
+          location: US
+          query: SELECT TO_JSON_STRING(t) FROM `${project}.${dataset}.t` AS t ORDER BY 1
+          useLegacySql: false
+        method: POST
+        path: /bigquery/v2/projects/${project}/queries
+cases:
+- name: large_native_integer
+  template: external
+  vars:
+    contents: eyJpZCI6OTAwNzE5OTI1NDc0MDk5M30=
+  expect:
+    create:
+      status: 200
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: '{"id":"9007199254740993"}'
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id INT64
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+- expect:
+    create:
+      status: 200
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      reason: invalid
+      status: 400
+  name: fraction_integer
+  template: failure
+  vars:
+    contents: eyJpZCI6MS41fQ==
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id INT64
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"id\":null}"
+      status: 200
+  name: missing_nullable
+  template: external
+  vars:
+    contents: e30=
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id INT64
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"id\":null}"
+      status: 200
+  name: explicit_null
+  template: external
+  vars:
+    contents: eyJpZCI6bnVsbH0=
+- expect:
+    create:
+      status: 200
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - mode: REQUIRED
+          name: id
+          type: INTEGER
+      status: 200
+    query:
+      reason: invalid
+      status: 400
+  name: missing_required
+  template: failure
+  vars:
+    columns: (id INT64 NOT NULL)
+    contents: e30=
+- expect:
+    create:
+      status: 200
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - mode: REQUIRED
+          name: id
+          type: INTEGER
+      status: 200
+    query:
+      reason: invalid
+      status: 400
+  name: null_required
+  template: failure
+  vars:
+    columns: (id INT64 NOT NULL)
+    contents: eyJpZCI6bnVsbH0=
+- expect:
+    create:
+      status: 200
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - mode: REPEATED
+          name: id
+          type: INTEGER
+      status: 200
+    query:
+      reason: invalid
+      status: 400
+  name: null_array_element
+  template: failure
+  vars:
+    columns: (id ARRAY<INT64>)
+    contents: eyJpZCI6WzEsbnVsbF19
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id ARRAY<INT64>
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - mode: REPEATED
+          name: id
+          type: INTEGER
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"id\":[]}"
+      status: 200
+  name: null_array
+  template: external
+  vars:
+    columns: (id ARRAY<INT64>)
+    contents: eyJpZCI6bnVsbH0=
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id ARRAY<INT64>
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - mode: REPEATED
+          name: id
+          type: INTEGER
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"id\":[]}"
+      status: 200
+  name: missing_array
+  template: external
+  vars:
+    columns: (id ARRAY<INT64>)
+    contents: e30=
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id INT64
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"id\":1}"
+      status: 200
+  name: case_variant
+  template: external
+  vars:
+    contents: eyJJRCI6MX0=
+- expect:
+    create:
+      status: 200
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      reason: invalid
+      status: 400
+  name: duplicate_key
+  template: failure
+  vars:
+    contents: eyJpZCI6MSwiaWQiOjJ9
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id BOOL
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: BOOLEAN
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"id\":true}"
+      status: 200
+  name: string_boolean
+  template: external
+  vars:
+    columns: (id BOOL)
+    contents: eyJpZCI6InllcyJ9
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              d DATE,
+              t TIME,
+              ts TIMESTAMP,
+              n NUMERIC
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: d
+          type: DATE
+        - name: t
+          type: TIME
+        - name: ts
+          type: TIMESTAMP
+        - name: "n"
+          type: NUMERIC
+      status: 200
+    query:
+      rows:
+      - f:
+        - v: "{\"d\":\"2020-01-02\",\"t\":\"03:04:05.123456\",\"ts\":\"2020-01-02T03:04:05Z\",\"n\":\"1.25\"}"
+      status: 200
+  name: temporal_numeric
+  template: external
+  vars:
+    columns: (d DATE, t TIME, ts TIMESTAMP, n NUMERIC)
+    contents: eyJkIjoiMjAyMC0wMS0wMiIsInQiOiIwMzowNDowNS4xMjM0NTYiLCJ0cyI6IjIwMjAtMDEtMDJUMDM6MDQ6MDVaIiwibiI6MS4yNX0=
+- expect:
+    create:
+      status: 200
+    ddl:
+      rows:
+      - f:
+        - v: |-
+            CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+            (
+              id INT64
+            )
+            OPTIONS(
+              format="NEWLINE_DELIMITED_JSON",
+              uris=["${uri}"]
+            );
+    get:
+      external:
+        sourceFormat: NEWLINE_DELIMITED_JSON
+        sourceUris:
+        - ${uri}
+      schema:
+        fields:
+        - name: id
+          type: INTEGER
+      status: 200
+    query:
+      status: 200
+  name: empty_source
+  template: external
+  vars:
+    contents: ""

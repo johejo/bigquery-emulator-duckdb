@@ -711,9 +711,18 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     }
     sql += ')';
   } else if (std::holds_alternative<JsonReadOptions>(options)) {
-    sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
+    sql = std::format("SELECT * FROM read_json({}, format='newline_delimited'", files);
+    const bool explicit_schema = std::get<JsonReadOptions>(options).explicit_schema;
+    if (explicit_schema) {
+      std::vector<std::string> columns;
+      std::ranges::transform(schema, std::back_inserter(columns), [](const FieldSchema& field) {
+        return QuoteLiteral(field.name) + ": " + QuoteLiteral(ToDuckDbType(JsonTextFields(field)));
+      });
+      sql += ", auto_detect=false, columns={" + Join(columns, ", ") + "}";
+    }
+    sql += ')';
     // A column no row has is NULL: UNION ALL BY NAME, which matches names without case, adds it.
-    if (!schema.empty()) {
+    if (!schema.empty() && !explicit_schema) {
       std::vector<std::string> nulls;
       std::ranges::transform(schema, std::back_inserter(nulls), [](const FieldSchema& field) {
         return "NULL AS " + QuoteIdentifier(field.name);
