@@ -117,9 +117,6 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
       }
     }
     if (external.format == "CSV") {
-      if (external.autodetect.value_or(false)) {
-        throw ApiError::Unsupported("CSV external table schema autodetection");
-      }
       if (external.enable_list_inference) {
         throw ApiError::Unsupported("enable_list_inference on CSV external tables");
       }

@@ -74,7 +74,8 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
   }
   std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
                     "." + dataset + "." + table + "`";
-  if (!external || external->format != "PARQUET") {
+  // BigQuery leaves out the columns of an external table whose schema it detects.
+  if (!external || (external->format != "PARQUET" && !external->autodetect.value_or(false))) {
     ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
   }
   if (external) {
@@ -88,7 +89,8 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     if (external->field_delimiter) {
       ddl += "  field_delimiter=" + StringOptionValue(*external->field_delimiter) + ",\n";
     }
-    if (external->skip_leading_rows) {
+    // tables.get reports skipLeadingRows 0, but the DDL leaves it out.
+    if (external->skip_leading_rows.value_or(0) != 0) {
       ddl += "  skip_leading_rows=" + std::to_string(*external->skip_leading_rows) + ",\n";
     }
     ddl += "  format=" + StringOptionValue(external->format) + ",\n  uris=[" +

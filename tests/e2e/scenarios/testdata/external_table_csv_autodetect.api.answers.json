@@ -1,0 +1,1092 @@
+{
+  "cases": {
+    "api_autodetect": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/api_autodetect/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "api_without_autodetect": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_detected_pipe": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_detected_pipe/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_detected_pipe.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_detected_pipe/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_detected_pipe/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_given_pipe": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "csvOptions": {
+              "fieldDelimiter": "|"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_given_pipe/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_given_pipe.t`\nOPTIONS(\n  field_delimiter=\"|\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_given_pipe/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_given_pipe/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_header": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_header.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_header_only": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header_only/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_header_only.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header_only/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "name"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_header_only/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_quoted_newline": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_quoted_newline/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_quoted_newline.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_quoted_newline/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_quoted_newline.t, error message: Missing close quote character (\").; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"string_field_1\" column_type: STRING value: \"a\" File: gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_quoted_newline/a.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_quoted_newline.t, error message: Missing close quote character (\").; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"string_field_1\" column_type: STRING value: \"a\" File: gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_quoted_newline/a.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_skip_one": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "csvOptions": {
+              "skipLeadingRows": "1"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_one/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_skip_one.t`\nOPTIONS(\n  skip_leading_rows=1,\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_one/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_one/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_one/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_skip_zero": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "csvOptions": {
+              "skipLeadingRows": "0"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_zero/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_skip_zero.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_zero/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_zero/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_zero/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "name"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_skip_zero/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_strings": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_strings/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_strings.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_strings/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_strings/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "c"
+                },
+                {
+                  "v": "d"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_strings/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_1",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_two_files": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_two_files/b.csv",
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_two_files/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_two_files.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_two_files/b.csv\", \"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_two_files/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_two_files/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_two_files/b.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_types": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_types/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_types.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_types/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "03:04:05"
+                },
+                {
+                  "v": "1.704164645E9"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_types/a.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_wildcard": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_wildcard/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_wildcard.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_wildcard/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_wildcard/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_wildcard/b.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

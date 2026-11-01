@@ -633,11 +633,12 @@ TableMetadata TableMetadataFromJson(const json& table) {
       if (!config["autodetect"].is_boolean()) {
         throw ApiError::Invalid("externalDataConfiguration.autodetect must be a boolean");
       }
-      // Without a schema, a Parquet table takes the one its sources have either way.
+      // Without a schema, a Parquet table takes the one its sources have either way. A CSV
+      // table keeps a given schema, and autodetection still finds the header its reads skip.
       const auto given = [](const json& resource) {
         return resource.contains("schema") && !resource["schema"].is_null();
       };
-      if (config["autodetect"] == true && (given(table) || given(config))) {
+      if (config["autodetect"] == true && format != "CSV" && (given(table) || given(config))) {
         throw ApiError::Unsupported("external table schema autodetection with a schema");
       }
       metadata.external_data->autodetect = config["autodetect"].get<bool>();

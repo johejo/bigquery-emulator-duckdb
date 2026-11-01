@@ -1,0 +1,161 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run cipf6vmsedeqlbl7jl7ggf5ums, with sources in
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. These cases of
+# ../external_table_csv_autodetect.api.yaml read values that do not convert to their columns'
+# types: BigQuery fails with reason invalid, the emulator with invalidQuery, since DuckDB rather
+# than the read reports the conversion error.
+description: >-
+  Queries of CSV external tables whose values do not convert to the detected or given column
+  types, which the emulator rejects with reason invalidQuery rather than invalid.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  header: aWQsbmFtZQoxLGEKMixiCg==
+  strings: YSxiCmMsZAo=
+  pipe: aWR8bmFtZQoxfGEK
+  x: eAoxCg==
+  y: eQoyCg==
+  reordered: bmFtZSxpZApiLDIK
+  types: aSxmLGIsZCx0LHRzLHMKMSwxLjUsdHJ1ZSwyMDI0LTAxLTAyLDAzOjA0OjA1LDIwMjQtMDEtMDIgMDM6MDQ6MDUsYQo=
+  header_only: aWQsbmFtZQo=
+  quoted_newline: aWQsdGV4dAoxLCJhCmIiCg==
+  # A second source, for cases that read only the first.
+  second: ${x}
+  options: ''
+  ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv']${options})
+templates:
+  # As ddl, for sources a query cannot read.
+  ddl_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/b.csv', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT *, _FILE_NAME AS file FROM `${project}.${dataset}.t` ORDER BY file, 1
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.csv'}
+  # As api, for a table a query cannot read.
+  api_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${header}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration: ${configuration}
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+cases:
+  # b.csv, which gives the schema, has the columns of a.csv in another order: queries read a.csv
+  # by position and fail on its values.
+  - name: ddl_reordered
+    template: ddl_unreadable
+    vars:
+      first: ${header}
+      second: ${reordered}
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv', '${prefix}/b.csv'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv", "${prefix}/b.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "id", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\", \"${prefix}/b.csv\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid"}}
+  # An explicit schema with autodetect is kept; queries skip the detected header and read columns
+  # by position, failing on the values.
+  - name: api_schema_autodetect
+    template: api_unreadable
+    vars:
+      configuration:
+        sourceFormat: CSV
+        sourceUris: ['${prefix}/a.csv']
+        autodetect: true
+        schema:
+          fields:
+            - {name: name, type: STRING}
+            - {name: id, type: INTEGER}
+    expect: {"create": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "id", "type": "INTEGER"}]}, "status": 200}, "query": {"status": 400, "reason": "invalid"}}
