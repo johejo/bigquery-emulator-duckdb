@@ -23,6 +23,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .intersect_except_distinct_only = true,
       .scalar_window_partition_keys_only = true,
       .distinct_set_operations_without_structs = true,
+      .distinct_set_operations_without_arrays = true,
       .distinct_comparisons_without_structs = true,
       .arrays_without_null_elements = true,
       .restrict_struct_results = true,

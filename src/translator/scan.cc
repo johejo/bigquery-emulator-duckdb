@@ -422,7 +422,8 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   std::vector<Collation> collations;
   for (const auto& column : set.column_list()) {
     if (distinct &&
-        (column.type()->IsArray() ||
+        ((column.type()->IsArray() &&
+          scope.context.functions.restrictions().distinct_set_operations_without_arrays) ||
          (column.type()->IsStruct() &&
           scope.context.functions.restrictions().distinct_set_operations_without_structs))) {
       const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT
