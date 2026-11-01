@@ -84,6 +84,8 @@ struct FunctionEntry {
 // Which forms the translator rejects that GoogleSQL accepts but BigQuery does not. Defaults keep
 // GoogleSQL's forms.
 struct QueryRestrictions {
+  // JSON_KEYS takes no SAFE. prefix.
+  bool json_keys_rejects_safe = false;
   // INTERSECT and EXCEPT take only DISTINCT.
   bool intersect_except_distinct_only = false;
   // Window PARTITION BY takes no STRUCT or ARRAY keys.

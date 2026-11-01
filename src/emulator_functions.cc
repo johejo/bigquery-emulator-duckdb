@@ -63,6 +63,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
   functions = std::make_unique<function_catalog::Catalog>(
       options.timestamp_precision,
       function_catalog::QueryRestrictions{
+          .json_keys_rejects_safe = options.json_keys_rejects_safe,
           .intersect_except_distinct_only = options.intersect_except_distinct_only,
           .scalar_window_partition_keys_only = options.scalar_window_partition_keys_only,
           .distinct_set_operations_without_structs =
