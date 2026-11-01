@@ -10,6 +10,7 @@
 #include <format>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <memory>
 #include <numbers>
 #include <numeric>
@@ -992,31 +993,388 @@ std::string GeoJsonPoint(const S2Point& point) {
   return GeoJsonPosition(coordinates.longitude, coordinates.latitude);
 }
 
-// The positions of a chain of `vertices`, with the vertices S2EdgeTessellator adds between them.
-// The error names a chain whose GeoJSON BigQuery writes otherwise: one that touches a pole, whose
-// longitude the projection does not give, or that crosses the antimeridian, which the tessellator
-// continues beyond longitude 180 where BigQuery splits it.
-absl::StatusOr<std::string> GeoJsonChain(const std::vector<S2Point>& vertices) {
+// Project a chain only after cutting it at the antimeridian. Polygon rings still reject cuts:
+// independently cutting their edges would lose the topology of shells and holes.
+absl::StatusOr<std::string> GeoJsonChain(const std::vector<S2Point>& vertices, bool line = false,
+                                         bool reflect = false) {
   const DegreesProjection projection;
   const S2EdgeTessellator tessellator(&projection, S2Earth::MetersToAngle(10));
   std::vector<R2Point> projected;
   for (auto a = vertices.begin(); a != vertices.end() && std::next(a) != vertices.end(); ++a) {
     const S2Point& b = *std::next(a);
+    const bool polar_start = std::abs(ToPoint(*a).latitude) == 90;
+    const bool polar_end = std::abs(ToPoint(b).latitude) == 90;
     for (const S2Point& pole : {S2Point(0, 0, 1), S2Point(0, 0, -1)}) {
-      if (S2::GetDistance(pole, *a, b) < S2EdgeTessellator::kMinTolerance()) {
+      if (!line && !polar_start && !polar_end &&
+          S2::GetDistance(pole, *a, b) < S2EdgeTessellator::kMinTolerance()) {
         return absl::UnimplementedError(" that touches a pole");
       }
     }
-    tessellator.AppendProjected(*a, b, &projected);
+    if (!line && polar_start && polar_end) {
+      return absl::UnimplementedError(" with an edge along a pole");
+    }
+    if (!line && (polar_start || polar_end)) {
+      // At a polar ring vertex the incoming and outgoing meridians need separate
+      // planar positions. Join them along the map boundary, not through its interior.
+      std::vector<R2Point> edge;
+      tessellator.AppendProjected(*a, b, &edge);
+      if (edge.size() < 2) {
+        return absl::UnimplementedError(" with a degenerate polar edge");
+      }
+      if (polar_end) {
+        edge.back() = R2Point(edge.at(edge.size() - 2).x(), edge.back().y());
+      }
+      const bool joined = !projected.empty() && projected.back() == edge.front();
+      std::ranges::copy(std::span(edge).subspan(joined ? 1 : 0), std::back_inserter(projected));
+    } else {
+      tessellator.AppendProjected(*a, b, &projected);
+    }
+  }
+  if (!line && std::abs(ToPoint(vertices.front()).latitude) == 90 &&
+      projected.back() != projected.front()) {
+    projected.push_back(projected.front());
   }
   std::vector<std::string> positions;
+  if (line && std::abs(ToPoint(vertices.front()).latitude) == 90) {
+    const double longitude = ToPoint(vertices.at(1)).longitude;
+    positions.push_back(
+        GeoJsonPosition(reflect ? -longitude : longitude, ToPoint(vertices.front()).latitude));
+  }
   for (const R2Point& vertex : projected) {
     if (std::abs(vertex.x()) > 180) {
       return absl::UnimplementedError(" that crosses the antimeridian");
     }
-    positions.push_back(GeoJsonPosition(vertex.x(), vertex.y()));
+    double longitude = vertex.x();
+    if (line && &vertex == projected.data() && std::abs(ToPoint(vertices.front()).latitude) == 90) {
+      // The endpoint has the incident edge's longitude, followed by the limiting
+      // longitude of the tessellated chain at the pole (not its arbitrary input one).
+      longitude = projected.at(1).x();
+    }
+    if (line && &vertex == &projected.back() && std::abs(ToPoint(vertices.back()).latitude) == 90) {
+      longitude = projected.at(projected.size() - 2).x();
+    }
+    positions.push_back(GeoJsonPosition(reflect ? -longitude : longitude, vertex.y()));
+  }
+  if (line && std::abs(ToPoint(vertices.back()).latitude) == 90) {
+    const double longitude = ToPoint(vertices.at(vertices.size() - 2)).longitude;
+    positions.push_back(
+        GeoJsonPosition(reflect ? -longitude : longitude, ToPoint(vertices.back()).latitude));
   }
   return GeoJsonArray(positions);
+}
+
+// Split spherical edges before tessellating: interpolating a projected edge's latitude at
+// longitude 180 would introduce a kink and change the tessellation on both sides of the cut.
+std::vector<std::vector<S2Point>> GeoJsonPieces(const std::vector<S2Point>& line) {
+  // A pole in the interior of an edge is not a proper crossing of either meridian quarter.
+  // Clip those chains against the spherical image of the map boundary instead. Retain the
+  // separate +/-180 representations of its corners: their limiting longitudes determine the
+  // tessellation approaching a pole, even though their latitudes both round to +/-90.
+  bool polar = false;
+  for (size_t i = 1; i < line.size(); ++i) {
+    if (std::abs(ToPoint(line.at(i - 1)).latitude) == 90 ||
+        std::abs(ToPoint(line.at(i)).latitude) == 90) {
+      continue;
+    }
+    for (const S2Point& pole : {S2Point(0, 0, 1), S2Point(0, 0, -1)}) {
+      polar = polar || S2::GetDistance(pole, line.at(i - 1), line.at(i)) <
+                           S2EdgeTessellator::kMinTolerance();
+    }
+  }
+  if (polar) {
+    static const auto* const kMap = [] {
+      std::vector<S2Point> corners;
+      for (const Point& corner : {
+               Point{.longitude = 180, .latitude = 90},
+               Point{.longitude = -180, .latitude = 90},
+               Point{.longitude = -180, .latitude = 0},
+               Point{.longitude = -180, .latitude = -90},
+               Point{.longitude = 180, .latitude = -90},
+               Point{.longitude = 180, .latitude = 0},
+           }) {
+        corners.push_back(ToS2Point(corner));
+      }
+      return new S2Polygon(std::make_unique<S2Loop>(corners));
+    }();
+    std::vector<std::vector<S2Point>> pieces;
+    for (const auto& part : kMap->IntersectWithPolyline(
+             S2Polyline(line), s2builderutil::IdentitySnapFunction(S1Angle::Zero()))) {
+      const auto vertices = part->vertices_span();
+      pieces.emplace_back(vertices.begin(), vertices.end());
+    }
+    return pieces;
+  }
+  std::vector<std::vector<S2Point>> pieces(1);
+  pieces.back().push_back(line.front());
+  for (size_t i = 1; i < line.size(); ++i) {
+    const S2Point& a = line.at(i - 1);
+    const S2Point& b = line.at(i);
+    const Point pa = ToPoint(a);
+    const Point pb = ToPoint(b);
+    if (std::abs(pa.longitude) == 180 && std::abs(pb.longitude) != 180 &&
+        pieces.back().size() > 1) {
+      const double before = ToPoint(pieces.back().at(pieces.back().size() - 2)).longitude;
+      if ((before < 0) != (pb.longitude < 0)) {
+        pieces.push_back({a});
+      }
+    }
+    if (std::abs(pa.longitude - pb.longitude) > 180 && std::abs(pa.longitude) != 180 &&
+        std::abs(pb.longitude) != 180 && std::abs(pa.latitude) != 90 &&
+        std::abs(pb.latitude) != 90) {
+      // Equatorial edges meet the shared endpoint of the two meridian quarters.
+      if (pa.latitude == 0 && pb.latitude == 0) {
+        pieces.back().emplace_back(-1, 0, 0);
+        pieces.push_back({S2Point(-1, 0, 0)});
+      }
+      // The antimeridian is two quarter-circle edges, meeting at the equator.
+      for (const S2Point& pole : {S2Point(0, 0, 1), S2Point(0, 0, -1)}) {
+        if (pa.latitude == 0 && pb.latitude == 0) {
+          break;
+        }
+        const S2Point equator(-1, 0, 0);
+        if (S2::CrossingSign(a, b, equator, pole) > 0) {
+          const double latitude = ToPoint(S2::GetIntersection(a, b, equator, pole)).latitude;
+          pieces.back().push_back(
+              ToS2Point({.longitude = pa.longitude > 0 ? 180.0 : -180.0, .latitude = latitude}));
+          const S2Point start =
+              ToS2Point({.longitude = pb.longitude > 0 ? 180.0 : -180.0, .latitude = latitude});
+          pieces.push_back({start});
+          break;
+        }
+      }
+    }
+    pieces.back().push_back(b);
+  }
+  return pieces;
+}
+
+absl::StatusOr<std::vector<std::string>> GeoJsonLines(
+    const std::vector<std::vector<S2Point>>& lines) {
+  std::vector<std::string> coordinates;
+  for (const std::vector<S2Point>& line : lines) {
+    auto pieces = GeoJsonPieces(line);
+    // An implicit first crossing emits its eastern half first. Original seam vertices
+    // retain traversal order, as do pieces after the first crossing.
+    if (pieces.size() > 1 && std::ranges::find(line, pieces.front().back()) == line.end() &&
+        std::ranges::any_of(pieces.front(), [](const S2Point& point) {
+          const double longitude = ToPoint(point).longitude;
+          return longitude < 0 && longitude > -180;
+        })) {
+      std::swap(pieces.at(0), pieces.at(1));
+    }
+    for (const std::vector<S2Point>& piece : pieces) {
+      // Project both sides of a cut from the east, undoing the reflection on output.
+      // This also chooses -180 for a western piece with an original vertex on the seam.
+      const bool seam = std::ranges::any_of(
+          piece, [](const S2Point& point) { return std::abs(ToPoint(point).longitude) == 180; });
+      const bool west = seam && std::ranges::any_of(piece, [](const S2Point& point) {
+                          const double longitude = ToPoint(point).longitude;
+                          return longitude < 0 && longitude > -180;
+                        });
+      std::vector<S2Point> reflected = piece;
+      for (S2Point& point : reflected) {
+        if (std::abs(ToPoint(point).longitude) == 180) {
+          point = S2Point(point.x(), std::abs(point.y()), point.z());
+        } else if (west) {
+          point = S2Point(point.x(), -point.y(), point.z());
+        }
+      }
+      GOOGLESQL_ASSIGN_OR_RETURN(std::string text, GeoJsonChain(reflected, true, west));
+      coordinates.push_back(std::move(text));
+    }
+  }
+  return coordinates;
+}
+
+// Cut all rings together. Each projected chain is a directed edge in a planar graph;
+// meridian intervals inside the spherical polygon join its shell and holes, rather than
+// closing each cut ring independently (which would turn a clipped hole into a shell).
+absl::StatusOr<std::vector<std::string>> GeoJsonCutPolygon(const Polygon& polygon) {
+  Geography geography;
+  geography.polygons.push_back(polygon);
+  const auto spherical = ToS2Polygon(geography);
+  const bool north = spherical->Contains(S2Point(0, 0, 1));
+  const bool south = spherical->Contains(S2Point(0, 0, -1));
+  const DegreesProjection projection;
+  const S2EdgeTessellator tessellator(&projection, S2Earth::MetersToAngle(10));
+  using Position = std::pair<double, double>;
+  struct Edge {
+    std::vector<R2Point> vertices;
+    bool visited = false;
+  };
+  std::vector<Edge> edges;
+  std::vector<double> latitudes{-90, 90};
+  // Start with the innermost rings: a hole meeting a cut becomes the beginning of
+  // its shell's indentation. Preserve traversal order when merging the open chains.
+  for (size_t i = polygon.size(); i > 0; --i) {
+    auto ring = polygon.at(i - 1);
+    if (i > 1) {
+      std::ranges::reverse(ring);
+    }
+    ring.push_back(ring.front());
+    auto pieces = GeoJsonPieces(ring);
+    if (pieces.size() > 1 && pieces.back().back() == pieces.front().front()) {
+      auto first = std::move(pieces.front());
+      pieces.back().insert(pieces.back().end(), std::next(first.begin()), first.end());
+      pieces.erase(pieces.begin());
+    }
+    for (auto& piece : pieces) {
+      if (piece.size() < 2) {
+        continue;
+      }
+      // Choose the side of each seam endpoint from its adjacent vertex. A polar
+      // chain can begin at -180 and end at +180, passing through Greenwich.
+      for (const size_t endpoint : {size_t{0}, piece.size() - 1}) {
+        S2Point& point = piece.at(endpoint);
+        if (std::abs(ToPoint(point).longitude) == 180) {
+          const auto& adjacent = piece.at(endpoint == 0 ? 1 : endpoint - 1);
+          point = ToS2Point({
+              .longitude = ToPoint(adjacent).longitude < 0 ? -180.0 : 180.0,
+              .latitude = ToPoint(point).latitude,
+          });
+        }
+      }
+      std::vector<R2Point> vertices;
+      for (size_t j = 1; j < piece.size(); ++j) {
+        for (const auto& pole : {S2Point(0, 0, 1), S2Point(0, 0, -1)}) {
+          if (S2::GetDistance(pole, piece.at(j - 1), piece.at(j)) <
+              S2EdgeTessellator::kMinTolerance()) {
+            return absl::UnimplementedError(" that touches a pole");
+          }
+        }
+        tessellator.AppendProjected(piece.at(j - 1), piece.at(j), &vertices);
+      }
+      if (vertices.empty()) {
+        return absl::UnimplementedError(" with degenerate projected rings");
+      }
+      if (std::ranges::any_of(vertices,
+                              [](const R2Point& vertex) { return std::abs(vertex.x()) > 180; })) {
+        return absl::UnimplementedError(" with ambiguous antimeridian cuts");
+      }
+      for (const auto& endpoint : {vertices.front(), vertices.back()}) {
+        if (std::abs(endpoint.x()) == 180) {
+          latitudes.push_back(endpoint.y());
+        }
+      }
+      edges.push_back({.vertices = std::move(vertices)});
+    }
+  }
+  std::ranges::sort(latitudes);
+  const auto duplicates = std::ranges::unique(latitudes);
+  latitudes.erase(duplicates.begin(), duplicates.end());
+  for (size_t i = 1; i < latitudes.size(); ++i) {
+    const double low = latitudes.at(i - 1);
+    const double high = latitudes.at(i);
+    if (spherical->Contains(ToS2Point({.longitude = 180, .latitude = std::midpoint(low, high)}))) {
+      edges.push_back({.vertices = {{180, low}, {180, high}}});
+      edges.push_back({.vertices = {{-180, high}, {-180, low}}});
+    }
+  }
+  if (north) {
+    edges.push_back({.vertices = {{180, 90}, {-180, 90}}});
+  }
+  if (south) {
+    edges.push_back({.vertices = {{-180, -90}, {180, -90}}});
+  }
+  const auto position = [](const R2Point& point) { return Position(point.x(), point.y()); };
+  std::map<Position, size_t> outgoing;
+  for (size_t i = 0; i < edges.size(); ++i) {
+    if (!outgoing.emplace(position(edges.at(i).vertices.front()), i).second) {
+      return absl::UnimplementedError(" with ambiguous antimeridian cuts");
+    }
+  }
+  struct Ring {
+    std::vector<R2Point> vertices;
+    double area = 0;
+  };
+  std::vector<Ring> rings;
+  for (size_t i = 0; i < edges.size(); ++i) {
+    if (edges.at(i).visited) {
+      continue;
+    }
+    Ring ring;
+    size_t next = i;
+    while (true) {
+      Edge& edge = edges.at(next);
+      if (edge.visited) {
+        return absl::UnimplementedError(" with ambiguous antimeridian cuts");
+      }
+      edge.visited = true;
+      ring.vertices.insert(ring.vertices.end(), edge.vertices.begin(),
+                           std::prev(edge.vertices.end()));
+      const auto found = outgoing.find(position(edge.vertices.back()));
+      if (found == outgoing.end()) {
+        return absl::UnimplementedError(" with ambiguous antimeridian cuts");
+      }
+      next = found->second;
+      if (next == i) {
+        break;
+      }
+    }
+    if (north || south) {
+      const R2Point corner = north ? R2Point(180, 90) : R2Point(-180, -90);
+      const auto start = std::ranges::find(ring.vertices, corner);
+      if (start != ring.vertices.end()) {
+        std::ranges::rotate(ring.vertices, start);
+      }
+    }
+    ring.vertices.push_back(ring.vertices.front());
+    for (size_t j = 1; j < ring.vertices.size(); ++j) {
+      const auto& a = ring.vertices.at(j - 1);
+      const auto& b = ring.vertices.at(j);
+      ring.area += (a.x() * b.y()) - (b.x() * a.y());
+    }
+    if (ring.area == 0) {
+      return absl::UnimplementedError(" with degenerate projected rings");
+    }
+    rings.push_back(std::move(ring));
+  }
+  const auto text = [](const Ring& ring) {
+    std::vector<std::string> positions;
+    std::ranges::transform(ring.vertices, std::back_inserter(positions), [](const R2Point& vertex) {
+      return GeoJsonPosition(vertex.x(), vertex.y());
+    });
+    return GeoJsonArray(positions);
+  };
+  std::vector<std::string> polygons;
+  std::vector<size_t> owners(rings.size(), 0);
+  for (const auto& shell : rings) {
+    if (shell.area <= 0) {
+      continue;
+    }
+    std::vector<std::string> items{text(shell)};
+    for (const auto& hole : rings) {
+      if (hole.area >= 0) {
+        continue;
+      }
+      // Closed rings not meeting a cut retain their hole topology. Find their shell
+      // in the projected plane; all newly joined boundary cycles have positive area.
+      const auto& point = hole.vertices.front();
+      bool inside = false;
+      for (size_t j = 1; j < shell.vertices.size(); ++j) {
+        const auto& a = shell.vertices.at(j - 1);
+        const auto& b = shell.vertices.at(j);
+        if ((a.y() > point.y()) != (b.y() > point.y()) &&
+            point.x() < a.x() + ((b.x() - a.x()) * (point.y() - a.y()) / (b.y() - a.y()))) {
+          inside = !inside;
+        }
+      }
+      if (inside) {
+        ++owners.at(static_cast<size_t>(&hole - rings.data()));
+        items.push_back(text(hole));
+      }
+    }
+    polygons.push_back(GeoJsonArray(items));
+  }
+  for (size_t i = 0; i < rings.size(); ++i) {
+    if (rings.at(i).area < 0 && owners.at(i) != 1) {
+      return absl::UnimplementedError(" with ambiguous antimeridian cuts");
+    }
+  }
+  if (polygons.empty()) {
+    return absl::UnimplementedError(" with ambiguous antimeridian cuts");
+  }
+  return polygons;
 }
 
 // The GeoJSON object of `items`, the points, linestrings or polygons of a geography, each as
@@ -1069,14 +1427,29 @@ absl::StatusOr<std::string> AsGeoJson(const Geography& geography) {
       parts.push_back(std::move(part));
     }
     if (!geography.lines.empty()) {
-      GOOGLESQL_ASSIGN_OR_RETURN(std::string part, GeoJsonParts(geography.lines, "LineString",
-                                                                "MultiLineString", GeoJsonChain));
-      parts.push_back(std::move(part));
+      GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::string> coordinates,
+                                 GeoJsonLines(geography.lines));
+      const bool one = coordinates.size() == 1;
+      parts.push_back(std::string(R"({ "type": ")") + (one ? "LineString" : "MultiLineString") +
+                      R"(", "coordinates": )" +
+                      (one ? coordinates.front() : GeoJsonArray(coordinates)) + " }");
     }
     if (!geography.polygons.empty()) {
-      GOOGLESQL_ASSIGN_OR_RETURN(
-          std::string part, GeoJsonParts(geography.polygons, "Polygon", "MultiPolygon", rings));
-      parts.push_back(std::move(part));
+      std::vector<std::string> coordinates;
+      for (const auto& polygon : geography.polygons) {
+        auto uncut = rings(polygon);
+        if (uncut.ok()) {
+          coordinates.push_back(std::move(*uncut));
+        } else {
+          GOOGLESQL_ASSIGN_OR_RETURN(auto cut, GeoJsonCutPolygon(polygon));
+          coordinates.insert(coordinates.end(), std::make_move_iterator(cut.begin()),
+                             std::make_move_iterator(cut.end()));
+        }
+      }
+      const bool one = coordinates.size() == 1;
+      parts.push_back(std::string(R"({ "type": ")") + (one ? "Polygon" : "MultiPolygon") +
+                      R"(", "coordinates": )" +
+                      (one ? coordinates.front() : GeoJsonArray(coordinates)) + " }");
     }
     return parts;
   };

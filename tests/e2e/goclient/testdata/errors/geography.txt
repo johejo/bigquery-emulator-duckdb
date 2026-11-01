@@ -8,18 +8,6 @@ SELECT ST_DISTANCE(ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 0), TRUE)
 SELECT TO_JSON_STRING(ST_GEOGPOINT(1, 2))
 => error contains: The emulator does not support function TO_JSON_STRING with GEOGRAPHY
 
-# BigQuery splits the GeoJSON of a line that crosses the antimeridian, and stops a line through a
-# pole there, in ways the emulator does not reproduce.
-
-SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(170 0, -170 0)'))
-=> error contains: The emulator does not support ST_ASGEOJSON of a LINESTRING that crosses the antimeridian
-
-SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((175 0, -175 0, 180 5, 175 0))'))
-=> error contains: The emulator does not support ST_ASGEOJSON of a POLYGON that crosses the antimeridian
-
-SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(0 80, 180 80)'))
-=> error contains: The emulator does not support ST_ASGEOJSON of a LINESTRING that touches a pole
-
 # BigQuery reads ST_ASGEOJSON's full polygon back as the full polygon. Its edges along the poles
 # collapse to them, which the emulator does not take.
 

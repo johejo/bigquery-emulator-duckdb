@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -67,6 +68,7 @@ absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>&
           "Polygon loop should be a closed ring (last point the same as first)");
     }
     double area = 0;
+    bool long_edge = false;
     for (size_t i = 0; i + 1 < positions.size(); ++i) {
       const R2Point& a = positions.at(i);
       const R2Point& b = positions.at(i + 1);
@@ -75,11 +77,14 @@ absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>&
             "The emulator does not support planar polygons with an edge along a pole");
       }
       area += a.CrossProd(b);
+      long_edge = long_edge || std::abs(a.x() - b.x()) > 180;
     }
     auto& loop = loops.emplace_back(Unproject(positions));
     loop.pop_back();
     if (area < 0) {
-      std::ranges::reverse(loop);
+      // BigQuery retains the input start when reversing a planar ring with an edge longer
+      // than 180 degrees; for shorter edges it uses S2Loop::Invert's reversed vertex order.
+      std::ranges::reverse(long_edge ? std::next(loop.begin()) : loop.begin(), loop.end());
     }
   }
   const auto result = BuildPolygon(loops, failed, /*oriented=*/true);
