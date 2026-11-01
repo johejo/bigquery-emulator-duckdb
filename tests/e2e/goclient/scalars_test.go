@@ -69,6 +69,17 @@ func runQuery(endpoint, project, dataset, sql string) (queryResponse, error) {
 // many small cases where a BigQuery function or operator must answer as BigQuery does.
 func TestScalars(t *testing.T) {
 	t.Parallel()
+	runScalarCases(t, "testdata/scalars", "scalars")
+}
+
+// TestGraphScalars runs graph cases with their own fixture, independently of other scalars.
+func TestGraphScalars(t *testing.T) {
+	t.Parallel()
+	runScalarCases(t, "testdata/scalars/graph", "")
+}
+
+func runScalarCases(t *testing.T, directory, dataset string) {
+	t.Helper()
 	endpoint := os.Getenv("BQ_EMULATOR_API")
 	if endpoint == "" {
 		t.Skip("BQ_EMULATOR_API is not set; run just e2e")
@@ -77,7 +88,7 @@ func TestScalars(t *testing.T) {
 	if project == "" {
 		project = "test"
 	}
-	const setupPath = "testdata/scalars/setup.sql"
+	setupPath := filepath.Join(directory, "setup.sql")
 	setup, err := os.ReadFile(setupPath)
 	if err != nil {
 		t.Fatal(err)
@@ -86,9 +97,9 @@ func TestScalars(t *testing.T) {
 		t.Fatalf("%s: %v", setupPath, err)
 	}
 
-	paths, err := filepath.Glob("testdata/scalars/*.txt")
+	paths, err := filepath.Glob(filepath.Join(directory, "*.txt"))
 	if err != nil || len(paths) == 0 {
-		t.Fatalf("no cases in testdata/scalars: %v", err)
+		t.Fatalf("no cases in %s: %v", directory, err)
 	}
 	for _, path := range paths {
 		for _, c := range readQueryCases(t, path) {
@@ -97,7 +108,7 @@ func TestScalars(t *testing.T) {
 					t.Skip("Spanner emulator is unavailable on this platform; set SPANNER_EMULATOR_HOST and E2E_SPANNER_DATABASE")
 				}
 				t.Parallel()
-				response, err := runQuery(endpoint, project, "scalars", c.sql)
+				response, err := runQuery(endpoint, project, dataset, c.sql)
 				queryFailed := response.Error != nil || len(response.Errors) > 0
 				if c.knownBug {
 					matches := err == nil && len(response.Rows) == 1 && len(response.Rows[0].F) == 1 &&
