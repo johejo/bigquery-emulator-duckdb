@@ -92,6 +92,8 @@ struct QueryRestrictions {
   bool scalar_window_partition_keys_only = false;
   // DISTINCT set operations take no STRUCT columns.
   bool distinct_set_operations_without_structs = false;
+  // IS DISTINCT FROM and IS NOT DISTINCT FROM take no STRUCT arguments.
+  bool distinct_comparisons_without_structs = false;
   // Query results and written values hold no ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
 };

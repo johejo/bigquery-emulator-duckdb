@@ -39,6 +39,8 @@ struct Options {
   bool scalar_window_partition_keys_only = false;
   // DISTINCT set operations reject STRUCT columns.
   bool distinct_set_operations_without_structs = false;
+  // IS DISTINCT FROM and IS NOT DISTINCT FROM reject STRUCT arguments.
+  bool distinct_comparisons_without_structs = false;
   // Query results and written values fail on an ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
   googlesql_collation::Options collation = {};

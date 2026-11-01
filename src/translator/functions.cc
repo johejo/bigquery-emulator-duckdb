@@ -381,7 +381,14 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
 
 void AddBuiltinFunctions(function_catalog::Catalog& functions) {
   for (const auto& [name, definition] : StaticTemplateRules()) {
-    functions.AddRules(name, definition, Implementation::kSQL);
+    auto selected = definition;
+    if ((name == "$IS_DISTINCT_FROM" || name == "$IS_NOT_DISTINCT_FROM") &&
+        !functions.restrictions().distinct_comparisons_without_structs) {
+      selected.type_rejections = {};
+      // Empty STRUCTs use a fixed placeholder field, preserving null-safe equality.
+      selected.uses |= {TypeUse::kReadsEmptyStruct};
+    }
+    functions.AddRules(name, selected, Implementation::kSQL);
   }
   for (const auto& [name, definition] : TemplateRules()) {
     functions.AddRules(name, definition, Implementation::kSQL);

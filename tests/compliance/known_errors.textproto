@@ -63,15 +63,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects IS DISTINCT FROM over STRUCTs, which GoogleSQL accepts"
-  label: "comparison_functions_test:is_distinct_empty_structs"
-  label: "comparison_functions_test:is_distinct_nan_struct"
-  label: "comparison_functions_test:is_distinct_null_second_arg_struct"
-  label: "comparison_functions_test:is_distinct_structs"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects INTERVAL * FLOAT64, which GoogleSQL accepts"
   label: "interval_test:multiply_double"
   label: "interval_test:multiply_double_without_nanos_feature"
