@@ -184,6 +184,9 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
     }
     return json{{"v", *text}};
   }
+  if (IsEmptyStruct(type)) {
+    return json{{"v", {{"f", json::array()}}}};
+  }
   json value;
   switch (duckdb_get_type_id(type)) {
     case DUCKDB_TYPE_STRUCT: {

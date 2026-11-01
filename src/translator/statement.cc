@@ -135,7 +135,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
       projections.push_back(
           result_value("struct_extract_at(" + column->second + ", " + std::to_string(i + 1) + ")",
                        fields.at(i).type, names.at(i)) +
-          " AS " + QuoteIdentifier(fields.at(i).name));
+          " AS " +
+          QuoteIdentifier(fields.at(i).name.empty() ? "_field_" + std::to_string(i + 1)
+                                                    : fields.at(i).name));
     }
     return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
   }

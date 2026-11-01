@@ -199,6 +199,39 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
       stdin: *struct_sets
     test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "Type STRUCT is not supported"
+  # GoogleSQL's struct_queries.test represents STRUCT() as an empty STRUCT, not its
+  # DuckDB placeholder. Exercise the shell's schema and JSON encoding, including nested NULLs.
+  semantics_empty_struct_results_googlesql:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: &empty_struct_results |
+        SELECT STRUCT() AS e, [STRUCT(), CAST(NULL AS STRUCT<>)] AS a;
+    test: current.exit_code == 0 && current.stdout == '{"e":{},"a":[{},null]}' + "\n"
+  semantics_empty_struct_results_bigquery:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
+      stdin: *empty_struct_results
+    test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "Unsupported empty struct type for field 'e'"
+  # A script and its dynamic SQL use the selected result restrictions too. Anonymous value
+  # table fields have empty names in GoogleSQL's union_distinct_queries.test.
+  semantics_struct_result_script_googlesql:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: &struct_result_script |
+        BEGIN
+          SELECT AS STRUCT 7, STRUCT() AS e;
+          EXECUTE IMMEDIATE 'SELECT AS STRUCT 8, STRUCT() AS e';
+        END;
+    test: current.exit_code == 0 && current.stdout == '{"":"8","e":{}}' + "\n"
+  semantics_struct_result_script_bigquery:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
+      stdin: *struct_result_script
+    test: current.exit_code == 1 && current.stdout == "" && current.stderr contains 'Invalid field name ""'
   # GoogleSQL's nanosecond precision spans the full TIMESTAMP range, not TIMESTAMP_NS's
   # 1677–2262 interval. These epoch values are -1ns and +1ns.
   semantics_nanosecond_values:

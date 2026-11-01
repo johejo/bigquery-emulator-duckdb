@@ -204,7 +204,7 @@ json FieldSchema::ToJson() const {
   if (range_element_type.has_value()) {
     field["rangeElementType"] = {{"type", FieldTypeName(*range_element_type)}};
   }
-  if (!fields.empty()) {
+  if (type == FieldType::kRecord || !fields.empty()) {
     field["fields"] = json::array();
     for (const FieldSchema& child : fields) {
       field["fields"].push_back(child.ToJson());

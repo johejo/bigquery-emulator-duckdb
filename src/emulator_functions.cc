@@ -70,6 +70,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
               options.distinct_set_operations_without_structs,
           .distinct_comparisons_without_structs = options.distinct_comparisons_without_structs,
           .arrays_without_null_elements = options.arrays_without_null_elements,
+          .restrict_struct_results = options.restrict_struct_results,
       });
   translator::AddBuiltinFunctions(*functions);
   functions->Add("COLLATE",

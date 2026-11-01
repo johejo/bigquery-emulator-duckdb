@@ -25,6 +25,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .distinct_set_operations_without_structs = true,
       .distinct_comparisons_without_structs = true,
       .arrays_without_null_elements = true,
+      .restrict_struct_results = true,
       .collation = {.like_unescaped_underscore = true},
   };
 }

@@ -163,7 +163,7 @@ FieldSchema ResultFieldSchema(const std::string& name, duckdb_logical_type type)
   if (IsRange(scalar_type)) {
     LogicalType const bound(duckdb_struct_type_child_type(scalar_type, 0));
     field.range_element_type = ToBigQueryType(bound.get());
-  } else if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT) {
+  } else if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT && !IsEmptyStruct(scalar_type)) {
     for (idx_t i = 0; i < duckdb_struct_type_child_count(scalar_type); ++i) {
       DuckString const child_name(duckdb_struct_type_child_name(scalar_type, i));
       LogicalType const child_type(duckdb_struct_type_child_type(scalar_type, i));

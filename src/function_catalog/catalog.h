@@ -96,6 +96,8 @@ struct QueryRestrictions {
   bool distinct_comparisons_without_structs = false;
   // Query results and written values hold no ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
+  // Query results take no empty STRUCTs or anonymous fields of STRUCT value tables.
+  bool restrict_struct_results = false;
 };
 
 // A catalog owns its entries; registered names and targets must outlive it.
