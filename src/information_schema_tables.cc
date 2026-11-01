@@ -74,7 +74,7 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
   }
   std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
                     "." + dataset + "." + table + "`";
-  if (!external) {
+  if (!external || external->format == "CSV") {
     ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
   }
   if (external) {
@@ -85,7 +85,14 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       ddl += std::string("  enable_list_inference=") +
              (*external->enable_list_inference ? "true" : "false") + ",\n";
     }
-    ddl += "  format=\"PARQUET\",\n  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
+    if (external->field_delimiter) {
+      ddl += "  field_delimiter=" + StringOptionValue(*external->field_delimiter) + ",\n";
+    }
+    if (external->skip_leading_rows) {
+      ddl += "  skip_leading_rows=" + std::to_string(*external->skip_leading_rows) + ",\n";
+    }
+    ddl += "  format=" + StringOptionValue(external->format) + ",\n  uris=[" +
+           absl::StrJoin(uris, ", ") + "]\n)";
   }
   return ddl + ";";
 }
@@ -301,7 +308,23 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
               .value = *metadata->external_data->enable_list_inference ? "true" : "false",
           });
         }
-        options.push_back({.name = "format", .type = "STRING", .value = "\"PARQUET\""});
+        const auto& external = *metadata->external_data;
+        if (external.field_delimiter) {
+          options.push_back({
+              .name = "field_delimiter",
+              .type = "STRING",
+              .value = StringOptionValue(*external.field_delimiter),
+          });
+        }
+        if (external.skip_leading_rows) {
+          options.push_back({
+              .name = "skip_leading_rows",
+              .type = "INT64",
+              .value = std::to_string(*external.skip_leading_rows),
+          });
+        }
+        options.push_back(
+            {.name = "format", .type = "STRING", .value = StringOptionValue(external.format)});
         options.push_back({
             .name = "uris",
             .type = "ARRAY<STRING>",

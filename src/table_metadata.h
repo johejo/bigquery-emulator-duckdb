@@ -14,11 +14,14 @@
 
 namespace bigquery_emulator_duckdb {
 
-// GCS Parquet external sources and their schema inference settings.
+// GCS external sources and their format-specific read settings.
 struct GcsExternalData {
   std::vector<std::string> uris;
   std::optional<bool> autodetect;
   std::optional<bool> enable_list_inference = std::nullopt;
+  std::string format = "PARQUET";
+  std::optional<int64_t> skip_leading_rows = std::nullopt;
+  std::optional<std::string> field_delimiter = std::nullopt;
   bool operator==(const GcsExternalData&) const = default;
 };
 

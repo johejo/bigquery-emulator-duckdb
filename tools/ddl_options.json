@@ -335,7 +335,8 @@
       },
       {
         "name": "field_delimiter",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["','", "'|'", "'\\t'", "'ab'"]
       },
       {
         "name": "format",
@@ -407,7 +408,8 @@
       },
       {
         "name": "skip_leading_rows",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["0", "1", "2"]
       },
       {
         "name": "source_column_match",
@@ -1898,8 +1900,15 @@
       "name": "CREATE EXTERNAL TABLE",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "exclude": ["format", "uris"],
+      "exclude": ["format", "uris", "field_delimiter", "skip_leading_rows"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE CSV",
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "only": ["field_delimiter", "skip_leading_rows"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], {option})"
     },
     {
       "name": "CREATE EXTERNAL TABLE format",

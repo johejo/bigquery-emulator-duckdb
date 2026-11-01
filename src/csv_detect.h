@@ -20,6 +20,9 @@ struct DetectedCsv {
   std::vector<FileSource> sources;
 };
 
+// Validates CSV quoting, including the default prohibition on quoted line breaks.
+void ValidateCsvRecords(const FileSource& source, char delimiter);
+
 // Detects the delimiter, header and column types of CSV `sources` as BigQuery does. An empty
 // `field_delimiter` detects one; `skip_leading_rows` is absent when the job leaves it out.
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
