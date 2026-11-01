@@ -428,6 +428,32 @@ json TableMetadata::ToJson() const {
       fields["externalDataConfiguration"]["csvOptions"]["fieldDelimiter"] =
           *external_data->field_delimiter;
     }
+    json& csv = fields["externalDataConfiguration"]["csvOptions"];
+    if (external_data->quote) {
+      csv["quote"] = *external_data->quote;
+    }
+    if (external_data->allow_quoted_newlines) {
+      csv["allowQuotedNewlines"] = *external_data->allow_quoted_newlines;
+    }
+    if (external_data->allow_jagged_rows) {
+      csv["allowJaggedRows"] = *external_data->allow_jagged_rows;
+    }
+    if (external_data->null_marker) {
+      csv["nullMarker"] = *external_data->null_marker;
+    }
+    if (external_data->null_markers) {
+      csv["nullMarkers"] = *external_data->null_markers;
+    }
+    if (external_data->preserve_ascii_control_characters) {
+      csv["preserveAsciiControlCharacters"] = *external_data->preserve_ascii_control_characters;
+    }
+    if (csv.is_null()) {
+      fields["externalDataConfiguration"].erase("csvOptions");
+    }
+    if (external_data->ignore_unknown_values) {
+      fields["externalDataConfiguration"]["ignoreUnknownValues"] =
+          *external_data->ignore_unknown_values;
+    }
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
     }
@@ -570,7 +596,8 @@ TableMetadata TableMetadataFromJson(const json& table) {
     }
     for (const auto& [name, value] : config.items()) {
       if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
-          name != "autodetect" && name != "parquetOptions" && name != "csvOptions") {
+          name != "autodetect" && name != "parquetOptions" && name != "csvOptions" &&
+          name != "ignoreUnknownValues") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
@@ -605,6 +632,20 @@ TableMetadata TableMetadataFromJson(const json& table) {
             throw ApiError::Invalid("Invalid csvOptions.skipLeadingRows");
           }
           metadata.external_data->skip_leading_rows = rows;
+        } else if (name == "quote" && value.is_string()) {
+          metadata.external_data->quote = value.get<std::string>();
+        } else if (name == "nullMarker" && value.is_string()) {
+          metadata.external_data->null_marker = value.get<std::string>();
+        } else if (name == "nullMarkers" && value.is_array() &&
+                   std::ranges::all_of(value,
+                                       [](const json& marker) { return marker.is_string(); })) {
+          metadata.external_data->null_markers = value.get<std::vector<std::string>>();
+        } else if (name == "allowQuotedNewlines" && value.is_boolean()) {
+          metadata.external_data->allow_quoted_newlines = value.get<bool>();
+        } else if (name == "allowJaggedRows" && value.is_boolean()) {
+          metadata.external_data->allow_jagged_rows = value.get<bool>();
+        } else if (name == "preserveAsciiControlCharacters" && value.is_boolean()) {
+          metadata.external_data->preserve_ascii_control_characters = value.get<bool>();
         } else {
           throw ApiError::Unsupported("externalDataConfiguration.csvOptions." + name);
         }
@@ -628,6 +669,12 @@ TableMetadata TableMetadataFromJson(const json& table) {
         }
         metadata.external_data->enable_list_inference = value.get<bool>();
       }
+    }
+    if (config.contains("ignoreUnknownValues")) {
+      if (!config["ignoreUnknownValues"].is_boolean()) {
+        throw ApiError::Invalid("externalDataConfiguration.ignoreUnknownValues must be a boolean");
+      }
+      metadata.external_data->ignore_unknown_values = config["ignoreUnknownValues"].get<bool>();
     }
     if (config.contains("autodetect")) {
       if (!config["autodetect"].is_boolean()) {

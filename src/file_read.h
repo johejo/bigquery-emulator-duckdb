@@ -52,7 +52,8 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
 void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
                          const std::vector<DecimalTargetType>& targets);
 
-// Reads staged sources with schema conversion, or infers columns when schema is empty.
+// Reads staged sources with schema conversion, or infers columns when schema is empty. CSV
+// sources must be staged by StageCsvSources or DetectCsv.
 // Does not prepare or execute SQL, acquire files, or apply destination-table policies.
 std::string FileReadQuery(const FileReadOptions& options, const std::vector<FileSource>& sources,
                           const std::vector<FieldSchema>& schema,

@@ -46,7 +46,7 @@ std::vector<Record> ParseRecords(std::string_view contents, char delimiter,
                                  bool lenient = false) {
   std::vector<Record> records;
   for (CsvRecord& parsed : ParseCsvRecords(contents, {.delimiter = delimiter}, limit, lenient)) {
-    std::ranges::transform(parsed, std::back_inserter(records.emplace_back()),
+    std::ranges::transform(parsed.cells, std::back_inserter(records.emplace_back()),
                            [](std::optional<CsvCell>& cell) {
                              return cell ? Cell(std::move(cell->text)) : std::nullopt;
                            });
@@ -394,10 +394,6 @@ std::string Quoted(std::string_view text) {
 }
 
 }  // namespace
-
-void ValidateCsvRecords(const FileSource& source, char delimiter) {
-  ParseRecords(ReadMaybeGzip(source.path), delimiter);
-}
 
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
                       std::optional<int> skip_leading_rows, TemporaryFiles& downloads, bool rows) {

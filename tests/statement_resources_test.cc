@@ -18,6 +18,7 @@
 #include "src/backend_error.h"
 #include "src/builtin_function_options.h"
 #include "src/catalog.h"
+#include "src/csv_stage.h"
 #include "src/default_dataset.h"
 #include "src/emulator_functions.h"
 #include "src/field_schema.h"
@@ -58,10 +59,12 @@ class FileSource : public TableSource {
   Preparation prepare_;
 };
 
-std::string FileQuery(const std::string& path) {
+std::string FileQuery(TemporaryFiles& files, const std::string& path) {
   // Exercise the same reader as load jobs through a statement-owned source.
-  return FileReadQuery(CsvReadOptions{.skip_leading_rows = 1}, {{.uri = path, .path = path}},
-                       {{.name = "value", .type = FieldType::kInteger}});
+  const CsvReadOptions options{.skip_leading_rows = 1};
+  const std::vector<FieldSchema> schema{{.name = "value", .type = FieldType::kInteger}};
+  return FileReadQuery(
+      options, StageCsvSources({{.uri = path, .path = path}}, options, schema, files), schema);
 }
 
 TranslatedStatement TranslateRead(const std::string& query, Preparation prepare) {
@@ -103,7 +106,7 @@ TEST(StatementResourcesTest, KeepsFilesWithCopiedRows) {
   {
     const auto statement = TranslateRead("SELECT value FROM t", [&](TemporaryFiles& files) {
       path = files.Write("value\n7\n");
-      return FileQuery(path);
+      return FileQuery(files, path);
     });
     // The analyzer, catalog and source are already destroyed before execution starts.
     rows = ExecuteRead(backend, statement);
@@ -134,7 +137,7 @@ TEST(StatementResourcesTest, CleansUpOnPreparationTranslationAndExecutionErrors)
                              "SELECT value FROM t @{test_hint=1}",
                              [&](TemporaryFiles& files) {
                                path = files.Write("value\n7\n");
-                               return FileQuery(path);
+                               return FileQuery(files, path);
                              }),
                std::runtime_error);
   EXPECT_FALSE(path.empty());
@@ -144,7 +147,7 @@ TEST(StatementResourcesTest, CleansUpOnPreparationTranslationAndExecutionErrors)
       {
         const auto statement = TranslateRead("SELECT value FROM t", [&](TemporaryFiles& files) {
           path = files.Write("value\nnot_an_integer\n");
-          return FileQuery(path);
+          return FileQuery(files, path);
         });
         ExecuteRead(backend, statement);
       },
@@ -160,7 +163,7 @@ TEST(StatementResourcesTest, ConcurrentStatementsDoNotSharePreparation) {
     const auto statement = TranslateRead("SELECT value FROM t", [&](TemporaryFiles& files) {
       path = files.Write("value\n7\n");
       staged.arrive_and_wait();
-      return FileQuery(path);
+      return FileQuery(files, path);
     });
     return std::pair(path, ExecuteRead(backend, statement));
   };
@@ -184,7 +187,7 @@ TEST(StatementResourcesTest, ScalarExpressionKeepsItsOwnExecutionScope) {
   {
     FileSource source([&](TemporaryFiles& files) {
       path = files.Write("value\n7\n");
-      return FileQuery(path);
+      return FileQuery(files, path);
     });
     googlesql::TypeFactory types;
     BigQueryCatalog catalog(source, &types, "test", "d", TimestampPrecision::kMicroseconds, nullptr,
@@ -221,7 +224,7 @@ TEST(StatementResourcesTest, StorageSnapshotRetainsFilesThroughConsumption) {
   {
     const auto statement = TranslateRead("SELECT value FROM t", [&](TemporaryFiles& files) {
       path = files.Write("value\n7\n");
-      return FileQuery(path);
+      return FileQuery(files, path);
     });
     ASSERT_TRUE(statement.result_schema.has_value());
     snapshot =

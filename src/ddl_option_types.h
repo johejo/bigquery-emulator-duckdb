@@ -47,6 +47,13 @@ enum class DdlOptionId : uint8_t {
   kEnableListInference,
   kSkipLeadingRows,
   kFieldDelimiter,
+  kQuote,
+  kAllowQuotedNewlines,
+  kAllowJaggedRows,
+  kNullMarker,
+  kNullMarkers,
+  kPreserveAsciiControlCharacters,
+  kIgnoreUnknownValues,
 };
 std::string_view DdlOptionContextName(DdlOptionContext context);
 std::string_view DdlOptionName(DdlOptionId option);

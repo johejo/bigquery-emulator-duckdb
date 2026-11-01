@@ -21,6 +21,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/csv_detect.h"
+#include "src/csv_stage.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
@@ -296,6 +297,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       throw;
     }
   }
+  CheckLoadRequest(request.load.configuration);
   JobLocation location(RequestedLocation(request.location));
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -337,19 +339,22 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     // Map validated job options to reader settings; no destination policy crosses this boundary.
     FileReadOptions read_options = ParquetReadOptions{};
     if (const auto* csv = std::get_if<CsvLoadOptions>(&options)) {
-      read_options = CsvReadOptions{
-          .skip_leading_rows = csv->skip_leading_rows,
-          .field_delimiter = csv->field_delimiter,
-      };
+      read_options = csv->read;
     } else if (std::holds_alternative<JsonLoadOptions>(options)) {
       read_options = JsonReadOptions{};
     }
     if (detects_csv) {
       const auto& csv = std::get<CsvLoadOptions>(options);
-      DetectedCsv detected = DetectCsv(
-          sources, config.contains("fieldDelimiter") ? csv.field_delimiter : "",
-          config.contains("skipLeadingRows") ? std::optional(csv.skip_leading_rows) : std::nullopt,
-          downloads);
+      if (csv.detection_options) {
+        throw ApiError::Unsupported(
+            "CSV options other than skipLeadingRows and fieldDelimiter "
+            "with schema auto-detection");
+      }
+      DetectedCsv detected =
+          DetectCsv(sources, config.contains("fieldDelimiter") ? csv.read.field_delimiter : "",
+                    config.contains("skipLeadingRows") ? std::optional(csv.read.skip_leading_rows)
+                                                       : std::nullopt,
+                    downloads);
       if (detected.schema.empty()) {
         throw ApiError::InvalidQuery("There are no column descriptions provided for table " +
                                      load.destination_table.table_id);
@@ -359,6 +364,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
           appends ? AppendedColumns(load.destination_table, std::move(detected.schema), *existing)
                   : std::move(detected.schema);
       read_options = CsvReadOptions{.quoted_nulls = false};
+    } else if (const auto* csv = std::get_if<CsvLoadOptions>(&options)) {
+      sources = StageCsvSources(sources, csv->read, requested_schema, downloads);
     }
     ParquetColumn parquet;
     if (std::holds_alternative<JsonLoadOptions>(options)) {

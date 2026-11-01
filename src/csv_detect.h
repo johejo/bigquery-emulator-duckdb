@@ -23,9 +23,6 @@ struct DetectedCsv {
   int skipped_rows = 0;
 };
 
-// Validates CSV quoting, including the default prohibition on quoted line breaks.
-void ValidateCsvRecords(const FileSource& source, char delimiter);
-
 // Detects the delimiter, header and column types of CSV `sources` as BigQuery does. An empty
 // `field_delimiter` detects one; `skip_leading_rows` is absent when the job leaves it out.
 // Without `rows`, the result has no sources, and a quote that does not close ends at the end of

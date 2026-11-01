@@ -672,12 +672,9 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
   const std::string files = "[" + Join(quoted, ", ") + "]";
   std::string sql;
   if (csv != nullptr) {
+    // StageCsvSources and DetectCsv write every value quoted and each NULL unquoted and empty.
     sql = "SELECT * FROM read_csv(" + files +
-          ", header=false, skip=" + std::to_string(csv->skip_leading_rows) +
-          ", delim=" + QuoteLiteral(csv->field_delimiter);
-    if (!csv->quoted_nulls) {
-      sql += ", allow_quoted_nulls=false";
-    }
+          ", header=false, delim=',', quote='\"', escape='\"', allow_quoted_nulls=false";
     if (!schema.empty()) {
       sql += ", auto_detect=false";
       std::vector<std::string> columns;
