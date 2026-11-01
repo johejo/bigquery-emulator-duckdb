@@ -1,7 +1,11 @@
 # Go client test data
 
 - `scalars/*.txt`: a query returning one cell, checked through `jobs.query` against its REST
-  value. These cover SQL results without Go client type conversion.
+  value by `TestScalars`, using `scalars/setup.sql`. These cover SQL results without Go client
+  type conversion.
+- `scalars/graph/*.txt`: graph queries checked the same way by `TestGraphScalars`, using only
+  `scalars/graph/setup.sql` and no default dataset. The two suites initialize independently and
+  run in parallel.
 - `errors/*.txt`: independent SQL queries expected to fail, checked through the Go client's
   `Query.Run` and `Job.Wait`. No default dataset is set. Use API scenarios in `tests/e2e/scenarios/testdata/` for request options, shared state and
   metadata assertions. Keep SDK behavior and typed decoding in Go tests.
@@ -31,3 +35,5 @@ Source expected values and error assertions as described in
 [AGENTS.md](../../../../AGENTS.md#expected-values).
 Deliberately unsupported emulator forms belong in `errors`, with an unsupported-error assertion.
 Failures report the filename and the first SQL line, usable with `go test -run` to select a case.
+Use `-run '^TestScalars$'` for non-graph scalars or `-run '^TestGraphScalars$'` for graph scalars;
+only the selected suite's setup runs.
