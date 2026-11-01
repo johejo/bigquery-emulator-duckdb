@@ -61,9 +61,9 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ### External tables
 
-GCS external tables support Parquet through `CREATE EXTERNAL TABLE` or `tables.insert`. Sources
+GCS external tables support Parquet and CSV through `CREATE EXTERNAL TABLE` or `tables.insert`. Sources
 must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A table created
-without a schema takes the one BigQuery detects from the alphabetically last source file when it
+without a schema, for Parquet, takes the one BigQuery detects from the alphabetically last source file when it
 is created, so creation reads the sources. Columns and their fields must be of the Parquet types
 that the [Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
 convert to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a DECIMAL that NUMERIC
@@ -75,8 +75,13 @@ the type detected for it; coercions, ENUM, GeoParquet, column name conversions a
 options that select other types are unsupported. Every source file must have each REQUIRED and
 REPEATED column and field of the schema.
 
-CSV, JSON, Bigtable, BigLake connections, Hive partitioning, metadata caching,
-Configuration updates, `ALTER TABLE`, stored views over external tables and time
+CSV requires an explicit, flat schema of the scalar types listed above. It supports
+`skip_leading_rows` / `csvOptions.skipLeadingRows` and a single ASCII
+`field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL.
+CSV schema autodetection and other CSV options are unsupported.
+
+JSON, Bigtable, BigLake connections, Hive partitioning, metadata caching,
+configuration updates, `ALTER TABLE`, stored views over external tables and time
 travel are unsupported. Query dry runs and stored definitions reject external reads rather
 than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
 not read external tables; use a query instead. Writes to external tables are rejected.

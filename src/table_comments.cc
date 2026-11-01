@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -109,6 +110,34 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
         metadata.default_rounding_mode != RoundingMode::kUnspecified || metadata.clone ||
         metadata.snapshot) {
       throw ApiError::Unsupported("external table storage options");
+    }
+    const auto& external = *metadata.external_data;
+    if (external.format == "CSV") {
+      if (external.autodetect.value_or(false)) {
+        throw ApiError::Unsupported("CSV external table schema autodetection");
+      }
+      if (external.enable_list_inference) {
+        throw ApiError::Unsupported("enable_list_inference on CSV external tables");
+      }
+      if (external.skip_leading_rows &&
+          (*external.skip_leading_rows < 0 ||
+           *external.skip_leading_rows > std::numeric_limits<int>::max())) {
+        throw ApiError::Unsupported("CSV external table skip_leading_rows out of range");
+      }
+      if (external.field_delimiter &&
+          (external.field_delimiter->size() != 1 ||
+           static_cast<unsigned char>(external.field_delimiter->front()) > 127 ||
+           external.field_delimiter->front() == '\n' || external.field_delimiter->front() == '\r' ||
+           external.field_delimiter->front() == '"' || external.field_delimiter->front() == '\0')) {
+        throw ApiError::Unsupported("CSV external table field_delimiter");
+      }
+      if (std::ranges::any_of(schema, [](const FieldSchema& field) {
+            return field.mode == FieldMode::kRepeated || field.type == FieldType::kRecord;
+          })) {
+        throw ApiError::Invalid("CSV external tables do not support nested or repeated fields");
+      }
+    } else if (external.skip_leading_rows || external.field_delimiter) {
+      throw ApiError::Unsupported("CSV options on non-CSV external tables");
     }
     const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);
     if (unsupported != schema.end()) {

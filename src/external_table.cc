@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "src/api_error.h"
+#include "src/csv_detect.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
@@ -260,6 +261,9 @@ ThriftValue SourceMetadata(const FileSource& source) {
 
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
                                                  GcsClient client) {
+  if (definition.format == "CSV") {
+    throw ApiError::Unsupported("CSV external tables without an explicit schema");
+  }
   TemporaryFiles files;
   const auto sources = StageFileSources(definition.uris, FileFormat::kParquet, client, files);
   if (sources.empty()) {
@@ -292,11 +296,26 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
                           GcsClient client) {
   return [definition = std::move(definition), schema = std::move(schema),
           client = std::move(client)](TemporaryFiles& files) mutable {
-    const auto sources = StageFileSources(definition.uris, FileFormat::kParquet, client, files);
+    const bool csv = definition.format == "CSV";
+    const auto sources = StageFileSources(
+        definition.uris, csv ? FileFormat::kCsv : FileFormat::kParquet, client, files);
     std::vector<FieldSchema> read_schema;
     std::ranges::transform(schema, std::back_inserter(read_schema), Unenforced);
     std::vector<std::string> reads;
     for (const auto& source : sources) {
+      if (csv) {
+        ValidateCsvRecords(source, definition.field_delimiter.value_or(",").front());
+        reads.push_back(
+            "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
+            FileReadQuery(
+                CsvReadOptions{
+                    .skip_leading_rows = static_cast<int>(definition.skip_leading_rows.value_or(0)),
+                    .field_delimiter = definition.field_delimiter.value_or(","),
+                },
+                {source}, read_schema) +
+            ") AS source");
+        continue;
+      }
       const ThriftValue metadata = SourceMetadata(source);
       const auto columns =
           ParquetColumns(metadata, definition.enable_list_inference.value_or(false));

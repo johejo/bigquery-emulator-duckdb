@@ -381,9 +381,23 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   for (const auto& option : options) {
     const auto decoded = DecodeDdlOption(*option, statement, scope);
     if (decoded && external && decoded->id == DdlOptionId::kFormat) {
-      format = !decoded->value.is_null() && decoded->value.string_value() == "PARQUET";
+      format = !decoded->value.is_null() && (decoded->value.string_value() == "PARQUET" ||
+                                             decoded->value.string_value() == "CSV");
       if (!format) {
-        return Unsupported(scope, "external tables other than PARQUET");
+        return Unsupported(scope, "external tables other than PARQUET or CSV");
+      }
+      metadata.external_data->format = decoded->value.string_value();
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kSkipLeadingRows) {
+      if (!decoded->value.is_null()) {
+        metadata.external_data->skip_leading_rows = decoded->value.int64_value();
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kFieldDelimiter) {
+      if (!decoded->value.is_null()) {
+        metadata.external_data->field_delimiter = decoded->value.string_value();
       }
       continue;
     }

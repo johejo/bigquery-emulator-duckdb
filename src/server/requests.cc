@@ -87,6 +87,8 @@ const ResourceMask& TableFields() {
                           "externalDataConfiguration.sourceUris",
                           "externalDataConfiguration.autodetect",
                           "externalDataConfiguration.parquetOptions.enableListInference",
+                          "externalDataConfiguration.csvOptions.skipLeadingRows",
+                          "externalDataConfiguration.csvOptions.fieldDelimiter",
                           "externalDataConfiguration.schema.fields.name",
                           "externalDataConfiguration.schema.fields.type",
                           "externalDataConfiguration.schema.fields.mode",

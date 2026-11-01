@@ -49,8 +49,12 @@ constexpr auto kNames = std::to_array<std::pair<I, std::string_view>>({
     {I::kFormat, "format"},
     {I::kUris, "uris"},
     {I::kEnableListInference, "enable_list_inference"},
+    {I::kSkipLeadingRows, "skip_leading_rows"},
+    {I::kFieldDelimiter, "field_delimiter"},
 });
 constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
+    {.context = C::kCreateExternalTable, .name = I::kSkipLeadingRows, .type = kInt64},
+    {.context = C::kCreateExternalTable, .name = I::kFieldDelimiter, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kFormat, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kUris, .type = kStrings},
     {.context = C::kCreateExternalTable, .name = I::kEnableListInference, .type = kBool},
@@ -163,6 +167,8 @@ const googlesql::Type* DdlOptionSqlType(DdlOptionType type) {
       return googlesql::types::StringType();
     case kBool:
       return googlesql::types::BoolType();
+    case kInt64:
+      return googlesql::types::Int64Type();
     case kFloat64:
       return googlesql::types::DoubleType();
     case kTimestamp:

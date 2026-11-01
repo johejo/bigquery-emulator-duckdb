@@ -434,6 +434,10 @@ std::string Quoted(std::string_view text) {
 
 }  // namespace
 
+void ValidateCsvRecords(const FileSource& source, char delimiter) {
+  ParseRecords(ReadMaybeGzip(source.path), delimiter);
+}
+
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
                       std::optional<int> skip_leading_rows, TemporaryFiles& downloads) {
   // BigQuery samples one of several files, and whether it then finds a header in each is not

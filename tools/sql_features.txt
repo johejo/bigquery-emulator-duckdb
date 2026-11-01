@@ -307,6 +307,8 @@ note `CREATE SNAPSHOT TABLE` | See [Table snapshots](compatibility.md#table-snap
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (s STRUCT<x INT64>, r ARRAY<STRUCT<y STRING>>) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'NEWLINE_DELIMITED_JSON', uris = ['gs://b/f.json'])
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE IF NOT EXISTS n (a INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet']); CREATE OR REPLACE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/g.parquet'])

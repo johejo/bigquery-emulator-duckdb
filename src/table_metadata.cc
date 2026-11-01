@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -12,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -415,9 +417,17 @@ json TableMetadata::ToJson() const {
   json fields = json::object();
   if (external_data) {
     fields["externalDataConfiguration"] = {
-        {"sourceFormat", "PARQUET"},
+        {"sourceFormat", external_data->format},
         {"sourceUris", external_data->uris},
     };
+    if (external_data->skip_leading_rows) {
+      fields["externalDataConfiguration"]["csvOptions"]["skipLeadingRows"] =
+          std::to_string(*external_data->skip_leading_rows);
+    }
+    if (external_data->field_delimiter) {
+      fields["externalDataConfiguration"]["csvOptions"]["fieldDelimiter"] =
+          *external_data->field_delimiter;
+    }
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
     }
@@ -560,19 +570,50 @@ TableMetadata TableMetadataFromJson(const json& table) {
     }
     for (const auto& [name, value] : config.items()) {
       if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
-          name != "autodetect" && name != "parquetOptions") {
+          name != "autodetect" && name != "parquetOptions" && name != "csvOptions") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
-    if (config.value("sourceFormat", "") != "PARQUET") {
-      throw ApiError::Unsupported("external tables other than PARQUET");
+    const std::string format = config.value("sourceFormat", "");
+    if (format != "PARQUET" && format != "CSV") {
+      throw ApiError::Unsupported("external tables other than PARQUET or CSV");
     }
     const auto uris = config.value("sourceUris", json::array());
     if (!uris.is_array() || uris.empty()) {
       throw ApiError::Invalid("externalDataConfiguration.sourceUris must not be empty");
     }
     metadata.external_data.emplace();
+    metadata.external_data->format = format;
+    if (config.contains("csvOptions")) {
+      if (format != "CSV") {
+        throw ApiError::Unsupported("csvOptions on a non-CSV external table");
+      }
+      const auto& options = config["csvOptions"];
+      if (!options.is_object()) {
+        throw ApiError::Invalid("externalDataConfiguration.csvOptions must be an object");
+      }
+      for (const auto& [name, value] : options.items()) {
+        if (name == "fieldDelimiter" && value.is_string()) {
+          metadata.external_data->field_delimiter = value.get<std::string>();
+        } else if (name == "skipLeadingRows" && value.is_number_integer()) {
+          metadata.external_data->skip_leading_rows = value.get<int64_t>();
+        } else if (name == "skipLeadingRows" && value.is_string()) {
+          const auto& text = value.get_ref<const std::string&>();
+          int64_t rows = 0;
+          const auto result = std::from_chars(text.data(), text.data() + text.size(), rows);
+          if (result.ec != std::errc{} || result.ptr != text.data() + text.size()) {
+            throw ApiError::Invalid("Invalid csvOptions.skipLeadingRows");
+          }
+          metadata.external_data->skip_leading_rows = rows;
+        } else {
+          throw ApiError::Unsupported("externalDataConfiguration.csvOptions." + name);
+        }
+      }
+    }
     if (config.contains("parquetOptions")) {
+      if (format != "PARQUET") {
+        throw ApiError::Unsupported("parquetOptions on a non-Parquet external table");
+      }
       const auto& options = config["parquetOptions"];
       if (!options.is_object()) {
         throw ApiError::Invalid("externalDataConfiguration.parquetOptions must be an object");
