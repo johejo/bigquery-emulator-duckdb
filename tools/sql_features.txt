@@ -458,6 +458,8 @@ query Dataset default collation | ALTER SCHEMA d SET DEFAULT COLLATE 'und:ci'
 query Collated views | CREATE VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
 query Collated views | CREATE VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t; SELECT c FROM n WHERE c = 'A'
 query Collated materialized views | CREATE MATERIALIZED VIEW n AS SELECT COLLATE(name, 'und:ci') AS c FROM t
+query Collated materialized views | CREATE MATERIALIZED VIEW n AS SELECT COLLATE(name, 'und:ci') AS c, COUNT(*) AS n FROM t GROUP BY c
+query Collated materialized views | CREATE MATERIALIZED VIEW n AS SELECT MIN(COLLATE(name, 'und:ci')) AS c FROM t
 query Collated table functions | CREATE TABLE FUNCTION d.f() AS (SELECT COLLATE(name, 'und:ci') AS c FROM d.t); SELECT c FROM d.f()
 note Collated comparisons | See [Collation](compatibility.md#collation).
 

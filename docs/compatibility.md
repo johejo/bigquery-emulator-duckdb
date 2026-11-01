@@ -233,7 +233,7 @@ is listed in [sql.md](sql.md#collation) and [functions.md](functions.md). `und:c
 GoogleSQL's collator, ICU's root locale at secondary strength, whose Unicode data can order
 some strings differently from BigQuery's.
 
-Default collations on views and materialized views with collated columns remain unsupported.
+Default collations on views remain unsupported.
 Aggregates that compare collated ARRAY elements or STRUCT fields are limited to
 `COUNT(DISTINCT ...)`; value-returning DISTINCT aggregates over those types remain unsupported.
 

@@ -1,0 +1,37 @@
+# Materialized views support collation, except collated aggregate sort keys.
+# Expected comparisons and grouping follow the documented und:ci semantics.
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+
+CREATE TABLE scalars.mv_ci_projection_source (word STRING COLLATE 'und:ci');
+INSERT scalars.mv_ci_projection_source VALUES ('Apple'), ('banana'), (NULL);
+CREATE MATERIALIZED VIEW scalars.mv_ci_projection AS SELECT word FROM scalars.mv_ci_projection_source;
+SELECT COUNT(*) FROM scalars.mv_ci_projection WHERE word = 'apple'
+=> "1"
+
+# An explicit COLLATE expression also gives the output column its collation.
+CREATE TABLE scalars.mv_ci_expression_source (word STRING);
+INSERT scalars.mv_ci_expression_source VALUES ('Apple');
+CREATE MATERIALIZED VIEW scalars.mv_ci_expression AS SELECT COLLATE(word, 'und:ci') AS word FROM scalars.mv_ci_expression_source;
+SELECT word = 'apple' FROM scalars.mv_ci_expression
+=> "true"
+
+# Do not depend on which spelling represents a collated group.
+CREATE TABLE scalars.mv_ci_group_source (word STRING COLLATE 'und:ci');
+INSERT scalars.mv_ci_group_source VALUES ('Apple'), ('apple'), ('banana');
+CREATE MATERIALIZED VIEW scalars.mv_ci_group AS SELECT word, COUNT(*) AS n FROM scalars.mv_ci_group_source GROUP BY word;
+SELECT n FROM scalars.mv_ci_group WHERE word = 'APPLE'
+=> "2"
+
+# Value-returning aggregates retain the input collation, not a comparison key.
+CREATE TABLE scalars.mv_ci_min_source (word STRING COLLATE 'und:ci');
+INSERT scalars.mv_ci_min_source VALUES ('apple'), ('Zebra');
+CREATE MATERIALIZED VIEW scalars.mv_ci_min AS SELECT MIN(word) AS word FROM scalars.mv_ci_min_source;
+SELECT word = 'APPLE' FROM scalars.mv_ci_min
+=> "true"
+
+# Collation affects the definition's filter even if no collated column is output.
+CREATE TABLE scalars.mv_ci_filter_source (word STRING COLLATE 'und:ci');
+INSERT scalars.mv_ci_filter_source VALUES ('Apple'), ('apple'), ('banana');
+CREATE MATERIALIZED VIEW scalars.mv_ci_filter AS SELECT COUNT(*) AS n FROM scalars.mv_ci_filter_source WHERE word = 'APPLE';
+SELECT n FROM scalars.mv_ci_filter
+=> "2"
