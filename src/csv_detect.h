@@ -10,7 +10,7 @@
 
 namespace bigquery_emulator_duckdb {
 
-// What a load with schema auto-detection reads from CSV sources.
+// What schema auto-detection finds in CSV sources.
 struct DetectedCsv {
   // The detected columns, or none when the sources have no rows.
   std::vector<FieldSchema> schema;
@@ -18,6 +18,9 @@ struct DetectedCsv {
   // is in a form FileReadQuery reads as its column's type; an unquoted empty value is NULL and a
   // quoted one an empty STRING.
   std::vector<FileSource> sources;
+  // The delimiter of the sources and the number of their leading records that are not data.
+  char delimiter = ',';
+  int skipped_rows = 0;
 };
 
 // Validates CSV quoting, including the default prohibition on quoted line breaks.
@@ -25,7 +28,10 @@ void ValidateCsvRecords(const FileSource& source, char delimiter);
 
 // Detects the delimiter, header and column types of CSV `sources` as BigQuery does. An empty
 // `field_delimiter` detects one; `skip_leading_rows` is absent when the job leaves it out.
+// Without `rows`, the result has no sources, and a quote that does not close ends at the end of
+// its line rather than failing, as in BigQuery's detection for external tables.
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
-                      std::optional<int> skip_leading_rows, TemporaryFiles& downloads);
+                      std::optional<int> skip_leading_rows, TemporaryFiles& downloads,
+                      bool rows = true);
 
 }  // namespace bigquery_emulator_duckdb

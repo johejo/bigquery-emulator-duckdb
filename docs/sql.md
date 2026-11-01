@@ -111,7 +111,7 @@ rejected.
 | `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE CLONE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE SNAPSHOT TABLE` | Supported | See [Table snapshots](compatibility.md#table-snapshots). |
-| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: CSV external tables without an explicit schema; NEWLINE_DELIMITED_JSON external tables without an explicit schema. |
+| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: NEWLINE_DELIMITED_JSON external tables without an explicit schema. |
 | `DROP TABLE` | Supported |  |
 | `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |

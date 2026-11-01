@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <string>
@@ -19,6 +20,7 @@
 #include "absl/time/time.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "src/api_error.h"
+#include "src/csv_records.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
@@ -36,59 +38,18 @@ using Cell = std::optional<std::string>;
 using Record = std::vector<Cell>;
 
 // Splits `contents` into at most `limit` records at `delimiter` and line breaks, skipping blank
-// lines. As without allowQuotedNewlines, a quoted value cannot hold a line break.
+// lines. As without allowQuotedNewlines, a quoted value cannot hold a line break; `lenient` ends
+// one that does not close at the end of its line.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a separator and a count, named apart.
 std::vector<Record> ParseRecords(std::string_view contents, char delimiter,
-                                 size_t limit = std::numeric_limits<size_t>::max()) {
+                                 size_t limit = std::numeric_limits<size_t>::max(),
+                                 bool lenient = false) {
   std::vector<Record> records;
-  size_t line = 1;
-  size_t i = 0;
-  const auto line_end = [&] {
-    return i >= contents.size() || contents.at(i) == '\n' || contents.at(i) == '\r';
-  };
-  while (i < contents.size() && records.size() < limit) {
-    Record record;
-    while (true) {
-      std::string value;
-      bool quoted = false;
-      if (i < contents.size() && contents.at(i) == '"') {
-        quoted = true;
-        for (++i;; ++i) {
-          if (line_end()) {
-            throw ApiError::Invalid(
-                std::format("Error while reading data, error message: Missing close quote "
-                            "character (\").; line_number: {}",
-                            line));
-          }
-          if (contents.at(i) == '"') {
-            if (i + 1 >= contents.size() || contents.at(i + 1) != '"') {
-              ++i;
-              break;
-            }
-            ++i;
-          }
-          value += contents.at(i);
-        }
-      }
-      for (; !line_end() && contents.at(i) != delimiter; ++i) {
-        value += contents.at(i);
-      }
-      record.push_back(quoted || !value.empty() ? Cell(std::move(value)) : std::nullopt);
-      if (line_end()) {
-        break;
-      }
-      ++i;
-    }
-    if (i < contents.size() && contents.at(i) == '\r') {
-      ++i;
-    }
-    if (i < contents.size() && contents.at(i) == '\n') {
-      ++i;
-    }
-    ++line;
-    if (record.size() > 1 || record.front().has_value()) {
-      records.push_back(std::move(record));
-    }
+  for (CsvRecord& parsed : ParseCsvRecords(contents, {.delimiter = delimiter}, limit, lenient)) {
+    std::ranges::transform(parsed, std::back_inserter(records.emplace_back()),
+                           [](std::optional<CsvCell>& cell) {
+                             return cell ? Cell(std::move(cell->text)) : std::nullopt;
+                           });
   }
   return records;
 }
@@ -99,7 +60,7 @@ char DetectDelimiter(std::string_view contents) {
   constexpr std::array kCandidates = {',', '|', '\t'};
   std::array<size_t, kCandidates.size()> counts{};
   for (size_t i = 0; i < kCandidates.size(); ++i) {
-    const std::vector<Record> first = ParseRecords(contents, kCandidates.at(i), 1);
+    const std::vector<Record> first = ParseRecords(contents, kCandidates.at(i), 1, true);
     counts.at(i) = first.empty() ? 0 : first.front().size();
   }
   const size_t most = std::ranges::max(counts);
@@ -439,7 +400,7 @@ void ValidateCsvRecords(const FileSource& source, char delimiter) {
 }
 
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
-                      std::optional<int> skip_leading_rows, TemporaryFiles& downloads) {
+                      std::optional<int> skip_leading_rows, TemporaryFiles& downloads, bool rows) {
   // BigQuery samples one of several files, and whether it then finds a header in each is not
   // known.
   if (sources.size() > 1) {
@@ -455,7 +416,9 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
   const std::string contents = ReadMaybeGzip(sources.front().path);
   const char delimiter =
       field_delimiter.empty() ? DetectDelimiter(contents) : field_delimiter.front();
-  const std::vector<Record> records = ParseRecords(contents, delimiter);
+  // Detection reads a quote that does not close leniently, but a read of the rows fails on it.
+  const std::vector<Record> records =
+      ParseRecords(contents, delimiter, std::numeric_limits<size_t>::max(), !rows);
 
   // Left out, skipLeadingRows looks for a header in the first row, which is otherwise data;
   // N > 0 skips N - 1 rows and looks for one in row N, which it skips either way; 0 reads every
@@ -523,6 +486,8 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
     }
   }
   DetectedCsv detected;
+  detected.delimiter = delimiter;
+  detected.skipped_rows = static_cast<int>(begin);
   std::vector<std::string> names;
   for (size_t column = 0; column < columns; ++column) {
     std::string name;
@@ -540,6 +505,9 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
     detected.schema.push_back({.name = name, .type = Info(types.at(column)).type});
   }
 
+  if (!rows) {
+    return detected;
+  }
   std::string rewritten;
   for (size_t row = begin; row < records.size(); ++row) {
     const Record& record = records.at(row);

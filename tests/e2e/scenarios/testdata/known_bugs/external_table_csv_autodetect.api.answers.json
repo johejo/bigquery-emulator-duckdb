@@ -1,0 +1,118 @@
+{
+  "cases": {
+    "api_schema_autodetect": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/api_schema_autodetect/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_api_schema_autodetect.t, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"id\" column_type: INT64 value: \"a\" File: gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/api_schema_autodetect/a.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_api_schema_autodetect.t, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"id\" column_type: INT64 value: \"a\" File: gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/api_schema_autodetect/a.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_reordered": {
+      "project": "johejo-sandbox",
+      "run": "cipf6vmsedeqlbl7jl7ggf5ums",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_reordered/a.csv",
+              "gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_reordered/b.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_reordered.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_reordered/a.csv\", \"gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_reordered/b.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_reordered.t, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"id\" column_type: INT64 value: \"a\" File: gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_reordered/a.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_cipf6vmsedeqlbl7jl7ggf5ums_ddl_reordered.t, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"id\" column_type: INT64 value: \"a\" File: gs://johejo-sandbox-us/cipf6vmsedeqlbl7jl7ggf5ums/ddl_reordered/a.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  },
+  "version": 1
+}

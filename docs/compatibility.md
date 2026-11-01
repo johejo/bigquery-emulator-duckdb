@@ -63,9 +63,9 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 GCS external tables support Parquet, CSV and newline-delimited JSON through `CREATE EXTERNAL TABLE`
 or `tables.insert`. Sources
-must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A table created
-without a schema, for Parquet, takes the one BigQuery detects from the alphabetically last source file when it
-is created, so creation reads the sources. Columns and their fields must be of the Parquet types
+must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A Parquet or CSV
+table created without a schema takes the one BigQuery detects from the alphabetically last source
+file when it is created, so creation reads the sources. Columns and their fields must be of the Parquet types
 that the [Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
 convert to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a DECIMAL that NUMERIC
 holds, or a group, which is a RECORD; a repeated field is REPEATED. By default a LIST or MAP
@@ -76,10 +76,11 @@ the type detected for it; coercions, ENUM, GeoParquet, column name conversions a
 options that select other types are unsupported. Every source file must have each REQUIRED and
 REPEATED column and field of the schema.
 
-CSV requires an explicit, flat schema of the scalar types listed above. It supports
+CSV takes a flat schema of the scalar types listed above, given or detected as
+[loads detect it](#loads-extracts-and-copies). It supports
 `skip_leading_rows` / `csvOptions.skipLeadingRows` and a single ASCII
 `field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL.
-CSV schema autodetection and other CSV options are unsupported.
+Other CSV options are unsupported.
 
 JSON requires an explicit schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, TIME
 or TIMESTAMP fields, RECORDs of those fields, or repeated fields of those types. Scalar values must

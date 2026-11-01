@@ -258,20 +258,44 @@ ThriftValue SourceMetadata(const FileSource& source) {
   return metadata;
 }
 
+// The skipLeadingRows DetectCsv takes, absent when the table leaves it out.
+std::optional<int> CsvSkipLeadingRows(const GcsExternalData& definition) {
+  if (!definition.skip_leading_rows) {
+    return std::nullopt;
+  }
+  return static_cast<int>(*definition.skip_leading_rows);
+}
+
 }  // namespace
 
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
                                                  GcsClient client) {
-  if (definition.format != "PARQUET") {
+  const bool csv = definition.format == "CSV";
+  if (!csv && definition.format != "PARQUET") {
     throw ApiError::Unsupported(definition.format + " external tables without an explicit schema");
   }
+  if (csv && !definition.autodetect.value_or(false)) {
+    throw ApiError::Invalid(
+        "When defining a table with an ExternalDataConfiguration, a schema must be present on "
+        "either the Table or the ExternalDataConfiguration. If the schema is present on both, the "
+        "schemas must be the same.");
+  }
   TemporaryFiles files;
-  const auto sources = StageFileSources(definition.uris, FileFormat::kParquet, client, files);
+  const auto sources = StageFileSources(
+      definition.uris, csv ? FileFormat::kCsv : FileFormat::kParquet, client, files);
   if (sources.empty()) {
     throw ApiError::Invalid("External table source URIs match no files");
   }
   // BigQuery takes the schema of the alphabetically last file, by its whole path.
   const FileSource& last = *std::ranges::max_element(sources, {}, &FileSource::uri);
+  if (csv) {
+    DetectedCsv detected = DetectCsv({last}, definition.field_delimiter.value_or(""),
+                                     CsvSkipLeadingRows(definition), files, /*rows=*/false);
+    if (detected.schema.empty()) {
+      throw ApiError::Invalid("External CSV source " + last.uri + " has no columns");
+    }
+    return std::move(detected.schema);
+  }
   const ThriftValue metadata = SourceMetadata(last);
   const ParquetColumn columns =
       ParquetColumns(metadata, definition.enable_list_inference.value_or(false));
@@ -306,6 +330,18 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
                                           client, files);
     std::vector<FieldSchema> read_schema;
     std::ranges::transform(schema, std::back_inserter(read_schema), Unenforced);
+    // An autodetected table reads each file with the delimiter and header rows BigQuery detects
+    // in the alphabetically last one, which gives its schema, and matches columns by position.
+    std::string delimiter = definition.field_delimiter.value_or(",");
+    int skip_leading_rows = static_cast<int>(definition.skip_leading_rows.value_or(0));
+    if (csv && definition.autodetect.value_or(false) && !sources.empty()) {
+      const DetectedCsv detected =
+          DetectCsv({*std::ranges::max_element(sources, {}, &FileSource::uri)},
+                    definition.field_delimiter.value_or(""), CsvSkipLeadingRows(definition), files,
+                    /*rows=*/false);
+      delimiter = std::string(1, detected.delimiter);
+      skip_leading_rows = detected.skipped_rows;
+    }
     std::vector<std::string> reads;
     for (const auto& source : sources) {
       if (json) {
@@ -317,16 +353,15 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         continue;
       }
       if (csv) {
-        ValidateCsvRecords(source, definition.field_delimiter.value_or(",").front());
-        reads.push_back(
-            "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-            FileReadQuery(
-                CsvReadOptions{
-                    .skip_leading_rows = static_cast<int>(definition.skip_leading_rows.value_or(0)),
-                    .field_delimiter = definition.field_delimiter.value_or(","),
-                },
-                {source}, read_schema) +
-            ") AS source");
+        ValidateCsvRecords(source, delimiter.front());
+        reads.push_back("SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
+                        FileReadQuery(
+                            CsvReadOptions{
+                                .skip_leading_rows = skip_leading_rows,
+                                .field_delimiter = delimiter,
+                            },
+                            {source}, read_schema) +
+                        ") AS source");
         continue;
       }
       const ThriftValue metadata = SourceMetadata(source);

@@ -1,0 +1,336 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run cipf6vmsedeqlbl7jl7ggf5ums, with sources in
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. Failed queries observe
+# only their status and reason, since their messages give line and byte positions the emulator
+# does not report.
+# third_party/bigquery_docs/loading-data-cloud-storage-csv.md describes CSV schema auto-detection
+# for loads, and load_csv_autodetect.api.yaml records its rules. These cases settle what the
+# documentation leaves open for external tables: DDL and tables.insert with autodetect detect a
+# schema with the load rules from the alphabetically last file; csvOptions and INFORMATION_SCHEMA
+# record neither a detected header nor a detected delimiter, yet queries skip that header in each
+# file, split at that delimiter and match columns by position, as they do with a given schema.
+description: >-
+  Schema auto-detection of CSV external tables created by DDL and tables.insert, with sources in
+  a Cloud Storage bucket.
+# Sources, base64-encoded:
+# - header: "id,name\n1,a\n2,b\n"
+# - strings: "a,b\nc,d\n"
+# - pipe: "id|name\n1|a\n"
+# - x and y: "x\n1\n" and "y\n2\n"
+# - reordered: "name,id\nb,2\n"
+# - types: "i,f,b,d,t,ts,s\n1,1.5,true,2024-01-02,03:04:05,2024-01-02 03:04:05,a\n"
+# - header_only: "id,name\n"
+# - quoted_newline: "id,text\n1,\"a\nb\"\n"
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  header: aWQsbmFtZQoxLGEKMixiCg==
+  strings: YSxiCmMsZAo=
+  pipe: aWR8bmFtZQoxfGEK
+  x: eAoxCg==
+  y: eQoyCg==
+  reordered: bmFtZSxpZApiLDIK
+  types: aSxmLGIsZCx0LHRzLHMKMSwxLjUsdHJ1ZSwyMDI0LTAxLTAyLDAzOjA0OjA1LDIwMjQtMDEtMDIgMDM6MDQ6MDUsYQo=
+  header_only: aWQsbmFtZQo=
+  quoted_newline: aWQsdGV4dAoxLCJhCmIiCg==
+  # A second source, for cases that read only the first.
+  second: ${x}
+  options: ''
+  ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv']${options})
+templates:
+  # Creates the table with `ddl` from sources a.csv (`first`) and b.csv (`second`).
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/b.csv', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT *, _FILE_NAME AS file FROM `${project}.${dataset}.t` ORDER BY file, 1
+        observe:
+          status: /status
+          errors: /body/errors
+          schema: /body/schema
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.csv'}
+  # As ddl, for sources a query cannot read.
+  ddl_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/b.csv', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT *, _FILE_NAME AS file FROM `${project}.${dataset}.t` ORDER BY file, 1
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.csv'}
+  # Creates the table with tables.insert and `configuration` from a.csv.
+  api:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${header}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration: ${configuration}
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+  # tables.insert rejects `configuration`.
+  api_rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${header}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration: ${configuration}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+cases:
+  # A detected header names the columns; csvOptions does not record it, but queries skip it.
+  - name: ddl_header
+    template: ddl
+    vars:
+      first: ${header}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "2"}, {"v": "b"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A first row of strings over STRING columns is data, named string_field_N.
+  - name: ddl_strings
+    template: ddl
+    vars:
+      first: ${strings}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "a"}, {"v": "b"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "c"}, {"v": "d"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: ddl_skip_one
+    template: ddl
+    vars:
+      first: ${header}
+      options: ', skip_leading_rows = 1'
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "csvOptions": {"skipLeadingRows": "1"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  skip_leading_rows=1,\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "2"}, {"v": "b"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: ddl_skip_zero
+    template: ddl
+    vars:
+      first: ${header}
+      options: ', skip_leading_rows = 0'
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "csvOptions": {"skipLeadingRows": "0"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "2"}, {"v": "b"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "id"}, {"v": "name"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # csvOptions does not record a detected delimiter, which queries still use.
+  - name: ddl_detected_pipe
+    template: ddl
+    vars:
+      first: ${pipe}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: ddl_given_pipe
+    template: ddl
+    vars:
+      first: ${pipe}
+      options: ", field_delimiter = '|'"
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "csvOptions": {"fieldDelimiter": "|"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  field_delimiter=\"|\",\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: ddl_types
+    template: ddl
+    vars:
+      first: ${types}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "i", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "f", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "b", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "t", "type": "TIME"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "1.5"}, {"v": "true"}, {"v": "2024-01-02"}, {"v": "03:04:05"}, {"v": "1.704164645E9"}, {"v": "a"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "i", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "f", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "b", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "t", "type": "TIME"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: ddl_header_only
+    template: ddl
+    vars:
+      first: ${header_only}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "id"}, {"v": "name"}, {"v": "${prefix}/a.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Detection accepts a quoted line break, which queries without allow_quoted_newlines reject.
+  - name: ddl_quoted_newline
+    template: ddl_unreadable
+    vars:
+      first: ${quoted_newline}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid"}}
+  # The alphabetically last file, b.csv (y), gives the schema whatever the URI order; queries
+  # skip a.csv's header too and read its column by position.
+  - name: ddl_two_files
+    template: ddl
+    vars:
+      first: ${x}
+      second: ${y}
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CSV', uris = ['${prefix}/b.csv', '${prefix}/a.csv'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/b.csv", "${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/b.csv\", \"${prefix}/a.csv\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "2"}, {"v": "${prefix}/b.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: ddl_wildcard
+    template: ddl
+    vars:
+      first: ${x}
+      second: ${y}
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CSV', uris = ['${prefix}/*'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "${prefix}/a.csv"}]}, {"f": [{"v": "2"}, {"v": "${prefix}/b.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "y", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  - name: api_autodetect
+    template: api
+    vars:
+      configuration:
+        sourceFormat: CSV
+        sourceUris: ['${prefix}/a.csv']
+        autodetect: true
+    expect: {"create": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "name", "type": "STRING"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "2"}, {"v": "b"}]}], "status": 200}}
+  # Without autodetect or a schema.
+  - name: api_without_autodetect
+    template: api_rejected
+    vars:
+      configuration:
+        sourceFormat: CSV
+        sourceUris: ['${prefix}/a.csv']
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same."}}

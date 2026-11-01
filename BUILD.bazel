@@ -1111,12 +1111,21 @@ cc_library(
 )
 
 cc_library(
+    name = "csv_records",
+    srcs = ["src/csv_records.cc"],
+    hdrs = ["src/csv_records.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":api_error"],
+)
+
+cc_library(
     name = "csv_detect",
     srcs = ["src/csv_detect.cc"],
     hdrs = ["src/csv_detect.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":api_error",
+        ":csv_records",
         ":duckdb_sql",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public/functions:date_time_util",
