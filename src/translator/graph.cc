@@ -202,9 +202,8 @@ bool PortableProperty(const googlesql::ResolvedNode& node) {
 std::optional<std::string> CreatePropertyGraph(
     const googlesql::ResolvedCreatePropertyGraphStmt& create, const Scope& scope) {
   if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
-      create.create_mode() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT ||
       !create.option_list().empty()) {
-    return Unsupported(scope, "property graph creation modes or options");
+    return Unsupported(scope, "property graph scopes or options");
   }
   if (std::ranges::any_of(create.label_list(),
                           [](const auto& label) { return !label->options_list().empty(); })) {
@@ -332,6 +331,10 @@ std::optional<std::string> CreatePropertyGraph(
     }
   }
   scope.context.statement.property_graph = target;
+  scope.context.statement.replaces =
+      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
+  scope.context.statement.skips_property_graph =
+      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS;
   scope.context.statement.property_graph_definition =
       "CREATE PROPERTY GRAPH " + quoted_graph + " NODE TABLES (" + Join(sql_nodes, ", ") + ")" +
       (sql_edges.empty() ? "" : " EDGE TABLES (" + Join(sql_edges, ", ") + ")");

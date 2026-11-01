@@ -22,9 +22,10 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
     const auto parts =
         NormalizeTablePath(drop.name_path(), scope.context.defaults.project,
                            scope.context.defaults.dataset, scope.context.defaults.source);
-    if (parts.size() != 3 || drop.is_if_exists()) {
-      return Unsupported(scope, "this DROP PROPERTY GRAPH form");
+    if (parts.size() != 3) {
+      return Unsupported(scope, "property graph name without a dataset");
     }
+    scope.context.statement.skips_property_graph = drop.is_if_exists();
     scope.context.statement.property_graph = TableReference{
         .project_id = parts.at(0),
         .dataset_id = parts.at(1),
