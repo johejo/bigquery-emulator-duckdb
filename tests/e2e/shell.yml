@@ -199,6 +199,60 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
       stdin: *struct_sets
     test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "Type STRUCT is not supported"
+  # ARRAY grouping follows data-types.md's "Grouping with arrays": NULL arrays, empty
+  # arrays and NULL elements differ; element order, length and multiplicity matter.
+  # BigQuery's DISTINCT set-operation rejection is also covered by scalars/interval_set_operations.txt.
+  semantics_array_sets_googlesql:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: &array_sets |
+        WITH a AS (
+          SELECT CAST(NULL AS ARRAY<INT64>) AS v UNION ALL SELECT []
+          UNION ALL SELECT [NULL] UNION ALL SELECT [1, 2] UNION ALL SELECT [2, 1]
+          UNION ALL SELECT [1] UNION ALL SELECT [1, 1] UNION ALL SELECT [1, 2]),
+        b AS (SELECT [1, 2] AS v UNION ALL SELECT [] UNION ALL SELECT [9])
+        SELECT (SELECT COUNT(*) FROM (SELECT v FROM a UNION DISTINCT SELECT v FROM b)) AS u,
+               (SELECT COUNT(*) FROM (SELECT v FROM a INTERSECT DISTINCT SELECT v FROM b)) AS i,
+               (SELECT COUNT(*) FROM (SELECT v FROM a EXCEPT DISTINCT SELECT v FROM b)) AS e;
+    test: current.exit_code == 0 && current.stdout == '{"u":"8","i":"2","e":"5"}' + "\n"
+  semantics_array_sets_bigquery:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
+      stdin: *array_sets
+    test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "Type ARRAY is not supported"
+  # Nested INTERVAL equality and und:ci equality use the same keys as the STRUCT set
+  # cases above and scalars/collation_nested_observed.txt. Return a source value, not its key.
+  semantics_array_sets_nested_keys:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        WITH a AS (
+          SELECT [STRUCT(INTERVAL 1 MONTH AS i, COLLATE('A', 'und:ci') AS s), NULL] AS v),
+        b AS (
+          SELECT [STRUCT(INTERVAL 30 DAY AS i, COLLATE('a', 'und:ci') AS s), NULL] AS v)
+        SELECT (SELECT COUNT(*) FROM (SELECT v FROM a UNION DISTINCT SELECT v FROM b)) AS u,
+               (SELECT COUNT(*) FROM (SELECT v FROM a INTERSECT DISTINCT SELECT v FROM b)) AS i,
+               (SELECT COUNT(*) FROM (SELECT v FROM a EXCEPT DISTINCT SELECT v FROM b)) AS e,
+               (SELECT LOWER(v[OFFSET(0)].s) FROM (SELECT v FROM a UNION DISTINCT SELECT v FROM b)) AS s;
+    test: current.exit_code == 0 && current.stdout == '{"u":"1","i":"1","e":"0","s":"a"}' + "\n"
+  # data-types.md's floating-point grouping puts all NaNs in one group and both zeros
+  # in one group, but keeps NULL separate. These rules apply to ARRAY elements too.
+  semantics_array_sets_float_keys:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        WITH a AS (
+          SELECT [CAST('NaN' AS FLOAT64), -0.0] AS v
+          UNION ALL SELECT [CAST(NULL AS FLOAT64), 0.0]),
+        b AS (SELECT [CAST('NaN' AS FLOAT64), 0.0] AS v)
+        SELECT (SELECT COUNT(*) FROM (SELECT v FROM a UNION DISTINCT SELECT v FROM b)) AS u,
+               (SELECT COUNT(*) FROM (SELECT v FROM a INTERSECT DISTINCT SELECT v FROM b)) AS i,
+               (SELECT COUNT(*) FROM (SELECT v FROM a EXCEPT DISTINCT SELECT v FROM b)) AS e;
+    test: current.exit_code == 0 && current.stdout == '{"u":"2","i":"1","e":"1"}' + "\n"
   # GoogleSQL's struct_queries.test represents STRUCT() as an empty STRUCT, not its
   # DuckDB placeholder. Exercise the shell's schema and JSON encoding, including nested NULLs.
   semantics_empty_struct_results_googlesql:
