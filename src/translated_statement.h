@@ -175,7 +175,8 @@ struct TranslatedStatement {
   std::optional<RoutineReference> ddl_target_routine;
   // The table whose rows a DML statement or TRUNCATE TABLE changes.
   std::optional<TableReference> written_table;
-  // Whether CREATE OR REPLACE replaces the relation its target names, if there is one.
+  // Whether CREATE OR REPLACE replaces the relation or property graph its target names, if there
+  // is one.
   bool replaces = false;
   // What the emulator records besides DuckDB's own catalog, at most one of which is set.
   std::optional<TableDefinition> table;
@@ -187,6 +188,8 @@ struct TranslatedStatement {
   // Canonical GoogleSQL DDL, kept for resolving subsequent graph queries.
   std::optional<std::string> property_graph_definition;
   std::optional<TableReference> property_graph;
+  // IF NOT EXISTS or IF EXISTS: a graph that exists, or is missing, makes the statement do nothing.
+  bool skips_property_graph = false;
   bool reads_property_graph = false;
 };
 

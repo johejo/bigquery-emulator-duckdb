@@ -67,7 +67,6 @@ func TestPropertyGraph(t *testing.T) {
 		t.Fatalf("schema = %v", rows.Schema)
 	}
 	for _, sql := range []string{
-		"CREATE OR REPLACE PROPERTY GRAPH go_graph.FinGraph NODE TABLES (go_graph.Person KEY (id))",
 		"CREATE PROPERTY GRAPH go_graph.measured NODE TABLES (go_graph.Person KEY (id) PROPERTIES (MEASURE(SUM(id)) AS total))",
 		"CREATE PROPERTY GRAPH go_graph.inferred NODE TABLES (go_graph.Person)",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) COLUMNS (p.name))",
@@ -89,6 +88,73 @@ func TestPropertyGraph(t *testing.T) {
 	if _, err := client.Query("SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN p.name)").Read(ctx); err == nil {
 		t.Fatal("query of dropped graph succeeded")
 	}
+}
+
+// OR REPLACE replaces a graph, IF NOT EXISTS keeps one, and DROP's IF EXISTS ignores a missing
+// one, as the definitions in BigQuery's graph reference describe:
+// third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+func TestPropertyGraphCreateModes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_graph_modes")
+	if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	read := func(sql string) [][]bigquery.Value {
+		t.Helper()
+		rows, err := client.Query(sql).Read(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+		var got [][]bigquery.Value
+		for {
+			var row []bigquery.Value
+			err := rows.Next(&row)
+			if err == iterator.Done {
+				return got
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			got = append(got, row)
+		}
+	}
+	fails := func(sql string) {
+		t.Helper()
+		if _, err := client.Query(sql).Read(ctx); err == nil {
+			t.Fatalf("%s succeeded", sql)
+		}
+	}
+	const people = "SELECT * FROM GRAPH_TABLE(go_graph_modes.g MATCH (p:Person) RETURN p.id) ORDER BY id"
+	const accounts = "SELECT * FROM GRAPH_TABLE(go_graph_modes.g MATCH (a:Account) RETURN a.id) ORDER BY id"
+	read("CREATE TABLE go_graph_modes.Person (id INT64)")
+	read("CREATE TABLE go_graph_modes.Account (id INT64)")
+	read("INSERT go_graph_modes.Person VALUES (1), (2)")
+	read("INSERT go_graph_modes.Account VALUES (7)")
+
+	read("CREATE PROPERTY GRAPH IF NOT EXISTS go_graph_modes.g NODE TABLES (go_graph_modes.Person KEY (id))")
+	read("CREATE PROPERTY GRAPH IF NOT EXISTS go_graph_modes.g NODE TABLES (go_graph_modes.Account KEY (id))")
+	if got, want := read(people), [][]bigquery.Value{{int64(1)}, {int64(2)}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("after IF NOT EXISTS: rows = %v, want %v", got, want)
+	}
+	fails(accounts)
+	fails("CREATE PROPERTY GRAPH go_graph_modes.g NODE TABLES (go_graph_modes.Account KEY (id))")
+	fails("CREATE OR REPLACE PROPERTY GRAPH IF NOT EXISTS go_graph_modes.g NODE TABLES (go_graph_modes.Account KEY (id))")
+
+	read("CREATE OR REPLACE PROPERTY GRAPH go_graph_modes.g NODE TABLES (go_graph_modes.Account KEY (id))")
+	if got, want := read(accounts), [][]bigquery.Value{{int64(7)}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("after OR REPLACE: rows = %v, want %v", got, want)
+	}
+	fails(people)
+	read("CREATE OR REPLACE PROPERTY GRAPH go_graph_modes.h NODE TABLES (go_graph_modes.Person KEY (id))")
+
+	read("DROP PROPERTY GRAPH IF EXISTS go_graph_modes.g")
+	fails(accounts)
+	read("DROP PROPERTY GRAPH IF EXISTS go_graph_modes.g")
+	fails("DROP PROPERTY GRAPH go_graph_modes.g")
+	read("DROP PROPERTY GRAPH go_graph_modes.h")
 }
 
 // A GQL query returns the rows its last RETURN orders. The fixture and answers are the FinGraph

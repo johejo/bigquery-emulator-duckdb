@@ -448,8 +448,6 @@ Graph DDL rejects:
 - Measures, property options, and computed properties that call user-defined functions or read
   query parameters, system variables or named constants.
 - Views as element tables and graph options.
-- `OR REPLACE` and `IF NOT EXISTS` in `CREATE PROPERTY GRAPH`, and `IF EXISTS` in
-  `DROP PROPERTY GRAPH`.
 - Edges whose endpoint nodes do not exist when the graph is created.
 
 `GRAPH_TABLE` and GQL queries reject:

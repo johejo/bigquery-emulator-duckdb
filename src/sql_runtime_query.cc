@@ -763,10 +763,14 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
     }
     const auto previous = backend.Execute(PropertyGraphQuery(graph));
     const bool creating = translation.property_graph_definition.has_value();
-    if (creating && !previous.rows.empty()) {
+    const bool exists = !previous.rows.empty();
+    if (creating == exists && translation.skips_property_graph) {
+      return result;
+    }
+    if (creating && exists && !translation.replaces) {
       throw ApiError::Duplicate("Property graph already exists");
     }
-    if (!creating && previous.rows.empty()) {
+    if (!creating && !exists) {
       throw ApiError::NotFound("Property graph not found");
     }
     try {
@@ -780,13 +784,12 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
     const std::string predicate =
         " WHERE lower(dataset_id) = lower(" + QuoteLiteral(graph.dataset_id) +
         ") AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) + ")";
+    backend.Execute("DELETE FROM " + PropertyGraphsTable(graph.project_id) + predicate);
     if (creating) {
       backend.Execute("INSERT INTO " + PropertyGraphsTable(graph.project_id) + " VALUES (" +
                       QuoteLiteral(graph.dataset_id) + ", " + QuoteLiteral(graph.table_id) + ", " +
                       QuoteLiteral(*translation.property_graph_definition) + ", " +
                       QuoteLiteral(translation.sql) + ")");
-    } else {
-      backend.Execute("DELETE FROM " + PropertyGraphsTable(graph.project_id) + predicate);
     }
   } else if (const std::optional<std::vector<std::string>> statements =
                  AlterationStatements(translation)) {
