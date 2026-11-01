@@ -79,6 +79,9 @@ struct Scope {
   std::optional<WithQuery> recursive = {};
   std::string graph_name = {};
   const googlesql::PropertyGraph* property_graph = nullptr;
+  // The alias of the element table whose computed property is being read, which qualifies the
+  // table columns its definition references.
+  std::string graph_element_table = {};
   std::shared_ptr<Relation> graph_input = {};
 };
 

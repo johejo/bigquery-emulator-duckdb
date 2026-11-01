@@ -26,6 +26,7 @@ section Graphs
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `CREATE PROPERTY GRAPH` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.u)
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name) LABEL Entity PROPERTIES (id))
+query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, id + 1 AS next, UPPER(name) AS upper_name))
 query `CREATE PROPERTY GRAPH` | CREATE OR REPLACE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
@@ -38,6 +39,7 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (a:Person|Account)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (a)<-[e WHERE e.v IS NULL]-(b) RETURN a.id AS src, b.id AS dst)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH p = (a)-[e]->{0,2}(b) RETURN PATH_LENGTH(p) AS length)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (p:Person) RETURN p.id)
+query `GRAPH_TABLE` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id + 1 AS next)); SELECT * FROM GRAPH_TABLE(g2 MATCH (n WHERE n.next > 1) RETURN n.next)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a.name, b.id)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:Person) RETURN a.id AS src, b.id AS dst)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->(b:Person), (b)-[:Knows]->(c:Person) RETURN a.name, c.id)

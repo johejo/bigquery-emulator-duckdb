@@ -1,0 +1,27 @@
+# A derived property evaluates its value expression over the columns of each element's row.
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+# The rows are the existing Person, Account and Knows fixture.
+GRAPH scalar_graph.ComputedProperties
+MATCH (p:Person)
+RETURN p.code, p.upper_name
+NEXT
+RETURN STRING_AGG(CONCAT(CAST(code AS STRING), ':', upper_name), ',' ORDER BY code) AS result
+=> "1001:ALEX,1002:DANA,1003:LEE"
+GRAPH scalar_graph.ComputedProperties
+MATCH (n)
+RETURN n.kind
+NEXT
+RETURN STRING_AGG(kind, ',' ORDER BY kind) AS result
+=> "checking!,person,person,person"
+SELECT STRING_AGG(name, ',' ORDER BY name) FROM GRAPH_TABLE(scalar_graph.ComputedProperties MATCH (p:Person WHERE p.code > 1001) RETURN p.upper_name AS name)
+=> "DANA,LEE"
+SELECT result FROM GRAPH_TABLE(scalar_graph.ComputedProperties MATCH (p:Person {code: 1003}) RETURN p.id AS result)
+=> "3"
+
+# A value expression's result can be NULL, such as for the self-loop 12 here.
+SELECT STRING_AGG(CAST(delta AS STRING), ',' ORDER BY delta) FROM GRAPH_TABLE(scalar_graph.ComputedProperties MATCH -[e:Knows]-> RETURN e.delta AS delta)
+=> "-1,1,1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.ComputedProperties MATCH -[e:Knows WHERE e.id = 12]-> RETURN e.delta AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.ComputedProperties MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.delta = b.id - a.id RETURN COUNT(*) AS result)
+=> "3"

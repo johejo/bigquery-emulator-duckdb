@@ -10,6 +10,7 @@
 
 #include "absl/status/statusor.h"
 #include "googlesql/public/analyzer.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/constant.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/property_graph.h"
@@ -445,6 +446,14 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     }
     return "struct_extract(struct_extract(" + *value + ", '$properties'), " +
            QuoteLiteral(property.property()->Name()) + ")";
+  }
+  if (expr.Is<googlesql::ResolvedCatalogColumnRef>()) {
+    if (scope.graph_element_table.empty()) {
+      return Unsupported(scope, "catalog column references");
+    }
+    const auto* column = expr.GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
+    return StoredColumn(scope.graph_element_table + "." + QuoteIdentifier(column->Name()),
+                        column->GetType(), scope.context.timestamp_precision);
   }
   if (expr.Is<googlesql::ResolvedColumnRef>()) {
     const auto* ref = expr.GetAs<googlesql::ResolvedColumnRef>();
