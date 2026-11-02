@@ -995,12 +995,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "LIMIT and OFFSET beyond DuckDB's maximum fail"
-  label: "limit_queries_test:expr_limit_max_offset"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "MIN and MAX do not order NaN, and arrays with NULL or NaN elements, as BigQuery does"
   label: "aggregation_queries_test:aggregation_min_max_1"
