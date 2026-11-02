@@ -48,7 +48,7 @@ These forms GoogleSQL accepts and BigQuery rejects. Where `--semantics=googlesql
 one, the compliance statements that use it are listed in
 [known_errors.textproto](../tests/compliance/known_errors.textproto) under the reason the Form
 column paraphrases. BigQuery's documentation states most of these restrictions; the last three it
-does not.
+does not, and it contradicts the one on APPROX_TOP_COUNT and APPROX_TOP_SUM.
 
 | Form | Rejected in | `googlesql` | BigQuery's documentation |
 |---|---|---|---|
@@ -61,6 +61,7 @@ does not.
 | INTERVAL * FLOAT64 | `$MULTIPLY` in [functions_template.cc](../src/translator/functions_template.cc) | Rejects | [Multiplication](../third_party/bigquery_docs/reference/standard-sql/interval_functions.md) by an integer |
 | HAVING modifiers and null-respecting ARRAY_AGG in PIVOT | Not located | Rejects | [PIVOT](../third_party/bigquery_docs/reference/standard-sql/query-syntax.md) takes only aggregates that ignore NULL inputs |
 | ARRAYs with NULL elements in results, written values and loaded fixtures | `ResultValue` and `WrittenValue` in [function.cc](../src/translator/function.cc), [file_read.cc](../src/file_read.cc), [ddl_table.cc](../src/translator/ddl_table.cc) | Accepts, except in Parquet files and column defaults | [NULLs and the array type](../third_party/bigquery_docs/reference/standard-sql/data-types.md) |
+| STRUCT and ARRAY values in APPROX_TOP_COUNT and APPROX_TOP_SUM | `kTopCountRejections` and `kTopSumRejections` in [functions_aggregate.cc](../src/translator/functions_aggregate.cc) | Accepts | [Approximate aggregate functions](../third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md) take any type GROUP BY supports, which includes STRUCT and ARRAY |
 | IS [NOT] DISTINCT FROM over STRUCTs | `kDistinctRejections` and `kNotDistinctRejections` in [functions_template.cc](../src/translator/functions_template.cc) | Accepts | [Defined](../third_party/bigquery_docs/reference/standard-sql/operators.md) by GROUP BY, which groups STRUCTs |
 | SAFE.JSON_KEYS | `TypeUse::kRejectsSafe` in [functions.cc](../src/translator/functions.cc) | Accepts | [JSON_KEYS](../third_party/bigquery_docs/reference/standard-sql/json_functions.md) does not exclude SAFE |
 | STRUCT<> or an anonymous field in a query's result | [analyzer.cc](../src/analyzer.cc) `CheckEmptyStructs` and `CheckResultColumns` | Accepts, except empty STRUCT value tables and strict procedure validation | [STRUCT<>](../third_party/bigquery_docs/reference/standard-sql/data-types.md) is a listed type, without the restriction |

@@ -96,6 +96,8 @@ struct QueryRestrictions {
   bool distinct_set_operations_without_arrays = false;
   // IS DISTINCT FROM and IS NOT DISTINCT FROM take no STRUCT arguments.
   bool distinct_comparisons_without_structs = false;
+  // APPROX_TOP_COUNT and APPROX_TOP_SUM take no STRUCT or ARRAY values.
+  bool approx_top_scalar_values_only = false;
   // Query results and written values hold no ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
   // Query results take no empty STRUCTs or anonymous fields of STRUCT value tables.

@@ -43,6 +43,8 @@ struct Options {
   bool distinct_set_operations_without_arrays = false;
   // IS DISTINCT FROM and IS NOT DISTINCT FROM reject STRUCT arguments.
   bool distinct_comparisons_without_structs = false;
+  // APPROX_TOP_COUNT and APPROX_TOP_SUM reject STRUCT and ARRAY values.
+  bool approx_top_scalar_values_only = false;
   // Query results and written values fail on an ARRAY with a NULL element.
   bool arrays_without_null_elements = false;
   // Query results reject empty STRUCTs and anonymous fields of STRUCT value tables.

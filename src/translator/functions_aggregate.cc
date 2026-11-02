@@ -338,6 +338,8 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
           .message = "Argument 1 to APPROX_QUANTILES must support ordering; Type JSON does not",
       },
   };
+  // APPROX_TOP_COUNT and APPROX_TOP_SUM list STRUCT and ARRAY values last, which only BigQuery
+  // rejects (QueryRestrictions::approx_top_scalar_values_only).
   static constexpr function_catalog::TypeRejection kTopCountRejections[] = {
       {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for approx_top_count_shard."},
       {.types = kRangeTypes, .message = "Unsupported type RANGE for approx_top_count_shard."},

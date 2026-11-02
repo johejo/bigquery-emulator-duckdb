@@ -2,7 +2,10 @@
 # them; BigQuery's answers to unverified/function_types.txt.
 
 # APPROX_TOP_COUNT and APPROX_TOP_SUM reject every STRUCT and ARRAY value, naming STRUCT or ARRAY
-# even when a field or element is a RANGE or INTERVAL.
+# even when a field or element is a RANGE or INTERVAL. The documentation disagrees: both take any
+# type GROUP BY supports, which includes a STRUCT or ARRAY of groupable types.
+# third_party/bigquery_docs/reference/standard-sql/approximate_aggregate_functions.md
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
 SELECT ARRAY_LENGTH(APPROX_TOP_COUNT(s, 2))
 FROM UNNEST([STRUCT(1 AS x, RANGE<DATE> '[2024-01-01, 2024-02-01)' AS span)]) AS s
 => error contains: Unsupported type STRUCT for aggregate function APPROX_TOP_COUNT
