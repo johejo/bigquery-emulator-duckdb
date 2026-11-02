@@ -54,6 +54,9 @@ enum class DdlOptionId : uint8_t {
   kNullMarkers,
   kPreserveAsciiControlCharacters,
   kIgnoreUnknownValues,
+  kCompression,
+  kMaxBadRecords,
+  kEncoding,
   kHivePartitionUriPrefix,
   kRequireHivePartitionFilter,
 };

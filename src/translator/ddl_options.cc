@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -13,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/match.h"
 #include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
@@ -24,6 +26,7 @@
 #include "src/language_options.h"
 #include "src/location.h"
 #include "src/table_metadata.h"
+#include "src/text_encoding.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -408,6 +411,43 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
     if (decoded && external && decoded->id == DdlOptionId::kQuote) {
       if (!decoded->value.is_null()) {
         metadata.external_data->quote = decoded->value.string_value();
+      }
+      continue;
+    }
+    // BigQuery's answers in external_table_read_options.api.answers.json: the DDL takes GZIP and
+    // the encodings in any case, and stores their REST names.
+    if (decoded && external && decoded->id == DdlOptionId::kCompression) {
+      if (!decoded->value.is_null()) {
+        const std::string& compression = decoded->value.string_value();
+        if (!absl::EqualsIgnoreCase(compression, "GZIP")) {
+          throw ApiError::InvalidQuery(
+              std::format("'{}' is not a valid value; failed to set 'compression' in external "
+                          "table OPTIONS",
+                          compression));
+        }
+        metadata.external_data->compression = "GZIP";
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kEncoding) {
+      if (!decoded->value.is_null()) {
+        const std::string& name = decoded->value.string_value();
+        const std::optional<TextEncoding> encoding = ParseTextEncoding(name, /*ddl=*/true);
+        if (!encoding) {
+          throw ApiError::InvalidQuery(std::format(
+              "'{}' is not a valid value; failed to set 'encoding' in external table OPTIONS",
+              name));
+        }
+        metadata.external_data->encoding = std::string(TextEncodingName(*encoding));
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kMaxBadRecords) {
+      if (!decoded->value.is_null()) {
+        if (decoded->value.int64_value() < 0) {
+          throw ApiError::InvalidQuery("max_bad_records may not be negative.");
+        }
+        metadata.external_data->max_bad_records = decoded->value.int64_value();
       }
       continue;
     }

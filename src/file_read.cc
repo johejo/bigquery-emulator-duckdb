@@ -610,11 +610,22 @@ void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& 
   }
 }
 
+bool QuotesJsonNumerics(const std::vector<FieldSchema>& schema, bool string_numbers) {
+  return HasType(schema, FieldType::kNumeric) || HasType(schema, FieldType::kBigNumeric) ||
+         (string_numbers && HasType(schema, FieldType::kString));
+}
+
+std::string QuotedJsonNumerics(std::string_view line, const std::vector<FieldSchema>& schema,
+                               bool string_numbers) {
+  NumericQuoter quoter(schema, string_numbers);
+  json::sax_parse(line, &quoter);
+  return quoter.Output();
+}
+
 std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
                                           TemporaryFiles& downloads, bool string_numbers) {
-  if (!HasType(schema, FieldType::kNumeric) && !HasType(schema, FieldType::kBigNumeric) &&
-      !(string_numbers && HasType(schema, FieldType::kString))) {
+  if (!QuotesJsonNumerics(schema, string_numbers)) {
     return sources;
   }
   std::vector<FileSource> staged;
@@ -630,9 +641,7 @@ std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources
       if (line.find_first_not_of(" \t\r") == std::string_view::npos) {
         rewritten += line;
       } else {
-        NumericQuoter quoter(schema, string_numbers);
-        json::sax_parse(line, &quoter);
-        rewritten += quoter.Output();
+        rewritten += QuotedJsonNumerics(line, schema, string_numbers);
       }
       rewritten += '\n';
       start = end + 1;
@@ -679,6 +688,9 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     // StageCsvSources and DetectCsv write every value quoted and each NULL unquoted and empty.
     sql = "SELECT * FROM read_csv(" + files +
           ", header=false, delim=',', quote='\"', escape='\"', allow_quoted_nulls=false";
+    if (csv->numbered_records) {
+      sql += ", ignore_errors=true";
+    }
     if (!schema.empty()) {
       sql += ", auto_detect=false";
       std::vector<std::string> columns;
@@ -686,6 +698,10 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
       // are a RANGE, which has no text form in DuckDB, and an INTERVAL, whose text form differs.
       // A GEOGRAPHY is read from its text, as in the other formats.
       std::vector<std::string> conversions;
+      if (csv->numbered_records) {
+        columns.emplace_back("'bad.record': 'BIGINT'");
+        conversions.emplace_back(QuoteIdentifier("bad.record"));
+      }
       for (const FieldSchema& field : schema) {
         const bool big = field.type == FieldType::kBigNumeric;
         const bool range = field.type == FieldType::kRange;

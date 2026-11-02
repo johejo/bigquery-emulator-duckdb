@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "src/field_schema.h"
@@ -33,6 +34,14 @@ std::string ReadMaybeGzip(const std::string& path);
 // and with `string_numbers` those of STRING fields as strings of their text. Returns the sources
 // unchanged when the schema contains none of those types. Malformed JSON and invalid BIGNUMERIC
 // values throw ApiError::Invalid.
+// Whether StageJsonNumerics rewrites the sources of `schema`.
+bool QuotesJsonNumerics(const std::vector<FieldSchema>& schema, bool string_numbers = false);
+
+// The JSON value `line` with its numbers rewritten as StageJsonNumerics rewrites them. Throws
+// ApiError::Invalid for malformed JSON and invalid BIGNUMERIC values.
+std::string QuotedJsonNumerics(std::string_view line, const std::vector<FieldSchema>& schema,
+                               bool string_numbers = false);
+
 std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
                                           TemporaryFiles& downloads, bool string_numbers = false);

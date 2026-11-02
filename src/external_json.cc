@@ -21,6 +21,7 @@
 #include "src/api_error.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/schema_detect.h"
 #include "src/temporary_files.h"
 
@@ -220,15 +221,28 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool c
   object = std::move(canonical);
 }
 
+// BigQuery's message when the record of `source` that `bad` reached exceeds its limit, which
+// counts that record among the errors.
+[[noreturn]] void TooManyErrors(const BadRecords& bad, const FileSource& source) {
+  throw ApiError::Invalid(
+      std::format("JSON table encountered too many errors, giving up. Rows: {}; errors: {}. Please "
+                  "look into the errors[] collection for more details. File: {}",
+                  bad.records, bad.limit + 1, source.uri));
+}
+
 FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>& schema,
-                       TemporaryFiles& files, bool converts) {
+                       TemporaryFiles& files, bool converts, BadRecords* bad) {
   const std::string contents = ReadMaybeGzip(source.path);
+  const bool quotes = QuotesJsonNumerics(schema, converts);
   std::string rewritten;
   for (std::size_t start = 0; start < contents.size();) {
     const auto newline = contents.find('\n', start);
     const auto end = newline == std::string::npos ? contents.size() : newline;
     const std::string_view line(contents.data() + start, end - start);
     if (line.find_first_not_of(" \t\r") != std::string_view::npos) {
+      if (bad != nullptr) {
+        ++bad->records;
+      }
       try {
         std::vector<std::set<std::string>> keys;
         const auto unique_keys = [&keys](int /*depth*/, json::parse_event_t event, json& parsed) {
@@ -243,7 +257,11 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
           }
           return true;
         };
-        auto object = json::parse(line, unique_keys, false);
+        // NUMERIC and BIGNUMERIC numbers, and with `converts` those of STRING fields, are read
+        // as their text.
+        const std::string text =
+            quotes ? QuotedJsonNumerics(line, schema, converts) : std::string(line);
+        auto object = json::parse(text, unique_keys, false);
         if (object.is_discarded()) {
           throw ApiError::Invalid("Invalid JSON in " + source.uri);
         }
@@ -253,15 +271,28 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
         if (std::string_view(error.what()).starts_with(kUnsupported)) {
           throw;
         }
-        throw error.WithMessage(
-            std::format("JSON parsing error in row starting at position {}: {} File: {}", start,
-                        error.what(), source.uri));
+        if (bad == nullptr) {
+          throw error.WithMessage(
+              std::format("JSON parsing error in row starting at position {}: {} File: {}", start,
+                          error.what(), source.uri));
+        }
+        if (!bad->Skip()) {
+          TooManyErrors(*bad, source);
+        }
       }
     } else if (line.find_first_of(" \t") != std::string_view::npos) {
       // BigQuery reads an empty line, but not one of spaces.
-      throw ApiError::Invalid(std::format(
-          "JSON parsing error in row starting at position {}: Unexpected token File: {}", start,
-          source.uri));
+      if (bad != nullptr) {
+        ++bad->records;
+      }
+      if (bad == nullptr) {
+        throw ApiError::Invalid(std::format(
+            "JSON parsing error in row starting at position {}: Unexpected token File: {}", start,
+            source.uri));
+      }
+      if (!bad->Skip()) {
+        TooManyErrors(*bad, source);
+      }
     }
     start = end + 1;
   }
@@ -272,11 +303,11 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
 
 std::vector<FileSource> StageExternalJson(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
-                                          TemporaryFiles& files, bool autodetected) {
-  const auto numeric = StageJsonNumerics(sources, schema, files, autodetected);
+                                          TemporaryFiles& files, bool autodetected,
+                                          BadRecords* bad) {
   std::vector<FileSource> staged;
-  std::ranges::transform(numeric, std::back_inserter(staged), [&](const FileSource& source) {
-    return StageSource(source, schema, files, autodetected);
+  std::ranges::transform(sources, std::back_inserter(staged), [&](const FileSource& source) {
+    return StageSource(source, schema, files, autodetected, bad);
   });
   return staged;
 }

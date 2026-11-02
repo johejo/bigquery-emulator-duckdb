@@ -28,6 +28,29 @@ struct CsvReadOptions {
   // Whether a quoted empty value is NULL, as an unquoted one is, rather than an empty STRING,
   // when no NULL marker is set.
   bool quoted_nulls = true;
+  // Whether staged records begin with their number, which FileReadQuery reads as the column
+  // "bad.record", and FileReadQuery leaves out a record with a value its reader cannot convert,
+  // which the caller counts as bad, rather than failing.
+  bool numbered_records = false;
+};
+
+// The bad records a read skips, at most `limit`, its maxBadRecords. `records` numbers the records
+// the read has reached, bad ones included. With `numbered`, a check of the read's results enforces
+// the limit, so staging skips every bad record and writes the number of each other one.
+struct BadRecords {
+  int64_t limit = 0;
+  int64_t records = 0;
+  int64_t skipped = 0;
+  bool numbered = false;
+
+  // Counts one more bad record, and whether the read may skip it.
+  bool Skip() {
+    if (!numbered && skipped >= limit) {
+      return false;
+    }
+    ++skipped;
+    return true;
+  }
 };
 struct JsonReadOptions {
   // External reads use the declared types, so inference cannot alter STRING values.

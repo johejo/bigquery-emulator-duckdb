@@ -87,7 +87,7 @@ std::optional<std::string> Value(const std::optional<CsvCell>& cell, const Field
 std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                                         const CsvReadOptions& options,
                                         const std::vector<FieldSchema>& schema,
-                                        TemporaryFiles& files) {
+                                        TemporaryFiles& files, BadRecords* bad) {
   const CsvDialect dialect{
       .delimiter = options.field_delimiter.front(),
       .quote = options.quote,
@@ -102,31 +102,49 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
          row < records.size(); ++row) {
       const CsvRecord& record = records.at(row);
       const size_t found = record.cells.size();
-      if (found > columns && !options.ignore_unknown_values) {
-        Reject(std::format("Too many values in line. Found {} column(s) when expecting {}.", found,
-                           columns),
-               record.line);
-      }
-      for (size_t column = 0; column < columns; ++column) {
-        const FieldSchema& field = schema.at(column);
-        if (column > 0) {
-          rewritten += ',';
-        }
-        if (column >= found && !options.allow_jagged_rows) {
-          Reject(std::format("CSV table references column position {}, but line contains only {} "
-                             "columns.",
-                             column, found),
+      std::string line;
+      try {
+        if (found > columns && !options.ignore_unknown_values) {
+          Reject(std::format("Too many values in line. Found {} column(s) when expecting {}.",
+                             found, columns),
                  record.line);
         }
-        const auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field,
-                                 options, record.line);
-        if (value) {
-          AppendQuoted(rewritten, *value);
-        } else if (column >= found && field.mode == FieldMode::kRequired) {
-          Reject("Required column value is missing.", record.line);
+        for (size_t column = 0; column < columns; ++column) {
+          const FieldSchema& field = schema.at(column);
+          if (column > 0) {
+            line += ',';
+          }
+          if (column >= found && !options.allow_jagged_rows) {
+            Reject(std::format("CSV table references column position {}, but line contains only "
+                               "{} columns.",
+                               column, found),
+                   record.line);
+          }
+          const auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field,
+                                   options, record.line);
+          if (value) {
+            AppendQuoted(line, *value);
+          } else if (column >= found && field.mode == FieldMode::kRequired) {
+            Reject("Required column value is missing.", record.line);
+          }
+        }
+      } catch (const ApiError&) {
+        if (bad == nullptr) {
+          throw;
+        }
+        ++bad->records;
+        if (!bad->Skip()) {
+          throw;
+        }
+        continue;
+      }
+      if (bad != nullptr) {
+        ++bad->records;
+        if (bad->numbered) {
+          rewritten += std::to_string(bad->records) + ',';
         }
       }
-      rewritten += '\n';
+      rewritten += line + '\n';
     }
     staged.push_back({.uri = source.uri, .path = files.Write(rewritten)});
   }

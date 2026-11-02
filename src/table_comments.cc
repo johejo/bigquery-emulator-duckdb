@@ -112,6 +112,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
       throw ApiError::Unsupported("external table storage options");
     }
     const auto& external = *metadata.external_data;
+    if (external.max_bad_records && *external.max_bad_records > std::numeric_limits<int>::max()) {
+      throw ApiError::Unsupported("external table max_bad_records out of range");
+    }
     if (external.format == "NEWLINE_DELIMITED_JSON" && external.enable_list_inference) {
       throw ApiError::Unsupported("enable_list_inference on JSON external tables");
     }
@@ -147,6 +150,8 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
         throw ApiError::Unsupported(
             "quote, allow_quoted_newlines and NULL markers with CSV schema auto-detection");
       }
+    } else if (external.format == "PARQUET" && external.encoding) {
+      throw ApiError::Unsupported("encoding on Parquet external tables");
     } else if (external.skip_leading_rows || external.field_delimiter || external.quote ||
                external.allow_quoted_newlines || external.allow_jagged_rows ||
                external.null_marker || external.null_markers ||
