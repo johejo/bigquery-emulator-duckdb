@@ -5,9 +5,9 @@ module(
 
 bazel_dep(name = "abseil-cpp", version = "20260526.0")
 bazel_dep(name = "openssl", version = "3.5.5.bcr.4")
-bazel_dep(name = "curl", version = "8.12.0.bcr.1")
-bazel_dep(name = "google_cloud_cpp", version = "3.10.0")
-bazel_dep(name = "googleapis", version = "0.0.0-20260825-d10ac924")
+bazel_dep(name = "curl", version = "8.22.0")
+bazel_dep(name = "google_cloud_cpp", version = "3.12.0")
+bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
 bazel_dep(name = "grpc", version = "1.84.0")
 bazel_dep(name = "googlesql", version = "2026.10.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
@@ -26,7 +26,7 @@ bazel_dep(name = "quickjs-ng", version = "0.15.1.bcr.1")
 bazel_dep(name = "re2", version = "2025-08-12.bcr.1")
 bazel_dep(name = "rules_cc", version = "0.2.22")
 bazel_dep(name = "rules_go", version = "0.60.0")
-bazel_dep(name = "rules_python", version = "2.3.2")
+bazel_dep(name = "rules_python", version = "2.4.1")
 bazel_dep(name = "s2geometry", version = "0.14.0")
 bazel_dep(name = "zlib", version = "1.3.2")
 
@@ -36,6 +36,14 @@ go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.from_file(
     name = "storage_host_go",
     go_mod = "//:go.mod",
+)
+
+# GoogleSQL's code generators use a pip hub that has wheels only for Python 3.11, while
+# rules_python 2.4 defaults to Python 3.14.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.11",
 )
 
 # Google's differential privacy library, at the version GoogleSQL's reference implementation uses.
@@ -91,6 +99,13 @@ archive_override(
     ],
     strip_prefix = "googlesql-2026.10.1",
     urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.10.1.tar.gz"],
+)
+
+# The embedded CPython's SSL and hash modules are compiled against OpenSSL 3.5 headers but link
+# this OpenSSL, so keep its ABI although curl requires OpenSSL 4; //:python_openssl_test checks it.
+single_version_override(
+    module_name = "openssl",
+    version = "3.5.5.bcr.4",
 )
 
 # OpenSSL's public headers belong to its crypto target, even for SSL clients.

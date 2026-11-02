@@ -1498,6 +1498,27 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "python_openssl_test",
+    srcs = [
+        "tests/python_openssl_test.cc",
+        ":python_runtime_path",
+    ],
+    copts = ["-std=c++20"],
+    data = [
+        "//third_party/python:files",
+        "//third_party/python:python3",
+    ],
+    # Match cc_binary's linking; cc_test defaults to shared dependencies.
+    linkstatic = True,
+    deps = [
+        "//third_party/python:runtime",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@rules_cc//cc/runfiles",
+    ],
+)
+
 cc_binary(
     name = "bigquery-emulator-duckdb",
     srcs = ["src/main.cc"],

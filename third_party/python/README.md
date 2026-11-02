@@ -7,7 +7,9 @@ and `files` makes the standard library available in runfiles. Build tools still 
 separate interpreter.
 
 The bundled `libssl.a` and `libcrypto.a` are excluded. CPython and the emulator's other dependencies
-link the same Bazel OpenSSL instead, avoiding duplicate crypto symbols. The static CPython archive
+link the same Bazel OpenSSL instead, avoiding duplicate crypto symbols.
+`//:python_openssl_test` checks that this OpenSSL keeps the ABI of the headers CPython was
+compiled against, which `MODULE.bazel` pins OpenSSL for. The static CPython archive
 contains LLVM bitcode. `BUILD.python.bazel` selects `native_archive_linux.bzl` or
 `native_archive_macos.bzl` to compile it to native code with LLVM lld before any executable links
 it. Bazel caches this action from the input archive, C++ toolchain and conversion options, so

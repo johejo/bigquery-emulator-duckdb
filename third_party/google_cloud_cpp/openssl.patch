@@ -8,7 +8,7 @@ diff --git a/MODULE.bazel b/MODULE.bazel
 -bazel_dep(name = "boringssl", version = "0.20251124.0")
 +bazel_dep(name = "openssl", version = "3.5.5.bcr.4")
  bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.1")
- bazel_dep(name = "curl", version = "8.8.0.bcr.3")
+ bazel_dep(name = "curl", version = "8.12.0.bcr.2")
  bazel_dep(name = "opentelemetry-cpp", version = "1.24.0")
 diff --git a/google/cloud/BUILD.bazel b/google/cloud/BUILD.bazel
 --- a/google/cloud/BUILD.bazel
