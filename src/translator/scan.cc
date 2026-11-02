@@ -917,10 +917,12 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     if (!count) {
       return std::nullopt;
     }
+    // DuckDB rejects a count or offset above 2^62, which no result reaches, so capping it there
+    // returns what BigQuery does.
     const auto checked = [](const std::string& sql) {
-      return "bq_checked_integer(" + sql +
+      return "least(bq_checked_integer(" + sql +
              ", 0, 'Limit requires non-null count and offset', "
-             "'Limit requires non-negative count and offset')";
+             "'Limit requires non-negative count and offset'), 4611686018427387904)";
     };
     result->sql = "SELECT q.*" + from + result->Order() + " LIMIT " + checked(*count);
     if (limit->offset() != nullptr) {

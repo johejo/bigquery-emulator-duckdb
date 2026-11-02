@@ -27,6 +27,9 @@ namespace {
 
 constexpr std::array kIntervalTypes = {googlesql::TYPE_INTERVAL};
 constexpr std::array kRangeTypes = {googlesql::TYPE_RANGE};
+constexpr std::array kStructTypes = {googlesql::TYPE_STRUCT};
+constexpr std::array kArrayTypes = {googlesql::TYPE_ARRAY};
+constexpr std::array kJsonTypes = {googlesql::TYPE_JSON};
 constexpr std::string_view kValueArgument[] = {"$1"};
 constexpr std::string_view kBigNumericValueArgument[] = {"CAST($1 AS VARCHAR)"};
 constexpr std::string_view kBigNumericPairArgument[] = {
@@ -319,20 +322,45 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
   static constexpr function_catalog::TypeRejection kApproxCountRejections[] = {
       {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for hll_count.init."},
       {.types = kRangeTypes, .message = "Unsupported type RANGE for hll_count.init."},
+      {
+          .types = kJsonTypes,
+          .message = "The argument to APPROX_COUNT_DISTINCT must support grouping; Type JSON does "
+                     "not",
+      },
   };
   static constexpr function_catalog::TypeRejection kApproxQuantileRejections[] = {
       {
           .types = kIntervalTypes,
           .message = "Unsupported type INTERVAL for aggregate function approx_quantiles",
       },
+      {
+          .types = kJsonTypes,
+          .message = "Argument 1 to APPROX_QUANTILES must support ordering; Type JSON does not",
+      },
   };
   static constexpr function_catalog::TypeRejection kTopCountRejections[] = {
       {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for approx_top_count_shard."},
       {.types = kRangeTypes, .message = "Unsupported type RANGE for approx_top_count_shard."},
+      {
+          .types = kStructTypes,
+          .message = "Unsupported type STRUCT for aggregate function APPROX_TOP_COUNT",
+      },
+      {
+          .types = kArrayTypes,
+          .message = "Unsupported type ARRAY for aggregate function APPROX_TOP_COUNT",
+      },
   };
   static constexpr function_catalog::TypeRejection kTopSumRejections[] = {
       {.types = kIntervalTypes, .message = "Unsupported type INTERVAL for approx_top_sum_shard."},
       {.types = kRangeTypes, .message = "Unsupported type RANGE for approx_top_sum_shard."},
+      {
+          .types = kStructTypes,
+          .message = "Unsupported type STRUCT for aggregate function APPROX_TOP_SUM",
+      },
+      {
+          .types = kArrayTypes,
+          .message = "Unsupported type ARRAY for aggregate function APPROX_TOP_SUM",
+      },
   };
   static constexpr auto kAggregatesBacking = std::tuple{
       // INTERVAL values and collated strings compare by their keys; among equal values, MIN and
