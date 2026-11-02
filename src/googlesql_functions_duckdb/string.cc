@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -17,6 +18,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "duckdb.h"
+#include "googlesql/public/functions/bitwise.h"
 #include "googlesql/public/functions/distance.h"
 #include "googlesql/public/functions/hash.h"
 #include "googlesql/public/functions/net.h"
@@ -390,6 +392,17 @@ void RegisterStringFunctions(duckdb_connection connection, const Options& option
   Register(connection, "bq_farm_fingerprint", {kBlob}, kBigint, Apply<fn::FarmFingerprint>);
   Register(connection, "bq_sha512", {kBlob}, kBlob, Sha512);
   Register(connection, "bq_to_base32", {kBlob}, kVarchar, Apply<ToBase32>);
+  Register(connection, "bq_bitwise_not_bytes", {kBlob}, kBlob, Apply<fn::BitwiseNotBytes>);
+  Register(connection, "bq_bitwise_and_bytes", {kBlob, kBlob}, kBlob,
+           Apply<fn::BitwiseBinaryOpBytes<std::bit_and>>);
+  Register(connection, "bq_bitwise_or_bytes", {kBlob, kBlob}, kBlob,
+           Apply<fn::BitwiseBinaryOpBytes<std::bit_or>>);
+  Register(connection, "bq_bitwise_xor_bytes", {kBlob, kBlob}, kBlob,
+           Apply<fn::BitwiseBinaryOpBytes<std::bit_xor>>);
+  Register(connection, "bq_bitwise_left_shift_bytes", {kBlob, kBigint}, kBlob,
+           Apply<fn::BitwiseLeftShiftBytes>);
+  Register(connection, "bq_bitwise_right_shift_bytes", {kBlob, kBigint}, kBlob,
+           Apply<fn::BitwiseRightShiftBytes>);
   Register(connection, "bq_from_base32", {kVarchar}, kBlob, Apply<FromBase32>);
   Register(connection, "bq_initcap", {kVarchar}, kVarchar, Initcap<true>);
   Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, Apply<DecimalString>);
