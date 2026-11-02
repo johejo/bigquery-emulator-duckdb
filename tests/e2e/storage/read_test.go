@@ -18,6 +18,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
 	"cloud.google.com/go/civil"
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/linkedin/goavro/v2"
@@ -459,6 +460,8 @@ func TestReadAvroJSONAndGeography(t *testing.T) {
 }
 
 // Arrow represents GEOGRAPHY as Utf8 WKT: third_party/bigquery_docs/reference/storage.md
+// The reference says only that field metadata indicates the original type; BigQuery was observed
+// to mark the field, or the list of an ARRAY rather than its items, as this extension type.
 func TestReadArrowGeography(t *testing.T) {
 	t.Parallel()
 	rest, read, _ := clients(t)
@@ -476,6 +479,15 @@ func TestReadArrowGeography(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer reader.Release()
+	geography := arrow.NewMetadata([]string{"ARROW:extension:name", "ARROW:extension:metadata"},
+		[]string{"google:sqlType:geography", `{"encoding": "WKT"}`})
+	fields := reader.Schema().Fields()
+	item := fields[2].Type.(*arrow.ListType).ElemField()
+	nested := fields[3].Type.(*arrow.StructType).Field(0)
+	if !fields[1].Metadata.Equal(geography) || !fields[2].Metadata.Equal(geography) ||
+		item.Metadata.Len() != 0 || fields[3].Metadata.Len() != 0 || !nested.Metadata.Equal(geography) {
+		t.Fatalf("schema = %v", reader.Schema())
+	}
 	got := map[int64][]string{}
 	for reader.Next() {
 		r := reader.RecordBatch()
