@@ -1,0 +1,21 @@
+# Collation in table functions and external tables, and the documented limitations on them.
+# The documented messages differ in spelling from the ones GoogleSQL gives, as they do for UDFs
+# in ../errors/collation.txt, so the cases match only their common part.
+# third_party/bigquery_docs/reference/standard-sql/collation-concepts.md
+
+# Table functions support collation: an output column keeps its collation.
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_ci_output() AS (SELECT COLLATE('a', 'und:ci') AS c);
+SELECT c = 'A' FROM scalars.tvf_ci_output()
+=> "true"
+
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_ci_argument(x STRING) AS (SELECT x AS c);
+SELECT COUNT(*) FROM scalars.tvf_ci_argument(COLLATE('abc', 'und:ci'))
+=> error contains: on argument of TVF call
+
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_ci_explicit(x STRING) RETURNS TABLE<output_str STRING> AS (SELECT COLLATE(x, 'und:ci') AS output_str);
+SELECT 1
+=> error contains: on output column output_str
+
+CREATE OR REPLACE EXTERNAL TABLE scalars.external_ci (c STRING COLLATE 'und:ci') OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv']);
+SELECT 1
+=> error:
