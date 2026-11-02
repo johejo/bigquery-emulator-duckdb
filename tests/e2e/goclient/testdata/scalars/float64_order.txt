@@ -1,0 +1,29 @@
+## Ordering FLOAT64 values
+# Expected values follow the documentation's order of floating point values, from least to
+# greatest: NULL, NaN, -inf, finite values and +inf.
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
+
+SELECT ARRAY_AGG(id ORDER BY x) FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (4, CAST('inf' AS FLOAT64)), (5, NULL), (6, -2.0)])
+=> [{"v":"5"},{"v":"2"},{"v":"3"},{"v":"6"},{"v":"1"},{"v":"4"}]
+
+SELECT ARRAY_AGG(id ORDER BY x NULLS LAST) FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (4, CAST('inf' AS FLOAT64)), (5, NULL), (6, -2.0)])
+=> [{"v":"2"},{"v":"3"},{"v":"6"},{"v":"1"},{"v":"4"},{"v":"5"}]
+
+SELECT ARRAY_AGG(id ORDER BY x DESC) FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (4, CAST('inf' AS FLOAT64)), (5, NULL), (6, -2.0)])
+=> [{"v":"4"},{"v":"1"},{"v":"6"},{"v":"3"},{"v":"2"},{"v":"5"}]
+
+SELECT ARRAY_AGG(id ORDER BY x DESC NULLS FIRST) FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (4, CAST('inf' AS FLOAT64)), (5, NULL), (6, -2.0)])
+=> [{"v":"5"},{"v":"4"},{"v":"1"},{"v":"6"},{"v":"3"},{"v":"2"}]
+
+SELECT id FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (5, NULL)]) ORDER BY x LIMIT 1 OFFSET 1
+=> "2"
+
+SELECT id FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (5, NULL)]) ORDER BY x DESC LIMIT 1 OFFSET 2
+=> "2"
+
+SELECT r FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY x) AS r FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64))])) WHERE id = 2
+=> "1"
+
+# Values in a cumulative RANGE frame, which has no offset: NaN precedes -inf.
+SELECT n FROM (SELECT id, COUNT(*) OVER (ORDER BY x RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS n FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64))])) WHERE id = 3
+=> "2"

@@ -397,9 +397,14 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     if (!ordering->hint_list().empty()) {
       return std::nullopt;
     }
+    const auto is_offset = [](const googlesql::ResolvedWindowFrameExpr* bound) {
+      return bound->boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_PRECEDING ||
+             bound->boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_FOLLOWING;
+    };
     const auto order = OrderItems(
         ordering->order_by_item_list(), scope, columns,
-        frame != nullptr && frame->frame_unit() == googlesql::ResolvedWindowFrame::RANGE);
+        frame != nullptr && frame->frame_unit() == googlesql::ResolvedWindowFrame::RANGE &&
+            (is_offset(frame->start_expr()) || is_offset(frame->end_expr())));
     if (!order) {
       return std::nullopt;
     }

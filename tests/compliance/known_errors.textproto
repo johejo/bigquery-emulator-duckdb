@@ -165,8 +165,6 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "NaN does not compare as BigQuery orders it, such as in MIN, MAX and IN"
-  label: "code:ArrayMin_ARRAY<FLOAT64>_<1@2, 1@2, nan>"
-  label: "code:ArrayMin_ARRAY<FLOAT64>_<NULL, 1@_zjNe2iNBBFI_1@2, nan>"
   label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_2_FLOAT64_nan_FLOAT64_3@14"
   label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_nan"
   label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_nan_FLOAT64_3@14"
@@ -1031,13 +1029,11 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ORDER BY of FLOAT64 does not order NaN and infinities as BigQuery does"
+  reason: "RANGE window frames with an offset, ordered by FLOAT64, sort NaN after +inf rather than below -inf"
   label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_0"
   label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_1"
   label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_asc"
   label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_desc"
-  label: "orderby_queries_test:orderby_duplicates_single_base_column_double_asc"
-  label: "orderby_queries_test:orderby_duplicates_single_base_column_double_desc"
 }
 
 known_errors {

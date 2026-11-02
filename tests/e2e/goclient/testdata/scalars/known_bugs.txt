@@ -149,3 +149,10 @@ SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
 # (geography_buffer.txt).
 SELECT SAFE.ST_BUFFER(ST_GEOGPOINT(1, 2), 100, use_spheroid => TRUE)
 !> error: ST_BUFFER does not yet implement use_spheroid=true.
+
+# A RANGE frame with an offset, ordered by FLOAT64, still sorts NaN after +inf, so the frame of
+# -inf leaves out the NaN that precedes it (analytic_sum_test). The documentation orders NaN
+# below -inf.
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
+SELECT n FROM (SELECT id, COUNT(*) OVER (ORDER BY x RANGE BETWEEN UNBOUNDED PRECEDING AND 0 FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64))])) WHERE id = 3
+!> "2"
