@@ -24,6 +24,12 @@ class ExternalTableProvider {
   // it is created, as BigQuery detects it. Throws ApiError.
   virtual std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition,
                                                 const std::string& table_id) = 0;
+  // The partition keys of the Hive-partitioned external table `table_id`, read from the paths of
+  // its sources when it is created; `declared` are those of WITH PARTITION COLUMNS. Throws
+  // ApiError.
+  virtual std::vector<FieldSchema> DetectPartitionKeys(const GcsExternalData& definition,
+                                                       const std::vector<FieldSchema>& declared,
+                                                       const std::string& table_id) = 0;
   virtual absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& key,
                                                                  const std::string& query,
                                                                  const std::string& options,

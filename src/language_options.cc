@@ -46,6 +46,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // in development.
     options->EnableLanguageFeature(googlesql::FEATURE_ENABLE_EDIT_DISTANCE_BYTES);
     options->EnableLanguageFeature(googlesql::FEATURE_CREATE_TABLE_CLONE);
+    // BigQuery has CREATE EXTERNAL TABLE WITH PARTITION COLUMNS, also still in development.
+    options->EnableLanguageFeature(googlesql::FEATURE_CREATE_EXTERNAL_TABLE_WITH_PARTITION_COLUMNS);
     // BigQuery has collations, which GoogleSQL still marks in development, and NULLIF compares
     // under them. The translator rejects the operations whose collation it does not apply.
     options->EnableLanguageFeature(googlesql::FEATURE_COLLATION_SUPPORT);

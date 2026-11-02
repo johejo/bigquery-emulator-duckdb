@@ -43,10 +43,12 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
 | [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 3 | 0 | 2 | 21 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 3 | 0 | 2 | 19 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 8 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE format](#create-external-table-format) | 0 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE uris](#create-external-table-uris) | 1 | 0 | 0 | 0 |
+| [CREATE EXTERNAL TABLE hive_partition_uri_prefix](#create-external-table-hive_partition_uri_prefix) | 1 | 0 | 0 | 0 |
+| [CREATE EXTERNAL TABLE require_hive_partition_filter](#create-external-table-require_hive_partition_filter) | 1 | 0 | 0 | 0 |
 
 ## CREATE SCHEMA
 
@@ -290,7 +292,6 @@ the emulator rejected.
 | [`encoding`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`enum_as_string`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
-| [`hive_partition_uri_prefix`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`file_set_spec_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`json_extension`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`max_bad_records`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
@@ -298,7 +299,6 @@ the emulator rejected.
 | [`object_metadata`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`projection_fields`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`reference_file_schema_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`require_hive_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`sheet_range`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`source_column_match`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
@@ -333,6 +333,18 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Supported |  |
+
+## CREATE EXTERNAL TABLE hive_partition_uri_prefix
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`hive_partition_uri_prefix`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+
+## CREATE EXTERNAL TABLE require_hive_partition_filter
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`require_hive_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 
 ## Unprobed contexts
 

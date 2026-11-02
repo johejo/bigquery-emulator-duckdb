@@ -59,6 +59,11 @@ struct TableDefinition {
   // Whether the fields keep their rounding modes rather than take the table's default, as those of
   // CREATE TABLE LIKE, COPY and CLONE, a copy job and a table a job replaces do.
   bool keeps_rounding_modes = false;
+  // The columns of CREATE EXTERNAL TABLE's WITH PARTITION COLUMNS, which the sources' paths must
+  // have, as partition keys, after the other columns.
+  std::vector<FieldSchema> partition_columns = {};
+  // Whether the runtime has read an external table's sources for its schema and keys.
+  bool sources_read = false;
 };
 
 // The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS

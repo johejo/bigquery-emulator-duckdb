@@ -128,18 +128,53 @@ std::vector<FieldSchema> SqlRuntime::DetectExternalSchema(const GcsExternalData&
   return schema;
 }
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): a table's columns, then its keys.
+std::vector<FieldSchema> SqlRuntime::ExternalSchema(GcsExternalData& definition,
+                                                    std::vector<FieldSchema> schema,
+                                                    const std::vector<FieldSchema>& declared_keys,
+                                                    const std::string& table_id) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  if (schema.empty()) {
+    schema = DetectExternalSchema(definition, table_id);
+  }
+  HivePartitioning* hive = definition.hive_partitioning ? &*definition.hive_partitioning : nullptr;
+  if (hive == nullptr) {
+    return schema;
+  }
+  hive->fields.clear();
+  if (hive->mode.empty()) {
+    return schema;
+  }
+  if (!external_tables_) {
+    throw ApiError::Unsupported("Hive-partitioned external tables without an external provider");
+  }
+  const std::vector<FieldSchema> keys =
+      external_tables_(backend_)->DetectPartitionKeys(definition, declared_keys, table_id);
+  // The keys replace fields of the same names.
+  std::erase_if(schema, [&keys](const FieldSchema& field) {
+    return std::ranges::find(keys, field.name, &FieldSchema::name) != keys.end();
+  });
+  for (const FieldSchema& key : keys) {
+    hive->fields.push_back(key.name);
+    schema.push_back(key);
+  }
+  SetModesGiven(schema);
+  return schema;
+}
+
 TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema> schema,
-                                  const TableMetadata& metadata) {
+                                  const TableMetadata& given) {
   table.project_id = ResolveProject(table.project_id);
+  TableMetadata metadata = given;
   // Read the sources before holding the mutex, after the checks that fail without them.
-  if (metadata.external_data && schema.empty()) {
+  if (metadata.external_data && (schema.empty() || metadata.external_data->hive_partitioning)) {
     GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
     if (RelationComment(backend_, "duckdb_tables()", "table_name", table) ||
         ViewComment(backend_, table)) {
       throw ApiError::Duplicate("Already Exists: Table " + table.project_id + ":" +
                                 table.dataset_id + "." + table.table_id);
     }
-    schema = DetectExternalSchema(*metadata.external_data, table.table_id);
+    schema = ExternalSchema(*metadata.external_data, std::move(schema), {}, table.table_id);
   }
   std::scoped_lock const lock(expiration_mutex_);
   const DatasetMetadata dataset =

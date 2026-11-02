@@ -461,6 +461,22 @@ json TableMetadata::ToJson() const {
       fields["externalDataConfiguration"]["parquetOptions"]["enableListInference"] =
           *external_data->enable_list_inference;
     }
+    if (const auto& hive = external_data->hive_partitioning) {
+      json options = json::object();
+      if (!hive->fields.empty()) {
+        options["fields"] = hive->fields;
+      }
+      if (!hive->mode.empty()) {
+        options["mode"] = hive->mode;
+      }
+      if (hive->require_partition_filter.value_or(false)) {
+        options["requirePartitionFilter"] = true;
+      }
+      if (!hive->source_uri_prefix.empty()) {
+        options["sourceUriPrefix"] = hive->source_uri_prefix;
+      }
+      fields["externalDataConfiguration"]["hivePartitioningOptions"] = std::move(options);
+    }
   }
   if (creation_time != 0) {
     fields["creationTime"] = std::to_string(creation_time);
@@ -586,6 +602,44 @@ json DatasetMetadata::ToJson() const {
   return fields;
 }
 
+namespace {
+
+// hivePartitioningOptions. BigQuery stores options without a mode, which do not partition the
+// table, and recomputes the output-only fields when it creates a table.
+HivePartitioning HivePartitioningFromJson(const json& options) {
+  if (!options.is_object()) {
+    throw ApiError::Invalid("externalDataConfiguration.hivePartitioningOptions must be an object");
+  }
+  HivePartitioning hive;
+  for (const auto& [name, value] : options.items()) {
+    if (name == "mode" && value.is_string()) {
+      hive.mode = value.get<std::string>();
+    } else if (name == "sourceUriPrefix" && value.is_string()) {
+      hive.source_uri_prefix = value.get<std::string>();
+    } else if (name == "requirePartitionFilter" && value.is_boolean()) {
+      hive.require_partition_filter = value.get<bool>();
+    } else if (name == "fields" && value.is_array() &&
+               std::ranges::all_of(value, [](const json& field) { return field.is_string(); })) {
+      hive.fields = value.get<std::vector<std::string>>();
+    } else {
+      throw ApiError::Invalid("Invalid externalDataConfiguration.hivePartitioningOptions." + name);
+    }
+  }
+  if (!hive.mode.empty() && hive.mode != "AUTO" && hive.mode != "STRINGS" &&
+      hive.mode != "CUSTOM") {
+    throw ApiError::Invalid("Invalid value for hivePartitioning.mode: " + hive.mode +
+                            " is not a valid value");
+  }
+  if (!hive.mode.empty() && hive.source_uri_prefix.empty()) {
+    throw ApiError::Invalid(
+        "Hive partitioned queries require that the HivePartitioningOptions be set, with both a "
+        "sourceUriPrefix and mode provided. No sourceUriPrefix was provided.");
+  }
+  return hive;
+}
+
+}  // namespace
+
 TableMetadata TableMetadataFromJson(const json& table) {
   TableMetadata metadata;
   if (table.contains("externalDataConfiguration") &&
@@ -597,7 +651,7 @@ TableMetadata TableMetadataFromJson(const json& table) {
     for (const auto& [name, value] : config.items()) {
       if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
           name != "autodetect" && name != "parquetOptions" && name != "csvOptions" &&
-          name != "ignoreUnknownValues") {
+          name != "ignoreUnknownValues" && name != "hivePartitioningOptions") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
@@ -669,6 +723,10 @@ TableMetadata TableMetadataFromJson(const json& table) {
         }
         metadata.external_data->enable_list_inference = value.get<bool>();
       }
+    }
+    if (config.contains("hivePartitioningOptions")) {
+      metadata.external_data->hive_partitioning =
+          HivePartitioningFromJson(config["hivePartitioningOptions"]);
     }
     if (config.contains("ignoreUnknownValues")) {
       if (!config["ignoreUnknownValues"].is_boolean()) {

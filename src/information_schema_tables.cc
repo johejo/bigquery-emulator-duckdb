@@ -59,6 +59,18 @@ absl::StatusOr<std::string> ColumnTypeDdl(FieldSchema field,
   return repeated ? "ARRAY<" + text + ">" : text;
 }
 
+// The hive_partition_uri_prefix of an external table's DDL, BigQuery's: the source URI prefix
+// without the keys a CUSTOM one encodes. None for options DDL cannot set, STRINGS or no mode, for
+// which BigQuery gives no DDL.
+std::optional<std::string> HivePrefixOption(const HivePartitioning& hive) {
+  if (hive.mode.empty() || hive.mode == "STRINGS") {
+    return std::nullopt;
+  }
+  const size_t schema = hive.source_uri_prefix.find("/{");
+  return schema == std::string::npos ? hive.source_uri_prefix
+                                     : hive.source_uri_prefix.substr(0, schema + 1);
+}
+
 absl::StatusOr<std::string> TableDdl(const std::string& project, const std::string& dataset,
                                      const std::string& table,
                                      const std::vector<FieldSchema>& schema,
@@ -79,6 +91,21 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
   // BigQuery leaves out the columns of an external table whose schema it detects.
   if (!external || (external->format != "PARQUET" && !external->autodetect.value_or(false))) {
     ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
+  }
+  // A CUSTOM schema created by DDL lists its keys, one in the prefix lists none, and AUTO has no
+  // list.
+  const std::optional<HivePartitioning>& hive =
+      external ? external->hive_partitioning : std::nullopt;
+  if (hive && hive->mode == "AUTO") {
+    ddl += "\nWITH PARTITION COLUMNS";
+  } else if (hive && hive->mode == "CUSTOM") {
+    std::vector<std::string> keys;
+    if (hive->source_uri_prefix.find("/{") == std::string::npos) {
+      for (size_t i = schema.size() - hive->fields.size(); i < schema.size(); ++i) {
+        keys.push_back(columns.at(i));
+      }
+    }
+    ddl += "\nWITH PARTITION COLUMNS (\n" + absl::StrJoin(keys, ",\n") + "\n)";
   }
   if (external) {
     std::vector<std::string> uris;
@@ -111,8 +138,15 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       ddl += "  skip_leading_rows=" + std::to_string(*external->skip_leading_rows) + ",\n";
     }
     flag("ignore_unknown_values", external->ignore_unknown_values);
-    ddl += "  format=" + StringOptionValue(external->format) + ",\n  uris=[" +
-           absl::StrJoin(uris, ", ") + "]\n)";
+    ddl += "  format=" + StringOptionValue(external->format) + ",\n";
+    if (hive) {
+      ddl +=
+          "  hive_partition_uri_prefix=" + StringOptionValue(HivePrefixOption(*hive).value_or("")) +
+          ",\n";
+      flag("require_hive_partition_filter",
+           hive->require_partition_filter.value_or(false) ? std::optional(true) : std::nullopt);
+    }
+    ddl += "  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
   }
   return ddl + ";";
 }
@@ -227,17 +261,21 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
           creation_time = description->metadata.creation_time;
           default_collation = description->metadata.default_collation;
         }
-        absl::StatusOr<std::string> table_ddl =
-            TableDdl(project, dataset.dataset_id, table, *schema, default_collation, external,
-                     context.type_factory);
-        if (!table_ddl.ok()) {
-          return table_ddl.status();
+        // BigQuery gives no DDL for Hive partitioning options DDL cannot set.
+        if (!external || !external->hive_partitioning ||
+            HivePrefixOption(*external->hive_partitioning)) {
+          absl::StatusOr<std::string> table_ddl =
+              TableDdl(project, dataset.dataset_id, table, *schema, default_collation, external,
+                       context.type_factory);
+          if (!table_ddl.ok()) {
+            return table_ddl.status();
+          }
+          if (default_collation.has_value()) {
+            table_ddl->pop_back();
+            *table_ddl += "\nDEFAULT COLLATE " + QuoteLiteral(*default_collation) + ";";
+          }
+          ddl = String(*table_ddl);
         }
-        if (default_collation.has_value()) {
-          table_ddl->pop_back();
-          *table_ddl += "\nDEFAULT COLLATE " + QuoteLiteral(*default_collation) + ";";
-        }
-        ddl = String(*table_ddl);
       } else if (!view_query->empty()) {
         ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query,
                              view_description->materialized));
@@ -364,6 +402,19 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
               .type = "INT64",
               .value = std::to_string(*external.skip_leading_rows),
           });
+        }
+        if (const auto& hive = external.hive_partitioning) {
+          if (const std::optional<std::string> prefix = HivePrefixOption(*hive)) {
+            options.push_back({
+                .name = "hive_partition_uri_prefix",
+                .type = "STRING",
+                .value = StringOptionValue(*prefix),
+            });
+            if (hive->require_partition_filter.value_or(false)) {
+              options.push_back(
+                  {.name = "require_hive_partition_filter", .type = "BOOL", .value = "true"});
+            }
+          }
         }
         options.push_back(
             {.name = "format", .type = "STRING", .value = StringOptionValue(external.format)});

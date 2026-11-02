@@ -323,6 +323,8 @@ query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (s STRUCT<x INT64>, r AR
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'JSON', uris = ['gs://b/f.json'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://b/k=1/*'], hive_partition_uri_prefix = 'gs://b')
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n WITH PARTITION COLUMNS (k INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/k=1/*'], hive_partition_uri_prefix = 'gs://b')
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE IF NOT EXISTS n (a INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet']); CREATE OR REPLACE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/g.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'PARQUET', uris = ['gs://b/*.parquet']); SELECT x FROM n

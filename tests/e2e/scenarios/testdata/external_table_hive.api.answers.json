@@ -1,0 +1,4266 @@
+{
+  "version": 1,
+  "cases": {
+    "auto_types": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "d",
+                "n",
+                "s",
+                "ts"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_types"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_types/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_types.t`\n(\n  x INT64,\n  d DATE,\n  n INT64,\n  s STRING,\n  ts TIMESTAMP\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_types\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_types/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"d\":\"2024-01-02\",\"n\":1,\"s\":\"a\",\"ts\":\"2024-01-02T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_types/d=2024-01-02/n=1/s=a/ts=2024-01-02 03:04:05+00/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"d\":\"2024-01-03\",\"n\":2,\"s\":\"b\",\"ts\":\"2024-01-03T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_types/d=2024-01-03/n=2/s=b/ts=2024-01-03 03:04:05+00/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_other_values": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "f",
+                "b",
+                "neg",
+                "z",
+                "dt"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_other_values"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_other_values/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "neg",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "z",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_other_values.t`\n(\n  x INT64,\n  f STRING,\n  b STRING,\n  neg INT64,\n  z INT64,\n  dt TIMESTAMP\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_other_values\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_other_values/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"f\":\"1.5\",\"b\":\"true\",\"neg\":-1,\"z\":1,\"dt\":\"2024-01-02T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_other_values/f=1.5/b=true/neg=-1/z=01/dt=2024-01-02T03:04:05/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"f\":\"2.5\",\"b\":\"false\",\"neg\":-2,\"z\":2,\"dt\":\"2024-01-03T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_other_values/f=2.5/b=false/neg=-2/z=02/dt=2024-01-03T03:04:05/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_timestamp_forms": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "plain",
+                "z"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_timestamp_forms"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_timestamp_forms/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "plain",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "z",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_timestamp_forms.t`\n(\n  x INT64,\n  plain TIMESTAMP,\n  z TIMESTAMP\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_timestamp_forms\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_timestamp_forms/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"plain\":\"2024-01-02T03:04:05Z\",\"z\":\"2024-01-02T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_timestamp_forms/plain=2024-01-02 03:04:05/z=2024-01-02T03:04:05Z/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"plain\":\"2024-01-03T03:04:05Z\",\"z\":\"2024-01-03T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_timestamp_forms/plain=2024-01-03 03:04:05/z=2024-01-03T03:04:05Z/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_merge_integer_string": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_integer_string"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_integer_string/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_merge_integer_string.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_integer_string\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_integer_string/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"1\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_integer_string/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"x\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_integer_string/k=x/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_merge_date_integer": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_integer"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_integer/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_merge_date_integer.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_integer\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_integer/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"1\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_integer/k=1/b.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"2024-01-02\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_integer/k=2024-01-02/a.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_merge_date_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_timestamp"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_timestamp/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_merge_date_timestamp.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_timestamp\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_timestamp/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"2024-01-02 03:04:05+00\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_timestamp/k=2024-01-02 03:04:05+00/b.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"2024-01-02\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_merge_date_timestamp/k=2024-01-02/a.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_large_integer": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_large_integer"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_large_integer/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_large_integer.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_large_integer\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_large_integer/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"1\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_large_integer/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"99999999999999999999\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_large_integer/k=99999999999999999999/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_default_partition": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_default_partition"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_default_partition/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_default_partition.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_default_partition\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_default_partition/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_default_partition/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":null}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_default_partition/k=__HIVE_DEFAULT_PARTITION__/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_escaped": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_escaped"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_escaped/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_escaped.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_escaped\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_escaped/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"a%20b\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_escaped/k=a%20b/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"c%2Fd\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_escaped/k=c%2Fd/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_empty_value": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition keys should be invariant from table creation across all partitions, with the number of partition keys held constant with invariant names.  Expected 1 partition keys ([k]), but 0 ([]) were encountered for partition k=.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition keys should be invariant from table creation across all partitions, with the number of partition keys held constant with invariant names.  Expected 1 partition keys ([k]), but 0 ([]) were encountered for partition k=.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_equals_in_value": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_equals_in_value"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_equals_in_value/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_equals_in_value.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_equals_in_value\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_equals_in_value/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"a=b\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_equals_in_value/k=a=b/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"c\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_equals_in_value/k=c/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_key_case": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "Dt",
+                "KEY"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_key_case"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_key_case/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "Dt",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "KEY",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_key_case.t`\n(\n  x INT64,\n  Dt INT64,\n  KEY STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_key_case\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_key_case/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"Dt\":1,\"KEY\":\"a\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_key_case/Dt=1/KEY=a/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"Dt\":2,\"KEY\":\"b\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_key_case/Dt=2/KEY=b/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_key_name": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid field name \"a-b\". Fields must contain only letters, numbers, and underscores, start with a letter or underscore, and be at most 300 characters long.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid field name \"a-b\". Fields must contain only letters, numbers, and underscores, start with a letter or underscore, and be at most 300 characters long.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_trailing_slash": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_trailing_slash/"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_trailing_slash/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_trailing_slash.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_trailing_slash/\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_trailing_slash/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_trailing_slash/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_trailing_slash/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_inconsistent_order": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key a when partition key b was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [b, a], encountered partition schema: [a, b].",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key a when partition key b was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [b, a], encountered partition schema: [a, b].",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_inconsistent_keys": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key a when partition key b was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [b], encountered partition schema: [a].",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key a when partition key b was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [b], encountered partition schema: [a].",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_missing_key": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: t, error message: Table t requested hive partitioning, but no partition keys were detected.  This is a sign of misconfiguration. Please ensure the source uri prefix provided is the prefix immediately before partition encoding begins. For instance, 'gs://bucket/table/key1=today/key2=5/foo.txt' would have 'gs://bucket/table' as a valid source uri prefix.  'gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_missing_key' was provided as the source uri prefix.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: t, error message: Table t requested hive partitioning, but no partition keys were detected.  This is a sign of misconfiguration. Please ensure the source uri prefix provided is the prefix immediately before partition encoding begins. For instance, 'gs://bucket/table/key1=today/key2=5/foo.txt' would have 'gs://bucket/table' as a valid source uri prefix.  'gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_missing_key' was provided as the source uri prefix.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_unencoded_directory": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_unencoded_directory"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_unencoded_directory/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_unencoded_directory.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_unencoded_directory\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_unencoded_directory/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_unencoded_directory/k=1/extra/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_unencoded_directory/k=2/extra/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_overlap": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "x"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_overlap"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_overlap/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_overlap.t`\n(\n  x INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_overlap\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_overlap/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Hive partitioning requires autodetect to be set or a non-empty schema to be provided.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Hive partitioning requires autodetect to be set or a non-empty schema to be provided.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_eleven_keys": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Detected 11 partition keys. At most 10 are supported. Partition key names are: [a, b, c, d, e, f, g, h, i, j, k]. Directory examined: a=1/b=1/c=1/d=1/e=1/f=1/g=1/h=1/i=1/j=1/k=1.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Detected 11 partition keys. At most 10 are supported. Partition key names are: [a, b, c, d, e, f, g, h, i, j, k]. Directory examined: a=1/b=1/c=1/d=1/e=1/f=1/g=1/h=1/i=1/j=1/k=1.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_outside_prefix": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Directory URI /bigstore/johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_outside_prefix/k=2/ does not contain path to table (/bigstore/johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_outside_prefix/other) as a prefix, which is a requirement.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Directory URI /bigstore/johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_outside_prefix/k=2/ does not contain path to table (/bigstore/johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_outside_prefix/other) as a prefix, which is a requirement.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_partial_prefix": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: t, error message: Table t requested hive partitioning, but no partition keys were detected.  This is a sign of misconfiguration. Please ensure the source uri prefix provided is the prefix immediately before partition encoding begins. For instance, 'gs://bucket/table/key1=today/key2=5/foo.txt' would have 'gs://bucket/table' as a valid source uri prefix.  'gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partial_prefix/k=' was provided as the source uri prefix.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: t, error message: Table t requested hive partitioning, but no partition keys were detected.  This is a sign of misconfiguration. Please ensure the source uri prefix provided is the prefix immediately before partition encoding begins. For instance, 'gs://bucket/table/key1=today/key2=5/foo.txt' would have 'gs://bucket/table' as a valid source uri prefix.  'gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partial_prefix/k=' was provided as the source uri prefix.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_file_uris": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris/k=2/b.json",
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris/k=1/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_file_uris.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris/k=2/b.json\", \"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris/k=1/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_file_uris/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_partition_wildcard": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partition_wildcard"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partition_wildcard/k=1/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_partition_wildcard.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partition_wildcard\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partition_wildcard/k=1/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_partition_wildcard/k=1/a.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_without_prefix": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "hive partitioning requires valid hive_partition_uri_prefix option",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "hive partitioning requires valid hive_partition_uri_prefix option",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "prefix_without_partition_columns": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "hive_partition_uri_prefix needs to be used with WITH PARTITION COLUMNS.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "hive_partition_uri_prefix needs to be used with WITH PARTITION COLUMNS.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "auto_parquet": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_parquet"
+            },
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_parquet/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "y",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_parquet.t`\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"PARQUET\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_parquet\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_parquet/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"y\":\"a\",\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_parquet/k=1/a.parquet"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"y\":\"b\",\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_parquet/k=2/b.parquet"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_csv": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_csv.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"CSV\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv/k=1/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv/k=2/b.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_csv_detected": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv_detected"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv_detected/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "y",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_csv_detected.t`\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"CSV\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv_detected\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv_detected/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"y\":\"a\",\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv_detected/k=1/a.csv"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"y\":\"b\",\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_csv_detected/k=2/b.csv"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_filter": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "s"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_filter"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_filter/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_filter.t`\n(\n  x INT64,\n  k INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_filter\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_filter/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "auto_select_key_only": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_select_key_only"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_select_key_only/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_auto_select_key_only.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_select_key_only\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/auto_select_key_only/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "custom_types": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "d",
+                "n",
+                "s"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_types/"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_types/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_custom_types.t`\n(\n  x INT64,\n  d DATE,\n  n INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS (\n  d DATE,\n  n INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_types/\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_types/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"d\":\"2024-01-02\",\"n\":1,\"s\":\"a\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_types/d=2024-01-02/n=1/s=a/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"d\":\"2024-01-03\",\"n\":2,\"s\":\"b\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_types/d=2024-01-03/n=2/s=b/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "custom_strings": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "d",
+                "n"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_strings/"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_strings/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_custom_strings.t`\n(\n  x INT64,\n  d STRING,\n  n STRING\n)\nWITH PARTITION COLUMNS (\n  d STRING,\n  n STRING\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_strings/\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_strings/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"d\":\"2024-01-02\",\"n\":\"1\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_strings/d=2024-01-02/n=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"d\":\"2024-01-03\",\"n\":\"2\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_strings/d=2024-01-03/n=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "custom_other_types": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "'BOOL' is not a valid partition key type.  Valid types are [STRING, TIMESTAMP, INTEGER, INT64, DATE]",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "'BOOL' is not a valid partition key type.  Valid types are [STRING, TIMESTAMP, INTEGER, INT64, DATE]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_numeric": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "'NUMERIC' is not a valid partition key type.  Valid types are [STRING, TIMESTAMP, INTEGER, INT64, DATE]",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "'NUMERIC' is not a valid partition key type.  Valid types are [STRING, TIMESTAMP, INTEGER, INT64, DATE]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_order": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key d when partition key n was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [n, d], encountered partition schema: [d, n].",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key d when partition key n was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [n, d], encountered partition schema: [d, n].",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_subset": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition keys should be invariant from table creation across all partitions, with the number of partition keys held constant with invariant names.  Expected 1 partition keys ([d]), but 2 ([d, n]) were encountered for partition d=2024-01-02/n=1.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition keys should be invariant from table creation across all partitions, with the number of partition keys held constant with invariant names.  Expected 1 partition keys ([d]), but 2 ([d, n]) were encountered for partition d=2024-01-02/n=1.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_unknown_key": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key k when partition key other was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [other], encountered partition schema: [k].",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key k when partition key other was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [other], encountered partition schema: [k].",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_bad_value": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Partition key 'k' was provided with type TYPE_INT64, but 'x' cannot be parsed as TYPE_INT64.  Full schema provided: [k:TYPE_INT64].",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Partition key 'k' was provided with type TYPE_INT64, but 'x' cannot be parsed as TYPE_INT64.  Full schema provided: [k:TYPE_INT64].",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_default_partition": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_default_partition/"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_default_partition/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_custom_default_partition.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS (\n  k INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_default_partition/\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_default_partition/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_default_partition/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":null}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/custom_default_partition/k=__HIVE_DEFAULT_PARTITION__/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "custom_not_null": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "column attributes are unsupported for columns in WITH PARTITION COLUMNS clause at [1:123]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "column attributes are unsupported for columns in WITH PARTITION COLUMNS clause at [1:123]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "custom_overlap": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Duplicate column name x in CREATE EXTERNAL TABLE at [1:122]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Duplicate column name x in CREATE EXTERNAL TABLE at [1:122]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "require_auto": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "column_filter": {
+          "message": "Cannot query over table 'johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_require_auto.t' without a filter over column(s) 'k' that can be used for partition elimination",
+          "reason": "invalidQuery",
+          "status": 400
+        },
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "requirePartitionFilter": true,
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_auto"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_auto/*"
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_require_auto.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_auto\",\n  require_hive_partition_filter=true,\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_auto/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "key_and_column_filter": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "key_filter": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "key_function_filter": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "key_is_not_null": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "key_or_column_filter": {
+          "message": "Cannot query over table 'johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_require_auto.t' without a filter over column(s) 'k' that can be used for partition elimination",
+          "reason": "invalidQuery",
+          "status": 400
+        },
+        "no_filter": {
+          "message": "Cannot query over table 'johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_require_auto.t' without a filter over column(s) 'k' that can be used for partition elimination",
+          "reason": "invalidQuery",
+          "status": 400
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "hive_partition_uri_prefix"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_auto\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "require_hive_partition_filter"
+                },
+                {
+                  "v": "BOOL"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_auto/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "require_false": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_false"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_false/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_require_false.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_false\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_false/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_false/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_false/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "require_without_partitioning": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_without_partitioning/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_require_without_partitioning.t`\n(\n  x INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_without_partitioning/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_without_partitioning/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/require_without_partitioning/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_auto": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "s"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "s"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_auto.t`\n(\n  x INT64,\n  k INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1,\"s\":\"a\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto/k=1/s=a/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2,\"s\":\"b\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_auto/k=2/s=b/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_strings": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "d"
+              ],
+              "mode": "STRINGS",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_strings"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_strings/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "d"
+              ],
+              "mode": "STRINGS",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_strings"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_strings/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":\"1\",\"d\":\"2024-01-02\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_strings/k=1/d=2024-01-02/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":\"2\",\"d\":\"2024-01-03\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_strings/k=2/d=2024-01-03/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_custom": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "s"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/{k:INTEGER}/{s:STRING}"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "s"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/{k:INTEGER}/{s:STRING}"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_custom.t`\n(\n  x INT64,\n  k INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS (\n\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1,\"s\":\"a\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/k=1/s=a/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2,\"s\":\"b\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom/k=2/s=b/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_custom_type_names": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "d"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/{k:INT64}/{d:DATE}"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k",
+                "d"
+              ],
+              "mode": "CUSTOM",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/{k:INT64}/{d:DATE}"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_custom_type_names.t`\n(\n  x INT64,\n  k INT64,\n  d DATE\n)\nWITH PARTITION COLUMNS (\n\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1,\"d\":\"2024-01-02\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/k=1/d=2024-01-02/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2,\"d\":\"2024-01-03\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_type_names/k=2/d=2024-01-03/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_custom_without_schema": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Prefix must contain a valid encoding of partition schema, with at least one partition key.  A proper example might be gs://bucket/table_name/{dt:DATE}/{country:STRING}.  Provided input: 'gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_without_schema'.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Prefix must contain a valid encoding of partition schema, with at least one partition key.  A proper example might be gs://bucket/table_name/{dt:DATE}/{country:STRING}.  Provided input: 'gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_custom_without_schema'.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "api_schema_with_keys": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_schema_with_keys.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_keys/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_schema_with_key_type": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_schema_with_key_type.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_schema_with_key_type/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_without_prefix": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Hive partitioned queries require that the HivePartitioningOptions be set, with both a sourceUriPrefix and mode provided. No sourceUriPrefix was provided.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Hive partitioned queries require that the HivePartitioningOptions be set, with both a sourceUriPrefix and mode provided. No sourceUriPrefix was provided.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "api_without_mode": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_without_mode"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_without_mode/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_without_mode"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_without_mode/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_without_mode/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_without_mode/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_empty": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {},
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_empty/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {},
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_empty/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_empty/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_empty/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_unknown_mode": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid value for hivePartitioning.mode: OTHER is not a valid value",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value for hivePartitioning.mode: OTHER is not a valid value",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "api_lower_mode": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid value for hivePartitioning.mode: auto is not a valid value",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value for hivePartitioning.mode: auto is not a valid value",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "api_require_filter": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "requirePartitionFilter": true,
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_require_filter"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_require_filter/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "requirePartitionFilter": true,
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_require_filter"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_require_filter/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_require_filter.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_require_filter\",\n  require_hive_partition_filter=true,\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_require_filter/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "api_fields": {
+      "project": "johejo-sandbox",
+      "run": "lopxclghzg3xdg56lp7l5s7bhc",
+      "steps": {
+        "create": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "hivePartitioningOptions": {
+              "fields": [
+                "k"
+              ],
+              "mode": "AUTO",
+              "sourceUriPrefix": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "k",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_lopxclghzg3xdg56lp7l5s7bhc_api_fields.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields\",\n  uris=[\"gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"x\":1,\"k\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields/k=1/a.json"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"x\":2,\"k\":2}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/lopxclghzg3xdg56lp7l5s7bhc/api_fields/k=2/b.json"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "row",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "file",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  }
+}
