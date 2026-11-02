@@ -454,6 +454,20 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    if (decoded && external && decoded->id == DdlOptionId::kHivePartitionUriPrefix) {
+      if (!decoded->value.is_null()) {
+        auto& hive = metadata.external_data->hive_partitioning;
+        (hive ? *hive : hive.emplace()).source_uri_prefix = decoded->value.string_value();
+      }
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kRequireHivePartitionFilter) {
+      if (!decoded->value.is_null()) {
+        auto& hive = metadata.external_data->hive_partitioning;
+        (hive ? *hive : hive.emplace()).require_partition_filter = decoded->value.bool_value();
+      }
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kEnableListInference) {
       if (!decoded->value.is_null()) {
         metadata.external_data->enable_list_inference = decoded->value.bool_value();

@@ -55,6 +55,12 @@ class ServiceTableProvider : public ExternalTableProvider {
     return DetectGcsExternalSchema(definition, table_id, gcs_);
   }
 
+  std::vector<FieldSchema> DetectPartitionKeys(const GcsExternalData& definition,
+                                               const std::vector<FieldSchema>& declared,
+                                               const std::string& table_id) override {
+    return DetectGcsPartitionKeys(definition, declared, table_id, gcs_);
+  }
+
   // NOLINTBEGIN(bugprone-easily-swappable-parameters): a connection and its query options.
   absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& key,
                                                          const std::string& query,

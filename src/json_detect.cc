@@ -1,7 +1,6 @@
 #include "src/json_detect.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -89,13 +88,6 @@ void MergeObject(std::vector<Node>& fields, const ordered_json& object) {
   }
 }
 
-bool StandardName(std::string_view name) {
-  return !name.empty() && name.size() <= 300 &&
-         (std::isalpha(static_cast<unsigned char>(name.front())) != 0 || name.front() == '_') &&
-         std::ranges::all_of(name,
-                             [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; });
-}
-
 // The fields of `appeared`, in their order of first appearance, as BigQuery reports them: in the
 // order a libc++ std::unordered_map of their names iterates them.
 std::vector<FieldSchema> Fields(const std::vector<Node>& appeared, std::string_view table_id,
@@ -109,12 +101,7 @@ std::vector<FieldSchema> Fields(const std::vector<Node>& appeared, std::string_v
                          });
   std::vector<FieldSchema> fields;
   for (const Node* node : ordered) {
-    if (!StandardName(node->name)) {
-      throw ApiError::Invalid(std::format(
-          "Invalid field name \"{}\". Fields must contain only letters, numbers, and "
-          "underscores, start with a letter or underscore, and be at most 300 characters long.",
-          node->name));
-    }
+    CheckDetectedFieldName(node->name);
     if (top) {
       CheckReservedFieldName(node->name);
     }

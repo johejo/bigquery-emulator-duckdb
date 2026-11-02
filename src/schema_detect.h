@@ -32,4 +32,8 @@ FieldType KindType(DetectedKind kind);
 // Throws ApiError::Invalid for a detected column name with a prefix BigQuery reserves.
 void CheckReservedFieldName(const std::string& name);
 
+// Throws ApiError::Invalid for a detected field name other than letters, digits and underscores
+// that does not start with a digit, of at most 300 characters.
+void CheckDetectedFieldName(const std::string& name);
+
 }  // namespace bigquery_emulator_duckdb

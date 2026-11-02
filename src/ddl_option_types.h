@@ -54,6 +54,8 @@ enum class DdlOptionId : uint8_t {
   kNullMarkers,
   kPreserveAsciiControlCharacters,
   kIgnoreUnknownValues,
+  kHivePartitionUriPrefix,
+  kRequireHivePartitionFilter,
 };
 std::string_view DdlOptionContextName(DdlOptionContext context);
 std::string_view DdlOptionName(DdlOptionId option);

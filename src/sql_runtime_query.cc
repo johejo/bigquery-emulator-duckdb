@@ -711,7 +711,8 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
   CheckDdlTarget(translation);
   CheckRelationTarget(backend, translation);
   if (const auto& table = translation.table;
-      table && table->metadata.external_data && table->schema.empty()) {
+      table && table->metadata.external_data && !table->sources_read &&
+      (table->schema.empty() || table->metadata.external_data->hive_partitioning)) {
     // IF NOT EXISTS keeps what is there without reading the sources.
     if (table->if_not_exists &&
         (RelationComment(backend, "duckdb_tables()", "table_name", table->table) ||
@@ -720,9 +721,13 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
     }
     TranslatedStatement detected = translation;
     // tables.get reports a table that CREATE EXTERNAL TABLE detects the schema of as autodetected.
-    detected.table->metadata.external_data->autodetect = true;
+    if (table->schema.empty()) {
+      detected.table->metadata.external_data->autodetect = true;
+    }
     detected.table->schema =
-        DetectExternalSchema(*detected.table->metadata.external_data, table->table.table_id);
+        ExternalSchema(*detected.table->metadata.external_data, detected.table->schema,
+                       detected.table->partition_columns, table->table.table_id);
+    detected.table->sources_read = true;
     const auto columns =
         ColumnDefinitions(detected.table->schema, functions_.timestamp_precision());
     if (!columns) {

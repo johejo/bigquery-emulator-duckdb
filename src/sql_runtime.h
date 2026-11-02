@@ -183,7 +183,7 @@ class SqlRuntime {
   // Return the mutation result before another request can expire the relation.
   // An external table created without a schema takes the one its sources have.
   TableInfo CreateTable(TableReference table, std::vector<FieldSchema> schema,
-                        const TableMetadata& metadata = {});
+                        const TableMetadata& given = {});
   TableInfo CreateView(TableReference table, const nlohmann::json& definition,
                        const TableMetadata& metadata, bool materialized = false);
   // tables.patch and tables.update: gives a table the schema `schema`, or a view the definition
@@ -287,6 +287,13 @@ class SqlRuntime {
   // the mode of each field given. Throws ApiError::Unsupported without an external table provider.
   std::vector<FieldSchema> DetectExternalSchema(const GcsExternalData& definition,
                                                 const std::string& table_id);
+  // The schema of the external table `table_id` created with `schema`, or with the one detected
+  // when it is empty. A Hive-partitioned table's keys, `declared_keys` or those of its sources'
+  // paths, replace the fields of their names at its end, and `definition` records them.
+  std::vector<FieldSchema> ExternalSchema(GcsExternalData& definition,
+                                          std::vector<FieldSchema> schema,
+                                          const std::vector<FieldSchema>& declared_keys,
+                                          const std::string& table_id);
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,

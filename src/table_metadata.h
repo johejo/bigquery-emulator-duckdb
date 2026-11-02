@@ -14,6 +14,19 @@
 
 namespace bigquery_emulator_duckdb {
 
+// ExternalDataConfiguration.hivePartitioningOptions. Without a mode, which DDL always sets, the
+// options are only stored, as BigQuery stores them, and the table is not partitioned. A CUSTOM
+// prefix created by DDL ends in a slash and encodes no keys; one given by tables.insert encodes
+// them, as gs://bucket/table/{dt:DATE}.
+struct HivePartitioning {
+  std::string mode = {};
+  std::string source_uri_prefix = {};
+  std::optional<bool> require_partition_filter = std::nullopt;
+  // The partition keys, which the schema ends with, in the order of the paths.
+  std::vector<std::string> fields = {};
+  bool operator==(const HivePartitioning&) const = default;
+};
+
 // GCS external sources and their format-specific read settings.
 struct GcsExternalData {
   std::vector<std::string> uris;
@@ -29,6 +42,7 @@ struct GcsExternalData {
   std::optional<std::vector<std::string>> null_markers = std::nullopt;
   std::optional<bool> preserve_ascii_control_characters = std::nullopt;
   std::optional<bool> ignore_unknown_values = std::nullopt;
+  std::optional<HivePartitioning> hive_partitioning = std::nullopt;
   bool operator==(const GcsExternalData&) const = default;
 };
 

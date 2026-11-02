@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -261,6 +262,26 @@ bool Eliminates(const Expr& expr, int key, const Filters& filters, bool temporal
   return partition;
 }
 
+// A Hive-partitioned table's filter eligible for partition elimination: a conjunct that
+// references partition keys, `keys` as roots, and no other column, as in k + 1 = 2.
+bool EliminatesHive(const Expr& expr, const std::set<int>& keys, const Filters& filters) {
+  if (const auto boolean = Boolean(expr)) {
+    return !*boolean;
+  }
+  if (const auto* call = As<googlesql::ResolvedFunctionCall>(expr);
+      call != nullptr && Name(*call) == "$and") {
+    return std::ranges::any_of(call->argument_list(), [&](const auto& arg) {
+      return EliminatesHive(*arg, keys, filters);
+    });
+  }
+  std::vector<const Node*> references;
+  expr.GetDescendantsWithKinds({googlesql::RESOLVED_COLUMN_REF}, &references);
+  return !references.empty() && std::ranges::all_of(references, [&](const Node* node) {
+    return keys.contains(
+        filters.Root(node->GetAs<googlesql::ResolvedColumnRef>()->column().column_id()));
+  });
+}
+
 void Check(const Node& node, Filters filters = {});
 
 void Children(const Node& node, const Filters& filters = {}) {
@@ -274,6 +295,33 @@ void Children(const Node& node, const Filters& filters = {}) {
 void CheckTable(const googlesql::ResolvedTableScan& scan, const Filters& filters) {
   const auto* table = dynamic_cast<const BigQueryTable*>(scan.table());
   const auto description = table == nullptr ? std::nullopt : table->Describe();
+  const auto name = [table] {
+    return table->reference().project_id + "." + table->reference().dataset_id + "." +
+           table->reference().table_id;
+  };
+  const HivePartitioning* hive = nullptr;
+  if (description && description->metadata.external_data &&
+      description->metadata.external_data->hive_partitioning) {
+    hive = &description->metadata.external_data.value().hive_partitioning.value();
+  }
+  if (hive != nullptr && !hive->mode.empty() && hive->require_partition_filter.value_or(false)) {
+    const auto& fields = hive->fields;
+    std::set<int> keys;
+    for (int i = 0; i < scan.column_list_size(); ++i) {
+      if (std::ranges::find(fields, scan.table()->GetColumn(scan.column_index_list(i))->Name()) !=
+          fields.end()) {
+        keys.insert(filters.Root(scan.column_list(i).column_id()));
+      }
+    }
+    if (std::ranges::none_of(filters.predicates, [&](const Expr* predicate) {
+          return EliminatesHive(*predicate, keys, filters);
+        })) {
+      throw ApiError::InvalidQuery("Cannot query over table '" + name() +
+                                   "' without a filter over column(s) '" + Join(fields, ", ") +
+                                   "' that can be used for partition elimination");
+    }
+    return;
+  }
   if (!description || !description->metadata.require_partition_filter) {
     return;
   }
@@ -297,8 +345,7 @@ void CheckTable(const googlesql::ResolvedTableScan& scan, const Filters& filters
                           [](const Expr* expr) { return Boolean(*expr) == false; })) {
     return;
   }
-  throw ApiError::InvalidQuery("Cannot query over table '" + table->reference().project_id + "." +
-                               table->reference().dataset_id + "." + table->reference().table_id +
+  throw ApiError::InvalidQuery("Cannot query over table '" + name() +
                                "' without a filter over column(s) '" + field +
                                "' that can be used for partition elimination");
 }

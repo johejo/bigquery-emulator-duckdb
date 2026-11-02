@@ -1,0 +1,985 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run lopxclghzg3xdg56lp7l5s7bhc, with sources in
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. Messages that name a
+# Cloud Storage path give it as /bigstore/BUCKET/OBJECT.
+# Hive-partitioned external tables. third_party/bigquery_docs/hive-partitioned-queries.md
+# describes the layout, the AUTO, STRINGS and CUSTOM detection modes and the required partition
+# filter, and third_party/bigquery_docs/reference/standard-sql/data-definition-language.md the
+# WITH PARTITION COLUMNS clause; these cases settle detected types and order, the metadata
+# tables.get and INFORMATION_SCHEMA report, the values queries read and the layouts BigQuery
+# rejects. Unless a case says otherwise, sources are JSON files {"x":1} (first) and {"x":2}
+# (second) at the object paths `p1` and `p2` under the prefix, read with an explicit schema.
+description: >-
+  Hive partitioning of external tables created by DDL and tables.insert, with sources in a Cloud
+  Storage bucket.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  first: 'eyJ4IjoxfQo='
+  second: 'eyJ4IjoyfQo='
+  columns: '(x INT64)'
+  partition: WITH PARTITION COLUMNS
+  format: JSON
+  options: ''
+  uris: "['${prefix}/*']"
+  ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${columns} ${partition} OPTIONS (format = '${format}', uris = ${uris}, hive_partition_uri_prefix = '${prefix}'${options})
+  query: SELECT TO_JSON_STRING(t) AS row, _FILE_NAME AS file FROM `${project}.${dataset}.t` AS t ORDER BY file
+  table_schema: {fields: [{name: x, type: INTEGER}]}
+templates:
+  # Creates the table with `ddl` from `first` at `p1` and `second` at `p2`, then reads it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+          schema: /body/schema
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+  # As ddl, with require_hive_partition_filter, and queries with and without eligible filters.
+  require:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          requirePartitionFilter: /body/requirePartitionFilter
+          external: /body/externalDataConfiguration
+      - name: table_options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: no_filter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x FROM `${project}.${dataset}.t` ORDER BY x
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+      - name: key_filter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x, k FROM `${project}.${dataset}.t` WHERE k = 1 ORDER BY x
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+      - name: key_and_column_filter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x FROM `${project}.${dataset}.t` WHERE k > 0 AND x = 2 ORDER BY x
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+      - name: key_or_column_filter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x FROM `${project}.${dataset}.t` WHERE k = 1 OR x = 2 ORDER BY x
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+      - name: column_filter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x FROM `${project}.${dataset}.t` WHERE x = 2
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+      - name: key_function_filter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x FROM `${project}.${dataset}.t` WHERE k + 1 = 2 ORDER BY x
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+          rows: /body/rows
+      - name: key_is_not_null
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT x FROM `${project}.${dataset}.t` WHERE k IS NOT NULL ORDER BY x
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+  # Creates the table with tables.insert, `table_schema` and `configuration`, then reads it.
+  api:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            schema: ${table_schema}
+            externalDataConfiguration: ${configuration}
+        observe:
+          status: /status
+          message: /body/error/message
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: list
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+        observe:
+          tables: /body/tables/0/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+          schema: /body/schema
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+  # As ddl, for a table BigQuery does not create.
+  ddl_rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+  # As ddl, for sources a query cannot read.
+  ddl_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+  # As ddl_rejected, observing only the status and reason of an error whose location the
+  # project's name shifts.
+  ddl_rejected_located:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+  # As api, for a table BigQuery does not create.
+  api_rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/${p1}', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/${p2}', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            schema: ${table_schema}
+            externalDataConfiguration: ${configuration}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/${p1}'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/${p2}'}
+cases:
+  # AUTO detection of the documented types: STRING, INTEGER, DATE and TIMESTAMP.
+  - name: auto_types
+    template: ddl
+    vars:
+      p1: "d=2024-01-02/n=1/s=a/ts=2024-01-02 03:04:05+00/a.json"
+      p2: "d=2024-01-03/n=2/s=b/ts=2024-01-03 03:04:05+00/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["d", "n", "s", "ts"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  d DATE,\n  n INT64,\n  s STRING,\n  ts TIMESTAMP\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"d\":\"2024-01-02\",\"n\":1,\"s\":\"a\",\"ts\":\"2024-01-02T03:04:05Z\"}"}, {"v": "${prefix}/d=2024-01-02/n=1/s=a/ts=2024-01-02 03:04:05+00/a.json"}]}, {"f": [{"v": "{\"x\":2,\"d\":\"2024-01-03\",\"n\":2,\"s\":\"b\",\"ts\":\"2024-01-03T03:04:05Z\"}"}, {"v": "${prefix}/d=2024-01-03/n=2/s=b/ts=2024-01-03 03:04:05+00/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Values of types AUTO does not list, signs and leading zeros.
+  - name: auto_other_values
+    template: ddl
+    vars:
+      p1: "f=1.5/b=true/neg=-1/z=01/dt=2024-01-02T03:04:05/a.json"
+      p2: "f=2.5/b=false/neg=-2/z=02/dt=2024-01-03T03:04:05/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["f", "b", "neg", "z", "dt"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "f", "type": "STRING"}, {"mode": "NULLABLE", "name": "b", "type": "STRING"}, {"mode": "NULLABLE", "name": "neg", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "z", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "dt", "type": "TIMESTAMP"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  f STRING,\n  b STRING,\n  neg INT64,\n  z INT64,\n  dt TIMESTAMP\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"f\":\"1.5\",\"b\":\"true\",\"neg\":-1,\"z\":1,\"dt\":\"2024-01-02T03:04:05Z\"}"}, {"v": "${prefix}/f=1.5/b=true/neg=-1/z=01/dt=2024-01-02T03:04:05/a.json"}]}, {"f": [{"v": "{\"x\":2,\"f\":\"2.5\",\"b\":\"false\",\"neg\":-2,\"z\":2,\"dt\":\"2024-01-03T03:04:05Z\"}"}, {"v": "${prefix}/f=2.5/b=false/neg=-2/z=02/dt=2024-01-03T03:04:05/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Timestamps without an offset and with Z.
+  - name: auto_timestamp_forms
+    template: ddl
+    vars:
+      p1: "plain=2024-01-02 03:04:05/z=2024-01-02T03:04:05Z/a.json"
+      p2: "plain=2024-01-03 03:04:05/z=2024-01-03T03:04:05Z/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["plain", "z"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "plain", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "z", "type": "TIMESTAMP"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  plain TIMESTAMP,\n  z TIMESTAMP\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"plain\":\"2024-01-02T03:04:05Z\",\"z\":\"2024-01-02T03:04:05Z\"}"}, {"v": "${prefix}/plain=2024-01-02 03:04:05/z=2024-01-02T03:04:05Z/a.json"}]}, {"f": [{"v": "{\"x\":2,\"plain\":\"2024-01-03T03:04:05Z\",\"z\":\"2024-01-03T03:04:05Z\"}"}, {"v": "${prefix}/plain=2024-01-03 03:04:05/z=2024-01-03T03:04:05Z/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # An INTEGER-looking value and a STRING value of one key.
+  - name: auto_merge_integer_string
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=x/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":\"1\"}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":\"x\"}"}, {"v": "${prefix}/k=x/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A DATE-looking value and an INTEGER-looking value of one key.
+  - name: auto_merge_date_integer
+    template: ddl
+    vars:
+      p1: "k=2024-01-02/a.json"
+      p2: "k=1/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":2,\"k\":\"1\"}"}, {"v": "${prefix}/k=1/b.json"}]}, {"f": [{"v": "{\"x\":1,\"k\":\"2024-01-02\"}"}, {"v": "${prefix}/k=2024-01-02/a.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A DATE value and a TIMESTAMP value of one key.
+  - name: auto_merge_date_timestamp
+    template: ddl
+    vars:
+      p1: "k=2024-01-02/a.json"
+      p2: "k=2024-01-02 03:04:05+00/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":2,\"k\":\"2024-01-02 03:04:05+00\"}"}, {"v": "${prefix}/k=2024-01-02 03:04:05+00/b.json"}]}, {"f": [{"v": "{\"x\":1,\"k\":\"2024-01-02\"}"}, {"v": "${prefix}/k=2024-01-02/a.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A value beyond INT64.
+  - name: auto_large_integer
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=99999999999999999999/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":\"1\"}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":\"99999999999999999999\"}"}, {"v": "${prefix}/k=99999999999999999999/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Hive's default partition name, which Hive writes for NULL.
+  - name: auto_default_partition
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=__HIVE_DEFAULT_PARTITION__/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":null}"}, {"v": "${prefix}/k=__HIVE_DEFAULT_PARTITION__/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Percent-encoded values.
+  - name: auto_escaped
+    template: ddl
+    vars:
+      p1: "k=a%20b/a.json"
+      p2: "k=c%2Fd/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":\"a%20b\"}"}, {"v": "${prefix}/k=a%20b/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":\"c%2Fd\"}"}, {"v": "${prefix}/k=c%2Fd/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # An empty value.
+  - name: auto_empty_value
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=/b.json"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition keys should be invariant from table creation across all partitions, with the number of partition keys held constant with invariant names.  Expected 1 partition keys ([k]), but 0 ([]) were encountered for partition k=."}}
+  # A value holding an equals sign.
+  - name: auto_equals_in_value
+    template: ddl
+    vars:
+      p1: "k=a=b/a.json"
+      p2: "k=c/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":\"a=b\"}"}, {"v": "${prefix}/k=a=b/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":\"c\"}"}, {"v": "${prefix}/k=c/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Key names in upper and mixed case.
+  - name: auto_key_case
+    template: ddl
+    vars:
+      p1: "Dt=1/KEY=a/a.json"
+      p2: "Dt=2/KEY=b/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["Dt", "KEY"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "Dt", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "KEY", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  Dt INT64,\n  KEY STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"Dt\":1,\"KEY\":\"a\"}"}, {"v": "${prefix}/Dt=1/KEY=a/a.json"}]}, {"f": [{"v": "{\"x\":2,\"Dt\":2,\"KEY\":\"b\"}"}, {"v": "${prefix}/Dt=2/KEY=b/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A key name that is not a column name BigQuery takes as it is.
+  - name: auto_key_name
+    template: ddl_rejected
+    vars:
+      p1: "a-b=1/a.json"
+      p2: "a-b=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Invalid field name \"a-b\". Fields must contain only letters, numbers, and underscores, start with a letter or underscore, and be at most 300 characters long."}}
+  # A prefix with a trailing slash.
+  - name: auto_trailing_slash
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (x INT64) WITH PARTITION COLUMNS OPTIONS (format = 'JSON', uris = ['${prefix}/*'], hive_partition_uri_prefix = '${prefix}/')"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}/"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}/\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Keys in different orders.
+  - name: auto_inconsistent_order
+    template: ddl_rejected
+    vars:
+      p1: "a=1/b=2/a.json"
+      p2: "b=3/a=4/b.json"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key a when partition key b was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [b, a], encountered partition schema: [a, b]."}}
+  # Different keys in two files.
+  - name: auto_inconsistent_keys
+    template: ddl_rejected
+    vars:
+      p1: "a=1/a.json"
+      p2: "b=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key a when partition key b was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [b], encountered partition schema: [a]."}}
+  # A file directly under the prefix and one under a partition.
+  - name: auto_missing_key
+    template: ddl_rejected
+    vars:
+      p1: "a.json"
+      p2: "k=1/b.json"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Error while reading table: t, error message: Table t requested hive partitioning, but no partition keys were detected.  This is a sign of misconfiguration. Please ensure the source uri prefix provided is the prefix immediately before partition encoding begins. For instance, 'gs://bucket/table/key1=today/key2=5/foo.txt' would have 'gs://bucket/table' as a valid source uri prefix.  '${prefix}' was provided as the source uri prefix."}}
+  # A directory that does not encode a key.
+  - name: auto_unencoded_directory
+    template: ddl
+    vars:
+      p1: "k=1/extra/a.json"
+      p2: "k=2/extra/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/extra/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/extra/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A key that is also a column of the files.
+  - name: auto_overlap
+    template: ddl_unreadable
+    vars:
+      p1: "x=1/a.json"
+      p2: "x=2/b.json"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["x"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid", "message": "Hive partitioning requires autodetect to be set or a non-empty schema to be provided."}}
+  # More than the ten keys the documentation allows.
+  - name: auto_eleven_keys
+    template: ddl_rejected
+    vars:
+      p1: "a=1/b=1/c=1/d=1/e=1/f=1/g=1/h=1/i=1/j=1/k=1/a.json"
+      p2: "a=2/b=2/c=2/d=2/e=2/f=2/g=2/h=2/i=2/j=2/k=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Detected 11 partition keys. At most 10 are supported. Partition key names are: [a, b, c, d, e, f, g, h, i, j, k]. Directory examined: a=1/b=1/c=1/d=1/e=1/f=1/g=1/h=1/i=1/j=1/k=1."}}
+  # URIs that are not under the prefix.
+  - name: auto_outside_prefix
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (x INT64) WITH PARTITION COLUMNS OPTIONS (format = 'JSON', uris = ['${prefix}/*'], hive_partition_uri_prefix = '${prefix}/other')"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Directory URI /bigstore/${bucket}/${run}/${case}/k=2/ does not contain path to table (/bigstore/${bucket}/${run}/${case}/other) as a prefix, which is a requirement."}}
+  # A prefix that ends within a directory name.
+  - name: auto_partial_prefix
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (x INT64) WITH PARTITION COLUMNS OPTIONS (format = 'JSON', uris = ['${prefix}/*'], hive_partition_uri_prefix = '${prefix}/k=')"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Error while reading table: t, error message: Table t requested hive partitioning, but no partition keys were detected.  This is a sign of misconfiguration. Please ensure the source uri prefix provided is the prefix immediately before partition encoding begins. For instance, 'gs://bucket/table/key1=today/key2=5/foo.txt' would have 'gs://bucket/table' as a valid source uri prefix.  '${prefix}/k=' was provided as the source uri prefix."}}
+  # URIs naming files rather than a wildcard.
+  - name: auto_file_uris
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      uris: "['${prefix}/k=2/b.json', '${prefix}/k=1/a.json']"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/k=2/b.json", "${prefix}/k=1/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/k=2/b.json\", \"${prefix}/k=1/a.json\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A wildcard within the partition directories.
+  - name: auto_partition_wildcard
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      uris: "['${prefix}/k=1/*']"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/k=1/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/k=1/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # WITH PARTITION COLUMNS without hive_partition_uri_prefix.
+  - name: auto_without_prefix
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (x INT64) WITH PARTITION COLUMNS OPTIONS (format = 'JSON', uris = ['${prefix}/*'])"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "hive partitioning requires valid hive_partition_uri_prefix option"}}
+  # hive_partition_uri_prefix without WITH PARTITION COLUMNS.
+  - name: prefix_without_partition_columns
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      partition: ""
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "hive_partition_uri_prefix needs to be used with WITH PARTITION COLUMNS."}}
+  # Parquet with a detected schema, as the DDL documentation's example; files hold x and y.
+  - name: auto_parquet
+    template: ddl
+    vars:
+      p1: "k=1/a.parquet"
+      p2: "k=2/b.parquet"
+      first: "UEFSMRUAFRAVFCwVAhUAFQYVBgAACBwBAAAAAAAAABUAFQoVDiwVAhUAFQYVBgAABRABAAAAYRUCGTw1ABgNZHVja2RiX3NjaGVtYRUEABUEJQAYAXglJAAVDCUAGAF5JQAAFgIZHBksJgAcFQQZFQAZGAF4FQIWAhYyFjYmCDwYCAEAAAAAAAAAGAgBAAAAAAAAABYAKAgBAAAAAAAAABgIAQAAAAAAAAAREQAZHBUAFQAVAgAAACYAHBUMGRUAGRgBeRUCFgIWLBYwJj48GAFhGAFhFgAoAWEYAWEREQAZHBUAFQAVAgAAABZeFgImCBZmACgoRHVja0RCIHZlcnNpb24gdjIuMC4wIChidWlsZCBkNTRjYmJlM2RmKRksHAAAHAAAAPAAAABQQVIx"
+      second: "UEFSMRUAFRAVFCwVAhUAFQYVBgAACBwCAAAAAAAAABUAFQoVDiwVAhUAFQYVBgAABRABAAAAYhUCGTw1ABgNZHVja2RiX3NjaGVtYRUEABUEJQAYAXglJAAVDCUAGAF5JQAAFgIZHBksJgAcFQQZFQAZGAF4FQIWAhYyFjYmCDwYCAIAAAAAAAAAGAgCAAAAAAAAABYAKAgCAAAAAAAAABgIAgAAAAAAAAAREQAZHBUAFQAVAgAAACYAHBUMGRUAGRgBeRUCFgIWLBYwJj48GAFiGAFiFgAoAWIYAWIREQAZHBUAFQAVAgAAABZeFgImCBZmACgoRHVja0RCIHZlcnNpb24gdjIuMC4wIChidWlsZCBkNTRjYmJlM2RmKRksHAAAHAAAAPAAAABQQVIx"
+      format: "PARQUET"
+      columns: ""
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "x", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "y", "type": "STRING"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"PARQUET\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"y\":\"a\",\"k\":1}"}, {"v": "${prefix}/k=1/a.parquet"}]}, {"f": [{"v": "{\"x\":2,\"y\":\"b\",\"k\":2}"}, {"v": "${prefix}/k=2/b.parquet"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # CSV with an explicit schema; files are "1\n" and "2\n".
+  - name: auto_csv
+    template: ddl
+    vars:
+      p1: "k=1/a.csv"
+      p2: "k=2/b.csv"
+      first: "MQo="
+      second: "Mgo="
+      format: "CSV"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"CSV\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.csv"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # CSV with a detected schema; files are "x,y\n1,a\n" and "x,y\n2,b\n".
+  - name: auto_csv_detected
+    template: ddl
+    vars:
+      p1: "k=1/a.csv"
+      p2: "k=2/b.csv"
+      first: "eCx5CjEsYQo="
+      second: "eCx5CjIsYgo="
+      format: "CSV"
+      columns: ""
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "CSV", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "y", "type": "STRING"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"CSV\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"y\":\"a\",\"k\":1}"}, {"v": "${prefix}/k=1/a.csv"}]}, {"f": [{"v": "{\"x\":2,\"y\":\"b\",\"k\":2}"}, {"v": "${prefix}/k=2/b.csv"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Filters and grouping on keys.
+  - name: auto_filter
+    template: ddl
+    vars:
+      p1: "k=1/s=a/a.json"
+      p2: "k=2/s=b/b.json"
+      query: "SELECT k, s, COUNT(*) AS n FROM `${project}.${dataset}.t` WHERE k > 1 OR s = 'a' GROUP BY k, s ORDER BY k"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k", "s"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}, {"v": "1"}]}, {"f": [{"v": "2"}, {"v": "b"}, {"v": "1"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "n", "type": "INTEGER"}]}, "status": 200}}
+  # A query that reads only partition keys.
+  - name: auto_select_key_only
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      query: "SELECT k FROM `${project}.${dataset}.t` ORDER BY k"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}}
+  # Declared partition columns of the types AUTO detects.
+  - name: custom_types
+    template: ddl
+    vars:
+      p1: "d=2024-01-02/n=1/s=a/a.json"
+      p2: "d=2024-01-03/n=2/s=b/b.json"
+      partition: "WITH PARTITION COLUMNS (d DATE, n INT64, s STRING)"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["d", "n", "s"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "n", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  d DATE,\n  n INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS (\n  d DATE,\n  n INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}/\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"d\":\"2024-01-02\",\"n\":1,\"s\":\"a\"}"}, {"v": "${prefix}/d=2024-01-02/n=1/s=a/a.json"}]}, {"f": [{"v": "{\"x\":2,\"d\":\"2024-01-03\",\"n\":2,\"s\":\"b\"}"}, {"v": "${prefix}/d=2024-01-03/n=2/s=b/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Declared STRING columns for values AUTO would detect as other types.
+  - name: custom_strings
+    template: ddl
+    vars:
+      p1: "d=2024-01-02/n=1/a.json"
+      p2: "d=2024-01-03/n=2/b.json"
+      partition: "WITH PARTITION COLUMNS (d STRING, n STRING)"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["d", "n"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "d", "type": "STRING"}, {"mode": "NULLABLE", "name": "n", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  d STRING,\n  n STRING\n)\nWITH PARTITION COLUMNS (\n  d STRING,\n  n STRING\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}/\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"d\":\"2024-01-02\",\"n\":\"1\"}"}, {"v": "${prefix}/d=2024-01-02/n=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"d\":\"2024-01-03\",\"n\":\"2\"}"}, {"v": "${prefix}/d=2024-01-03/n=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # Declared partition columns of other types.
+  - name: custom_other_types
+    template: ddl_rejected
+    vars:
+      p1: "b=true/f=1.5/dt=2024-01-02 03:04:05/ts=2024-01-02 03:04:05+00/a.json"
+      p2: "b=false/f=2.5/dt=2024-01-03 03:04:05/ts=2024-01-03 03:04:05+00/b.json"
+      partition: "WITH PARTITION COLUMNS (b BOOL, f FLOAT64, dt DATETIME, ts TIMESTAMP)"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "'BOOL' is not a valid partition key type.  Valid types are [STRING, TIMESTAMP, INTEGER, INT64, DATE]"}}
+  # A declared NUMERIC and BYTES partition column.
+  - name: custom_numeric
+    template: ddl_rejected
+    vars:
+      p1: "n=1.5/y=a/a.json"
+      p2: "n=2/y=b/b.json"
+      partition: "WITH PARTITION COLUMNS (n NUMERIC, y BYTES)"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "'NUMERIC' is not a valid partition key type.  Valid types are [STRING, TIMESTAMP, INTEGER, INT64, DATE]"}}
+  # Declared columns in a different order than the path.
+  - name: custom_order
+    template: ddl_rejected
+    vars:
+      p1: "d=2024-01-02/n=1/a.json"
+      p2: "d=2024-01-03/n=2/b.json"
+      partition: "WITH PARTITION COLUMNS (n INT64, d DATE)"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key d when partition key n was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [n, d], encountered partition schema: [d, n]."}}
+  # Fewer declared columns than the path has keys.
+  - name: custom_subset
+    template: ddl_rejected
+    vars:
+      p1: "d=2024-01-02/n=1/a.json"
+      p2: "d=2024-01-03/n=2/b.json"
+      partition: "WITH PARTITION COLUMNS (d DATE)"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition keys should be invariant from table creation across all partitions, with the number of partition keys held constant with invariant names.  Expected 1 partition keys ([d]), but 2 ([d, n]) were encountered for partition d=2024-01-02/n=1."}}
+  # A declared column the path does not have.
+  - name: custom_unknown_key
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      partition: "WITH PARTITION COLUMNS (other INT64)"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition keys should be invariant from table creation across all partitions.  Encountered partition key k when partition key other was expected at position 0.  To query this data, either disable requesting hive partition inference, or make directory structure consistent.  Expected partition schema: [other], encountered partition schema: [k]."}}
+  # A value that does not parse as the declared type.
+  - name: custom_bad_value
+    template: ddl_rejected
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=x/b.json"
+      partition: "WITH PARTITION COLUMNS (k INT64)"
+    expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "Partition key 'k' was provided with type TYPE_INT64, but 'x' cannot be parsed as TYPE_INT64.  Full schema provided: [k:TYPE_INT64]."}}
+  # Hive's default partition name under a declared INT64 column.
+  - name: custom_default_partition
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=__HIVE_DEFAULT_PARTITION__/b.json"
+      partition: "WITH PARTITION COLUMNS (k INT64)"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS (\n  k INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}/\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":null}"}, {"v": "${prefix}/k=__HIVE_DEFAULT_PARTITION__/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # A declared NOT NULL partition column, and an option on one.
+  - name: custom_not_null
+    template: ddl_rejected_located
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      partition: "WITH PARTITION COLUMNS (k INT64 NOT NULL OPTIONS (description = 'key'))"
+    expect: {"create": {"status": 400, "reason": "invalidQuery"}}
+  # A declared partition column that is also a declared file column.
+  - name: custom_overlap
+    template: ddl_rejected_located
+    vars:
+      p1: "x=1/a.json"
+      p2: "x=2/b.json"
+      partition: "WITH PARTITION COLUMNS (x INT64)"
+    expect: {"create": {"status": 400, "reason": "invalidQuery"}}
+  # require_hive_partition_filter with a detected INTEGER key.
+  - name: require_auto
+    template: require
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      options: ", require_hive_partition_filter = true"
+    expect: {"column_filter": {"message": "Cannot query over table '${project}.${dataset}.t' without a filter over column(s) 'k' that can be used for partition elimination", "reason": "invalidQuery", "status": 400}, "create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "requirePartitionFilter": true, "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  require_hive_partition_filter=true,\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "key_and_column_filter": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "key_filter": {"rows": [{"f": [{"v": "1"}, {"v": "1"}]}], "status": 200}, "key_function_filter": {"rows": [{"f": [{"v": "1"}]}], "status": 200}, "key_is_not_null": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}, "key_or_column_filter": {"message": "Cannot query over table '${project}.${dataset}.t' without a filter over column(s) 'k' that can be used for partition elimination", "reason": "invalidQuery", "status": 400}, "no_filter": {"message": "Cannot query over table '${project}.${dataset}.t' without a filter over column(s) 'k' that can be used for partition elimination", "reason": "invalidQuery", "status": 400}, "table_options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"NEWLINE_DELIMITED_JSON\""}]}, {"f": [{"v": "hive_partition_uri_prefix"}, {"v": "STRING"}, {"v": "\"${prefix}\""}]}, {"f": [{"v": "require_hive_partition_filter"}, {"v": "BOOL"}, {"v": "true"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/*\"]"}]}]}}
+  # require_hive_partition_filter = false, and a query without a filter.
+  - name: require_false
+    template: ddl
+    vars:
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      options: ", require_hive_partition_filter = false"
+    expect: {"create": {"status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # require_hive_partition_filter without hive partitioning.
+  - name: require_without_partitioning
+    template: ddl
+    vars:
+      p1: "a.json"
+      p2: "b.json"
+      partition: ""
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (x INT64) OPTIONS (format = 'JSON', uris = ['${prefix}/*'], require_hive_partition_filter = true)"
+    expect: {"create": {"status": 200}, "get": {"external": {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"name": "x", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"x\":1}"}, {"v": "${prefix}/a.json"}]}, {"f": [{"v": "{\"x\":2}"}, {"v": "${prefix}/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # AUTO with the file schema only.
+  - name: api_auto
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "AUTO", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/s=a/a.json"
+      p2: "k=2/s=b/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k", "s"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k", "s"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1,\"s\":\"a\"}"}, {"v": "${prefix}/k=1/s=a/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2,\"s\":\"b\"}"}, {"v": "${prefix}/k=2/s=b/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # STRINGS mode.
+  - name: api_strings
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "STRINGS", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/d=2024-01-02/a.json"
+      p2: "k=2/d=2024-01-03/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k", "d"], "mode": "STRINGS", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}, {"mode": "NULLABLE", "name": "d", "type": "STRING"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k", "d"], "mode": "STRINGS", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "STRING"}, {"mode": "NULLABLE", "name": "d", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": null}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":\"1\",\"d\":\"2024-01-02\"}"}, {"v": "${prefix}/k=1/d=2024-01-02/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":\"2\",\"d\":\"2024-01-03\"}"}, {"v": "${prefix}/k=2/d=2024-01-03/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # CUSTOM mode with the schema in the prefix.
+  - name: api_custom
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "CUSTOM", "sourceUriPrefix": "${prefix}/{k:INTEGER}/{s:STRING}"}}
+      p1: "k=1/s=a/a.json"
+      p2: "k=2/s=b/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k", "s"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/{k:INTEGER}/{s:STRING}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k", "s"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/{k:INTEGER}/{s:STRING}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64,\n  s STRING\n)\nWITH PARTITION COLUMNS (\n\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}/\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1,\"s\":\"a\"}"}, {"v": "${prefix}/k=1/s=a/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2,\"s\":\"b\"}"}, {"v": "${prefix}/k=2/s=b/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # CUSTOM mode with standard SQL type names and a DATE.
+  - name: api_custom_type_names
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "CUSTOM", "sourceUriPrefix": "${prefix}/{k:INT64}/{d:DATE}"}}
+      p1: "k=1/d=2024-01-02/a.json"
+      p2: "k=2/d=2024-01-03/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k", "d"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/{k:INT64}/{d:DATE}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k", "d"], "mode": "CUSTOM", "sourceUriPrefix": "${prefix}/{k:INT64}/{d:DATE}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64,\n  d DATE\n)\nWITH PARTITION COLUMNS (\n\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}/\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1,\"d\":\"2024-01-02\"}"}, {"v": "${prefix}/k=1/d=2024-01-02/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2,\"d\":\"2024-01-03\"}"}, {"v": "${prefix}/k=2/d=2024-01-03/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # CUSTOM mode with a prefix that encodes no schema.
+  - name: api_custom_without_schema
+    template: api_rejected
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "CUSTOM", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Prefix must contain a valid encoding of partition schema, with at least one partition key.  A proper example might be gs://bucket/table_name/{dt:DATE}/{country:STRING}.  Provided input: '${prefix}'."}}
+  # AUTO with a table schema that also lists the key.
+  - name: api_schema_with_keys
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "AUTO", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      table_schema: {"fields": [{"name": "x", "type": "INTEGER"}, {"name": "k", "type": "INTEGER"}]}
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # AUTO with a table schema that lists the key as a STRING.
+  - name: api_schema_with_key_type
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "AUTO", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      table_schema: {"fields": [{"name": "x", "type": "INTEGER"}, {"name": "k", "type": "STRING"}]}
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # AUTO without sourceUriPrefix.
+  - name: api_without_prefix
+    template: api_rejected
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "AUTO"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Hive partitioned queries require that the HivePartitioningOptions be set, with both a sourceUriPrefix and mode provided. No sourceUriPrefix was provided."}}
+  # sourceUriPrefix without a mode.
+  - name: api_without_mode
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": null}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # An empty hivePartitioningOptions.
+  - name: api_empty
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": null}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}
+  # An unknown mode.
+  - name: api_unknown_mode
+    template: api_rejected
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "OTHER", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Invalid value for hivePartitioning.mode: OTHER is not a valid value"}}
+  # A mode in lower case.
+  - name: api_lower_mode
+    template: api_rejected
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "auto", "sourceUriPrefix": "${prefix}"}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"status": 400, "reason": "invalid", "message": "Invalid value for hivePartitioning.mode: auto is not a valid value"}}
+  # requirePartitionFilter in hivePartitioningOptions.
+  - name: api_require_filter
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "AUTO", "sourceUriPrefix": "${prefix}", "requirePartitionFilter": true}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+      query: "SELECT x FROM `${project}.${dataset}.t` WHERE k = 1"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "requirePartitionFilter": true, "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "requirePartitionFilter": true, "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  require_hive_partition_filter=true,\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "1"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}}
+  # Output-only fields given on insert.
+  - name: api_fields
+    template: api
+    vars:
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"], "hivePartitioningOptions": {"mode": "AUTO", "sourceUriPrefix": "${prefix}", "fields": ["other"]}}
+      p1: "k=1/a.json"
+      p2: "k=2/b.json"
+    expect: {"create": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "get": {"external": {"hivePartitioningOptions": {"fields": ["k"], "mode": "AUTO", "sourceUriPrefix": "${prefix}"}, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/*"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "k", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  x INT64,\n  k INT64\n)\nWITH PARTITION COLUMNS\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  hive_partition_uri_prefix=\"${prefix}\",\n  uris=[\"${prefix}/*\"]\n);"}]}]}, "list": {}, "query": {"rows": [{"f": [{"v": "{\"x\":1,\"k\":1}"}, {"v": "${prefix}/k=1/a.json"}]}, {"f": [{"v": "{\"x\":2,\"k\":2}"}, {"v": "${prefix}/k=2/b.json"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "row", "type": "STRING"}, {"mode": "NULLABLE", "name": "file", "type": "STRING"}]}, "status": 200}}

@@ -347,7 +347,8 @@
       },
       {
         "name": "hive_partition_uri_prefix",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'gs://bucket'", "'gs://bucket/'"]
       },
       {
         "name": "file_set_spec_type",
@@ -407,7 +408,8 @@
       },
       {
         "name": "require_hive_partition_filter",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false"]
       },
       {
         "name": "sheet_range",
@@ -1907,7 +1909,7 @@
       "name": "CREATE EXTERNAL TABLE",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "exclude": ["format", "uris", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote"],
+      "exclude": ["format", "uris", "hive_partition_uri_prefix", "require_hive_partition_filter", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})"
     },
     {
@@ -1930,6 +1932,20 @@
       "group": "external_table_option_list",
       "only": ["uris"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', {option})"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE hive_partition_uri_prefix",
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "only": ["hive_partition_uri_prefix"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], {option})"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE require_hive_partition_filter",
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "only": ["require_hive_partition_filter"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], hive_partition_uri_prefix = 'gs://bucket', {option})"
     },
     {
       "name": "CREATE TABLE generated column",

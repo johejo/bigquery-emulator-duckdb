@@ -1788,13 +1788,31 @@ cc_library(
         ":file_read",
         ":file_read_options",
         ":gcs",
+        ":hive_partitioning",
         ":parquet_metadata",
         ":schema_detect",
+        ":schema_sql",
         ":statement_resources",
         ":table_metadata",
         ":temporary_files",
         ":unordered_map_order",
         "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "hive_partitioning",
+    srcs = ["src/hive_partitioning.cc"],
+    hdrs = ["src/hive_partitioning.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":schema_detect",
+        "@abseil-cpp//absl/strings",
+    ],
+    deps = [
+        ":field_schema",
+        ":table_metadata",
     ],
 )
 

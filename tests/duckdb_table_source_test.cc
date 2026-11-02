@@ -74,6 +74,12 @@ class StagedProvider : public ExternalTableProvider {
     return {};
   }
 
+  std::vector<FieldSchema> DetectPartitionKeys(const GcsExternalData& /*definition*/,
+                                               const std::vector<FieldSchema>& /*declared*/,
+                                               const std::string& /*table_id*/) override {
+    return {};
+  }
+
   absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& /*key*/,
                                                          const std::string& /*query*/,
                                                          const std::string& /*options*/,
