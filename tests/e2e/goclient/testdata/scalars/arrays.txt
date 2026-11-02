@@ -19,6 +19,55 @@ SELECT 8 >> 2
 SELECT CAST(NULL AS INT64) << 1
 => null
 
+# Bitwise operators on BYTES work byte by byte, and shifts move bits across the whole sequence
+# and keep its length, as third_party/bigquery_docs/reference/standard-sql/operators.md defines
+# them; the shifts are cases of GoogleSQL's compliance test data.
+SELECT TO_HEX(~b'\x01\x23\x45\x67\xef\xaa')
+=> "fedcba981055"
+
+SELECT TO_HEX(~b'')
+=> ""
+
+SELECT ~CAST(NULL AS BYTES)
+=> null
+
+SELECT TO_HEX(b'\x00\xff' & b'\xff\x00')
+=> "0000"
+
+SELECT TO_HEX(b'\x00\xff' | b'\xff\x00')
+=> "ffff"
+
+SELECT TO_HEX(b'\x00\xff' ^ b'\xff\x00')
+=> "ffff"
+
+SELECT TO_HEX(b'\xaa\xaa' ^ b'\xff\xaa')
+=> "5500"
+
+SELECT TO_HEX(b'' & b'')
+=> ""
+
+SELECT b'foo' & CAST(NULL AS BYTES)
+=> null
+
+# Binary operators on BYTES of different lengths fail.
+SELECT b'' | b'\xff'
+=> error:
+
+SELECT TO_HEX(b'\xfe\xdc\xba\x98\x76' << 17)
+=> "7530ec0000"
+
+SELECT TO_HEX(b'\xfe\xdc\xba\x98\x76' >> 1)
+=> "7f6e5d4c3b"
+
+SELECT TO_HEX(b'\xfe\xdc\xba\x98\x76' >> 41)
+=> "0000000000"
+
+SELECT b'foo' << CAST(NULL AS INT64)
+=> null
+
+SELECT b'foo' >> -1
+=> error:
+
 SELECT 1 IS DISTINCT FROM NULL
 => "true"
 

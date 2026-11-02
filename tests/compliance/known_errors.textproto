@@ -872,41 +872,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "Bitwise operators on BYTES are not translated"
-  label: "code:bAnd_BYTES_<>_BYTES_<>"
-  label: "code:bAnd_BYTES_<>_BYTES_<@xff>"
-  label: "code:bAnd_BYTES_<@x00>_BYTES_<@xff>"
-  label: "code:bAnd_BYTES_<@x00@xff>_BYTES_<@xff@x00>"
-  label: "code:bAnd_BYTES_<@x01#Eg@_RCPM0xUgGXE_@xdc@xba>_BYTES_<@x12@x34_liaFVU4Gzas_@xed@xcb>"
-  label: "code:bAnd_BYTES_<@xaa@xaa_oAF5vaTKOd4_@xaa@xaa>_BYTES_<UUUUU>"
-  label: "code:bAnd_BYTES_<foo>_BYTES_NULL"
-  label: "code:bAnd_BYTES_NULL_BYTES_<foo>"
-  label: "code:bNot_BYTES_<>"
-  label: "code:bNot_BYTES_<@x00>"
-  label: "code:bNot_BYTES_<@x01#Eg@_8esPlfPGU70_xefU@xaa>"
-  label: "code:bNot_BYTES_<@xfe@xdc_qE1tTH6QLCQ_x10@xaaU>"
-  label: "code:bNot_BYTES_<@xff>"
-  label: "code:bNot_BYTES_NULL"
-  label: "code:bOr_BYTES_<>_BYTES_<>"
-  label: "code:bOr_BYTES_<>_BYTES_<@xff>"
-  label: "code:bOr_BYTES_<@x00>_BYTES_<@xff>"
-  label: "code:bOr_BYTES_<@x00@xff>_BYTES_<@xff@x00>"
-  label: "code:bOr_BYTES_<@x01#Eg@_RCPM0xUgGXE_@xdc@xba>_BYTES_<@x12@x34_liaFVU4Gzas_@xed@xcb>"
-  label: "code:bOr_BYTES_<@xaa@xaa_oAF5vaTKOd4_@xaa@xaa>_BYTES_<UUUUU>"
-  label: "code:bOr_BYTES_<foo>_BYTES_NULL"
-  label: "code:bOr_BYTES_NULL_BYTES_<foo>"
-  label: "code:bXor_BYTES_<>_BYTES_<>"
-  label: "code:bXor_BYTES_<>_BYTES_<@xff>"
-  label: "code:bXor_BYTES_<@x00>_BYTES_<@xff>"
-  label: "code:bXor_BYTES_<@x00@xff>_BYTES_<@xff@x00>"
-  label: "code:bXor_BYTES_<@x01#Eg@_RCPM0xUgGXE_@xdc@xba>_BYTES_<@x12@x34_liaFVU4Gzas_@xed@xcb>"
-  label: "code:bXor_BYTES_<@xaa@xaa_oAF5vaTKOd4_@xaa@xaa>_BYTES_<UUUUU>"
-  label: "code:bXor_BYTES_<foo>_BYTES_NULL"
-  label: "code:bXor_BYTES_NULL_BYTES_<foo>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1e29"
 }

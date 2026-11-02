@@ -575,9 +575,15 @@ std::vector<Rule> ArrayAt(bool ordinal, bool safe) {
 }
 
 // DuckDB's integer shifts fail on overflow and extend the sign; BigQuery's drop the bits shifted
-// out and fill with zeros, which is what shifting a 64-bit BIT string does.
-std::vector<Rule> Shift(std::string_view op) {
+// out and fill with zeros, which is what shifting a 64-bit BIT string does. GoogleSQL's shift
+// BYTES.
+std::vector<Rule> Shift(std::string_view op, std::string_view bytes) {
   return {
+      {
+          .arity = 2,
+          .spelling = std::string(bytes) + "($1, $2)",
+          .conditions = {Is(1, {TYPE_BYTES})},
+      },
       {
           .arity = 2,
           .spelling = "CASE WHEN $2 < 0 THEN !1 WHEN $2 >= 64 THEN 0 ELSE CAST(CAST($1 AS BIT) " +
@@ -1099,10 +1105,27 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       Define("$IS_TRUE", {{.arity = 1, .spelling = "($1 IS TRUE)"}}),
       Define("$IS_FALSE", {{.arity = 1, .spelling = "($1 IS FALSE)"}}),
       Define("$NOT", {{.arity = 1, .spelling = "(NOT $1)"}}),
-      Define("$BITWISE_NOT", {{.arity = 1, .spelling = "(~$1)"}}),
-      Define("$BITWISE_AND", {{.arity = 2, .spelling = "($1 & $2)"}}),
-      Define("$BITWISE_OR", {{.arity = 2, .spelling = "($1 | $2)"}}),
-      Define("$BITWISE_XOR", {{.arity = 2, .spelling = "xor($1, $2)"}}),
+      // DuckDB has no bitwise operators on BLOBs, so GoogleSQL's implement those on BYTES.
+      Define("$BITWISE_NOT",
+             {
+                 {.arity = 1, .spelling = "bq_bitwise_not_bytes($1)", .conditions = kBytes},
+                 {.arity = 1, .spelling = "(~$1)"},
+             }),
+      Define("$BITWISE_AND",
+             {
+                 {.arity = 2, .spelling = "bq_bitwise_and_bytes($1, $2)", .conditions = kBytes},
+                 {.arity = 2, .spelling = "($1 & $2)"},
+             }),
+      Define("$BITWISE_OR",
+             {
+                 {.arity = 2, .spelling = "bq_bitwise_or_bytes($1, $2)", .conditions = kBytes},
+                 {.arity = 2, .spelling = "($1 | $2)"},
+             }),
+      Define("$BITWISE_XOR",
+             {
+                 {.arity = 2, .spelling = "bq_bitwise_xor_bytes($1, $2)", .conditions = kBytes},
+                 {.arity = 2, .spelling = "xor($1, $2)"},
+             }),
 
       // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL
       // array.
@@ -1656,8 +1679,8 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
                   },
           },
       },
-      {"$BITWISE_LEFT_SHIFT", {.rules = Shift("<<")}},
-      {"$BITWISE_RIGHT_SHIFT", {.rules = Shift(">>")}},
+      {"$BITWISE_LEFT_SHIFT", {.rules = Shift("<<", "bq_bitwise_left_shift_bytes")}},
+      {"$BITWISE_RIGHT_SHIFT", {.rules = Shift(">>", "bq_bitwise_right_shift_bytes")}},
       {
           "$ARRAY_AT_OFFSET",
           {
