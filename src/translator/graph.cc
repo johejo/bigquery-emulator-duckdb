@@ -354,7 +354,7 @@ std::optional<Relation> FlatGraphPath(
   for (size_t i = 0; i < input.size(); ++i) {
     if (input.size() % 2 == 0 ||
         input.at(i)->Is<googlesql::ResolvedGraphEdgeScan>() != (i % 2 == 1)) {
-      return Unsupported(scope, "graph paths with adjacent node or edge patterns");
+      return Unsupported(scope, "graph paths with adjacent edge patterns");
     }
   }
   // Choose edge tables first so their endpoint references narrow the node branches.
@@ -719,13 +719,17 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
     path_type = path.path()->column().type()->AsGraphPath();
   }
   std::vector<const googlesql::ResolvedGraphElementScan*> elements;
-  for (const auto& part : path.input_scan_list()) {
-    if (part->Is<googlesql::ResolvedGraphElementScan>()) {
-      elements.push_back(part->GetAs<googlesql::ResolvedGraphElementScan>());
+  bool alternating = path.input_scan_list().size() % 2 == 1;
+  for (size_t i = 0; i < path.input_scan_list().size(); ++i) {
+    const auto& part = *path.input_scan_list().at(i);
+    if (part.Is<googlesql::ResolvedGraphElementScan>()) {
+      elements.push_back(part.GetAs<googlesql::ResolvedGraphElementScan>());
     }
+    alternating = alternating && part.Is<googlesql::ResolvedGraphEdgeScan>() == (i % 2 == 1);
   }
   std::optional<Relation> result;
-  if (elements.size() == path.input_scan_list().size()) {
+  // Adjacent node patterns bind the same node, so they compose by identity like subpaths.
+  if (elements.size() == path.input_scan_list().size() && alternating) {
     result = FlatGraphPath(elements, path_type, scope);
   } else {
     // Compose subpaths and element patterns by identity. An edge gets its own
@@ -739,7 +743,9 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
       } else if (part.Is<googlesql::ResolvedGraphNodeScan>()) {
         piece = FlatGraphPath({part.GetAs<googlesql::ResolvedGraphNodeScan>()}, path_type, scope);
       } else if (part.Is<googlesql::ResolvedGraphEdgeScan>() && i > 0 &&
-                 i + 1 < path.input_scan_list().size()) {
+                 i + 1 < path.input_scan_list().size() &&
+                 !path.input_scan_list().at(i - 1)->Is<googlesql::ResolvedGraphEdgeScan>() &&
+                 !path.input_scan_list().at(i + 1)->Is<googlesql::ResolvedGraphEdgeScan>()) {
         auto left = BoundaryNode(*path.input_scan_list().at(i - 1), false, scope);
         auto right = BoundaryNode(*path.input_scan_list().at(i + 1), true, scope);
         piece =

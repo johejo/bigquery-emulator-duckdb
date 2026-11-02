@@ -99,3 +99,23 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((x:Person)-[e:Owns]-
 => "4"
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ((x:Person)-[e:Knows]->(y:Person)){0,1}(a:Account) RETURN PATH_FIRST(p).kind AS result)
 => "checking"
+
+# A node pattern before or after a quantified subpath binds the same node as the subpath's
+# endpoint in each repetition, and the subpath's own endpoint when it repeats zero times.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (a:Account)(()-[t:Transfers]->()){1,2}(b:Account) RETURN COUNT(*) AS result)
+=> "12"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1)((x:Person)-[e:Knows]->(y:Person)){1,2}(b:Person WHERE b.id = 2) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1)((x:Person)-[e:Knows]->(y:Person)){1,2}(a) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)((x:Person)-[e:Knows]->(y:Person)){1,2}(b:Person)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "24"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)((x:Person)-[e:Owns]->(y:Account)){0,1}(b:Account) RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Reader)((x:Author)-[e:Knows]->(y:Reader)){1} RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author)((x:Author)-[e:Knows]->(y:Reader)){1}(b:Author) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author)((x:Author)-[e:Knows]->(y:Reader)){1}(b:Reader) RETURN COUNT(*) AS result)
+=> "4"

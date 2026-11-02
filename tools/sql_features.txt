@@ -52,6 +52,8 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = ACYCLIC (a:Person)-[
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->{1,2}(b:Person) RETURN a.name)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->{0,2}(b:Person) RETURN a.id, ARRAY_LENGTH(e) AS hops)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH ((a:Person)-[e:Knows]->(b:Person)){1,2} RETURN ARRAY_LENGTH(e) AS hops)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)(b:Person)-[:Knows]->(c:Person) RETURN a.name, c.id)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person WHERE a.id = 1)((x:Person)-[e:Knows]->(y:Person)){0,2}(b:Person) RETURN b.id, ARRAY_LENGTH(e) AS hops)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = (a:Person)-[:Knows]->{1,2}(b:Person) RETURN PATH_LENGTH(p) AS hops)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH TRAIL (a:Person)-[:Knows]-{1,2}(b:Person) RETURN a.id)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH ANY SHORTEST (a:Person)-[:Knows]->{1,2}(b:Person) RETURN a.id)

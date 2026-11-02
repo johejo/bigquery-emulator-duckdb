@@ -469,7 +469,6 @@ Graph DDL rejects:
 `GRAPH_TABLE` and GQL queries reject:
 
 - Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.
-- Adjacent node patterns, such as `(a)(b)`.
 - GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
   `COLUMNS` clause.
 - Graph elements or paths in query results.
