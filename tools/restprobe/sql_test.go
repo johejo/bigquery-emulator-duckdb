@@ -17,6 +17,19 @@ func TestClassifyDisabledSyntax(t *testing.T) {
 	}
 }
 
+func TestClassifyMissingTVF(t *testing.T) {
+	t.Parallel()
+	for _, message := range []string{
+		"INVALID_ARGUMENT: Table-valued function not found: GRAPH_EXPAND [at 1:15]",
+		"Table-valued function not found: GRAPH_EXPAND [at 1:92]",
+	} {
+		got := classify("probe", message)
+		if got.Outcome != probereport.Unsupported || got.Detail != "GRAPH_EXPAND" {
+			t.Errorf("classify(%q) = %+v", message, got)
+		}
+	}
+}
+
 func TestClassifyInvalidProbe(t *testing.T) {
 	t.Parallel()
 	for _, message := range []string{
