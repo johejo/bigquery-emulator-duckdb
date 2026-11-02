@@ -62,7 +62,8 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
     ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_LIST));
     FieldSchema item = field;
     item.name = "item";
-    item.mode = FieldMode::kRequired;
+    // BigQuery declares items nullable, although an ARRAY holds no NULL elements.
+    item.mode = FieldMode::kNullable;
     ArrowField(out->children[0], item, arrow);
     if (arrow && field.type == FieldType::kGeography) {
       // BigQuery marks the list rather than its items.

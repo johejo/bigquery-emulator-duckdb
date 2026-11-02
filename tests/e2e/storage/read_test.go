@@ -459,9 +459,30 @@ func TestReadAvroJSONAndGeography(t *testing.T) {
 	}
 }
 
+// BigQuery was observed to declare the items of every ARRAY nullable in Arrow schemas.
+func TestReadArrowArrayItemsNullable(t *testing.T) {
+	t.Parallel()
+	rest, read, _ := clients(t)
+	path := table(t, rest, "storage_read_arrow_array_items", `i ARRAY<INT64>, s ARRAY<STRING>, b ARRAY<BYTES>,
+		n ARRAY<NUMERIC>, bn ARRAY<BIGNUMERIC>, d ARRAY<DATE>, ts ARRAY<TIMESTAMP>, r ARRAY<STRUCT<a INT64>>,
+		rd ARRAY<RANGE<DATE>>`)
+	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
+	reader, err := ipc.NewReader(bytes.NewReader(s.GetArrowSchema().SerializedSchema))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Release()
+	for _, field := range reader.Schema().Fields() {
+		if field.Nullable || !field.Type.(*arrow.ListType).ElemField().Nullable {
+			t.Fatalf("%s: %v", field.Name, field)
+		}
+	}
+}
+
 // Arrow represents GEOGRAPHY as Utf8 WKT: third_party/bigquery_docs/reference/storage.md
 // The reference says only that field metadata indicates the original type; BigQuery was observed
-// to mark the field, or the list of an ARRAY rather than its items, as this extension type.
+// to mark the field, or the list of an ARRAY rather than its items, as this extension type, and
+// to declare the items nullable.
 func TestReadArrowGeography(t *testing.T) {
 	t.Parallel()
 	rest, read, _ := clients(t)
@@ -485,7 +506,7 @@ func TestReadArrowGeography(t *testing.T) {
 	item := fields[2].Type.(*arrow.ListType).ElemField()
 	nested := fields[3].Type.(*arrow.StructType).Field(0)
 	if !fields[1].Metadata.Equal(geography) || !fields[2].Metadata.Equal(geography) ||
-		item.Metadata.Len() != 0 || fields[3].Metadata.Len() != 0 || !nested.Metadata.Equal(geography) {
+		item.Metadata.Len() != 0 || !item.Nullable || fields[3].Metadata.Len() != 0 || !nested.Metadata.Equal(geography) {
 		t.Fatalf("schema = %v", reader.Schema())
 	}
 	got := map[int64][]string{}
