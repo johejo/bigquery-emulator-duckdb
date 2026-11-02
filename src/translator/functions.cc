@@ -1,5 +1,6 @@
 #include "src/translator/functions.h"
 
+#include <algorithm>
 #include <array>
 #include <span>
 #include <string_view>
@@ -442,7 +443,19 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                         });
   }
   for (const auto& [name, definition] : Aggregates()) {
-    functions.AddAggregates(name, definition, Translation::kAggregate);
+    auto selected = definition;
+    if ((name == "APPROX_TOP_COUNT" || name == "APPROX_TOP_SUM") &&
+        !functions.restrictions().approx_top_scalar_values_only) {
+      // GoogleSQL takes STRUCT and ARRAY values, whose rejections come last.
+      const auto nested =
+          std::ranges::find_if(selected.type_rejections, [](const TypeRejection& rejection) {
+            return rejection.types.front() == googlesql::TYPE_STRUCT ||
+                   rejection.types.front() == googlesql::TYPE_ARRAY;
+          });
+      selected.type_rejections =
+          selected.type_rejections.first(nested - selected.type_rejections.begin());
+    }
+    functions.AddAggregates(name, selected, Translation::kAggregate);
   }
   for (const auto& [name, definition] : Analytics()) {
     functions.AddAggregates(name, definition, Translation::kAnalytic);
