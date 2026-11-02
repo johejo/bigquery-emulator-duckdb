@@ -31,9 +31,10 @@ std::string IntervalKey(const std::string& sql);
 // are.
 std::string IntervalKey(const googlesql::Type* type, const std::string& sql);
 
-// ORDER BY items, with BigQuery's default NULL ordering spelled out.
+// ORDER BY items, with BigQuery's default NULL ordering spelled out. `range_frame` marks the
+// items that order a RANGE window frame.
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,
-    const Scope& scope, const Columns& columns);
+    const Scope& scope, const Columns& columns, bool range_frame = false);
 
 }  // namespace bigquery_emulator_duckdb::translator

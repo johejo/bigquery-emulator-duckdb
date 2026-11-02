@@ -380,7 +380,7 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
 }
 
 std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item, const Scope& scope,
-                                     const Columns& columns) {
+                                     const Columns& columns, bool range_frame) {
   // BigQuery has no ORDER BY ... COLLATE clause, which the analyzer's options leave off.
   if (item.collation_name() != nullptr) {
     return Unsupported(scope, "ORDER BY with COLLATE");
@@ -395,6 +395,11 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
   }
   if (item.column_ref()->type()->IsInterval()) {
     column = IntervalKey(*column);
+  }
+  // DuckDB adds a RANGE frame's offsets to the key in the key's type, which overflows near
+  // INT64's limits, where BigQuery's frames reach past them.
+  if (range_frame && item.column_ref()->type()->IsInt64()) {
+    column = "CAST(" + *column + " AS HUGEINT)";
   }
   column = CollationKey(*column, *collation, item.column_ref()->type());
   // BigQuery sorts NULL first for ASC and last for DESC, unlike DuckDB's ASC default.
@@ -658,14 +663,14 @@ std::string IntervalKey(const googlesql::Type* type, const std::string& sql) {
 
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,
-    const Scope& scope, const Columns& columns) {
+    const Scope& scope, const Columns& columns, bool range_frame) {
   std::vector<std::string> sql;
   for (const auto& item : items) {
     const googlesql::Type* type = item->column_ref()->type();
     if (HasInterval(type) && !type->IsInterval()) {
       return Unsupported(scope, "ORDER BY with INTERVAL");
     }
-    const auto order = OrderItem(*item, scope, columns);
+    const auto order = OrderItem(*item, scope, columns, range_frame);
     if (!order) {
       return std::nullopt;
     }
