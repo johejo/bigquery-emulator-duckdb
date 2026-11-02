@@ -869,7 +869,6 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR
   reason: "AVG over windows overflows on large NUMERIC values, and differs on frames with extreme offsets or special values"
-  label: "analytic_avg_test:analytic_avg_range_preceding_preceding_5"
   label: "analytic_avg_test:analytic_moving_avg_numeric_no_overflow_1"
   label: "analytic_avg_test:analytic_moving_avg_numeric_no_overflow_2"
   label: "analytic_avg_test:analytic_moving_avg_numeric_no_overflow_3"
@@ -1033,6 +1032,10 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "ORDER BY of FLOAT64 does not order NaN and infinities as BigQuery does"
+  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_0"
+  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_1"
+  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_asc"
+  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_desc"
   label: "orderby_queries_test:orderby_duplicates_single_base_column_double_asc"
   label: "orderby_queries_test:orderby_duplicates_single_base_column_double_desc"
 }
@@ -1081,42 +1084,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "RANGE window frames overflow INT64 near the type's limits, and infinite and NULL offsets are not handled as BigQuery does"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_1"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_10"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_12"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_13"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_14"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_15"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_16"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_17"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_3"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_4"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_5"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_6"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_7"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_8"
-  label: "analytic_window_frames_test:range_window_asc_with_special_values_underflow"
-  label: "analytic_window_frames_test:range_window_asc_without_special_values_18"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_1"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_10"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_12"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_13"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_14"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_15"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_16"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_17"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_3"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_4"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_5"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_6"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_7"
-  label: "analytic_window_frames_test:range_window_desc_with_special_values_8"
-  label: "analytic_window_frames_test:range_window_desc_without_special_values_18"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "RANGE window frames overflow INT64 near the type's limits, and infinite and NULL offsets are not handled as BigQuery does"
   label: "analytic_window_frames_test:range_window_inf_offset_11"
@@ -1129,16 +1096,6 @@ known_errors {
   label: "analytic_window_frames_test:range_window_null_offset_2"
   label: "analytic_window_frames_test:range_window_null_offset_3"
   label: "analytic_window_frames_test:range_window_null_offset_4"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "RANGE window frames overflow INT64 when an offset reaches the type's limit"
-  label: "analytic_count_test:analytic_count_over_range_between_preceding_and_following_with_large_offsets_asc"
-  label: "analytic_count_test:analytic_count_over_range_between_preceding_and_following_with_large_offsets_desc"
-  label: "analytic_count_test:analytic_count_range_4"
-  label: "analytic_count_test:analytic_count_range_current_row_and_offset_following_asc"
-  label: "analytic_count_test:analytic_count_star_4"
 }
 
 known_errors {
@@ -1158,6 +1115,7 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR
   reason: "SUM and AVG over NUMERIC overflow on sums BigQuery computes, or lose precision"
+  label: "analytic_sum_test:analytic_moving_sum_numeric_no_overflow_1"
   label: "numeric_aggregation_queries_test:numeric_avg_large"
   label: "numeric_aggregation_queries_test:numeric_sum_large"
 }
@@ -1167,30 +1125,6 @@ known_errors {
   reason: "SUM and AVG over NUMERIC overflow on sums BigQuery computes, or lose precision"
   label: "numeric_aggregation_queries_test:numeric_avg_overflow_1"
   label: "numeric_aggregation_queries_test:numeric_avg_overflow_2"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "SUM over RANGE window frames differs at INT64 and NUMERIC limits and on floating-point overflow"
-  label: "analytic_sum_test:analytic_moving_sum_numeric_no_overflow_1"
-  label: "analytic_sum_test:analytic_sum_range_current_and_following_order_by_int64_asc"
-  label: "analytic_sum_test:analytic_sum_range_current_and_following_order_by_int64_desc"
-  label: "analytic_sum_test:analytic_sum_range_following_and_following_large_offsets_1"
-  label: "analytic_sum_test:analytic_sum_range_preceding_and_following_1"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_2"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_3"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_int64_asc"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_int64_desc"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "SUM over RANGE window frames differs at INT64 and NUMERIC limits and on floating-point overflow"
-  label: "analytic_sum_test:analytic_sum_double_overflow_3"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_0"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_1"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_asc"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_desc"
 }
 
 known_errors {
@@ -1221,7 +1155,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 averages and statistics in long double, and the emulator's results differ from it"
+  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 sums, averages and statistics in long double, and the emulator's results differ from it"
+  label: "analytic_sum_test:analytic_sum_double_overflow_3"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params_2"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_stddev_samp_double_extreme"

@@ -397,7 +397,9 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     if (!ordering->hint_list().empty()) {
       return std::nullopt;
     }
-    const auto order = OrderItems(ordering->order_by_item_list(), scope, columns);
+    const auto order = OrderItems(
+        ordering->order_by_item_list(), scope, columns,
+        frame != nullptr && frame->frame_unit() == googlesql::ResolvedWindowFrame::RANGE);
     if (!order) {
       return std::nullopt;
     }
