@@ -381,7 +381,7 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
 }
 
 std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item, const Scope& scope,
-                                     const Columns& columns, bool range_frame) {
+                                     const Columns& columns, bool offset_range_frame) {
   // BigQuery has no ORDER BY ... COLLATE clause, which the analyzer's options leave off.
   if (item.collation_name() != nullptr) {
     return Unsupported(scope, "ORDER BY with COLLATE");
@@ -399,7 +399,7 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
   }
   // DuckDB adds a RANGE frame's offsets to the key in the key's type, which overflows near
   // INT64's limits, where BigQuery's frames reach past them.
-  if (range_frame && item.column_ref()->type()->IsInt64()) {
+  if (offset_range_frame && item.column_ref()->type()->IsInt64()) {
     column = "CAST(" + *column + " AS HUGEINT)";
   }
   column = CollationKey(*column, *collation, item.column_ref()->type());
@@ -408,8 +408,15 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
       item.null_order() == googlesql::ResolvedOrderByItem::NULLS_FIRST ||
       (item.null_order() == googlesql::ResolvedOrderByItem::ORDER_UNSPECIFIED &&
        !item.is_descending());
-  return *column + (item.is_descending() ? " DESC" : " ASC") +
-         (nulls_first ? " NULLS FIRST" : " NULLS LAST");
+  const std::string nulls = nulls_first ? " NULLS FIRST" : " NULLS LAST";
+  std::string order = *column + (item.is_descending() ? " DESC" : " ASC") + nulls;
+  // BigQuery sorts NaN below -inf, where DuckDB sorts it above +inf. A RANGE frame with an offset
+  // takes a single key, so its NaN rows still sort last.
+  if (item.column_ref()->type()->IsFloatingPoint() && !offset_range_frame) {
+    order =
+        "isnan(" + *column + ")" + (item.is_descending() ? " ASC" : " DESC") + nulls + ", " + order;
+  }
+  return order;
 }
 
 }  // namespace
@@ -667,14 +674,14 @@ std::string IntervalKey(const googlesql::Type* type, const std::string& sql) {
 
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,
-    const Scope& scope, const Columns& columns, bool range_frame) {
+    const Scope& scope, const Columns& columns, bool offset_range_frame) {
   std::vector<std::string> sql;
   for (const auto& item : items) {
     const googlesql::Type* type = item->column_ref()->type();
     if (HasInterval(type) && !type->IsInterval()) {
       return Unsupported(scope, "ORDER BY with INTERVAL");
     }
-    const auto order = OrderItem(*item, scope, columns, range_frame);
+    const auto order = OrderItem(*item, scope, columns, offset_range_frame);
     if (!order) {
       return std::nullopt;
     }
