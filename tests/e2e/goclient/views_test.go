@@ -17,11 +17,7 @@ func TestViewLifecycle(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_views")
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_views")
 	view := dataset.Table("v")
 	definition := "SELECT 7 AS id, STRUCT('x' AS name, [1, 2] AS tags) AS nested"
 	before := time.Now().Truncate(time.Millisecond)
@@ -120,12 +116,7 @@ func TestViewStatements(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_view_statements")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_view_statements")
 	mustRun := func(sql string) {
 		t.Helper()
 		if _, _, err := runScript(t, client, "", sql); err != nil {
@@ -139,15 +130,10 @@ func TestViewStatements(t *testing.T) {
 			t.Fatalf("%s: %v", sql, err)
 		}
 		var result []bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err == iterator.Done {
-				return result
-			} else if err != nil {
-				t.Fatalf("%s: %v", sql, err)
-			}
+		for _, row := range readRows(t, rows) {
 			result = append(result, row...)
 		}
+		return result
 	}
 	metadata := func(name string) *bigquery.TableMetadata {
 		t.Helper()
@@ -156,16 +142,6 @@ func TestViewStatements(t *testing.T) {
 			t.Fatal(err)
 		}
 		return metadata
-	}
-	wait := func(job *bigquery.Job, err error) error {
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
 	}
 	wantError := func(operation string, err error, want string) {
 		t.Helper()
@@ -251,9 +227,9 @@ func TestViewStatements(t *testing.T) {
 	destination := client.Query("SELECT 99 AS id")
 	destination.Dst = dataset.Table("v")
 	destination.WriteDisposition = bigquery.WriteTruncate
-	wantError("query to a view", wait(destination.Run(ctx)), "Cannot write to a view")
+	wantError("query to a view", wait(ctx, destination), "Cannot write to a view")
 	copier := dataset.Table("copy").CopierFrom(dataset.Table("v"))
-	wantError("copy from a view", wait(copier.Run(ctx)), "Cannot copy a view")
+	wantError("copy from a view", wait(ctx, copier), "Cannot copy a view")
 	var row []bigquery.Value
 	if err := dataset.Table("v").Read(ctx).Next(&row); err == nil {
 		t.Error("tabledata.list read a view")

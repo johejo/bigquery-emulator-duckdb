@@ -14,46 +14,9 @@ func TestOmittedRepeatedColumnsAreEmpty(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_repeated_default")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		if err := status.Err(); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
-	lengths := func(sql string) [][]bigquery.Value {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		var result [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err != nil {
-				break
-			}
-			result = append(result, row)
-		}
-		return result
-	}
+	dataset := newDataset(t, client, "go_repeated_default")
+	queries := datasetQueries{t, client, dataset}
+	run, lengths := queries.mustRun, queries.read
 
 	if err := dataset.Table("api").Create(ctx, &bigquery.TableMetadata{Schema: bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
@@ -68,12 +31,8 @@ func TestOmittedRepeatedColumnsAreEmpty(t *testing.T) {
 	run("CREATE TABLE ctas AS SELECT 0 AS id, ['a'] AS tags, [STRUCT('b' AS sku)] AS items")
 	destination := client.Query("SELECT 0 AS id, ['a'] AS tags, [STRUCT('b' AS sku)] AS items")
 	destination.Dst = dataset.Table("destination")
-	job, err := destination.Run(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status, err := job.Wait(ctx); err != nil || status.Err() != nil {
-		t.Fatalf("destination: %v %v", err, status.Err())
+	if err := wait(ctx, destination); err != nil {
+		t.Fatalf("destination: %v", err)
 	}
 	for _, table := range []string{"api", "ddl", "ctas", "destination"} {
 		run("INSERT " + table + " (id) VALUES (1)")

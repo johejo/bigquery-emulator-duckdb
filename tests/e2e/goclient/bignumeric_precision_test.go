@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
-	"google.golang.org/api/iterator"
 )
 
 // A BIGNUMERIC(P, S) column rounds what is written to it half away from zero to S fractional
@@ -18,54 +17,18 @@ func TestBigNumericPrecisionAndScale(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_precision")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
-	mustRun := func(sql string) {
-		t.Helper()
-		if err := run(sql); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
+	dataset := newDataset(t, client, "go_bignumeric_precision")
+	queries := datasetQueries{t, client, dataset}
+	run, mustRun := queries.run, queries.mustRun
 	// The values of the query's single column as text.
 	values := func(sql string) []string {
 		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
 		var got []string
-		for {
-			var row []bigquery.Value
-			err := rows.Next(&row)
-			if err == iterator.Done {
-				return got
-			}
-			if err != nil {
-				t.Fatalf("%s: %v", sql, err)
-			}
+		for _, row := range queries.read(sql) {
 			text, _ := row[0].(string)
 			got = append(got, text)
 		}
+		return got
 	}
 	check := func(sql string, want ...string) {
 		t.Helper()
@@ -139,12 +102,8 @@ func TestBigNumericPrecisionAndScale(t *testing.T) {
 	}
 	source := bigquery.NewReaderSource(strings.NewReader("{\"n\": -1.125}\n"))
 	source.SourceFormat = bigquery.JSON
-	job, err := api.LoaderFrom(source).Run(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status, err := job.Wait(ctx); err != nil || status.Err() != nil {
-		t.Fatalf("load: %v %v", err, status.Err())
+	if err := wait(ctx, api.LoaderFrom(source)); err != nil {
+		t.Fatalf("load: %v", err)
 	}
 	check("SELECT CAST(n AS STRING) FROM api ORDER BY n",
 		"-1.13", "12345678901234567890123456789012345678.13")

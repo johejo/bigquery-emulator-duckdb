@@ -14,12 +14,7 @@ func TestSqlProcedureMetadata(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_procedures")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_procedures")
 	run := func(sql string) *bigquery.JobStatus {
 		t.Helper()
 		_, status, err := runScript(t, client, "", sql)
@@ -81,12 +76,7 @@ func TestCallWithQueryParameters(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_procedure_parameters")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	newDataset(t, client, "go_procedure_parameters")
 	if _, _, err := runScript(t, client, "", `CREATE PROCEDURE go_procedure_parameters.p()
         OPTIONS(strict_mode=FALSE) BEGIN SELECT 1; END`); err != nil {
 		t.Fatal(err)

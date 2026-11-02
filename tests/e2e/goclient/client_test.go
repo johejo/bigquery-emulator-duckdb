@@ -48,15 +48,7 @@ func TestDatasetTableAndRows(t *testing.T) {
 		{Name: "name", Value: "alice"},
 		{Name: "created", Value: created},
 	}
-	job, err := insert.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		t.Fatalf("Wait: %v", err)
-	}
-	if err := status.Err(); err != nil {
+	if err := wait(ctx, insert); err != nil {
 		t.Fatalf("insert job: %v", err)
 	}
 

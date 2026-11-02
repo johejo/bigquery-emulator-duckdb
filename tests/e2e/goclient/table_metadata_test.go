@@ -16,25 +16,8 @@ func TestTableMetadata(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_metadata")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
+	dataset := newDataset(t, client, "go_table_metadata")
+	run := (datasetQueries{t, client, dataset}).run
 	type metadata struct {
 		Description, Name string
 		Labels            map[string]string
@@ -124,25 +107,8 @@ func TestTablePartitioning(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_partitioning")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
+	dataset := newDataset(t, client, "go_table_partitioning")
+	run := (datasetQueries{t, client, dataset}).run
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
 		{Name: "day", Type: bigquery.DateFieldType},

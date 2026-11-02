@@ -17,28 +17,8 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_schema")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		if err := status.Err(); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
+	dataset := newDataset(t, client, "go_table_schema")
+	run := (datasetQueries{t, client, dataset}).mustRun
 	schemaOf := func(table string) bigquery.Schema {
 		t.Helper()
 		metadata, err := dataset.Table(table).Metadata(ctx)
@@ -135,24 +115,16 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 
 	// Copies and query results written to a table keep the schema too.
 	copier := dataset.Table("copied").CopierFrom(dataset.Table("api"))
-	job, err := copier.Run(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status, err := job.Wait(ctx); err != nil || status.Err() != nil {
-		t.Fatalf("copy: %v %v", err, status.Err())
+	if err := wait(ctx, copier); err != nil {
+		t.Fatalf("copy: %v", err)
 	}
 	if got := schemaOf("copied"); !reflect.DeepEqual(got, created) {
 		t.Errorf("copy: got schema\n%v\nwant\n%v", fields(got), fields(created))
 	}
 	query := client.Query("SELECT doc FROM go_table_schema.ddl")
 	query.Dst = dataset.Table("written")
-	job, err = query.Run(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status, err := job.Wait(ctx); err != nil || status.Err() != nil {
-		t.Fatalf("destination: %v %v", err, status.Err())
+	if err := wait(ctx, query); err != nil {
+		t.Fatalf("destination: %v", err)
 	}
 	if got := schemaOf("written"); len(got) != 1 || got[0].Type != bigquery.JSONFieldType {
 		t.Errorf("destination table: got schema %v, want a JSON column", fields(got))
@@ -166,26 +138,8 @@ func TestTablesInsertAppliesPrecisionAndScale(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_precision")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
+	dataset := newDataset(t, client, "go_table_precision")
+	run := (datasetQueries{t, client, dataset}).run
 
 	schema := bigquery.Schema{
 		{Name: "price", Type: bigquery.NumericFieldType, Precision: 5, Scale: 2},
@@ -242,12 +196,7 @@ func TestTableSchemasRejectFieldNamesDifferingInCase(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_schema_case")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_table_schema_case")
 
 	a := &bigquery.FieldSchema{Name: "a", Type: bigquery.StringFieldType}
 	upperA := &bigquery.FieldSchema{Name: "A", Type: bigquery.IntegerFieldType}

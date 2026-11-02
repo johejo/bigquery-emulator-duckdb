@@ -21,25 +21,8 @@ func TestCreateTableLike(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_create_table_like")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
+	dataset := newDataset(t, client, "go_create_table_like")
+	run := (datasetQueries{t, client, dataset}).run
 	for _, sql := range []string{
 		`CREATE TABLE source (
 		   id INT64 NOT NULL OPTIONS (description = 'key'),

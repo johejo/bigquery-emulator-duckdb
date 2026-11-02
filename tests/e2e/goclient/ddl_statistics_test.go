@@ -1,7 +1,6 @@
 package goclient
 
 import (
-	"context"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -9,14 +8,8 @@ import (
 
 func TestJobStatisticsDescribeTheStatement(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_statement_type")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_statement_type")
 
 	for _, tc := range []struct {
 		sql           string
@@ -36,17 +29,8 @@ func TestJobStatisticsDescribeTheStatement(t *testing.T) {
 		{"DROP VIEW v", "DROP_VIEW", "v"},
 		{"DROP TABLE u", "DROP_TABLE", "u"},
 	} {
-		query := client.Query(tc.sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
+		_, status, err := runScript(t, client, dataset.DatasetID, tc.sql)
 		if err != nil {
-			t.Fatalf("%s: %v", tc.sql, err)
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", tc.sql, err)
-		}
-		if err := status.Err(); err != nil {
 			t.Fatalf("%s: %v", tc.sql, err)
 		}
 		statistics := status.Statistics.Details.(*bigquery.QueryStatistics)

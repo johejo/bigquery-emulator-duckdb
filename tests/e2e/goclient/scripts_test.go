@@ -15,12 +15,7 @@ func TestMultiStatementQueryReturnsItsLastResult(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_scripts")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_scripts")
 
 	job, status, err := runScript(t, client, dataset.DatasetID, `
 DECLARE n INT64 DEFAULT 3;
@@ -62,14 +57,7 @@ func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
 	client := newClient(t)
 	query := client.Query(`SELECT @p; EXECUTE IMMEDIATE "SELECT @p"`)
 	query.Parameters = []bigquery.QueryParameter{{Name: "p", Value: int64(1)}}
-	job, err := query.Run(ctx)
-	if err == nil {
-		var status *bigquery.JobStatus
-		if status, err = job.Wait(ctx); err == nil {
-			err = status.Err()
-		}
-	}
-	if err == nil {
+	if err := wait(ctx, query); err == nil {
 		t.Error("EXECUTE IMMEDIATE read a query parameter of the request")
 	}
 }
@@ -91,14 +79,7 @@ func TestMultiStatementQueryRejectsJobOptionsOfASingleStatement(t *testing.T) {
 
 	destination := client.Query("SELECT 1; SELECT 2")
 	destination.Dst = client.Dataset("go_scripts_destination").Table("t")
-	job, err = destination.Run(ctx)
-	if err == nil {
-		var status *bigquery.JobStatus
-		if status, err = job.Wait(ctx); err == nil {
-			err = status.Err()
-		}
-	}
-	if err == nil || !strings.Contains(err.Error(), "multi-statement") {
+	if err := wait(ctx, destination); err == nil || !strings.Contains(err.Error(), "multi-statement") {
 		t.Errorf("got %v, want a multi-statement query to have no destination table", err)
 	}
 }
@@ -123,12 +104,7 @@ func TestTemporaryTablesLastForTheirMultiStatementQuery(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_temporary_tables")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_temporary_tables")
 	if _, _, err := runScript(t, client, dataset.DatasetID,
 		"CREATE TABLE t AS SELECT 1 AS a"); err != nil {
 		t.Fatal(err)
@@ -239,12 +215,7 @@ func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_transactions")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_transactions")
 	if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE t AS SELECT 1 AS x"); err != nil {
 		t.Fatal(err)
 	}
@@ -292,12 +263,7 @@ func TestTransactionsLeaveExpirationToOtherQueries(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_transaction_expiration")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_transaction_expiration")
 	if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE t (x INT64)"); err != nil {
 		t.Fatal(err)
 	}

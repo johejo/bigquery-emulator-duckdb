@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"google.golang.org/api/iterator"
 )
 
 // FOR SYSTEM_TIME AS OF reads the rows a table had at a time, whichever kind of write changed
@@ -19,38 +18,18 @@ func TestTimeTravel(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_time_travel")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	mustRun := func(sql string) {
-		t.Helper()
-		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
+	dataset := newDataset(t, client, "go_time_travel")
+	queries := datasetQueries{t, client, dataset}
+	mustRun := queries.mustRun
 	readAt := func(table string, at time.Time) []string {
 		t.Helper()
-		query := client.Query("SELECT FORMAT('%d:%s', id, name) FROM " + table +
-			" FOR SYSTEM_TIME AS OF @ts ORDER BY id")
-		query.DefaultDatasetID = dataset.DatasetID
-		query.Parameters = []bigquery.QueryParameter{{Name: "ts", Value: at}}
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s at %v: %v", table, at, err)
-		}
+		rows := queries.read("SELECT FORMAT('%d:%s', id, name) FROM "+table+
+			" FOR SYSTEM_TIME AS OF @ts ORDER BY id", bigquery.QueryParameter{Name: "ts", Value: at})
 		got := []string{}
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err == iterator.Done {
-				return got
-			} else if err != nil {
-				t.Fatal(err)
-			}
+		for _, row := range rows {
 			got = append(got, row[0].(string))
 		}
+		return got
 	}
 	mustJob := func(job *bigquery.Job, err error) {
 		t.Helper()
@@ -161,12 +140,7 @@ func TestTimeTravelErrorsAndStatements(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_time_travel_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_time_travel_errors")
 	run := func(sql string, ts time.Time) ([][]bigquery.Value, error) {
 		t.Helper()
 		query := client.Query(sql)
@@ -178,16 +152,7 @@ func TestTimeTravelErrorsAndStatements(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		var got [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err == iterator.Done {
-				return got, nil
-			} else if err != nil {
-				return nil, err
-			}
-			got = append(got, row)
-		}
+		return collectRows(rows)
 	}
 	if _, _, err := runScript(t, client, dataset.DatasetID,
 		"CREATE TABLE t (id INT64); INSERT t (id) VALUES (1)"); err != nil {
@@ -263,12 +228,7 @@ func TestTimeTravelUnsupported(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_time_travel_unsupported")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_time_travel_unsupported")
 	for name, c := range map[string]struct{ write, read string }{
 		"replaced": {"CREATE OR REPLACE TABLE replaced (id INT64)", "replaced"},
 		"added":    {"ALTER TABLE added ADD COLUMN extra STRING", "added"},
