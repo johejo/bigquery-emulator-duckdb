@@ -980,6 +980,8 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = &variables,
+      .distinct_aggregates_without_structs =
+          host.functions().restrictions().distinct_aggregates_without_structs,
       .restrict_struct_results = host.functions().restrictions().restrict_struct_results,
   };
   for (const FieldSchema& field : parameters.named_types()) {

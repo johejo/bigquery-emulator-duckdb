@@ -43,9 +43,6 @@ SELECT COUNT(*) FROM (SELECT x FROM UNNEST([STRUCT(STRUCT(COLLATE('a', 'und:ci')
 SELECT COUNT(*) FROM (SELECT x FROM UNNEST([STRUCT(STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n) AS x), STRUCT(STRUCT('A', 1)), STRUCT(STRUCT('b', 1))]) GROUP BY x)
 => "2"
 
-SELECT COUNT(DISTINCT x) FROM UNNEST([STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n), ('A', 1), ('b', 1)]) AS x
-=> "2"
-
 SELECT COUNT(*) FROM (SELECT DISTINCT a FROM UNNEST([STRUCT([COLLATE('a', 'und:ci'), 'b'] AS a), STRUCT(['A', 'B']), STRUCT(['A', 'c'])]))
 => "2"
 
