@@ -50,7 +50,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const std::string& over, const Scope& scope,
                                          const Columns& columns, const std::string& having = "",
                                          std::vector<std::string>* intermediates = nullptr,
-                                         const std::string& partition_order = "") {
+                                         const std::string& partition_order = "",
+                                         const std::string& array = "",
+                                         const std::string& element = "") {
   const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   // A graph value's STRUCT is equal to another exactly when their identities are, so functions
@@ -188,6 +190,37 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return std::nullopt;
     }
     arguments.push_back(*sql);
+  }
+  if (!array.empty()) {
+    // List aggregates stay inside the enclosing conditional branch, unlike a correlated
+    // scalar subquery, which DuckDB can evaluate even in an unselected branch. Keep the
+    // initial forms to one argument and a plain aggregate rule; modifiers and rules needing
+    // extra keys or a finishing expression require their own list semantics.
+    if (aggregate == nullptr || arguments.size() != 1 || call.distinct() || !collation->empty() ||
+        rule->finish != nullptr || !rule->arguments.empty() || rule->skip_nulls ||
+        !aggregate->order_by_item_list().empty() || aggregate->limit() != nullptr ||
+        (name != "SUM" && name != "AVG" && name != "MIN" && name != "MAX" && name != "COUNT" &&
+         name != "ARRAY_AGG") ||
+        // DuckDB's floating aggregates differ on NaN and finite overflow, and its decimal
+        // AVG passes through DOUBLE. Do not expose those overloads through list_aggregate.
+        ((name == "SUM" || name == "AVG" || name == "MIN" || name == "MAX") &&
+         call.argument_list(0)->type()->IsDouble()) ||
+        (name == "AVG" && !call.argument_list(0)->type()->IsInt64()) ||
+        (name != "ARRAY_AGG" && call.null_handling_modifier() ==
+                                    googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS)) {
+      return Unsupported(scope, "horizontal aggregate " + name + " with this type or modifiers");
+    }
+    std::string values = "list_transform(COALESCE(" + array + ", []), lambda " + element + ": " +
+                         arguments.at(0) + ")";
+    if (name == "ARRAY_AGG" && call.null_handling_modifier() ==
+                                   googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
+      const std::string value = scope.context.FreshName("_value");
+      values = "list_filter(" + values + ", lambda " + value + ": " + value + " IS NOT NULL)";
+    }
+    const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
+    return type ? std::optional("CAST(list_aggregate(" + values + ", " +
+                                QuoteLiteral(rule->function) + ") AS " + *type + ")")
+                : std::nullopt;
   }
   std::vector<std::string> keyed = arguments;
   if (rule->collated) {
@@ -626,6 +659,51 @@ std::string GroupKey(const googlesql::Type* type, const std::string& sql,
 }
 
 }  // namespace
+
+std::optional<std::string> ArrayAggregate(const googlesql::ResolvedArrayAggregate& aggregate,
+                                          const Scope& scope, const Columns& columns) {
+  auto array = Expression(*aggregate.array(), scope, columns);
+  if (!array) {
+    return std::nullopt;
+  }
+  // Each lambda row carries the element and computed columns. Materialize each computed
+  // expression once per element, preserving traversal order and references to enclosing rows.
+  const std::string element = scope.context.FreshName("_horizontal");
+  const std::string element_name = ColumnName(aggregate.element_column().column_id());
+  *array = "list_transform(" + *array + ", lambda " + element + ": struct_pack(" + element_name +
+           " := " + element + "))";
+  Columns bound = columns;
+  bound[aggregate.element_column().column_id()] = element + "." + element_name;
+  std::vector<std::string> fields = {element_name + " := " + element + "." + element_name};
+  for (const auto& computed : aggregate.pre_aggregate_computed_column_list()) {
+    const auto value = Expression(*computed->expr(), scope, bound);
+    if (!value) {
+      return std::nullopt;
+    }
+    const std::string name = ColumnName(computed->column().column_id());
+    auto projection = fields;
+    std::string field = name;
+    field += " := ";
+    field += *value;
+    projection.push_back(std::move(field));
+    array->insert(0, "list_transform(");
+    *array += ", lambda ";
+    *array += element;
+    *array += ": struct_pack(";
+    *array += Join(projection, ", ");
+    *array += "))";
+    std::string reference = element;
+    reference += '.';
+    reference += name;
+    std::string binding = name;
+    binding += " := ";
+    binding += reference;
+    fields.push_back(std::move(binding));
+    bound[computed->column().column_id()] = std::move(reference);
+  }
+  return NonScalarCall(*aggregate.aggregate(), aggregate.aggregate(), "", scope, bound, "", nullptr,
+                       "", *array, element);
+}
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {

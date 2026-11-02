@@ -35,7 +35,7 @@ rejected.
 | `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: measures, property options or computed properties that call user-defined functions or read parameters, variables or constants. |
 | `DROP PROPERTY GRAPH` | Supported |  |
 | `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints. |
-| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints. |
+| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints; horizontal aggregate ARRAY_AGG with this type or modifiers. |
 
 ## Queries
 
