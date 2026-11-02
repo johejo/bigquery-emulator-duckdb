@@ -194,11 +194,12 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!array.empty()) {
     // List aggregates stay inside the enclosing conditional branch, unlike a correlated
     // scalar subquery, which DuckDB can evaluate even in an unselected branch. Keep the
-    // initial forms to one argument and a plain aggregate rule; modifiers and rules needing
-    // extra keys or a finishing expression require their own list semantics.
-    if (aggregate == nullptr || arguments.size() != 1 || call.distinct() || !collation->empty() ||
+    // forms to one argument and a plain aggregate rule. ARRAY_AGG decorates each value
+    // with its sort key so sorting and deduplication also stay within list expressions.
+    if (aggregate == nullptr || arguments.size() != 1 || !collation->empty() ||
         rule->finish != nullptr || !rule->arguments.empty() || rule->skip_nulls ||
-        !aggregate->order_by_item_list().empty() || aggregate->limit() != nullptr ||
+        (name != "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty())) ||
+        aggregate->limit() != nullptr ||
         (name != "SUM" && name != "AVG" && name != "MIN" && name != "MAX" && name != "COUNT" &&
          name != "ARRAY_AGG") ||
         // DuckDB's floating aggregates differ on NaN and finite overflow, and its decimal
@@ -210,12 +211,64 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                     googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS)) {
       return Unsupported(scope, "horizontal aggregate " + name + " with this type or modifiers");
     }
-    std::string values = "list_transform(COALESCE(" + array + ", []), lambda " + element + ": " +
-                         arguments.at(0) + ")";
+    std::string value = arguments.at(0);
+    const bool decorated =
+        name == "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty());
+    if (decorated) {
+      std::vector<std::string> keys;
+      for (const auto& item : aggregate->order_by_item_list()) {
+        const auto key_collation = OperationCollation(item->collation(), scope);
+        if (!key_collation) {
+          return std::nullopt;
+        }
+        if (item->collation_name() != nullptr || !key_collation->empty()) {
+          return Unsupported(scope, "horizontal ARRAY_AGG ordered with collation");
+        }
+        auto key = Expression(*item->column_ref(), scope, columns);
+        if (!key) {
+          return std::nullopt;
+        }
+        const auto* key_type = item->column_ref()->type();
+        if (key_type->IsInterval()) {
+          key = IntervalKey(*key);
+        }
+        const bool nulls_first =
+            item->null_order() == googlesql::ResolvedOrderByItem::NULLS_FIRST ||
+            (item->null_order() == googlesql::ResolvedOrderByItem::ORDER_UNSPECIFIED &&
+             !item->is_descending());
+        const std::string nulls = nulls_first ? " NULLS FIRST" : " NULLS LAST";
+        // As in ORDER BY, put NaN below -inf rather than DuckDB's above +inf.
+        if (key_type->IsFloatingPoint()) {
+          keys.push_back("isnan(" + *key + ")");
+          keys.push_back(QuoteLiteral((item->is_descending() ? "ASC" : "DESC") + nulls));
+        }
+        keys.push_back(*key);
+        keys.push_back(QuoteLiteral((item->is_descending() ? "DESC" : "ASC") + nulls));
+      }
+      value = "struct_pack(" +
+              (keys.empty() ? "" : "sort_key := create_sort_key(" + Join(keys, ", ") + "), ") +
+              "value := " + value + ")";
+    }
+    std::string values =
+        "list_transform(COALESCE(" + array + ", []), lambda " + element + ": " + value + ")";
     if (name == "ARRAY_AGG" && call.null_handling_modifier() ==
                                    googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
-      const std::string value = scope.context.FreshName("_value");
-      values = "list_filter(" + values + ", lambda " + value + ": " + value + " IS NOT NULL)";
+      const std::string row = scope.context.FreshName("_value");
+      values = "list_filter(" + values + ", lambda " + row + ": " + row +
+               (decorated ? ".value" : "") + " IS NOT NULL)";
+    }
+    if (decorated) {
+      // Wrapping values in non-NULL structs retains one NULL under DISTINCT, unlike
+      // list_distinct on the values themselves. DISTINCT order keys are the argument,
+      // as required by the resolver, so deduplicating decorated rows is equivalent.
+      if (call.distinct()) {
+        values = "list_distinct(" + values + ")";
+      }
+      if (!aggregate->order_by_item_list().empty()) {
+        values = "list_sort(" + values + ", 'ASC', 'NULLS FIRST')";
+      }
+      const std::string row = scope.context.FreshName("_value");
+      values = "list_transform(" + values + ", lambda " + row + ": " + row + ".value)";
     }
     const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
     return type ? std::optional("CAST(list_aggregate(" + values + ", " +
