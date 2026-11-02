@@ -1039,18 +1039,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "PARSE_TIMESTAMP with a precision argument is not translated"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision_fewer_digits"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision_format_string_requires_too_many"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision_format_string_requires_too_many_with_safe"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision_too_many_digits"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision_too_many_digits_strict"
-  label: "pico_timestamp_test:parse_timestamp_with_explicit_precision_too_many_digits_strict_with_safe"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects HAVING modifiers and null-respecting ARRAY_AGG in PIVOT, which GoogleSQL's reference implementation accepts"
   label: "pivot_test:having_in_aggregate_fn_call"
   label: "pivot_test:having_min_with_reference"

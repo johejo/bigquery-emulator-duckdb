@@ -1,0 +1,33 @@
+# BigQuery rejects PARSE_TIMESTAMP's named precision argument, including under SAFE.
+# third_party/bigquery_docs/reference/standard-sql/timestamp_functions.md
+# Observed BigQuery responses report that `precision` does not exist in the signature.
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', '2017-01-01T13:54:59.123Z', precision => 3)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', '2017-01-01T13:54:59.123456Z', precision => 3)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E3S%Ez', '2017-01-01T13:54:59.123456Z', precision => 6)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E3S%Ez', '2017-01-01T13:54:59.123456Z', precision => 6)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', '2017-01-01T13:54:59.1Z', precision => 3)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E6S%Ez', '2017-01-01T13:54:59.123Z', precision => 3)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E6S%Ez', '2017-01-01T13:54:59.123Z', precision => 3)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', '2017-01-01T13:54:59.123456Z', precision => 0)
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', '2017-01-01T13:54:59.123456', precision => 6, timezone => 'Asia/Tokyo')
+=> error contains: Named argument `precision` does not exist in signature
+
+SELECT PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S', '2017-01-01T13:54:59.123456', precision => 3, timezone => 'Asia/Tokyo')
+=> error contains: Named argument `precision` does not exist in signature
