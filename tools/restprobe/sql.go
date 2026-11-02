@@ -83,6 +83,13 @@ func classify(sql, message string) probereport.Probe {
 	if feature, ok := strings.CutPrefix(message, unsupportedPrefix); ok {
 		return probereport.Probe{Outcome: probereport.Unsupported, Detail: feature}
 	}
+	// BigQuery-only TVFs are absent from GoogleSQL's catalog. Queries in the
+	// catalog must be valid BigQuery, so a missing TVF is unsupported, not broken.
+	analyzerMessage := analyzerError.ReplaceAllString(message, "")
+	if name, ok := strings.CutPrefix(analyzerMessage, "Table-valued function not found: "); ok {
+		name, _, _ = strings.Cut(name, " [at ")
+		return probereport.Probe{Outcome: probereport.Unsupported, Detail: name}
+	}
 	if prefix := analyzerError.FindString(message); prefix != "" {
 		// A feature whose language option the emulator leaves off is one it does
 		// not support rather than a query the probe got wrong.
