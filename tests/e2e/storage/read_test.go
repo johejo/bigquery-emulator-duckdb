@@ -18,6 +18,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
 	"cloud.google.com/go/civil"
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/linkedin/goavro/v2"
@@ -444,6 +445,9 @@ func TestReadAvroJSONAndGeography(t *testing.T) {
 			if rows[2]["value"] != nil || rows[2]["rec"] != nil || len(rows[2]["items"].([]any)) != 0 || len(rows[2]["records"].([]any)) != 0 {
 				t.Fatalf("NULL/empty: %v", rows[2])
 			}
+			if tc.kind != "JSON" {
+				return
+			}
 			_, err = read.CreateReadSession(t.Context(), &storagepb.CreateReadSessionRequest{
 				Parent:      "projects/test",
 				ReadSession: &storagepb.ReadSession{Table: path, DataFormat: storagepb.DataFormat_ARROW},
@@ -452,6 +456,65 @@ func TestReadAvroJSONAndGeography(t *testing.T) {
 				t.Fatalf("Arrow session error = %v", err)
 			}
 		})
+	}
+}
+
+// Arrow represents GEOGRAPHY as Utf8 WKT: third_party/bigquery_docs/reference/storage.md
+// The reference says only that field metadata indicates the original type; BigQuery was observed
+// to mark the field, or the list of an ARRAY rather than its items, as this extension type.
+func TestReadArrowGeography(t *testing.T) {
+	t.Parallel()
+	rest, read, _ := clients(t)
+	path := table(t, rest, "storage_read_arrow_geography", "id INT64, value GEOGRAPHY, items ARRAY<GEOGRAPHY>, rec STRUCT<value GEOGRAPHY>")
+	query(t, rest, `INSERT INTO storage_read_arrow_geography.rows VALUES
+		(1, ST_GEOGPOINT(1, 2), [ST_GEOGPOINT(3, 4)], STRUCT(ST_GEOGPOINT(5, 6))), (2, NULL, [], NULL)`)
+	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
+	var data []byte
+	data = append(data, s.GetArrowSchema().SerializedSchema...)
+	for _, block := range responses(t, read, s.Streams[0].Name, 0) {
+		data = append(data, block.GetArrowRecordBatch().SerializedRecordBatch...)
+	}
+	reader, err := ipc.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Release()
+	geography := arrow.NewMetadata([]string{"ARROW:extension:name", "ARROW:extension:metadata"},
+		[]string{"google:sqlType:geography", `{"encoding": "WKT"}`})
+	fields := reader.Schema().Fields()
+	item := fields[2].Type.(*arrow.ListType).ElemField()
+	nested := fields[3].Type.(*arrow.StructType).Field(0)
+	if !fields[1].Metadata.Equal(geography) || !fields[2].Metadata.Equal(geography) ||
+		item.Metadata.Len() != 0 || fields[3].Metadata.Len() != 0 || !nested.Metadata.Equal(geography) {
+		t.Fatalf("schema = %v", reader.Schema())
+	}
+	got := map[int64][]string{}
+	for reader.Next() {
+		r := reader.RecordBatch()
+		value := r.Column(1).(*array.String)
+		items := r.Column(2).(*array.List)
+		rec := r.Column(3).(*array.Struct)
+		for row := 0; row < int(r.NumRows()); row++ {
+			var text []string
+			if !value.IsNull(row) {
+				text = append(text, value.Value(row))
+			}
+			start, end := items.ValueOffsets(row)
+			for i := start; i < end; i++ {
+				text = append(text, items.ListValues().(*array.String).Value(int(i)))
+			}
+			if !rec.IsNull(row) {
+				text = append(text, rec.Field(0).(*array.String).Value(row))
+			}
+			got[r.Column(0).(*array.Int64).Value(row)] = text
+		}
+	}
+	if err := reader.Err(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[int64][]string{1: {"POINT(1 2)", "POINT(3 4)", "POINT(5 6)"}, 2: nil}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 

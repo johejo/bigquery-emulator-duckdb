@@ -41,6 +41,17 @@ void ArrowCheck(int code) {
   }
 }
 
+// Marks `out` as WKT text of the extension type BigQuery gives GEOGRAPHY.
+void SetGeographyMetadata(ArrowSchema* out) {
+  nanoarrow::UniqueBuffer metadata;
+  ArrowCheck(ArrowMetadataBuilderInit(metadata.get(), nullptr));
+  ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
+                                        ArrowCharView("google:sqlType:geography")));
+  ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:metadata"),
+                                        ArrowCharView(R"({"encoding": "WKT"})")));
+  ArrowCheck(ArrowSchemaSetMetadata(out, reinterpret_cast<const char*>(metadata->data)));
+}
+
 void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
   if (field.precision || field.scale) {
     throw ApiError::Invalid("Storage Read does not support parameterized decimals");
@@ -53,6 +64,11 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
     item.name = "item";
     item.mode = FieldMode::kRequired;
     ArrowField(out->children[0], item, arrow);
+    if (arrow && field.type == FieldType::kGeography) {
+      // BigQuery marks the list rather than its items.
+      ArrowCheck(ArrowSchemaSetMetadata(out->children[0], nullptr));
+      SetGeographyMetadata(out);
+    }
     out->flags =
         static_cast<int64_t>(static_cast<uint64_t>(out->flags) & ~uint64_t{ARROW_FLAG_NULLABLE});
     return;
@@ -101,6 +117,11 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
       }
       break;
     case FieldType::kGeography:
+      ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
+      if (arrow) {
+        SetGeographyMetadata(out);
+      }
+      break;
     case FieldType::kJson:
       if (arrow) {
         throw ApiError::Invalid("Storage Read does not support " +
