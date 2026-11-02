@@ -39,6 +39,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // no other type to JSON, leaving that to TO_JSON and PARSE_JSON.
     options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);
     options->DisableLanguageFeature(googlesql::FEATURE_CAST_TO_JSON_TYPE);
+    // BigQuery rejects PARSE_TIMESTAMP's named precision argument.
+    options->DisableLanguageFeature(googlesql::FEATURE_PARSE_TIMESTAMP_WITH_PRECISION_AND_TIMEZONE);
     options->EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);
     // BigQuery has EDIT_DISTANCE over BYTES and CREATE TABLE CLONE, which GoogleSQL still marks
     // in development.
