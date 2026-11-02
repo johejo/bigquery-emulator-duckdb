@@ -112,10 +112,8 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
       throw ApiError::Unsupported("external table storage options");
     }
     const auto& external = *metadata.external_data;
-    if (external.format == "NEWLINE_DELIMITED_JSON") {
-      if (external.autodetect.value_or(false) || external.enable_list_inference) {
-        throw ApiError::Unsupported("JSON external table schema or options");
-      }
+    if (external.format == "NEWLINE_DELIMITED_JSON" && external.enable_list_inference) {
+      throw ApiError::Unsupported("enable_list_inference on JSON external tables");
     }
     if (external.format == "CSV") {
       if (external.enable_list_inference) {

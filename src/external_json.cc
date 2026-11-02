@@ -8,6 +8,7 @@
 #include <format>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <regex>
 #include <set>
 #include <string>
@@ -20,6 +21,7 @@
 #include "src/api_error.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/schema_detect.h"
 #include "src/temporary_files.h"
 
 namespace bigquery_emulator_duckdb {
@@ -34,12 +36,14 @@ std::string Folded(std::string_view name) {
   return folded;
 }
 
-void ValidateObject(json& object, const std::vector<FieldSchema>& schema);
+void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts);
 
 // Reject unimplemented representations before DuckDB can coerce them, for example rounding a
 // fractional INT64. External read observations are retained in
-// external_table_json.api.answers.json.
-void ValidateValue(json& value, const FieldSchema& field, bool element = false) {
+// external_table_json.api.answers.json, and those of autodetected tables, which `converts` the
+// values of, in external_table_json_autodetect.api.answers.json: a string converts to the type
+// DetectValue finds in it, or an INT64 to a FLOAT64, and a number or a BOOL to a STRING.
+void ValidateValue(json& value, const FieldSchema& field, bool converts, bool element = false) {
   if (value.is_null()) {
     if (element || field.mode == FieldMode::kRequired) {
       throw ApiError::Invalid("Only optional fields can be set to NULL. Field: " + field.name +
@@ -52,20 +56,40 @@ void ValidateValue(json& value, const FieldSchema& field, bool element = false) 
   }
   if (field.mode == FieldMode::kRepeated && !element) {
     if (!value.is_array()) {
-      throw ApiError::Invalid("Expected a JSON array for " + field.name);
+      throw ApiError::Invalid(
+          "Repeated field must be imported as a JSON array. Field: " + field.name + ".");
     }
     for (auto& item : value) {
-      ValidateValue(item, field, true);
+      ValidateValue(item, field, converts, true);
     }
     return;
   }
+  if (element && value.is_array()) {
+    throw ApiError::Invalid("Nested arrays not allowed.");
+  }
+  // A converted string, or none.
+  const auto detected = [&]() -> std::optional<DetectedValue> {
+    if (!converts || !value.is_string()) {
+      return std::nullopt;
+    }
+    return DetectValue(value.get_ref<const std::string&>());
+  }();
   switch (field.type) {
     case FieldType::kRecord:
-      ValidateObject(value, field.fields);
+      if (!value.is_object()) {
+        throw ApiError::Invalid("Flat value specified for record field. Field: " + field.name +
+                                "; Value: " + value.dump());
+      }
+      ValidateObject(value, field.fields, converts);
       return;
     case FieldType::kString:
     case FieldType::kBytes:
       if (value.is_string()) {
+        return;
+      }
+      // StageJsonNumerics writes the numbers of STRING fields as their text.
+      if (converts && field.type == FieldType::kString && value.is_boolean()) {
+        value = value.dump();
         return;
       }
       break;
@@ -87,6 +111,11 @@ void ValidateValue(json& value, const FieldSchema& field, bool element = false) 
       break;
     case FieldType::kFloat:
       if (value.is_number()) {
+        return;
+      }
+      if (detected &&
+          (detected->kind == DetectedKind::kInteger || detected->kind == DetectedKind::kFloat)) {
+        value = detected->text;
         return;
       }
       break;
@@ -116,6 +145,10 @@ void ValidateValue(json& value, const FieldSchema& field, bool element = false) 
           return;
         }
       }
+      if (detected && detected->kind == DetectedKind::kInteger) {
+        value = detected->text;
+        return;
+      }
       break;
     case FieldType::kNumeric:
       // StageJsonNumerics preserves original numeric tokens as strings before DOM parsing.
@@ -129,6 +162,10 @@ void ValidateValue(json& value, const FieldSchema& field, bool element = false) 
     case FieldType::kDate:
     case FieldType::kTime:
     case FieldType::kTimestamp:
+      if (detected && KindType(detected->kind) == field.type) {
+        value = detected->text;
+        return;
+      }
       if (value.is_string()) {
         const auto& text = value.get_ref<const std::string&>();
         // Only canonical dates, times and UTC timestamps are accepted. The typed reader
@@ -154,7 +191,7 @@ void ValidateValue(json& value, const FieldSchema& field, bool element = false) 
   throw ApiError::Unsupported("JSON external representation for " + field.name);
 }
 
-void ValidateObject(json& object, const std::vector<FieldSchema>& schema) {
+void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts) {
   if (!object.is_object()) {
     throw ApiError::Invalid("Expected a JSON object");
   }
@@ -164,12 +201,12 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema) {
       return Folded(declared.name) == Folded(name);
     });
     if (field == schema.end()) {
-      throw ApiError::Invalid("No such field: " + name);
+      throw ApiError::Invalid("No such field: " + name + ".");
     }
     if (canonical.contains(field->name)) {
       throw ApiError::Unsupported("case variant duplicate JSON external field: " + name);
     }
-    ValidateValue(value, *field);
+    ValidateValue(value, *field, converts);
     canonical[field->name] = std::move(value);
   }
   for (const auto& field : schema) {
@@ -177,14 +214,14 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema) {
       if (field.mode == FieldMode::kRequired) {
         throw ApiError::Invalid("Missing required field: " + field.name);
       }
-      ValidateValue(canonical[field.name], field);
+      ValidateValue(canonical[field.name], field, converts);
     }
   }
   object = std::move(canonical);
 }
 
 FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>& schema,
-                       TemporaryFiles& files) {
+                       TemporaryFiles& files, bool converts) {
   const std::string contents = ReadMaybeGzip(source.path);
   std::string rewritten;
   for (std::size_t start = 0; start < contents.size();) {
@@ -210,7 +247,7 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
         if (object.is_discarded()) {
           throw ApiError::Invalid("Invalid JSON in " + source.uri);
         }
-        ValidateObject(object, schema);
+        ValidateObject(object, schema, converts);
         rewritten += object.dump() + '\n';
       } catch (const ApiError& error) {
         if (std::string_view(error.what()).starts_with(kUnsupported)) {
@@ -220,6 +257,11 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
             std::format("JSON parsing error in row starting at position {}: {} File: {}", start,
                         error.what(), source.uri));
       }
+    } else if (line.find_first_of(" \t") != std::string_view::npos) {
+      // BigQuery reads an empty line, but not one of spaces.
+      throw ApiError::Invalid(std::format(
+          "JSON parsing error in row starting at position {}: Unexpected token File: {}", start,
+          source.uri));
     }
     start = end + 1;
   }
@@ -230,11 +272,11 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
 
 std::vector<FileSource> StageExternalJson(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
-                                          TemporaryFiles& files) {
-  const auto numeric = StageJsonNumerics(sources, schema, files);
+                                          TemporaryFiles& files, bool autodetected) {
+  const auto numeric = StageJsonNumerics(sources, schema, files, autodetected);
   std::vector<FileSource> staged;
   std::ranges::transform(numeric, std::back_inserter(staged), [&](const FileSource& source) {
-    return StageSource(source, schema, files);
+    return StageSource(source, schema, files, autodetected);
   });
   return staged;
 }

@@ -22,6 +22,7 @@
 #include "src/file_read.h"
 #include "src/file_read_options.h"
 #include "src/gcs.h"
+#include "src/json_detect.h"
 #include "src/parquet_metadata.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
@@ -286,25 +287,32 @@ CsvReadOptions CsvOptions(const GcsExternalData& definition) {
 }  // namespace
 
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
-                                                 GcsClient client) {
+                                                 std::string_view table_id, GcsClient client) {
   const bool csv = definition.format == "CSV";
-  if (!csv && definition.format != "PARQUET") {
+  const bool json = definition.format == "NEWLINE_DELIMITED_JSON";
+  if (!csv && !json && definition.format != "PARQUET") {
     throw ApiError::Unsupported(definition.format + " external tables without an explicit schema");
   }
-  if (csv && !definition.autodetect.value_or(false)) {
+  if ((csv || json) && !definition.autodetect.value_or(false)) {
     throw ApiError::Invalid(
         "When defining a table with an ExternalDataConfiguration, a schema must be present on "
         "either the Table or the ExternalDataConfiguration. If the schema is present on both, the "
         "schemas must be the same.");
   }
   TemporaryFiles files;
-  const auto sources = StageFileSources(
-      definition.uris, csv ? FileFormat::kCsv : FileFormat::kParquet, client, files);
+  const auto sources = StageFileSources(definition.uris,
+                                        csv    ? FileFormat::kCsv
+                                        : json ? FileFormat::kJson
+                                               : FileFormat::kParquet,
+                                        client, files);
   if (sources.empty()) {
     throw ApiError::Invalid("External table source URIs match no files");
   }
   // BigQuery takes the schema of the alphabetically last file, by its whole path.
   const FileSource& last = *std::ranges::max_element(sources, {}, &FileSource::uri);
+  if (json) {
+    return DetectJson(last, table_id);
+  }
   if (csv) {
     DetectedCsv detected = DetectCsv({last}, definition.field_delimiter.value_or(""),
                                      CsvSkipLeadingRows(definition), files, /*rows=*/false);
@@ -335,8 +343,9 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
 }
 
 TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema,
-                          GcsClient client) {
+                          std::string table_name, GcsClient client) {
   return [definition = std::move(definition), schema = std::move(schema),
+          table_name = std::move(table_name),
           client = std::move(client)](TemporaryFiles& files) mutable {
     const bool csv = definition.format == "CSV";
     const bool json = definition.format == "NEWLINE_DELIMITED_JSON";
@@ -362,7 +371,17 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     std::vector<std::string> reads;
     for (const auto& source : sources) {
       if (json) {
-        const auto staged = StageExternalJson({source}, schema, files);
+        std::vector<FileSource> staged;
+        try {
+          staged =
+              StageExternalJson({source}, schema, files, definition.autodetect.value_or(false));
+        } catch (const ApiError& error) {
+          if (std::string_view(error.what()).starts_with(kUnsupported)) {
+            throw;
+          }
+          throw error.WithMessage(std::format("Error while reading table: {}, error message: {}",
+                                              table_name, error.what()));
+        }
         reads.push_back(
             "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
             FileReadQuery(JsonReadOptions{.explicit_schema = true}, staged, read_schema) +

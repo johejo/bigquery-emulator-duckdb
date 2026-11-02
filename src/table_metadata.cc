@@ -681,7 +681,9 @@ TableMetadata TableMetadataFromJson(const json& table) {
         throw ApiError::Invalid("externalDataConfiguration.autodetect must be a boolean");
       }
       // Without a schema, a Parquet table takes the one its sources have either way. A CSV
-      // table keeps a given schema, and autodetection still finds the header its reads skip.
+      // table keeps a given schema, and autodetection still finds the header its reads skip. A
+      // JSON table keeps one too, but its reads skip fields the schema lacks, which the stored
+      // definition cannot tell from a detected schema's.
       const auto given = [](const json& resource) {
         return resource.contains("schema") && !resource["schema"].is_null();
       };

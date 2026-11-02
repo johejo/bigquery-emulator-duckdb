@@ -1146,14 +1146,27 @@ cc_library(
         ":api_error",
         ":csv_records",
         ":duckdb_sql",
-        "@abseil-cpp//absl/time",
-        "@googlesql//googlesql/public/functions:date_time_util",
+        ":schema_detect",
     ],
     deps = [
         ":field_schema",
         ":file_read",
         ":temporary_files",
     ],
+)
+
+cc_library(
+    name = "schema_detect",
+    srcs = ["src/schema_detect.cc"],
+    hdrs = ["src/schema_detect.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":duckdb_sql",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public/functions:date_time_util",
+    ],
+    deps = [":field_schema"],
 )
 
 cc_library(
@@ -1757,10 +1770,12 @@ cc_library(
     srcs = [
         "src/external_json.cc",
         "src/external_table.cc",
+        "src/json_detect.cc",
     ],
     hdrs = [
         "src/external_json.h",
         "src/external_table.h",
+        "src/json_detect.h",
     ],
     copts = ["-std=c++20"],
     deps = [
@@ -1774,11 +1789,20 @@ cc_library(
         ":file_read_options",
         ":gcs",
         ":parquet_metadata",
+        ":schema_detect",
         ":statement_resources",
         ":table_metadata",
         ":temporary_files",
+        ":unordered_map_order",
         "@nlohmann_json//:json",
     ],
+)
+
+cc_library(
+    name = "unordered_map_order",
+    srcs = ["src/unordered_map_order.cc"],
+    hdrs = ["src/unordered_map_order.h"],
+    copts = ["-std=c++20"],
 )
 
 cc_library(

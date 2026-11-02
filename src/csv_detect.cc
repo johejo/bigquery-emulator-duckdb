@@ -2,33 +2,28 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
-#include <cmath>
 #include <cstddef>
-#include <cstdint>
-#include <cstdlib>
 #include <format>
 #include <iterator>
 #include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
-#include "absl/time/time.h"
-#include "googlesql/public/functions/date_time_util.h"
 #include "src/api_error.h"
 #include "src/csv_records.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/schema_detect.h"
 #include "src/temporary_files.h"
 
 // The rules below follow BigQuery's answers in
 // tests/e2e/goclient/testdata/unverified/load_csv_autodetect.api.answers.json, which
-// third_party/bigquery_docs/loading-data-cloud-storage-csv.md describes only in outline.
+// third_party/bigquery_docs/loading-data-cloud-storage-csv.md describes only in outline. The
+// types of values are in src/schema_detect.h.
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -73,9 +68,10 @@ char DetectDelimiter(std::string_view contents) {
   return counts.at(1) == most ? '|' : ',';
 }
 
-// The types auto-detection gives values, with the prefix of the names of columns it does not
-// name from a header.
-enum class Kind : uint8_t { kString, kInteger, kFloat, kBoolean, kDate, kTime, kTimestamp };
+using Kind = DetectedKind;
+
+// The prefix of the names of columns of each type that auto-detection does not name from a
+// header.
 
 struct KindInfo {
   Kind kind;
@@ -94,250 +90,7 @@ constexpr std::array kKinds = {
 
 const KindInfo& Info(Kind kind) { return *std::ranges::find(kKinds, kind, &KindInfo::kind); }
 
-// The type of a column holding values of types `a` and `b`. An empty value is a STRING, so a
-// column with one is a STRING column.
-Kind Merge(Kind a, Kind b) {
-  if (a == b) {
-    return a;
-  }
-  const auto numeric = [](Kind kind) { return kind == Kind::kInteger || kind == Kind::kFloat; };
-  return numeric(a) && numeric(b) ? Kind::kFloat : Kind::kString;
-}
-
-// A value's detected type, and its text in a form FileReadQuery reads as that type.
-struct Typed {
-  Kind kind = Kind::kString;
-  std::string text;
-};
-
-std::string_view Trim(std::string_view text) {
-  const size_t begin = text.find_first_not_of(" \t");
-  if (begin == std::string_view::npos) {
-    return {};
-  }
-  return text.substr(begin, text.find_last_not_of(" \t") - begin + 1);
-}
-
-bool IsDigit(char c) { return c >= '0' && c <= '9'; }
-
-bool AllDigits(std::string_view text) {
-  return !text.empty() && std::ranges::all_of(text, IsDigit);
-}
-
-// The digits of an integer with an optional sign and thousands separators, such as -1,000,
-// without the separators or a plus sign.
-std::optional<std::string> IntegerDigits(std::string_view text) {
-  std::string digits;
-  if (!text.empty() && (text.front() == '+' || text.front() == '-')) {
-    if (text.front() == '-') {
-      digits += '-';
-    }
-    text.remove_prefix(1);
-  }
-  const size_t group = std::min(text.find(','), text.size());
-  if (!AllDigits(text.substr(0, group)) || (group < text.size() && group > 3)) {
-    return std::nullopt;
-  }
-  digits.append(text.substr(0, group));
-  for (text.remove_prefix(group); !text.empty(); text.remove_prefix(4)) {
-    if (text.size() < 4 || text.front() != ',' || !AllDigits(text.substr(1, 3))) {
-      return std::nullopt;
-    }
-    digits.append(text.substr(1, 3));
-  }
-  return digits;
-}
-
-// `text` as strtod reads it, which takes hexadecimal integers, infinities and NaN as BigQuery
-// does.
-std::optional<double> ParseFloat(std::string_view text) {
-  const std::string copy(text);
-  char* end = nullptr;
-  const double value = std::strtod(copy.c_str(), &end);
-  if (copy.empty() || end != copy.c_str() + copy.size()) {
-    return std::nullopt;
-  }
-  return value;
-}
-
-std::string FloatText(double value) {
-  if (std::isnan(value)) {
-    return "NaN";
-  }
-  if (std::isinf(value)) {
-    return value > 0 ? "Infinity" : "-Infinity";
-  }
-  std::array<char, 32> buffer{};
-  const auto result = std::to_chars(buffer.begin(), buffer.end(), value);
-  return {buffer.begin(), result.ptr};
-}
-
-// Reads `min` to `max` digits of `text` at `pos` into `value`, returning the position after them.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a position and the bounds of a count.
-std::optional<size_t> ReadNumber(std::string_view text, size_t pos, size_t min, size_t max,
-                                 int& value) {
-  value = 0;
-  size_t end = pos;
-  for (; end < text.size() && end - pos < max && IsDigit(text.at(end)); ++end) {
-    value = (value * 10) + (text.at(end) - '0');
-  }
-  return end - pos >= min ? std::optional(end) : std::nullopt;
-}
-
-struct Date {
-  int year = 0;
-  int month = 0;
-  int day = 0;
-};
-
-// Reads a date of `text` at its start, YYYY-M-D or YYYY/M/D, returning the position after it.
-std::optional<size_t> ReadDate(std::string_view text, Date& date) {
-  std::optional<size_t> pos = ReadNumber(text, 0, 4, 4, date.year);
-  if (!pos || *pos >= text.size() || (text.at(*pos) != '-' && text.at(*pos) != '/')) {
-    return std::nullopt;
-  }
-  const char separator = text.at(*pos);
-  pos = ReadNumber(text, *pos + 1, 1, 2, date.month);
-  if (!pos || *pos >= text.size() || text.at(*pos) != separator) {
-    return std::nullopt;
-  }
-  pos = ReadNumber(text, *pos + 1, 1, 2, date.day);
-  if (!pos || date.year < 1 || date.month < 1 || date.month > 12 || date.day < 1) {
-    return std::nullopt;
-  }
-  constexpr std::array kDays = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  const bool leap = date.year % 4 == 0 && (date.year % 100 != 0 || date.year % 400 == 0);
-  const int days = kDays.at(date.month - 1) + (date.month == 2 && leap ? 1 : 0);
-  return date.day <= days ? pos : std::nullopt;
-}
-
-// Reads a time of `text` at `pos`, HH:MM:SS with up to nine fractional digits, or HH:MM unless
-// `seconds` is required, into `time` as HH:MM:SS with at most six. Returns the position after it.
-std::optional<size_t> ReadTime(std::string_view text, size_t pos, bool seconds, std::string& time) {
-  int hour = 0;
-  int minute = 0;
-  int second = 0;
-  std::optional<size_t> end = ReadNumber(text, pos, 2, 2, hour);
-  if (!end || *end >= text.size() || text.at(*end) != ':') {
-    return std::nullopt;
-  }
-  end = ReadNumber(text, *end + 1, 2, 2, minute);
-  if (!end) {
-    return std::nullopt;
-  }
-  std::string fraction;
-  if (*end < text.size() && text.at(*end) == ':') {
-    end = ReadNumber(text, *end + 1, 2, 2, second);
-    if (!end) {
-      return std::nullopt;
-    }
-    if (*end < text.size() && text.at(*end) == '.') {
-      size_t digits = *end + 1;
-      for (; digits < text.size() && digits - *end <= 9 && IsDigit(text.at(digits)); ++digits) {
-      }
-      if (digits == *end + 1) {
-        return std::nullopt;
-      }
-      fraction = "." + std::string(text.substr(*end + 1, std::min<size_t>(digits - *end - 1, 6)));
-      end = digits;
-    }
-  } else if (seconds) {
-    return std::nullopt;
-  }
-  if (hour > 23 || minute > 59 || second > 59) {
-    return std::nullopt;
-  }
-  time = std::format("{:02}:{:02}:{:02}{}", hour, minute, second, fraction);
-  return end;
-}
-
-// The UTC text of a TIMESTAMP at `date` and `time` in `zone`, which is empty, Z, an offset or a
-// time zone name after a space, as GoogleSQL reads it.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the parts of a timestamp, in order.
-std::optional<std::string> TimestampText(const Date& date, std::string_view time,
-                                         std::string_view zone) {
-  std::string text = std::format("{:04}-{:02}-{:02} {}", date.year, date.month, date.day, time);
-  // GoogleSQL takes no space before an offset, which a CSV value can have, as in
-  // 2018-08-19T07:11:35.220 -05:00.
-  if (const std::string_view offset = Trim(zone);
-      !offset.empty() && (offset.front() == '+' || offset.front() == '-')) {
-    zone = offset;
-  }
-  text += zone == "Z" || zone == "z" ? "+00" : zone;
-  absl::Time timestamp;
-  if (!googlesql::functions::ConvertStringToTimestamp(text, absl::UTCTimeZone(),
-                                                      googlesql::functions::kMicroseconds,
-                                                      /*allow_tz_in_str=*/true, &timestamp)
-           .ok()) {
-    return std::nullopt;
-  }
-  return absl::FormatTime("%Y-%m-%d %H:%M:%E6S+00", timestamp, absl::UTCTimeZone());
-}
-
-Typed Classify(const Cell& cell) {
-  const std::string_view text = cell ? Trim(*cell) : std::string_view();
-  if (text.empty()) {
-    return {};
-  }
-  const std::string lower = ToLowerAscii(text);
-  for (const std::string_view value : {
-           "true",
-           "t",
-           "yes",
-           "y",
-       }) {
-    if (lower == value) {
-      return {.kind = Kind::kBoolean, .text = "true"};
-    }
-  }
-  for (const std::string_view value : {
-           "false",
-           "f",
-           "no",
-           "n",
-       }) {
-    if (lower == value) {
-      return {.kind = Kind::kBoolean, .text = "false"};
-    }
-  }
-  // An integer out of INT64's range is a FLOAT64.
-  if (const std::optional<std::string> digits = IntegerDigits(text)) {
-    int64_t value = 0;
-    const auto result = std::from_chars(digits->data(), digits->data() + digits->size(), value);
-    if (result.ec == std::errc()) {
-      return {.kind = Kind::kInteger, .text = std::to_string(value)};
-    }
-    return {.kind = Kind::kFloat, .text = FloatText(std::strtod(digits->c_str(), nullptr))};
-  }
-  if (const std::optional<double> value = ParseFloat(text)) {
-    return {.kind = Kind::kFloat, .text = FloatText(*value)};
-  }
-  // A date with a time is a TIMESTAMP, never a DATETIME.
-  Date date;
-  if (const std::optional<size_t> end = ReadDate(text, date)) {
-    if (*end == text.size()) {
-      return {
-          .kind = Kind::kDate,
-          .text = std::format("{:04}-{:02}-{:02}", date.year, date.month, date.day),
-      };
-    }
-    if (const char separator = text.at(*end);
-        separator == ' ' || separator == 'T' || separator == 't') {
-      std::string time;
-      if (const std::optional<size_t> zone = ReadTime(text, *end + 1, /*seconds=*/false, time)) {
-        if (std::optional<std::string> timestamp = TimestampText(date, time, text.substr(*zone))) {
-          return {.kind = Kind::kTimestamp, .text = *std::move(timestamp)};
-        }
-      }
-    }
-    return {};
-  }
-  std::string time;
-  if (ReadTime(text, 0, /*seconds=*/true, time) == text.size()) {
-    return {.kind = Kind::kTime, .text = time};
-  }
-  return {};
-}
+DetectedValue Classify(const Cell& cell) { return cell ? DetectValue(*cell) : DetectedValue{}; }
 
 // Checks the characters of a column name taken from a header as BigQuery does with its default
 // character map: of the characters flexible column names do not support
@@ -359,27 +112,7 @@ void CheckHeaderName(const std::string& name) {
   if (name.find_first_of("\f\v") != std::string::npos) {
     throw ApiError::Unsupported("detecting a CSV header name with a form feed or vertical tab");
   }
-  const std::string upper = ToUpperAscii(name);
-  for (const std::string_view prefix : {
-           "_PARTITION",
-           "_TABLE_",
-           "_FILE_",
-           "_ROW_TIMESTAMP",
-           "__ROOT__",
-           "_COLIDENTIFIER",
-           "__DREMEL_PK_MERGED_STRUCT_",
-           "_CHANGE_SEQUENCE_NUMBER",
-           "_CHANGE_TYPE",
-           "_CHANGE_TIMESTAMP",
-       }) {
-    if (upper.starts_with(prefix)) {
-      throw ApiError::Invalid(std::format(
-          "Invalid field name \"{}\". Field names are not allowed to start with the "
-          "(case-insensitive) prefixes _PARTITION, _TABLE_, _FILE_, _ROW_TIMESTAMP, __ROOT__, "
-          "_COLIDENTIFIER, and __DREMEL_PK_MERGED_STRUCT_",
-          name));
-    }
-  }
+  CheckReservedFieldName(name);
 }
 
 std::string Quoted(std::string_view text) {
@@ -436,12 +169,12 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
   if (columns == 0) {
     return {};
   }
-  std::vector<std::vector<Typed>> typed;
+  std::vector<std::vector<DetectedValue>> typed;
   for (size_t row = first; row < records.size(); ++row) {
-    std::vector<Typed>& values = typed.emplace_back();
+    std::vector<DetectedValue>& values = typed.emplace_back();
     for (size_t column = 0; column < columns; ++column) {
       const Record& record = records.at(row);
-      values.push_back(column < record.size() ? Classify(record.at(column)) : Typed{});
+      values.push_back(column < record.size() ? Classify(record.at(column)) : DetectedValue{});
     }
   }
   const auto kinds = [&](size_t begin) {
@@ -449,7 +182,7 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
     for (size_t column = 0; column < columns; ++column) {
       result.at(column) = typed.at(begin - first).at(column).kind;
       for (size_t row = begin; row < records.size(); ++row) {
-        result.at(column) = Merge(result.at(column), typed.at(row - first).at(column).kind);
+        result.at(column) = MergeKinds(result.at(column), typed.at(row - first).at(column).kind);
       }
     }
     return result;
@@ -462,7 +195,7 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
     const std::vector<Kind> rest = kinds(data);
     for (size_t column = 0; column < columns; ++column) {
       const Kind kind = typed.front().at(column).kind;
-      header = header || Merge(kind, rest.at(column)) != rest.at(column);
+      header = header || MergeKinds(kind, rest.at(column)) != rest.at(column);
     }
   }
   const size_t begin =

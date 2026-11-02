@@ -721,7 +721,8 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
     TranslatedStatement detected = translation;
     // tables.get reports a table that CREATE EXTERNAL TABLE detects the schema of as autodetected.
     detected.table->metadata.external_data->autodetect = true;
-    detected.table->schema = DetectExternalSchema(*detected.table->metadata.external_data);
+    detected.table->schema =
+        DetectExternalSchema(*detected.table->metadata.external_data, table->table.table_id);
     const auto columns =
         ColumnDefinitions(detected.table->schema, functions_.timestamp_precision());
     if (!columns) {

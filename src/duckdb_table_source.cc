@@ -81,7 +81,8 @@ class DuckDbTableSource : public TableSource {
       if (!external_) {
         throw ApiError::UnsupportedQuery("external table reads without an external provider");
       }
-      return external_->Read(*metadata.external_data, TableSchema(backend_, table));
+      return external_->Read(*metadata.external_data, TableSchema(backend_, table),
+                             table.project_id + "." + table.dataset_id + "." + table.table_id);
     }
     const auto query = TableReadQuery(backend_, table);
     return query ? std::optional<TableRead>(*query) : std::nullopt;

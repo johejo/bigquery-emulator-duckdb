@@ -1081,6 +1081,14 @@
       "updateTime": "2026-10-02T03:43:15Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/schema-detect",
+      "file": "third_party/bigquery_docs/schema-detect.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/schema-detect",
+      "title": "Using schema auto-detection",
+      "sha256": "3803d054526354fccfff78b921557ab72f38394c507fa88c4c7835005de38322",
+      "updateTime": "2026-10-27T13:28:26Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/schemas",
       "file": "third_party/bigquery_docs/schemas.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/schemas",

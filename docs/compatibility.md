@@ -87,14 +87,19 @@ CSV takes a flat schema of the scalar types listed above, given or detected as
 [CSV options](#loads-extracts-and-copies) loads take. Schema detection does not take a quote,
 quoted line breaks or NULL markers. Other CSV options are unsupported.
 
-JSON requires an explicit schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, TIME
-or TIMESTAMP fields, RECORDs of those fields, or repeated fields of those types. Scalar values must
-use their native JSON representation, except INT64 also accepts decimal strings, BOOL accepts its
-text spellings, and BYTES requires base64 strings. NUMERIC accepts decimal numbers or strings
+JSON takes a schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, TIME or TIMESTAMP
+fields, RECORDs of those fields, or repeated fields of those types. Given a schema, scalar values
+must use their native JSON representation, except INT64 also accepts decimal strings, BOOL accepts
+its text spellings, and BYTES requires base64 strings. NUMERIC accepts decimal numbers or strings
 with at most 29 integer digits and nine fractional digits, without exponent notation. DATE and
 TIME accept canonical `YYYY-MM-DD` and `HH:MM:SS[.SSSSSS]` strings, and TIMESTAMP accepts only
-`YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z`. Other scalar types, schema autodetection and additional JSON
-options are unsupported.
+`YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z`. A table created without a schema takes the one BigQuery
+[detects](../third_party/bigquery_docs/schema-detect.md) from the alphabetically last source
+file, and its reads also take strings in the forms detection converts, and numbers and BOOL
+values for STRING fields. The order of detected columns can differ from BigQuery's for objects of
+more than six fields. Detection rejects an empty object, which BigQuery detects as a RECORD with
+no fields, and `tables.insert` rejects `autodetect` with a schema. Other scalar types and
+additional JSON options are unsupported.
 
 Bigtable, BigLake connections, Hive partitioning, metadata caching,
 configuration updates, `ALTER TABLE`, stored views over external tables and time

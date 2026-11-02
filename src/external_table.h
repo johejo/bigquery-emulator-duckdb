@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "src/field_schema.h"
@@ -9,19 +11,22 @@
 
 namespace bigquery_emulator_duckdb {
 
-// The schema BigQuery detects for the Parquet sources of `definition`: the columns of the
-// alphabetically last file, with LIST inference as configured, a group as a RECORD, a repeated
-// field as REPEATED, and other fields REQUIRED or NULLABLE as the file declares them. Downloads
-// the sources. Throws ApiError::Unsupported for a column whose type or name is not emulated.
+// The schema BigQuery detects for the sources of `definition`, the external table `table_id`,
+// from the alphabetically last file. For Parquet, it has the file's columns, with LIST inference
+// as configured, a group as a RECORD, a repeated field as REPEATED, and other fields REQUIRED or
+// NULLABLE as the file declares them; CSV and JSON detect it as DetectCsv and DetectJson do.
+// Downloads the sources. Throws ApiError::Unsupported for a column whose type or name is not
+// emulated.
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
-                                                 GcsClient client);
+                                                 std::string_view table_id, GcsClient client);
 
 // Captures only the persisted definition and a shared configured client; each statement owns
 // its downloads and resolves wildcards anew. Resolution itself performs no network requests.
 // Each source column must have the type DetectGcsExternalSchema gives it and be REPEATED where
 // the schema is; a source can lack NULLABLE columns and fields, and have fields the schema does
-// not. A NULL value of a REQUIRED column or field reads as NULL.
+// not. A NULL value of a REQUIRED column or field reads as NULL. JSON read errors name the table
+// `table_name`, as BigQuery's do.
 TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema,
-                          GcsClient client);
+                          std::string table_name, GcsClient client);
 
 }  // namespace bigquery_emulator_duckdb
