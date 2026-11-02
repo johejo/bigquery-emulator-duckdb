@@ -459,8 +459,9 @@ func TestReadAvroJSONAndGeography(t *testing.T) {
 	}
 }
 
-// BigQuery was observed to declare the items of every ARRAY nullable in Arrow schemas.
-func TestReadArrowArrayItemsNullable(t *testing.T) {
+// BigQuery was observed to declare the items of every ARRAY nullable in Arrow schemas, and to
+// mark the list of an ARRAY<RANGE> rather than its items with google:sqlType range.
+func TestReadArrowArrays(t *testing.T) {
 	t.Parallel()
 	rest, read, _ := clients(t)
 	path := table(t, rest, "storage_read_arrow_array_items", `i ARRAY<INT64>, s ARRAY<STRING>, b ARRAY<BYTES>,
@@ -473,7 +474,40 @@ func TestReadArrowArrayItemsNullable(t *testing.T) {
 	}
 	defer reader.Release()
 	for _, field := range reader.Schema().Fields() {
-		if field.Nullable || !field.Type.(*arrow.ListType).ElemField().Nullable {
+		item := field.Type.(*arrow.ListType).ElemField()
+		metadata := arrow.Metadata{}
+		if field.Name == "rd" {
+			metadata = arrow.NewMetadata([]string{"google:sqlType"}, []string{"range"})
+		}
+		if field.Nullable || !item.Nullable || !field.Metadata.Equal(metadata) || item.Metadata.Len() != 0 {
+			t.Fatalf("%s: %v", field.Name, field)
+		}
+	}
+}
+
+// BigQuery was observed to mark each RANGE field with google:sqlType range, whatever its element
+// type or enclosing STRUCT, and neither the STRUCT nor the bounds.
+func TestReadArrowRangeMetadata(t *testing.T) {
+	t.Parallel()
+	rest, read, _ := clients(t)
+	path := table(t, rest, "storage_read_arrow_range_metadata",
+		"d RANGE<DATE>, dt RANGE<DATETIME>, ts RANGE<TIMESTAMP>, rec STRUCT<d RANGE<DATE>>")
+	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
+	reader, err := ipc.NewReader(bytes.NewReader(s.GetArrowSchema().SerializedSchema))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Release()
+	rangeMetadata := arrow.NewMetadata([]string{"google:sqlType"}, []string{"range"})
+	fields := reader.Schema().Fields()
+	rec := fields[3]
+	ranges := append(fields[:3:3], rec.Type.(*arrow.StructType).Field(0))
+	if rec.Metadata.Len() != 0 {
+		t.Fatalf("rec: %v", rec)
+	}
+	for _, field := range ranges {
+		bounds := field.Type.(*arrow.StructType)
+		if !field.Metadata.Equal(rangeMetadata) || bounds.Field(0).Metadata.Len() != 0 || bounds.Field(1).Metadata.Len() != 0 {
 			t.Fatalf("%s: %v", field.Name, field)
 		}
 	}

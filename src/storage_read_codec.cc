@@ -41,14 +41,26 @@ void ArrowCheck(int code) {
   }
 }
 
-// Marks `out` as WKT text of the extension type BigQuery gives GEOGRAPHY.
-void SetGeographyMetadata(ArrowSchema* out) {
+// Sets the metadata BigQuery gives a field of `type` whose Arrow type other types share:
+// GEOGRAPHY is WKT text of an extension type, and a RANGE is a struct marked as one.
+void SetTypeMetadata(ArrowSchema* out, FieldType type) {
   nanoarrow::UniqueBuffer metadata;
   ArrowCheck(ArrowMetadataBuilderInit(metadata.get(), nullptr));
-  ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
-                                        ArrowCharView("google:sqlType:geography")));
-  ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:metadata"),
-                                        ArrowCharView(R"({"encoding": "WKT"})")));
+  switch (type) {
+    case FieldType::kGeography:
+      ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
+                                            ArrowCharView("google:sqlType:geography")));
+      ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(),
+                                            ArrowCharView("ARROW:extension:metadata"),
+                                            ArrowCharView(R"({"encoding": "WKT"})")));
+      break;
+    case FieldType::kRange:
+      ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("google:sqlType"),
+                                            ArrowCharView("range")));
+      break;
+    default:
+      return;
+  }
   ArrowCheck(ArrowSchemaSetMetadata(out, reinterpret_cast<const char*>(metadata->data)));
 }
 
@@ -65,10 +77,10 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
     // BigQuery declares items nullable, although an ARRAY holds no NULL elements.
     item.mode = FieldMode::kNullable;
     ArrowField(out->children[0], item, arrow);
-    if (arrow && field.type == FieldType::kGeography) {
+    if (arrow) {
       // BigQuery marks the list rather than its items.
       ArrowCheck(ArrowSchemaSetMetadata(out->children[0], nullptr));
-      SetGeographyMetadata(out);
+      SetTypeMetadata(out, field.type);
     }
     out->flags =
         static_cast<int64_t>(static_cast<uint64_t>(out->flags) & ~uint64_t{ARROW_FLAG_NULLABLE});
@@ -117,18 +129,13 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
         ArrowField(out->children[i], field.fields.at(i), arrow);
       }
       break;
-    case FieldType::kGeography:
-      ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
-      if (arrow) {
-        SetGeographyMetadata(out);
-      }
-      break;
     case FieldType::kJson:
       if (arrow) {
         throw ApiError::Invalid("Storage Read does not support " +
                                 std::string(FieldTypeName(field.type)));
       }
       [[fallthrough]];
+    case FieldType::kGeography:
     case FieldType::kString:
       ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
       break;
@@ -140,6 +147,9 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
     default:
       throw ApiError::Invalid("Storage Read does not support " +
                               std::string(FieldTypeName(field.type)));
+  }
+  if (arrow) {
+    SetTypeMetadata(out, field.type);
   }
 }
 
