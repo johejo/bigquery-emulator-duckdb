@@ -76,7 +76,6 @@ func TestPropertyGraph(t *testing.T) {
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN TO_JSON_STRING(p))",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN SAFE.SAME(p, p))",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN SAFE.ALL_DIFFERENT(p, p))",
-		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person)(q:Person) RETURN q.name)",
 		"GRAPH go_graph.FinGraph MATCH path = (p:Person)-[:Owns]->(a:Account) RETURN COUNT(DISTINCT path) AS n",
 		"GRAPH go_graph.FinGraph MATCH (p:Person)-[:Owns]->(a:Account) RETURN COUNT(*) OVER (PARTITION BY p) AS n",
 	} {

@@ -65,3 +65,23 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person
 => error contains: The emulator does not support
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) RETURN a = a AS result)
 => error contains: The emulator does not support
+
+# Adjacent node patterns bind the same node, so the labels and filters of both apply.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)(b:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)(b:Account) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author)(b:Reader) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1)(b:Person) RETURN b.name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)(b)(c:Person WHERE c.id = 3) RETURN a.name AS result)
+=> "Lee"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)(b:Person)-[e:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person)(c:Person WHERE c.id = 2) RETURN COUNT(*) AS result)
+=> "2"
+# The documented equivalent of a quantified subpath repeated zero times.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (source_acct:Account)(dest_acct:Account) RETURN COUNT(*) AS result)
+=> "3"
