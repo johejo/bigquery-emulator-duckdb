@@ -1,0 +1,14 @@
+# BigQuery groups by STRUCTs but rejects them in aggregate functions with DISTINCT:
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
+# BigQuery's answer, with a collated field.
+SELECT ARRAY_AGG(DISTINCT x) FROM UNNEST([STRUCT(COLLATE('a', 'und:ci') AS s), STRUCT('A')]) AS x
+=> error contains: Aggregate functions with DISTINCT cannot be used with arguments of type STRUCT
+
+SELECT COUNT(DISTINCT x) FROM UNNEST([STRUCT(COLLATE('a', 'und:ci') AS s, 1 AS n), ('A', 1), ('b', 1)]) AS x
+=> error:
+
+SELECT COUNT(DISTINCT x) FROM UNNEST([STRUCT(1 AS n), STRUCT(1)]) AS x
+=> error:
+
+SELECT ARRAY(SELECT COUNT(DISTINCT x) OVER () FROM UNNEST([STRUCT(1 AS n), STRUCT(1)]) AS x)
+=> error:

@@ -94,6 +94,8 @@ struct QueryRestrictions {
   bool distinct_set_operations_without_structs = false;
   // DISTINCT set operations take no ARRAY columns.
   bool distinct_set_operations_without_arrays = false;
+  // Aggregate functions with DISTINCT take no STRUCT arguments.
+  bool distinct_aggregates_without_structs = false;
   // IS DISTINCT FROM and IS NOT DISTINCT FROM take no STRUCT arguments.
   bool distinct_comparisons_without_structs = false;
   // APPROX_TOP_COUNT and APPROX_TOP_SUM take no STRUCT or ARRAY values.

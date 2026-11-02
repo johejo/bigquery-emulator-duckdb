@@ -456,7 +456,6 @@ query Collated `GROUP BY` | SELECT DISTINCT STRUCT(COLLATE(name, 'und:ci'), id) 
 query Collated `GROUP BY` | SELECT STRUCT([COLLATE(name, 'und:ci')]) AS s FROM t GROUP BY s
 query Collated `GROUP BY` | SELECT COLLATE(name, 'und:ci') AS n, COUNT(*) FROM t GROUP BY ROLLUP(n)
 query Collated `GROUP BY` | SELECT id, COLLATE(name, 'und:ci') AS n FROM t GROUP BY id, n HAVING n = 'A'
-query Collated `DISTINCT` aggregates | SELECT COUNT(DISTINCT STRUCT(COLLATE(name, 'und:ci'), id)) FROM t
 query Collated `DISTINCT` aggregates | SELECT ARRAY_AGG(DISTINCT COLLATE(name, 'und:ci')) FROM t
 query Collated `DISTINCT` aggregates | SELECT STRING_AGG(DISTINCT COLLATE(name, 'und:ci') ORDER BY COLLATE(name, 'und:ci') DESC LIMIT 2) FROM t
 query Collated window functions | SELECT ROW_NUMBER() OVER (PARTITION BY COLLATE(name, 'und:ci')) FROM t

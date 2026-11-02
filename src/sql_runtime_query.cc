@@ -436,6 +436,8 @@ TranslatedStatement SqlRuntime::Translate(
       .default_project = default_project,
       .default_dataset = default_dataset,
       .system_variables = system_variables,
+      .distinct_aggregates_without_structs =
+          functions_.restrictions().distinct_aggregates_without_structs,
       .restrict_struct_results = functions_.restrictions().restrict_struct_results,
   };
   googlesql::TypeFactory type_factory;

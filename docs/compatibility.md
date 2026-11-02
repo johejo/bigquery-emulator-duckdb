@@ -260,8 +260,6 @@ GoogleSQL's collator, ICU's root locale at secondary strength, whose Unicode dat
 some strings differently from BigQuery's.
 
 Default collations on views remain unsupported.
-Aggregates that compare collated ARRAY elements or STRUCT fields are limited to
-`COUNT(DISTINCT ...)`; value-returning DISTINCT aggregates over those types remain unsupported.
 
 ### RANGE values
 
