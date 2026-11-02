@@ -1,0 +1,48 @@
+version: 1
+description: >-
+  Record the Arrow schema a Storage Read session gives GEOGRAPHY columns. The reference gives
+  them Utf8 and says the field metadata indicates the original type, without naming its keys.
+  The emulator marks them with ARROW:extension:name google:sqlType:geography and
+  ARROW:extension:metadata {"encoding": "WKT"}, as the Python client's own schemas do.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: geography
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.t` (
+                value GEOGRAPHY, items ARRAY<GEOGRAPHY>, rec STRUCT<value GEOGRAPHY>);
+              INSERT `${project}.${dataset}.t` VALUES
+                (ST_GEOGPOINT(1, 2), [ST_GEOGPOINT(3, 4)], STRUCT(ST_GEOGPOINT(5, 6)));
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: session
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryRead/CreateReadSession
+          headers:
+            x-goog-request-params: read_session.table=projects/${project}/datasets/${dataset}/tables/t
+          requests:
+            - parent: projects/${project}
+              readSession:
+                table: projects/${project}/datasets/${dataset}/tables/t
+                dataFormat: ARROW
+              maxStreamCount: 1
+        observe:
+          schema: /messages/0/arrowSchema/serializedSchema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

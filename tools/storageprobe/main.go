@@ -264,6 +264,8 @@ var sections = []section{
 				RangeElementType: &bigquery.RangeElementType{Type: bigquery.DateFieldType}}}, storagepb.DataFormat_AVRO, nil, nil)},
 			{"INTERVAL columns", readSession(bigquery.Schema{{Name: "i", Type: bigquery.IntervalFieldType}},
 				storagepb.DataFormat_AVRO, nil, nil)},
+			{"GEOGRAPHY columns in Arrow", readSession(bigquery.Schema{{Name: "g", Type: bigquery.GeographyFieldType}},
+				storagepb.DataFormat_ARROW, nil, nil)},
 			{"JSON columns in Arrow", readSession(bigquery.Schema{{Name: "j", Type: bigquery.JSONFieldType}},
 				storagepb.DataFormat_ARROW, nil, nil)},
 		}},

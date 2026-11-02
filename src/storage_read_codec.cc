@@ -101,6 +101,19 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
       }
       break;
     case FieldType::kGeography:
+      ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
+      if (arrow) {
+        // WKT text, marked as the extension type BigQuery gives GEOGRAPHY.
+        nanoarrow::UniqueBuffer metadata;
+        ArrowCheck(ArrowMetadataBuilderInit(metadata.get(), nullptr));
+        ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
+                                              ArrowCharView("google:sqlType:geography")));
+        ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(),
+                                              ArrowCharView("ARROW:extension:metadata"),
+                                              ArrowCharView(R"({"encoding": "WKT"})")));
+        ArrowCheck(ArrowSchemaSetMetadata(out, reinterpret_cast<const char*>(metadata->data)));
+      }
+      break;
     case FieldType::kJson:
       if (arrow) {
         throw ApiError::Invalid("Storage Read does not support " +
