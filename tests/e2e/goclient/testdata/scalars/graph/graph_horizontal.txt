@@ -33,14 +33,62 @@ GRAPH scalar_graph.FinGraph LET x = [1,2,3] LET x2 = [4,5,6] LET r = WITH(a AS S
 => "15"
 
 # Aggregate input order follows array order, including NULL elements. Values follow the
-# horizontal_aggregation_array_agg and array_agg_with_nulls compliance examples, restricted
-# to calls without ordering modifiers. TO_JSON_STRING retains interior NULLs for the API.
+# horizontal_aggregation_array_agg and array_agg_with_nulls compliance examples.
+# TO_JSON_STRING retains interior NULLs for the API.
 GRAPH scalar_graph.FinGraph LET single = 3 LET x = [4, 5] LET r = ARRAY_AGG(x + single) RETURN TO_JSON_STRING(r) AS result
 => "[7,8]"
 GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(x IGNORE NULLS) RETURN TO_JSON_STRING(r) AS result
 => "[4,5]"
 GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(2 * x RESPECT NULLS) RETURN TO_JSON_STRING(r) AS result
 => "[8,null,10]"
+
+# ORDER BY supports computed keys, enclosing constants, and multiple keys, as in
+# horizontal_aggregation_array_agg. NULL placement follows array_agg_with_nulls.
+GRAPH scalar_graph.FinGraph LET single = 3 LET x = [4, 5] LET r = ARRAY_AGG(x + x ORDER BY x + single DESC) RETURN TO_JSON_STRING(r) AS result
+=> "[10,8]"
+GRAPH scalar_graph.FinGraph LET single = 3 LET x = [4, 5] LET r = ARRAY_AGG(x ORDER BY single, single, x) RETURN TO_JSON_STRING(r) AS result
+=> "[4,5]"
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(x IGNORE NULLS ORDER BY x) RETURN TO_JSON_STRING(r) AS result
+=> "[4,5]"
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(2 * x RESPECT NULLS ORDER BY x DESC NULLS LAST) RETURN TO_JSON_STRING(r) AS result
+=> "[10,8,null]"
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(2 * x RESPECT NULLS ORDER BY x DESC NULLS FIRST) RETURN TO_JSON_STRING(r) AS result
+=> "[null,10,8]"
+
+# DISTINCT and ORDER BY follow ordinary ARRAY_AGG semantics, including retaining one
+# NULL unless IGNORE NULLS is requested.
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+GRAPH scalar_graph.FinGraph LET x = [2, 1, 2, 3, 1] LET r = ARRAY_AGG(DISTINCT x ORDER BY x) RETURN TO_JSON_STRING(r) AS result
+=> "[1,2,3]"
+GRAPH scalar_graph.FinGraph LET x = [2, NULL, 1, NULL, 2] LET r = ARRAY_AGG(DISTINCT x ORDER BY x) RETURN TO_JSON_STRING(r) AS result
+=> "[null,1,2]"
+GRAPH scalar_graph.FinGraph LET x = [2, NULL, 1, NULL, 2] LET r = ARRAY_AGG(DISTINCT x IGNORE NULLS ORDER BY x DESC) RETURN TO_JSON_STRING(r) AS result
+=> "[2,1]"
+GRAPH scalar_graph.FinGraph LET x = [2, NULL, 1, NULL, 2] LET r = ARRAY_AGG(DISTINCT x ORDER BY x NULLS LAST) RETURN TO_JSON_STRING(r) AS result
+=> "[1,2,null]"
+GRAPH scalar_graph.FinGraph LET x = [1,2,3] LET z = ARRAY_AGG(DISTINCT x + 1 ORDER BY x + 1) RETURN TO_JSON_STRING(z) AS result
+=> "[2,3,4]"
+GRAPH scalar_graph.FinGraph LET x = ['b', 'a', 'b'] LET r = ARRAY_AGG(DISTINCT x ORDER BY x DESC) RETURN TO_JSON_STRING(r) AS result
+=> "[\"b\",\"a\"]"
+GRAPH scalar_graph.FinGraph LET x = [b'b', b'a', b'b'] LET r = ARRAY_AGG(DISTINCT x ORDER BY x) RETURN TO_HEX(r[OFFSET(0)]) AS result
+=> "61"
+GRAPH scalar_graph.FinGraph LET x = [NUMERIC '2', NUMERIC '1', NUMERIC '2'] LET r = ARRAY_AGG(DISTINCT x ORDER BY x) RETURN TYPEOF(r) AS result
+=> "ARRAY<NUMERIC>"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(2 AS k, 1 AS v), STRUCT(1 AS k, 2 AS v), STRUCT(1 AS k, 3 AS v)] LET r = ARRAY_AGG(x.v ORDER BY x.k, x.v DESC) RETURN TO_JSON_STRING(r) AS result
+=> "[3,2,1]"
+GRAPH scalar_graph.FinGraph LET x = [] LET r = ARRAY_AGG(DISTINCT x ORDER BY x) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<INT64>) LET r = ARRAY_AGG(DISTINCT x ORDER BY x) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INT64)] LET r = ARRAY_AGG(DISTINCT x IGNORE NULLS ORDER BY x) RETURN r IS NULL AS result
+=> "true"
+
+# Ordering FLOAT64 follows BigQuery's documented NULL, NaN, -inf, finite, +inf order.
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
+GRAPH scalar_graph.FinGraph LET x = [CAST('inf' AS FLOAT64), 1., CAST('NaN' AS FLOAT64), NULL, CAST('-inf' AS FLOAT64)] LET r = ARRAY_AGG(x ORDER BY x) RETURN TO_JSON_STRING(r) AS result
+=> "[null,\"NaN\",\"-Infinity\",1,\"Infinity\"]"
+GRAPH scalar_graph.FinGraph LET x = [CAST('inf' AS FLOAT64), 1., CAST('NaN' AS FLOAT64), NULL, CAST('-inf' AS FLOAT64)] LET r = ARRAY_AGG(x ORDER BY x DESC) RETURN TO_JSON_STRING(r) AS result
+=> "[\"Infinity\",1,\"-Infinity\",\"NaN\",null]"
 
 # Ordinary AVG result type and empty/NULL semantics.
 # third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
@@ -64,3 +112,9 @@ GRAPH scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3)-[e:Knows]->{0,1}(b:P
 => "0"
 GRAPH scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3)-[e:Knows]->{0,1}(b:Person) LET ids = ARRAY_AGG(e.id) RETURN ids IS NULL AS result
 => "true"
+GRAPH scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3)-[e:Knows]->{0,1}(b:Person) LET ids = ARRAY_AGG(DISTINCT e.id ORDER BY e.id) RETURN ids IS NULL AS result
+=> "true"
+
+# Decorated sorting and deduplication must not move failing inputs out of their branch.
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = IF(TRUE, [1], ARRAY_AGG(DISTINCT DIV(2, x) ORDER BY DIV(2, x))) RETURN TO_JSON_STRING(r) AS result
+=> "[1]"
