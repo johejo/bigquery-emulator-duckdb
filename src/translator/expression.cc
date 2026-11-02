@@ -20,6 +20,7 @@
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/comparison.h"
 #include "src/timestamp_precision.h"
+#include "src/translator/aggregate.h"
 #include "src/translator/collation.h"
 #include "src/translator/context.h"
 #include "src/translator/function.h"
@@ -463,6 +464,9 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       return std::nullopt;
     }
     return column->second;
+  }
+  if (expr.Is<googlesql::ResolvedArrayAggregate>()) {
+    return ArrayAggregate(*expr.GetAs<googlesql::ResolvedArrayAggregate>(), scope, columns);
   }
   if (expr.Is<googlesql::ResolvedWithExpr>()) {
     const auto& with = *expr.GetAs<googlesql::ResolvedWithExpr>();

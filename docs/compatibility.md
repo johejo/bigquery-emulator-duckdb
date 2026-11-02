@@ -465,7 +465,10 @@ Graph DDL rejects:
 - Graph elements or paths in query results.
 - Graph values in comparisons such as `a = b`, grouping sets, `PARTITION BY`, and aggregate or
   analytic functions other than `COUNT`; paths in `GROUP BY`, `DISTINCT` and `COUNT(DISTINCT)`.
-- Horizontal aggregation over group variables, such as `ARRAY_AGG(e.id)`.
+- Horizontal aggregates other than `SUM`, `AVG`, `MIN`, `MAX`, `COUNT` and `ARRAY_AGG`;
+  horizontal aggregates with `DISTINCT`, `ORDER BY`, `LIMIT`, `HAVING`, collation, or overloads
+  needing INTERVAL or BIGNUMERIC-specific aggregation; horizontal `SUM`, `AVG`, `MIN` and `MAX`
+  over FLOAT64, and horizontal `AVG` over types other than INT64.
 - `ELEMENT_ID`, `SOURCE_NODE_ID` and `DESTINATION_NODE_ID`.
 - NULL operands of `IS [NOT] SOURCE [OF]` and `IS [NOT] DESTINATION [OF]`, until their BigQuery
   behavior is verified.

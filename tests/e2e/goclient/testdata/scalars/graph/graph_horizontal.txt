@@ -1,0 +1,66 @@
+# Quantified group-variable SUM: BigQuery's documented two result rows.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+GRAPH scalar_graph.TransferGraph
+MATCH (src:Account {id: 7})-[e:Transfers WHERE e.amount > 100]->{0,2}(dst:Account)
+WHERE src.id != dst.id
+LET total_amount = SUM(e.amount)
+RETURN src.id AS src, dst.id AS dst, ARRAY_LENGTH(e) AS hops, total_amount
+NEXT
+RETURN STRING_AGG(FORMAT('%d:%d:%d:%d', src, dst, hops, total_amount), ',' ORDER BY dst) AS result
+=> "7:16:1:300,7:20:2:600"
+
+# GoogleSQL compliance graph_table_gql_extended1.test: horizontal_aggregation_simple,
+# separate_aggregations, empty_array, null_array, overflow and with_expr.
+# These forms use the same ordinary aggregate semantics documented in:
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+GRAPH scalar_graph.FinGraph LET single = 3 LET x = [4, 5] LET x2 = [5, 6] LET r = SUM(x * single) + SUM(x2) RETURN r
+=> "38"
+GRAPH scalar_graph.FinGraph LET x = [4, 5] LET y = [6, 7] LET z = SUM(x + x) + MIN(y) + MAX(x - x) RETURN z
+=> "24"
+GRAPH scalar_graph.FinGraph LET x = [] LET r = COUNT(x) + ARRAY_LENGTH(x) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET x = [] LET r = ARRAY_AGG(x) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET xs = CAST(NULL AS ARRAY<INT64>) LET r = SUM(xs) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET xs = CAST(NULL AS ARRAY<INT64>) LET r = COUNT(xs) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET xs = CAST(NULL AS ARRAY<INT64>) LET r = ARRAY_AGG(xs) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [3689348814741910528,3689348814741910528] LET r = SUM(x + x) RETURN r
+=> error contains: range
+GRAPH scalar_graph.FinGraph LET x = [1,2,3] LET x2 = [4,5,6] LET r = WITH(a AS SUM(x), 2 * a + COUNT(x2)) RETURN r
+=> "15"
+
+# Aggregate input order follows array order, including NULL elements. Values follow the
+# horizontal_aggregation_array_agg and array_agg_with_nulls compliance examples, restricted
+# to calls without ordering modifiers. TO_JSON_STRING retains interior NULLs for the API.
+GRAPH scalar_graph.FinGraph LET single = 3 LET x = [4, 5] LET r = ARRAY_AGG(x + single) RETURN TO_JSON_STRING(r) AS result
+=> "[7,8]"
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(x IGNORE NULLS) RETURN TO_JSON_STRING(r) AS result
+=> "[4,5]"
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = ARRAY_AGG(2 * x RESPECT NULLS) RETURN TO_JSON_STRING(r) AS result
+=> "[8,null,10]"
+
+# Ordinary AVG result type and empty/NULL semantics.
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 5] LET r = AVG(x) RETURN r
+=> "4.5"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INT64)] LET r = SUM(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INT64)] LET r = ARRAY_AGG(x IGNORE NULLS) RETURN r IS NULL AS result
+=> "true"
+
+# The conditional_evaluation compliance example establishes that failing inputs in an
+# unselected branch are not evaluated. Use DIV to keep the aggregate inputs INT64.
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = CASE WHEN SUM(x) = 9 THEN COUNT(x * 0) ELSE SUM(DIV(x, 0)) END RETURN r
+=> "3"
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = COALESCE(SUM(x), SUM(DIV(2, x))) RETURN r
+=> "9"
+
+# Empty group variables from zero repetitions obey the same empty-input rules.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+GRAPH scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3)-[e:Knows]->{0,1}(b:Person) LET n = COUNT(e) RETURN n
+=> "0"
+GRAPH scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3)-[e:Knows]->{0,1}(b:Person) LET ids = ARRAY_AGG(e.id) RETURN ids IS NULL AS result
+=> "true"

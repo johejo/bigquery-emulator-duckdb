@@ -58,6 +58,7 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH ANY SHORTEST (a:Person)-
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH ANY (a:Person)-[:Knows]->(b:Person) RETURN a.id AS src, b.id AS dst)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = ANY SHORTEST (a:Person)-[:Knows]->{0,2}(b:Person) RETURN PATH_LENGTH(p) AS hops)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = ANY SHORTEST (TRAIL (a:Person)-[:Knows]->{1,2}(b:Person)) RETURN PATH_LENGTH(p) AS hops)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (a:Account)-[e:Transfers]->{0,2}(b:Account) LET values = ARRAY_AGG(e.v) LET total = SUM(e.v) RETURN a.id, b.id AS dst, values, total)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH ANY CHEAPEST (a:Person)-[e:Knows COST 1]->(b:Person) RETURN a.id)
 
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS SOURCE OF e RETURN b IS DESTINATION OF e AS is_destination)
@@ -77,6 +78,9 @@ query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id UNION ALL MATCH (p:Pe
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id INTERSECT DISTINCT MATCH (p:Person)-[:Knows]->(:Person) RETURN p.id
 query GQL queries | GRAPH d.g MATCH (p:Person) CALL (p) { MATCH (p)-[:Knows]->(q:Person) RETURN q.id AS friend_id } RETURN p.id, friend_id
 query GQL queries | GRAPH d.g MATCH (p:Person) OPTIONAL CALL (p) { MATCH (p)-[:Knows]->(q:Person) RETURN q.id AS friend_id } RETURN p.id, friend_id
+query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{0,2}(b:Account) LET values = ARRAY_AGG(e.v) LET total = SUM(e.v) LET hops = COUNT(e) RETURN a.id, b.id AS dst, values, total, hops
+query GQL queries | GRAPH d.g LET values = [1, NULL, 3] LET mean = AVG(values) LET lo = MIN(values) LET hi = MAX(values) RETURN mean, lo, hi
+query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{1,2}(b:Account) LET values = ARRAY_AGG(DISTINCT e.v ORDER BY e.v) RETURN values
 query GQL queries | GRAPH d.g MATCH ANY CHEAPEST (a:Person)-[e:Knows COST 1]->(b:Person) RETURN a.id
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
