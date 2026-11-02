@@ -29,12 +29,13 @@ std::vector<FileSource> StageFileSources(const std::vector<std::string>& uris, F
 // it cannot be read.
 std::string ReadMaybeGzip(const std::string& path);
 
-// Rewrites JSON NUMERIC and BIGNUMERIC numbers as strings for exact conversion by FileReadQuery.
-// Returns the sources unchanged when the schema contains neither type. Malformed JSON and
-// invalid BIGNUMERIC values throw ApiError::Invalid.
+// Rewrites JSON NUMERIC and BIGNUMERIC numbers as strings for exact conversion by FileReadQuery,
+// and with `string_numbers` those of STRING fields as strings of their text. Returns the sources
+// unchanged when the schema contains none of those types. Malformed JSON and invalid BIGNUMERIC
+// values throw ApiError::Invalid.
 std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
-                                          TemporaryFiles& downloads);
+                                          TemporaryFiles& downloads, bool string_numbers = false);
 
 struct ParquetSources {
   std::vector<FileSource> sources;

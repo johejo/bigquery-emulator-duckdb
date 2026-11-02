@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 1 | 3 |
 | [Queries](#queries) | 34 | 2 |
 | [DML](#dml) | 9 | 0 |
-| [DDL](#ddl) | 23 | 10 |
+| [DDL](#ddl) | 24 | 9 |
 | [Collation](#collation) | 15 | 0 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 |
@@ -111,7 +111,7 @@ rejected.
 | `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE CLONE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE SNAPSHOT TABLE` | Supported | See [Table snapshots](compatibility.md#table-snapshots). |
-| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: NEWLINE_DELIMITED_JSON external tables without an explicit schema. |
+| `CREATE EXTERNAL TABLE` | Supported | See [External tables](compatibility.md#external-tables). |
 | `DROP TABLE` | Supported |  |
 | `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |

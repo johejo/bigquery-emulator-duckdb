@@ -285,7 +285,8 @@ class SqlRuntime {
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // The schema BigQuery detects from the sources of an external table created without one, with
   // the mode of each field given. Throws ApiError::Unsupported without an external table provider.
-  std::vector<FieldSchema> DetectExternalSchema(const GcsExternalData& definition);
+  std::vector<FieldSchema> DetectExternalSchema(const GcsExternalData& definition,
+                                                const std::string& table_id);
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,

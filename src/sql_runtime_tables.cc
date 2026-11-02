@@ -118,11 +118,12 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
   return info;
 }
 
-std::vector<FieldSchema> SqlRuntime::DetectExternalSchema(const GcsExternalData& definition) {
+std::vector<FieldSchema> SqlRuntime::DetectExternalSchema(const GcsExternalData& definition,
+                                                          const std::string& table_id) {
   if (!external_tables_) {
     throw ApiError::Unsupported("external tables without an explicit schema");
   }
-  std::vector<FieldSchema> schema = external_tables_(backend_)->DetectSchema(definition);
+  std::vector<FieldSchema> schema = external_tables_(backend_)->DetectSchema(definition, table_id);
   SetModesGiven(schema);
   return schema;
 }
@@ -138,7 +139,7 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
       throw ApiError::Duplicate("Already Exists: Table " + table.project_id + ":" +
                                 table.dataset_id + "." + table.table_id);
     }
-    schema = DetectExternalSchema(*metadata.external_data);
+    schema = DetectExternalSchema(*metadata.external_data, table.table_id);
   }
   std::scoped_lock const lock(expiration_mutex_);
   const DatasetMetadata dataset =

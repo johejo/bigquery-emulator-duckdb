@@ -95,11 +95,13 @@ bool HasType(const std::vector<FieldSchema>& fields, FieldType type) {
 
 // Rewrites a JSON value, writing the numbers of the NUMERIC and BIGNUMERIC fields of a schema as
 // strings that DuckDB casts exactly: a NUMERIC as its text, and a BIGNUMERIC as its units (see
-// src/bignumeric.h), which a CAST to BIGNUM at any depth reads. The fields of objects are matched
-// by name in any case. It implements json::sax_parse's interface.
+// src/bignumeric.h), which a CAST to BIGNUM at any depth reads. With `string_numbers`, the
+// numbers of STRING fields are their text too. The fields of objects are matched by name in any
+// case. It implements json::sax_parse's interface.
 class NumericQuoter {
  public:
-  explicit NumericQuoter(const std::vector<FieldSchema>& schema) : schema_(schema) {}
+  NumericQuoter(const std::vector<FieldSchema>& schema, bool string_numbers)
+      : schema_(schema), string_numbers_(string_numbers) {}
 
   [[nodiscard]] const std::string& Output() const { return out_; }
 
@@ -214,7 +216,7 @@ class NumericQuoter {
     Separate();
     if (IsField(FieldType::kBigNumeric)) {
       WriteBigNumeric(text);
-    } else if (IsField(FieldType::kNumeric)) {
+    } else if (IsField(FieldType::kNumeric) || (string_numbers_ && IsField(FieldType::kString))) {
       out_ += json(text).dump();
     } else {
       out_ += text;
@@ -232,6 +234,7 @@ class NumericQuoter {
   }
 
   const std::vector<FieldSchema>& schema_;
+  bool string_numbers_;
   std::vector<Frame> frames_;
   std::string out_;
 };
@@ -609,8 +612,9 @@ void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& 
 
 std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
-                                          TemporaryFiles& downloads) {
-  if (!HasType(schema, FieldType::kNumeric) && !HasType(schema, FieldType::kBigNumeric)) {
+                                          TemporaryFiles& downloads, bool string_numbers) {
+  if (!HasType(schema, FieldType::kNumeric) && !HasType(schema, FieldType::kBigNumeric) &&
+      !(string_numbers && HasType(schema, FieldType::kString))) {
     return sources;
   }
   std::vector<FileSource> staged;
@@ -626,7 +630,7 @@ std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources
       if (line.find_first_not_of(" \t\r") == std::string_view::npos) {
         rewritten += line;
       } else {
-        NumericQuoter quoter(schema);
+        NumericQuoter quoter(schema, string_numbers);
         json::sax_parse(line, &quoter);
         rewritten += quoter.Output();
       }

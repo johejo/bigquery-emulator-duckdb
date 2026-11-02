@@ -1,0 +1,322 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, runs k7rzotp3mfasddg3wgjgb22fp4 and
+# zjkr3yfemu4okj5pa4gwpabctw, as ../external_table_json_autodetect.api.yaml; the answers sidecar
+# keeps the observations. Each case names the emulator's mismatch.
+description: >-
+  Schema auto-detection of JSON external tables that the emulator does not match yet.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  # A second source, for cases that read only the first: {"z":true}.
+  second: eyJ6Ijp0cnVlfQo=
+  uris: "['${prefix}/a.json']"
+templates:
+  # Creates the table by DDL from a.json (`first`) and b.json (`second`), which `uris` lists.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.json', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/b.json', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'JSON', uris = ${uris})
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t), _FILE_NAME AS file FROM `${project}.${dataset}.t` AS t ORDER BY file, 1
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.json'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.json'}
+  # As ddl, for sources a query cannot read.
+  ddl_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.json', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/b.json', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'JSON', uris = ${uris})
+        observe:
+          status: /status
+          errors: /body/errors
+          message: /body/error/message
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t), _FILE_NAME AS file FROM `${project}.${dataset}.t` AS t ORDER BY file, 1
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.json'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.json'}
+  # As ddl, for sources BigQuery detects no schema of.
+  ddl_rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.json', base64: '${first}'}
+      - name: b
+        gcs: {method: PUT, object: '${run}/${case}/b.json', base64: '${second}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'JSON', uris = ${uris})
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.json'}
+      - name: delete_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.json'}
+  # Creates the table by tables.insert with `configuration` from a.json: {"id":"1","name":"a"}.
+  api:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.json', base64: '${first}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration: ${configuration}
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT TO_JSON_STRING(t) FROM `${project}.${dataset}.t` AS t ORDER BY 1
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.json'}
+  # tables.insert rejects `configuration`.
+  api_rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.json', base64: '${first}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration: ${configuration}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.json'}
+cases:
+  # String conversion to the types the documentation lists.
+  # Known bug: The emulator orders the columns as a libc++ std::unordered_map of their names does,
+  # which gives BigQuery's order for other objects but not this one's.
+  # a.json: {"i":"12","f":"1.5","b":"true","d":"2024-01-02","t":"03:04:05","s":"a","empty":""}
+  - name: ddl_string_scalars
+    template: ddl
+    vars:
+      first: 'eyJpIjoiMTIiLCJmIjoiMS41IiwiYiI6InRydWUiLCJkIjoiMjAyNC0wMS0wMiIsInQiOiIwMzowNDowNSIsInMiOiJhIiwiZW1wdHkiOiIifQo='
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "empty", "type": "STRING"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "b", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "t", "type": "TIME"}, {"mode": "NULLABLE", "name": "f", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "i", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/a.json\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"empty\":\"\",\"d\":\"2024-01-02\",\"b\":true,\"s\":\"a\",\"t\":\"03:04:05\",\"f\":1.5,\"i\":12}"}, {"v": "${prefix}/a.json"}]}], "status": 200}}
+  # Strings in the timestamp formats the documentation lists, and DATETIME forms.
+  # Known bug: The emulator orders the columns as a libc++ std::unordered_map of their names does,
+  # which gives BigQuery's order for other objects but not this one's.
+  # a.json: {"space":"2024-01-02 03:04:05","t":"2024-01-02T03:04:05","z":"2024-01-02T03:04:05Z","frac":"2024-01-02 03:04:05.123456","minutes":"2024-01-02 03:04","slash":"2024/01/02 03:04","offset":"2024-01-02 03:04:05.220 -05:00","utc":"2024-01-02 03:04:05 UTC"}
+  - name: ddl_string_timestamps
+    template: ddl
+    vars:
+      first: 'eyJzcGFjZSI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUiLCJ0IjoiMjAyNC0wMS0wMlQwMzowNDowNSIsInoiOiIyMDI0LTAxLTAyVDAzOjA0OjA1WiIsImZyYWMiOiIyMDI0LTAxLTAyIDAzOjA0OjA1LjEyMzQ1NiIsIm1pbnV0ZXMiOiIyMDI0LTAxLTAyIDAzOjA0Iiwic2xhc2giOiIyMDI0LzAxLzAyIDAzOjA0Iiwib2Zmc2V0IjoiMjAyNC0wMS0wMiAwMzowNDowNS4yMjAgLTA1OjAwIiwidXRjIjoiMjAyNC0wMS0wMiAwMzowNDowNSBVVEMifQo='
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "offset", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "t", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "minutes", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "slash", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "frac", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "z", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "utc", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "space", "type": "TIMESTAMP"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/a.json\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"offset\":\"2024-01-02T08:04:05.220Z\",\"t\":\"2024-01-02T03:04:05Z\",\"minutes\":\"2024-01-02T03:04:00Z\",\"slash\":\"2024-01-02T03:04:00Z\",\"frac\":\"2024-01-02T03:04:05.123456Z\",\"z\":\"2024-01-02T03:04:05Z\",\"utc\":\"2024-01-02T03:04:05Z\",\"space\":\"2024-01-02T03:04:05Z\"}"}, {"v": "${prefix}/a.json"}]}], "status": 200}}
+  # Number forms CSV detection treats specially.
+  # Known bug: The emulator orders the columns as a libc++ std::unordered_map of their names does,
+  # which gives BigQuery's order for other objects but not this one's.
+  # a.json: {"plus":"+1","thousands":"1,000","space":" 1","exp":"1e3","hex":"0x10","nan":"NaN","inf":"Infinity","dot":".5","big":"12345678901234567890"}
+  - name: ddl_string_numbers
+    template: ddl
+    vars:
+      first: 'eyJwbHVzIjoiKzEiLCJ0aG91c2FuZHMiOiIxLDAwMCIsInNwYWNlIjoiIDEiLCJleHAiOiIxZTMiLCJoZXgiOiIweDEwIiwibmFuIjoiTmFOIiwiaW5mIjoiSW5maW5pdHkiLCJkb3QiOiIuNSIsImJpZyI6IjEyMzQ1Njc4OTAxMjM0NTY3ODkwIn0K'
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "nan", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "big", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "hex", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "inf", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "exp", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "dot", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "thousands", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "space", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "plus", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/a.json\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"nan\":\"NaN\",\"big\":1.2345678901234567e+19,\"hex\":16,\"inf\":\"Infinity\",\"exp\":1000,\"dot\":0.5,\"thousands\":1000,\"space\":1,\"plus\":1}"}, {"v": "${prefix}/a.json"}]}], "status": 200}}
+  # Objects, arrays, arrays of objects and empty values.
+  # Known bug: BigQuery detects {} as a RECORD with no fields, which the emulator rejects.
+  # a.json: {"r":{"x":1,"y":"a"},"a":[1,2],"ra":[{"x":1},{"y":"b"}],"e":[],"o":{},"sa":["1","2"]}
+  - name: ddl_nested
+    template: ddl
+    vars:
+      first: 'eyJyIjp7IngiOjEsInkiOiJhIn0sImEiOlsxLDJdLCJyYSI6W3sieCI6MX0seyJ5IjoiYiJ9XSwiZSI6W10sIm8iOnt9LCJzYSI6WyIxIiwiMiJdfQo='
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "REPEATED", "name": "sa", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "o", "type": "RECORD"}, {"mode": "REPEATED", "name": "e", "type": "STRING"}, {"fields": [{"mode": "NULLABLE", "name": "y", "type": "STRING"}, {"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "REPEATED", "name": "ra", "type": "RECORD"}, {"mode": "REPEATED", "name": "a", "type": "INTEGER"}, {"fields": [{"mode": "NULLABLE", "name": "y", "type": "STRING"}, {"mode": "NULLABLE", "name": "x", "type": "INTEGER"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/a.json\"]\n);"}]}]}, "query": {"rows": [{"f": [{"v": "{\"sa\":[1,2],\"o\":{},\"e\":[],\"ra\":[{\"y\":null,\"x\":1},{\"y\":\"b\",\"x\":null}],\"a\":[1,2],\"r\":{\"y\":\"a\",\"x\":1}}"}, {"v": "${prefix}/a.json"}]}], "status": 200}}
+  # Blank lines between rows.
+  # Known bug: BigQuery fails at position 8, the empty line before the line of spaces, and the
+  # emulator at position 9, the line of spaces itself.
+  # a.json: {"x":1}
+  # a.json: 
+  # a.json:   
+  # a.json: {"x":2}
+  - name: ddl_blank_lines
+    template: ddl_unreadable
+    vars:
+      first: 'eyJ4IjoxfQoKICAKeyJ4IjoyfQo='
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "x", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/a.json\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 8: Unexpected token File: ${prefix}/a.json"}}
+  # tables.insert with autodetect keeps a given schema.
+  # Known bug: BigQuery keeps the given schema and its reads skip the field it lacks; the emulator
+  # rejects autodetect with a schema for JSON, since reads of a detected schema fail on such a
+  # field.
+  - name: api_autodetect_with_schema
+    template: api
+    vars:
+      first: 'eyJpZCI6IjEiLCJuYW1lIjoiYSJ9Cg=='
+      configuration: {"sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"], "autodetect": true, "schema": {"fields": [{"name": "id", "type": "STRING"}]}}
+    expect: {"create": {"external": {"autodetect": true, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "id", "type": "STRING"}]}, "status": 200}, "query": {"rows": [{"f": [{"v": "{\"id\":\"1\"}"}]}], "status": 200}}

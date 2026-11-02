@@ -1,0 +1,470 @@
+{
+  "version": 1,
+  "cases": {
+    "ddl_string_scalars": {
+      "project": "johejo-sandbox",
+      "run": "k7rzotp3mfasddg3wgjgb22fp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_scalars/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "empty",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_k7rzotp3mfasddg3wgjgb22fp4_ddl_string_scalars.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_scalars/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"empty\":\"\",\"d\":\"2024-01-02\",\"b\":true,\"s\":\"a\",\"t\":\"03:04:05\",\"f\":1.5,\"i\":12}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_scalars/a.json"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "ddl_string_timestamps": {
+      "project": "johejo-sandbox",
+      "run": "k7rzotp3mfasddg3wgjgb22fp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_timestamps/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "offset",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "minutes",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "slash",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "frac",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "z",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "utc",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "space",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_k7rzotp3mfasddg3wgjgb22fp4_ddl_string_timestamps.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_timestamps/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"offset\":\"2024-01-02T08:04:05.220Z\",\"t\":\"2024-01-02T03:04:05Z\",\"minutes\":\"2024-01-02T03:04:00Z\",\"slash\":\"2024-01-02T03:04:00Z\",\"frac\":\"2024-01-02T03:04:05.123456Z\",\"z\":\"2024-01-02T03:04:05Z\",\"utc\":\"2024-01-02T03:04:05Z\",\"space\":\"2024-01-02T03:04:05Z\"}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_timestamps/a.json"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "ddl_string_numbers": {
+      "project": "johejo-sandbox",
+      "run": "k7rzotp3mfasddg3wgjgb22fp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_numbers/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "nan",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "big",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "hex",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "inf",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "exp",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dot",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "thousands",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "space",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "plus",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_k7rzotp3mfasddg3wgjgb22fp4_ddl_string_numbers.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_numbers/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"nan\":\"NaN\",\"big\":1.2345678901234567e+19,\"hex\":16,\"inf\":\"Infinity\",\"exp\":1000,\"dot\":0.5,\"thousands\":1000,\"space\":1,\"plus\":1}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_string_numbers/a.json"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "ddl_nested": {
+      "project": "johejo-sandbox",
+      "run": "k7rzotp3mfasddg3wgjgb22fp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_nested/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "sa",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "o",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "e",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "ra",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "a",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "y",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "x",
+                    "type": "INTEGER"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_k7rzotp3mfasddg3wgjgb22fp4_ddl_nested.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_nested/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"sa\":[1,2],\"o\":{},\"e\":[],\"ra\":[{\"y\":null,\"x\":1},{\"y\":\"b\",\"x\":null}],\"a\":[1,2],\"r\":{\"y\":\"a\",\"x\":1}}"
+                },
+                {
+                  "v": "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/ddl_nested/a.json"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "ddl_blank_lines": {
+      "project": "johejo-sandbox",
+      "run": "zjkr3yfemu4okj5pa4gwpabctw",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/zjkr3yfemu4okj5pa4gwpabctw/ddl_blank_lines/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_zjkr3yfemu4okj5pa4gwpabctw_ddl_blank_lines.t`\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/zjkr3yfemu4okj5pa4gwpabctw/ddl_blank_lines/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_zjkr3yfemu4okj5pa4gwpabctw_ddl_blank_lines.t, error message: JSON parsing error in row starting at position 8: Unexpected token File: gs://johejo-sandbox-us/zjkr3yfemu4okj5pa4gwpabctw/ddl_blank_lines/a.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_zjkr3yfemu4okj5pa4gwpabctw_ddl_blank_lines.t, error message: JSON parsing error in row starting at position 8: Unexpected token File: gs://johejo-sandbox-us/zjkr3yfemu4okj5pa4gwpabctw/ddl_blank_lines/a.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "api_autodetect_with_schema": {
+      "project": "johejo-sandbox",
+      "run": "k7rzotp3mfasddg3wgjgb22fp4",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/k7rzotp3mfasddg3wgjgb22fp4/api_autodetect_with_schema/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":\"1\"}"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

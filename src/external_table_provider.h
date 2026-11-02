@@ -17,10 +17,13 @@ namespace bigquery_emulator_duckdb {
 class ExternalTableProvider {
  public:
   virtual ~ExternalTableProvider() = default;
-  virtual TableRead Read(GcsExternalData definition, std::vector<FieldSchema> schema) = 0;
-  // The schema of an external table created without one, read from its sources when it is
-  // created, as BigQuery detects it. Throws ApiError.
-  virtual std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition) = 0;
+  // `table_name`, as project.dataset.table, names the table in read errors.
+  virtual TableRead Read(GcsExternalData definition, std::vector<FieldSchema> schema,
+                         std::string table_name) = 0;
+  // The schema of the external table `table_id` created without one, read from its sources when
+  // it is created, as BigQuery detects it. Throws ApiError.
+  virtual std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition,
+                                                const std::string& table_id) = 0;
   virtual absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& key,
                                                                  const std::string& query,
                                                                  const std::string& options,
