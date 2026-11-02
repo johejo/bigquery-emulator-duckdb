@@ -18,25 +18,8 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_create_table_copy")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
+	dataset := newDataset(t, client, "go_create_table_copy")
+	run := (datasetQueries{t, client, dataset}).run
 	ids := func(table string) []int64 {
 		t.Helper()
 		query := client.Query("SELECT id FROM " + table + " ORDER BY id")
@@ -179,16 +162,7 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got [][]bigquery.Value
-	for {
-		var row []bigquery.Value
-		if err := rows.Next(&row); err == iterator.Done {
-			break
-		} else if err != nil {
-			t.Fatal(err)
-		}
-		got = append(got, row)
-	}
+	got := readRows(t, rows)
 	want := [][]bigquery.Value{
 		{"cloned", "CLONE", client.Project(), dataset.DatasetID, "source", clone.CloneTime},
 		{"copied", "BASE TABLE", nil, nil, nil, nil},

@@ -15,12 +15,7 @@ func TestTableUpdateSchema(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_update")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_table_update")
 
 	table := dataset.Table("t")
 	created := bigquery.Schema{
@@ -68,18 +63,7 @@ func TestTableUpdateSchema(t *testing.T) {
 
 	// Existing rows read the added fields as NULL, or empty for a REPEATED column, and the relaxed
 	// column takes NULL.
-	run := func(sql string) error {
-		job, err := client.Query(sql).Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
-	if err := run("INSERT go_table_update.t (point, doc) VALUES (STRUCT(3, 4), JSON '{}')"); err != nil {
+	if err := wait(ctx, client.Query("INSERT go_table_update.t (point, doc) VALUES (STRUCT(3, 4), JSON '{}')")); err != nil {
 		t.Fatal(err)
 	}
 	rows, err := client.Query(`SELECT id, point.y, items[SAFE_OFFSET(0)].count, doc, ARRAY_LENGTH(tags)
@@ -143,12 +127,7 @@ func TestTableUpdateViewQuery(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_view_update")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_view_update")
 
 	view := dataset.Table("v")
 	if err := view.Create(ctx, &bigquery.TableMetadata{ViewQuery: "SELECT 1 AS a"}); err != nil {

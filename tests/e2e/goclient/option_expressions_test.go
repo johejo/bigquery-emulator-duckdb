@@ -15,11 +15,7 @@ func TestCreateTableNullOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_create_table_null_options")
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_create_table_null_options")
 	for _, tc := range []struct {
 		name   string
 		create string
@@ -56,25 +52,12 @@ func TestOptionExpressions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_option_expressions")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_option_expressions")
 	run := func(sql string, parameters ...bigquery.QueryParameter) error {
 		query := client.Query(sql)
 		query.DefaultDatasetID = dataset.DatasetID
 		query.Parameters = parameters
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
+		return wait(ctx, query)
 	}
 	mustRun := func(sql string, parameters ...bigquery.QueryParameter) {
 		t.Helper()
