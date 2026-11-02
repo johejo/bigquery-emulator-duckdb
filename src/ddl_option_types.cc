@@ -58,6 +58,8 @@ constexpr auto kNames = std::to_array<std::pair<I, std::string_view>>({
     {I::kNullMarkers, "null_markers"},
     {I::kPreserveAsciiControlCharacters, "preserve_ascii_control_characters"},
     {I::kIgnoreUnknownValues, "ignore_unknown_values"},
+    {I::kHivePartitionUriPrefix, "hive_partition_uri_prefix"},
+    {I::kRequireHivePartitionFilter, "require_hive_partition_filter"},
 });
 constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kCreateExternalTable, .name = I::kSkipLeadingRows, .type = kInt64},
@@ -72,6 +74,8 @@ constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kCreateExternalTable, .name = I::kFormat, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kUris, .type = kStrings},
     {.context = C::kCreateExternalTable, .name = I::kEnableListInference, .type = kBool},
+    {.context = C::kCreateExternalTable, .name = I::kHivePartitionUriPrefix, .type = kString},
+    {.context = C::kCreateExternalTable, .name = I::kRequireHivePartitionFilter, .type = kBool},
     {.context = C::kCreateExternalTable, .name = I::kDescription, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kExpirationTimestamp, .type = kTimestamp},
     {.context = C::kCreateTable, .name = I::kDescription, .type = kString},

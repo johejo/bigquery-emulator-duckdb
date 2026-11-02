@@ -26,6 +26,13 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
 // the schema is; a source can lack NULLABLE columns and fields, and have fields the schema does
 // not. A NULL value of a REQUIRED column or field reads as NULL. JSON read errors name the table
 // `table_name`, as BigQuery's do.
+// The partition keys of the Hive-partitioned external table `table_id` defined as `definition`,
+// with `declared` those of WITH PARTITION COLUMNS, from the paths its sources list. Throws
+// ApiError as DetectHiveKeys does.
+std::vector<FieldSchema> DetectGcsPartitionKeys(const GcsExternalData& definition,
+                                                const std::vector<FieldSchema>& declared,
+                                                std::string_view table_id, GcsClient client);
+
 TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema,
                           std::string table_name, GcsClient client);
 

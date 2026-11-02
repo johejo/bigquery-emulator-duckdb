@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <cstddef>
@@ -287,6 +288,18 @@ FieldType KindType(DetectedKind kind) {
       break;
   }
   return FieldType::kString;
+}
+
+void CheckDetectedFieldName(const std::string& name) {
+  if (name.empty() || name.size() > 300 ||
+      (std::isalpha(static_cast<unsigned char>(name.front())) == 0 && name.front() != '_') ||
+      !std::ranges::all_of(name,
+                           [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; })) {
+    throw ApiError::Invalid(std::format(
+        "Invalid field name \"{}\". Fields must contain only letters, numbers, and underscores, "
+        "start with a letter or underscore, and be at most 300 characters long.",
+        name));
+  }
 }
 
 void CheckReservedFieldName(const std::string& name) {

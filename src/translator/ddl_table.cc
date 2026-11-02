@@ -20,11 +20,13 @@
 #include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/api_error.h"
 #include "src/catalog_table.h"
 #include "src/column_default.h"
 #include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/hive_partitioning.h"
 #include "src/references.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
@@ -936,9 +938,8 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
 std::optional<std::string> CreateExternalTable(
     const googlesql::ResolvedCreateExternalTableStmt& create, const Scope& scope) {
   if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
-      create.with_partition_columns() != nullptr || create.like_table() != nullptr ||
-      create.primary_key() != nullptr || !create.foreign_key_list().empty() ||
-      create.collation_name() != nullptr) {
+      create.like_table() != nullptr || create.primary_key() != nullptr ||
+      !create.foreign_key_list().empty() || create.collation_name() != nullptr) {
     return Unsupported(scope, "this CREATE EXTERNAL TABLE clause");
   }
   auto head = CreateTableHead(create, scope);
@@ -966,8 +967,41 @@ std::optional<std::string> CreateExternalTable(
     CheckFieldNames(*field, field->name);
     table.schema.push_back(std::move(*field));
   }
-  // The runtime detects the columns of a table that declares none from its sources and adds them.
-  if (table.schema.empty()) {
+  // WITH PARTITION COLUMNS takes the keys of the paths under hive_partition_uri_prefix, which
+  // BigQuery stores with a slash for a CUSTOM schema; require_hive_partition_filter alone is
+  // dropped.
+  if (!table.metadata.external_data) {
+    return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
+  }
+  auto& hive = table.metadata.external_data->hive_partitioning;
+  if (const auto* partition = create.with_partition_columns(); partition == nullptr) {
+    if (hive && !hive->source_uri_prefix.empty()) {
+      throw ApiError::InvalidQuery(
+          "hive_partition_uri_prefix needs to be used with WITH PARTITION COLUMNS.");
+    }
+    hive.reset();
+  } else {
+    if (!hive || hive->source_uri_prefix.empty()) {
+      throw ApiError::InvalidQuery(
+          "hive partitioning requires valid hive_partition_uri_prefix option");
+    }
+    hive->mode = partition->column_definition_list().empty() ? "AUTO" : "CUSTOM";
+    if (hive->mode == "CUSTOM") {
+      hive->source_uri_prefix += '/';
+    }
+    for (const auto& column : partition->column_definition_list()) {
+      auto field = ColumnField(*column, scope);
+      if (!field) {
+        return std::nullopt;
+      }
+      CheckHiveKeyType(field->mode == FieldMode::kRepeated ? FieldType::kRecord : field->type,
+                       column->type()->TypeName(googlesql::PRODUCT_EXTERNAL));
+      table.partition_columns.push_back(std::move(*field));
+    }
+  }
+  // The runtime detects the columns of a table that declares none from its sources and adds them,
+  // and adds a partitioned table's keys.
+  if (table.schema.empty() || hive) {
     scope.context.statement.table = std::move(table);
     return head;
   }

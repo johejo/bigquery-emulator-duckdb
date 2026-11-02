@@ -49,6 +49,14 @@
       "updateTime": "2026-10-02T03:50:23Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/hive-partitioned-queries",
+      "file": "third_party/bigquery_docs/hive-partitioned-queries.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/hive-partitioned-queries",
+      "title": "Manage external Hive partitioned data",
+      "sha256": "5fc696ed0d7dbe5e64ec6d767d97cfc69825a326b82a22249dee99f4d33d0e2e",
+      "updateTime": "2026-10-27T16:42:15Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-datasets-schemata-options",
       "file": "third_party/bigquery_docs/information-schema-datasets-schemata-options.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-datasets-schemata-options",

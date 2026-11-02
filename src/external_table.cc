@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iterator>
@@ -22,8 +23,10 @@
 #include "src/file_read.h"
 #include "src/file_read_options.h"
 #include "src/gcs.h"
+#include "src/hive_partitioning.h"
 #include "src/json_detect.h"
 #include "src/parquet_metadata.h"
+#include "src/schema_sql.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
@@ -342,6 +345,31 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
   return schema;
 }
 
+std::vector<FieldSchema> DetectGcsPartitionKeys(const GcsExternalData& definition,
+                                                const std::vector<FieldSchema>& declared,
+                                                std::string_view table_id, GcsClient client) {
+  if (!definition.hive_partitioning) {
+    return {};
+  }
+  const HivePartitioning& hive = *definition.hive_partitioning;
+  std::vector<FieldSchema> keys = declared;
+  if (hive.mode == "CUSTOM" && keys.empty()) {
+    keys = CustomPrefixKeys(hive.source_uri_prefix);
+    if (keys.empty()) {
+      throw ApiError::Invalid(std::format(
+          "Prefix must contain a valid encoding of partition schema, with at least one partition "
+          "key.  A proper example might be "
+          "gs://bucket/table_name/{{dt:DATE}}/{{country:STRING}}.  Provided input: '{}'.",
+          hive.source_uri_prefix));
+    }
+  }
+  std::vector<std::string> uris;
+  for (const std::string& uri : definition.uris) {
+    std::ranges::copy(client.Expand(uri), std::back_inserter(uris));
+  }
+  return DetectHiveKeys(hive, keys, uris, table_id);
+}
+
 TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema,
                           std::string table_name, GcsClient client) {
   return [definition = std::move(definition), schema = std::move(schema),
@@ -354,8 +382,43 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
                                           : json ? FileFormat::kJson
                                                  : FileFormat::kParquet,
                                           client, files);
+    // A partitioned table reads its keys from each source's path rather than its contents.
+    const HivePartitioning* hive =
+        definition.hive_partitioning && !definition.hive_partitioning->mode.empty()
+            ? &*definition.hive_partitioning
+            : nullptr;
+    std::vector<FieldSchema> keys;
+    std::vector<FieldSchema> file_schema = schema;
+    if (hive != nullptr) {
+      std::erase_if(file_schema, [hive](const FieldSchema& field) {
+        return std::ranges::find(hive->fields, field.name) != hive->fields.end();
+      });
+      std::ranges::transform(hive->fields, std::back_inserter(keys), [&schema](const auto& name) {
+        return *std::ranges::find(schema, name, &FieldSchema::name);
+      });
+      // As when BigQuery finds a key that is also a column of the files.
+      if (file_schema.empty()) {
+        throw ApiError::Invalid(
+            "Hive partitioning requires autodetect to be set or a non-empty schema to be "
+            "provided.");
+      }
+    }
+    const std::string table_id = table_name.substr(table_name.rfind('.') + 1);
+    // The columns of a source's `read`, its keys and _FILE_NAME.
+    const auto select = [&](const FileSource& source, const std::string& read) {
+      std::string columns = "*";
+      if (hive != nullptr) {
+        const auto values = HiveValues(*hive, keys, source.uri, table_id);
+        for (size_t i = 0; i < keys.size(); ++i) {
+          columns += ", CAST(" + (values.at(i) ? QuoteLiteral(*values.at(i)) : "NULL") + " AS " +
+                     ToDuckDbType(keys.at(i)) + ") AS " + QuoteIdentifier(keys.at(i).name);
+        }
+      }
+      return "SELECT " + columns + ", " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
+             read + ") AS source";
+    };
     std::vector<FieldSchema> read_schema;
-    std::ranges::transform(schema, std::back_inserter(read_schema), Unenforced);
+    std::ranges::transform(file_schema, std::back_inserter(read_schema), Unenforced);
     // An autodetected table reads each file with the delimiter and header rows BigQuery detects
     // in the alphabetically last one, which gives its schema, and matches columns by position.
     std::string delimiter = definition.field_delimiter.value_or(",");
@@ -373,8 +436,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       if (json) {
         std::vector<FileSource> staged;
         try {
-          staged =
-              StageExternalJson({source}, schema, files, definition.autodetect.value_or(false));
+          staged = StageExternalJson({source}, file_schema, files,
+                                     definition.autodetect.value_or(false));
         } catch (const ApiError& error) {
           if (std::string_view(error.what()).starts_with(kUnsupported)) {
             throw;
@@ -382,21 +445,17 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
           throw error.WithMessage(std::format("Error while reading table: {}, error message: {}",
                                               table_name, error.what()));
         }
-        reads.push_back(
-            "SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-            FileReadQuery(JsonReadOptions{.explicit_schema = true}, staged, read_schema) +
-            ") AS source");
+        reads.push_back(select(
+            source, FileReadQuery(JsonReadOptions{.explicit_schema = true}, staged, read_schema)));
         continue;
       }
       if (csv) {
         CsvReadOptions options = CsvOptions(definition);
         options.skip_leading_rows = skip_leading_rows;
         options.field_delimiter = delimiter;
-        reads.push_back("SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-                        FileReadQuery(options,
-                                      StageCsvSources({source}, options, read_schema, files),
-                                      read_schema) +
-                        ") AS source");
+        reads.push_back(select(
+            source, FileReadQuery(options, StageCsvSources({source}, options, read_schema, files),
+                                  read_schema)));
         continue;
       }
       const ThriftValue metadata = SourceMetadata(source);
@@ -404,7 +463,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
           ParquetColumns(metadata, definition.enable_list_inference.value_or(false));
       // Do not inherit load's coercions: a source column must have the type BigQuery would
       // detect for it, so that no incompatible column is silently cast to the declared type.
-      for (const auto& field : schema) {
+      for (const auto& field : file_schema) {
         const auto* column = columns.Child(field.name);
         const auto detected = column == nullptr ? std::nullopt : DetectedField(metadata, *column);
         if (detected && detected->mode == FieldMode::kRepeated &&
@@ -421,14 +480,12 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         }
       }
       // Each source is read with its own columns, which put back what DuckDB unwraps.
-      reads.push_back("SELECT *, " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
-                      FileReadQuery(
-                          ParquetReadOptions{
-                              .allow_missing_columns = true,
-                              .allow_null_list_elements = true,
-                          },
-                          {source}, read_schema, columns) +
-                      ") AS source");
+      reads.push_back(select(source, FileReadQuery(
+                                         ParquetReadOptions{
+                                             .allow_missing_columns = true,
+                                             .allow_null_list_elements = true,
+                                         },
+                                         {source}, read_schema, columns)));
     }
     if (reads.empty()) {
       throw ApiError::Invalid("External table source URIs match no files");
