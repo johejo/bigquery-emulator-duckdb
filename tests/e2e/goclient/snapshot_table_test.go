@@ -18,12 +18,7 @@ func TestCreateSnapshotTable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_snapshot_table")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_snapshot_table")
 	run := func(sql string) (*bigquery.JobStatus, error) {
 		_, status, err := runScript(t, client, dataset.DatasetID, sql)
 		return status, err
@@ -122,25 +117,7 @@ func TestCreateSnapshotTable(t *testing.T) {
 	// INFORMATION_SCHEMA reports the snapshot, its base table and when it was made.
 	// third_party/bigquery_docs/information-schema-tables.md
 	// third_party/bigquery_docs/information-schema-snapshots.md
-	read := func(sql string) [][]bigquery.Value {
-		t.Helper()
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		rows, err := query.Read(ctx)
-		if err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-		var got [][]bigquery.Value
-		for {
-			var row []bigquery.Value
-			if err := rows.Next(&row); err == iterator.Done {
-				return got
-			} else if err != nil {
-				t.Fatal(err)
-			}
-			got = append(got, row)
-		}
-	}
+	read := (datasetQueries{t, client, dataset}).read
 	tables := read(`SELECT table_name, table_type, is_insertable_into, base_table_catalog,
 	    base_table_schema, base_table_name, snapshot_time_ms = creation_time
 	  FROM go_snapshot_table.INFORMATION_SCHEMA.TABLES ORDER BY table_name`)
@@ -193,21 +170,11 @@ func TestCreateSnapshotTable(t *testing.T) {
 	}, "")
 	wantError("tables.patch of the schema", err,
 		"Only table expirationTime, description, friendlyName, labels and tags can be updated for a snapshot.")
-	jobError := func(job *bigquery.Job, err error) error {
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
-	}
 	for _, disposition := range []bigquery.TableWriteDisposition{bigquery.WriteAppend, bigquery.WriteTruncate} {
 		query := client.Query("SELECT 7 AS id, CAST(NULL AS DATE) AS day")
 		query.Dst = dataset.Table("snap")
 		query.WriteDisposition = disposition
-		wantError("query job with "+string(disposition), jobError(query.Run(ctx)), immutable)
+		wantError("query job with "+string(disposition), wait(ctx, query), immutable)
 	}
 	// BigQuery rejects a load when it is inserted, rather than failing the job.
 	source := bigquery.NewReaderSource(strings.NewReader(`{"id": 8}` + "\n"))

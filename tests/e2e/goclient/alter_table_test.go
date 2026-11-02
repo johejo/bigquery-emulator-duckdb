@@ -14,15 +14,8 @@ func TestAlterTableAddColumn(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_alter")
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
+	dataset := newDataset(t, client, "go_alter")
+	run := (datasetQueries{t, client, dataset}).run
 	for _, sql := range []string{
 		"CREATE TABLE users (id INT64)",
 		"INSERT users VALUES (1)",
@@ -112,16 +105,8 @@ func TestAlterTableDropColumnAndRename(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_alter_drop")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
+	dataset := newDataset(t, client, "go_alter_drop")
+	run := (datasetQueries{t, client, dataset}).run
 	for _, sql := range []string{
 		`CREATE TABLE events (id INT64, day DATE, name STRING, note STRING, extra STRING)
 		 PARTITION BY day CLUSTER BY name OPTIONS (description = 'events')`,
@@ -190,16 +175,8 @@ func TestAlterTableSetOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_alter_options")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
+	dataset := newDataset(t, client, "go_alter_options")
+	run := (datasetQueries{t, client, dataset}).run
 	type metadata struct {
 		Description, Name string
 		Labels            map[string]string
@@ -249,16 +226,8 @@ func TestAlterTableAlterColumnSetOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_alter_column_options")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) error {
-		_, _, err := runScript(t, client, dataset.DatasetID, sql)
-		return err
-	}
+	dataset := newDataset(t, client, "go_alter_column_options")
+	run := (datasetQueries{t, client, dataset}).run
 	check := func(want bigquery.Schema) {
 		t.Helper()
 		got, err := dataset.Table("t").Metadata(ctx)
@@ -318,17 +287,8 @@ func TestAlterTableColumnDefault(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_alter_default")
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
-	run := func(sql string) {
-		t.Helper()
-		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err != nil {
-			t.Fatalf("%s: %v", sql, err)
-		}
-	}
+	dataset := newDataset(t, client, "go_alter_default")
+	run := (datasetQueries{t, client, dataset}).mustRun
 	check := func(defaults ...string) {
 		t.Helper()
 		metadata, err := dataset.Table("t").Metadata(ctx)

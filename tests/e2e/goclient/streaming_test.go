@@ -12,12 +12,7 @@ func TestInserterPut(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_streaming")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-		t.Fatalf("Dataset.Create: %v", err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_streaming")
 	table := dataset.Table("events")
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType, Required: true},
@@ -67,12 +62,7 @@ func TestStreamingInsertOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_streaming_options")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-		t.Fatalf("Dataset.Create: %v", err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_streaming_options")
 
 	table := dataset.Table("events")
 	schema := bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType, Required: true}}

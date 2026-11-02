@@ -15,12 +15,7 @@ func TestJSONLoadNullColumns(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_json_load_nulls")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_json_load_nulls")
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
 		{Name: "s", Type: bigquery.StringFieldType},
@@ -46,14 +41,7 @@ func TestJSONLoadNullColumns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got [][]bigquery.Value
-	for {
-		var row []bigquery.Value
-		if err := rows.Next(&row); err != nil {
-			break
-		}
-		got = append(got, row)
-	}
+	got := readRows(t, rows)
 	want := [][]bigquery.Value{
 		{int64(1), nil, nil, nil, nil},
 		{int64(2), nil, nil, "1.5", nil},
