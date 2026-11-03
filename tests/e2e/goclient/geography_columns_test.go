@@ -3,15 +3,21 @@ package goclient
 import (
 	"cmp"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+	"github.com/apache/arrow-go/v18/parquet"
+	"github.com/apache/arrow-go/v18/parquet/file"
 	"google.golang.org/api/iterator"
 )
 
@@ -214,5 +220,171 @@ func TestGeographyParquetWkb(t *testing.T) {
 		{int64(2), nil, []bigquery.Value(nil)},
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("loaded = %v, want %v", got, want)
+	}
+}
+
+// A Parquet extract writes GEOGRAPHY columns as BYTE_ARRAY with GeoParquet metadata whose edges
+// are spherical, and a load of the file reads them back into GEOGRAPHY columns by default:
+// third_party/bigquery_docs/exporting-data.md
+// third_party/bigquery_docs/geospatial-data.md
+// The long constant-latitude line stays a single great-circle arc only with spherical edges.
+func TestGeographyParquetExtract(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := newDataset(t, client, "go_geography_parquet_extract")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
+	p.mustRun(`CREATE TABLE places AS SELECT * FROM UNNEST([
+	  STRUCT(1 AS id, ST_GEOGPOINT(2, 4) AS g, ST_GEOGPOINT(5, 6) AS h),
+	  (2, ST_GEOGFROMTEXT('LINESTRING(-60 60, 60 60)'), NULL),
+	  (3, ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))'), NULL),
+	  (4, NULL, NULL)])`)
+
+	extracted := filepath.Join(t.TempDir(), "places.parquet")
+	destination := bigquery.NewGCSReference(extracted)
+	destination.DestinationFormat = bigquery.Parquet
+	if err := wait(ctx, dataset.Table("places").ExtractorTo(destination)); err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	reader, err := file.OpenParquetFile(extracted, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	columns := reader.MetaData().Schema
+	for _, name := range []string{"g", "h"} {
+		column := columns.Column(columns.ColumnIndexByName(name))
+		if column.PhysicalType() != parquet.Types.ByteArray {
+			t.Errorf("%s is %s, want BYTE_ARRAY", name, column.PhysicalType())
+		}
+	}
+	geo := reader.MetaData().KeyValueMetadata().FindValue("geo")
+	if geo == nil {
+		t.Fatal("no GeoParquet metadata")
+	}
+	var metadata struct {
+		Columns map[string]struct {
+			Encoding string `json:"encoding"`
+			Edges    string `json:"edges"`
+		} `json:"columns"`
+	}
+	if err := json.Unmarshal([]byte(*geo), &metadata); err != nil {
+		t.Fatalf("GeoParquet metadata %s: %v", *geo, err)
+	}
+	for _, name := range []string{"g", "h"} {
+		if column, ok := metadata.Columns[name]; !ok || column.Encoding != "WKB" || column.Edges != "spherical" {
+			t.Errorf("GeoParquet metadata %s: want column %s in WKB with spherical edges", *geo, name)
+		}
+	}
+	if _, ok := metadata.Columns["id"]; ok || len(metadata.Columns) != 2 {
+		t.Errorf("GeoParquet metadata %s: want only columns g and h", *geo)
+	}
+
+	if err := loadParquet(ctx, dataset.Table("loaded"), extracted, nil); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	table, err := dataset.Table("loaded").Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range table.Schema {
+		if (field.Name == "g" || field.Name == "h") && field.Type != bigquery.GeographyFieldType {
+			t.Errorf("loaded %s as %s, want GEOGRAPHY", field.Name, field.Type)
+		}
+	}
+	if got, want := p.read(`SELECT id, IFNULL(ST_EQUALS(l.g, p.g), l.g IS NULL AND p.g IS NULL),
+		IFNULL(ST_EQUALS(l.h, p.h), l.h IS NULL AND p.h IS NULL)
+		FROM places AS p JOIN loaded AS l USING (id) ORDER BY id`), [][]bigquery.Value{
+		{int64(1), true, true},
+		{int64(2), true, true},
+		{int64(3), true, true},
+		{int64(4), true, true},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("loaded = %v, want each value as extracted", got)
+	}
+}
+
+// CSV and JSON extracts write each GEOGRAPHY, also REPEATED and in a RECORD, as the WKT that
+// tabledata.list returns, and a Parquet extract fails on a REPEATED GEOGRAPHY and on a GEOGRAPHY
+// in a RECORD. The expected values were recorded on BigQuery in project johejo-sandbox, runs
+// xte2ufb5rlbgmlndmar3ujkli3 and h4punfth2ppvhtlpxwcv4kt4e6, from cases of a scenario since
+// resolved.
+func TestGeographyTextExtract(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := newDataset(t, client, "go_geography_text_extract")
+	p := datasetQueries{t: t, client: client, dataset: dataset}
+	p.mustRun(`CREATE TABLE places AS SELECT * FROM UNNEST([
+	  STRUCT(1 AS id, ST_GEOGPOINT(-122.35, 47.62) AS g),
+	  (2, ST_GEOGFROMTEXT('LINESTRING(0 0, 132 0)')),
+	  (3, ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))')),
+	  (4, ST_GEOGFROMTEXT('MULTIPOINT(1 2, 3 4)')),
+	  (5, ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(5 5), LINESTRING(0 0, 1 1))')),
+	  (6, ST_GEOGFROMTEXT('POINT EMPTY')),
+	  (7, NULL)])`)
+	p.mustRun(`CREATE TABLE nested AS SELECT 1 AS id, [ST_GEOGPOINT(1, 2), ST_GEOGPOINT(3, 4)] AS gs,
+	  STRUCT(ST_GEOGPOINT(5, 6) AS g) AS r`)
+	extract := func(table string, format bigquery.DataFormat) ([]string, error) {
+		path := filepath.Join(t.TempDir(), table)
+		destination := bigquery.NewGCSReference(path)
+		destination.DestinationFormat = format
+		if err := wait(ctx, dataset.Table(table).ExtractorTo(destination)); err != nil {
+			return nil, err
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// BigQuery's lines were observed sorted.
+		lines := strings.Split(strings.TrimSuffix(string(contents), "\n"), "\n")
+		slices.Sort(lines)
+		return lines, nil
+	}
+
+	for _, c := range []struct {
+		table  string
+		format bigquery.DataFormat
+		want   []string
+	}{
+		{"places", bigquery.CSV, []string{
+			`1,POINT(-122.35 47.62)`,
+			`2,"LINESTRING(0 0, 132 0)"`,
+			`3,"POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))"`,
+			`4,"MULTIPOINT(1 2, 3 4)"`,
+			`5,"GEOMETRYCOLLECTION(POINT(5 5), LINESTRING(0 0, 1 1))"`,
+			`6,GEOMETRYCOLLECTION EMPTY`,
+			`7,`,
+			`id,g`,
+		}},
+		{"places", bigquery.JSON, []string{
+			`{"id":"1","g":"POINT(-122.35 47.62)"}`,
+			`{"id":"2","g":"LINESTRING(0 0, 132 0)"}`,
+			`{"id":"3","g":"POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))"}`,
+			`{"id":"4","g":"MULTIPOINT(1 2, 3 4)"}`,
+			`{"id":"5","g":"GEOMETRYCOLLECTION(POINT(5 5), LINESTRING(0 0, 1 1))"}`,
+			`{"id":"6","g":"GEOMETRYCOLLECTION EMPTY"}`,
+			`{"id":"7"}`,
+		}},
+		{"nested", bigquery.JSON, []string{
+			`{"id":"1","gs":["POINT(1 2)","POINT(3 4)"],"r":{"g":"POINT(5 6)"}}`,
+		}},
+	} {
+		got, err := extract(c.table, c.format)
+		if err != nil {
+			t.Errorf("%s to %s: %v", c.table, c.format, err)
+		} else if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s to %s: got %q, want %q", c.table, c.format, got, c.want)
+		}
+	}
+
+	// The first column GeoParquet cannot describe fails the extract.
+	p.mustRun("CREATE TABLE record AS SELECT 1 AS id, STRUCT(ST_GEOGPOINT(5, 6) AS g) AS r")
+	for table, column := range map[string]string{"nested": "Repeated column 'gs'", "record": "Nested column 'r.g'"} {
+		message := "Error while reading data, error message: " + column + " with GEOGRAPHY " +
+			"type cannot be exported to Parquet. GeoParquet only supports non-repeated root level columns"
+		if _, err := extract(table, bigquery.Parquet); err == nil || !strings.Contains(err.Error(), message) {
+			t.Errorf("%s to Parquet: got %v, want an error containing %q", table, err, message)
+		}
 	}
 }

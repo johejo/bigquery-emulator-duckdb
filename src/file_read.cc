@@ -510,16 +510,15 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
     ThriftValue metadata = ReadParquetMetadata(path);
     ParquetColumn columns = ParquetColumns(metadata, list_inference);
     bool geo = false;
-    // FileMetaData.key_value_metadata (5), KeyValue.key (1), value (2).
     // Hide geo from DuckDB: its native GEOMETRY reader discards the edge interpretation.
-    if (ThriftValue* entries = metadata.Field(5)) {
+    if (ThriftValue* entries = metadata.Field(parquet::kKeyValueMetadata)) {
       std::erase_if(entries->elements, [&](const ThriftValue& entry) {
-        const ThriftValue* key = entry.Field(1);
+        const ThriftValue* key = entry.Field(parquet::kKeyValueKey);
         if (key == nullptr || key->bytes != "geo") {
           return false;
         }
         geo = true;
-        const ThriftValue* value = entry.Field(2);
+        const ThriftValue* value = entry.Field(parquet::kKeyValueValue);
         if (value == nullptr) {
           throw ApiError::Invalid("GeoParquet metadata has no value");
         }

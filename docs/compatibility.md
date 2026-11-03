@@ -44,9 +44,13 @@ Loads and extracts also accept local paths. Their limits are:
 - CSV schema detection, which a load also performs when neither it nor its destination gives a
   schema, takes one file, rejects header names with a form feed or vertical tab, and takes none
   of the options above.
-- Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns.
+- Extracts write the whole table to one file and reject INTERVAL and RANGE columns, and in
+  Parquet, GEOGRAPHY fields that are REPEATED in a RECORD, nested in more than one RECORD or in a
+  REPEATED RECORD.
   BIGNUMERIC Parquet output uses `DECIMAL(76, 38)` with `BYTE_ARRAY` rather than
-  `FIXED_LEN_BYTE_ARRAY`.
+  `FIXED_LEN_BYTE_ARRAY`. GEOGRAPHY Parquet output is the WKB of `ST_ASBINARY`, with GeoParquet
+  1.0.0 metadata that gives each column only its encoding, spherical edges and an empty list of
+  geometry types.
 - A copy job's `destinationExpirationTime` is accepted only when creating its destination.
 - Copy jobs with `operationType` `SNAPSHOT`, `RESTORE` or `CLONE` take one source table without a
   default rounding mode and create their destination with `WRITE_EMPTY`; a `RESTORE` can also

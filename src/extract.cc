@@ -115,13 +115,24 @@ std::string ScalarText(const googlesql::Value& value) {
 
 void CheckTextFields(const std::vector<FieldSchema>& fields) {
   for (const FieldSchema& field : fields) {
-    if (field.type == FieldType::kInterval || field.type == FieldType::kRange ||
-        field.type == FieldType::kGeography) {
+    if (field.type == FieldType::kInterval || field.type == FieldType::kRange) {
       throw ApiError::Unsupported("extracting " + std::string(FieldTypeName(field.type)) +
                                   " columns");
     }
     CheckTextFields(field.fields);
   }
+}
+
+// `fields` with each GEOGRAPHY, at any depth, as the STRING of its WKT, which text extracts write
+// as they write a STRING.
+std::vector<FieldSchema> TextFields(std::vector<FieldSchema> fields) {
+  for (FieldSchema& field : fields) {
+    if (field.type == FieldType::kGeography) {
+      field.type = FieldType::kString;
+    }
+    field.fields = TextFields(std::move(field.fields));
+  }
+  return fields;
 }
 
 // The JSON object of a row or RECORD whose fields are `fields` and whose field `i` is
@@ -236,9 +247,13 @@ FieldSchema ParquetField(FieldSchema field) {
   switch (field.type) {
     case FieldType::kInterval:
     case FieldType::kRange:
-    case FieldType::kGeography:
       throw ApiError::Unsupported("extracting " + std::string(FieldTypeName(field.type)) +
                                   " columns to Parquet");
+    // GeoParquet describes only top-level columns, which ParquetExtractColumns writes.
+    case FieldType::kGeography:
+      throw ApiError::Unsupported(
+          "extracting GEOGRAPHY fields to Parquet that are REPEATED in a RECORD, nested in more "
+          "than one RECORD or in a REPEATED RECORD");
     // TIMESTAMP is written without isAdjustedToUTC, which is DuckDB's TIMESTAMP, and JSON as a
     // string.
     case FieldType::kTimestamp:
@@ -280,9 +295,62 @@ bool HasBigNumeric(const FieldSchema& field) {
   return field.type == FieldType::kBigNumeric || std::ranges::any_of(field.fields, HasBigNumeric);
 }
 
+// A top-level GEOGRAPHY column, which Parquet export writes as WKB described by GeoParquet
+// metadata.
+bool IsGeoParquetColumn(const FieldSchema& field) {
+  return field.type == FieldType::kGeography && field.mode != FieldMode::kRepeated;
+}
+
+bool ContainsGeography(const FieldSchema& field) {
+  return field.type == FieldType::kGeography ||
+         std::ranges::any_of(field.fields, ContainsGeography);
+}
+
+// Fails as BigQuery does on a GEOGRAPHY that GeoParquet cannot describe: a REPEATED column, or
+// a field of a RECORD column. Other forms, deeper or in a REPEATED RECORD, ParquetField rejects
+// as unsupported.
+void CheckGeoParquetField(const FieldSchema& field) {
+  const auto fail = [](std::string_view kind, const std::string& path) {
+    throw ApiError::Invalid(std::format(
+        "Error while reading data, error message: {} column '{}' with GEOGRAPHY type cannot be "
+        "exported to Parquet. GeoParquet only supports non-repeated root level columns",
+        kind, path));
+  };
+  if (field.type == FieldType::kGeography && field.mode == FieldMode::kRepeated) {
+    fail("Repeated", field.name);
+  }
+  if (field.type != FieldType::kRecord || field.mode == FieldMode::kRepeated) {
+    return;
+  }
+  const auto child = std::ranges::find_if(field.fields, ContainsGeography);
+  if (child != field.fields.end() && child->type == FieldType::kGeography &&
+      child->mode != FieldMode::kRepeated) {
+    fail("Nested", field.name + "." + child->name);
+  }
+}
+
+// The GeoParquet metadata of the GEOGRAPHY columns of `schema`, the first of which is the
+// primary column. Their edges are spherical, and the omitted CRS is CRS84, BigQuery's
+// coordinates. An empty list of geometry types allows any.
+std::string GeoParquetMetadata(const std::vector<FieldSchema>& schema) {
+  std::vector<std::string> columns;
+  for (const FieldSchema& field : schema) {
+    if (IsGeoParquetColumn(field)) {
+      columns.push_back(googlesql::JSONValue(field.name).GetConstRef().ToString() +
+                        R"(:{"encoding":"WKB","geometry_types":[],"edges":"spherical"})");
+    }
+  }
+  const std::string primary =
+      googlesql::JSONValue(std::ranges::find_if(schema, IsGeoParquetColumn)->name)
+          .GetConstRef()
+          .ToString();
+  return R"({"version":"1.0.0","primary_column":)" + primary + R"(,"columns":{)" +
+         Join(columns, ",") + "}}";
+}
+
 // The DuckDB value `sql` of `field`, a ParquetField, as Parquet export writes it. DuckDB cannot
 // write a DECIMAL wider than 38 digits, so a BIGNUMERIC is written as the bytes of a
-// DECIMAL(76, 38), which AnnotateParquetBigNumerics then declares in the footer. A lambda takes
+// DECIMAL(76, 38), which AnnotateParquetExtract then declares in the footer. A lambda takes
 // the name _e and its `depth`.
 std::string ParquetValue(const std::string& sql, const FieldSchema& field, int depth) {
   if (!HasBigNumeric(field)) {
@@ -342,9 +410,10 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
                             std::string(ExtractCompressionName(compression)));
   }
   CheckTextFields(schema);
+  const std::vector<FieldSchema> fields = TextFields(schema);
   googlesql::TypeFactory type_factory;
   std::vector<const googlesql::Type*> types;
-  std::ranges::transform(schema, std::back_inserter(types), [&](const FieldSchema& field) {
+  std::ranges::transform(fields, std::back_inserter(types), [&](const FieldSchema& field) {
     return Checked(GoogleSqlType(field, &type_factory));
   });
   const auto row = [&](size_t r) {
@@ -361,25 +430,25 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
       std::string line;
       const std::vector<googlesql::Value> values = row(r);
       AppendJsonObject(
-          schema, [&](size_t i) -> const googlesql::Value& { return values.at(i); }, line);
+          fields, [&](size_t i) -> const googlesql::Value& { return values.at(i); }, line);
       contents += EscapeHtml(line) + "\n";
     }
   } else {
-    const auto nested = std::ranges::find_if(schema, [](const FieldSchema& field) {
+    const auto nested = std::ranges::find_if(fields, [](const FieldSchema& field) {
       return field.type == FieldType::kRecord || field.mode == FieldMode::kRepeated;
     });
-    if (nested != schema.end()) {
+    if (nested != fields.end()) {
       throw ApiError::Invalid("Operation cannot be performed on a nested schema. Field: " +
                               nested->name);
     }
     const auto& csv = std::get<CsvExtractOptions>(options);
     const std::string& delimiter = csv.field_delimiter;
     if (csv.print_header) {
-      for (size_t i = 0; i < schema.size(); ++i) {
+      for (size_t i = 0; i < fields.size(); ++i) {
         if (i > 0) {
           contents += delimiter;
         }
-        AppendCsvField(schema.at(i).name, delimiter, contents);
+        AppendCsvField(fields.at(i).name, delimiter, contents);
       }
       contents += '\n';
     }
@@ -402,17 +471,37 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
 std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
+    CheckGeoParquetField(field);
     const std::string name = QuoteIdentifier(field.name);
-    columns.push_back(std::format("{} AS {}", ParquetValue(name, ParquetField(field), 0), name));
+    columns.push_back(std::format("{} AS {}",
+                                  IsGeoParquetColumn(field)
+                                      ? std::format("bq_st_asbinary({})", name)
+                                      : ParquetValue(name, ParquetField(field), 0),
+                                  name));
   }
   return Join(columns, ", ");
 }
 
-void AnnotateParquetBigNumerics(const std::string& path, const std::vector<FieldSchema>& schema) {
-  if (std::ranges::none_of(schema, HasBigNumeric)) {
+void AnnotateParquetExtract(const std::string& path, const std::vector<FieldSchema>& schema) {
+  const bool geography = std::ranges::any_of(schema, IsGeoParquetColumn);
+  if (std::ranges::none_of(schema, HasBigNumeric) && !geography) {
     return;
   }
   ThriftValue metadata = ReadParquetMetadata(path);
+  if (geography) {
+    ThriftValue entry = ThriftValue::Struct({
+        {.id = parquet::kKeyValueKey, .value = ThriftValue::Binary("geo")},
+        {.id = parquet::kKeyValueValue, .value = ThriftValue::Binary(GeoParquetMetadata(schema))},
+    });
+    if (ThriftValue* entries = metadata.Field(parquet::kKeyValueMetadata)) {
+      entries->elements.push_back(std::move(entry));
+    } else {
+      ThriftValue list;
+      list.type = ThriftValue::Type::kList;
+      list.elements.push_back(std::move(entry));
+      metadata.SetField(parquet::kKeyValueMetadata, std::move(list));
+    }
+  }
   // DuckDB writes a REPEATED field as a standard LIST group.
   const ParquetColumn columns = ParquetColumns(metadata, /*list_inference=*/true);
   std::vector<ThriftValue>& elements = metadata.Field(parquet::kSchema)->elements;

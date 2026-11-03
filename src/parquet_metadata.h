@@ -46,6 +46,7 @@ struct ThriftValue {
   std::vector<ThriftField> fields;
 
   static ThriftValue Int32(int32_t value);
+  static ThriftValue Binary(std::string value);
   static ThriftValue Struct(std::vector<ThriftField> fields);
 
   // The struct field `id`, or null when it is absent.
@@ -70,11 +71,14 @@ ThriftValue ReadParquetMetadata(const std::string& path);
 // are.
 void RewriteParquetMetadata(const std::string& path, const ThriftValue& metadata);
 
-// The fields of FileMetaData, SchemaElement, LogicalType, DecimalType, RowGroup, ColumnChunk and
-// ColumnMetaData that the emulator reads or writes.
+// The fields of FileMetaData, KeyValue, SchemaElement, LogicalType, DecimalType, RowGroup,
+// ColumnChunk and ColumnMetaData that the emulator reads or writes.
 namespace parquet {
 inline constexpr int16_t kSchema = 2;
 inline constexpr int16_t kRowGroups = 4;
+inline constexpr int16_t kKeyValueMetadata = 5;
+inline constexpr int16_t kKeyValueKey = 1;
+inline constexpr int16_t kKeyValueValue = 2;
 inline constexpr int16_t kElementType = 1;
 inline constexpr int16_t kElementTypeLength = 2;
 inline constexpr int16_t kElementRepetition = 3;

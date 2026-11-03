@@ -38,6 +38,7 @@
 #include "src/parquet_metadata.h"
 #include "src/references.h"
 #include "src/result_googlesql.h"
+#include "src/schema_sql.h"
 #include "src/sql_runtime.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
@@ -625,9 +626,10 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
                           encoding.compression == ExtractCompression::kNone
                               ? "uncompressed"
                               : ToLowerAscii(ExtractCompressionName(encoding.compression))));
-      AnnotateParquetBigNumerics(path, table.schema);
+      AnnotateParquetExtract(path, table.schema);
     } else {
-      const QueryResult result = Execute("SELECT * FROM " + ReadTableRelation(backend_, source));
+      const QueryResult result = Execute("SELECT " + ReadColumns(table.schema) + " FROM " +
+                                         ReadTableRelation(backend_, source));
       const TextExtractFormatOptions options =
           ParseTextExtractFormatOptions(encoding.format, extract.configuration);
       WriteTextExtract(

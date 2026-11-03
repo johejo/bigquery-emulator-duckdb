@@ -1276,6 +1276,7 @@ cc_library(
         ":object_ref",
         ":parquet_metadata",
         ":result_googlesql",
+        ":schema_sql",
         ":service_backend",
         ":service_table_provider",
         ":table_metadata",

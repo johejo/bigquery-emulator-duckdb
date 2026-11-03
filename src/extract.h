@@ -16,7 +16,8 @@ class Value;
 
 namespace bigquery_emulator_duckdb {
 
-// The value of column `column` of row `row` of an extracted table as a GoogleSQL value of `type`.
+// The value of column `column` of row `row` of an extracted table as a GoogleSQL value of `type`,
+// with each GEOGRAPHY as the STRING of its WKT, as ReadColumns reads it.
 using ExtractValue = std::function<absl::StatusOr<googlesql::Value>(size_t row, size_t column,
                                                                     const googlesql::Type* type)>;
 
@@ -30,8 +31,9 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
 // BigQuery's Parquet export writes. Throws ApiError for a type the emulator does not export.
 std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema);
 
-// Declares the BIGNUMERIC columns of `schema` in the Parquet file `path`, which DuckDB wrote from
-// ParquetExtractColumns, as DECIMAL(76, 38), the type BigQuery's Parquet export writes.
-void AnnotateParquetBigNumerics(const std::string& path, const std::vector<FieldSchema>& schema);
+// Completes the footer of the Parquet file `path`, which DuckDB wrote from ParquetExtractColumns,
+// as BigQuery's Parquet export writes it: BIGNUMERIC columns of `schema` are DECIMAL(76, 38), and
+// GeoParquet metadata describes its top-level GEOGRAPHY columns.
+void AnnotateParquetExtract(const std::string& path, const std::vector<FieldSchema>& schema);
 
 }  // namespace bigquery_emulator_duckdb
