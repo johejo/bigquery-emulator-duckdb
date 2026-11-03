@@ -171,6 +171,16 @@ json QueryResult::SchemaToJson() const {
   return bigquery_emulator_duckdb::SchemaToJson(given);
 }
 
+std::vector<std::vector<std::optional<std::string>>> QueryResult::TextRows() const {
+  std::vector<std::vector<std::optional<std::string>>> text(rows.size());
+  for (size_t row = 0; row < rows.size(); ++row) {
+    for (size_t column = 0; column < schema.size(); ++column) {
+      text.at(row).push_back(rows.OptionalString(row, column));
+    }
+  }
+  return text;
+}
+
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
   std::mutex ddl_mutex;

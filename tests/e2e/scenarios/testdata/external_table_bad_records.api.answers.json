@@ -1,6 +1,103 @@
 {
   "version": 1,
   "cases": {
+    "warnings_csv": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_csv/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
     "warnings_script": {
       "project": "johejo-sandbox",
       "run": "ogj6cok4pl35drtorqgjhk34iz",
@@ -61,6 +158,2013 @@
               ]
             }
           ]
+        }
+      }
+    },
+    "warnings_read_twice": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_read_twice/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "warnings_filtered": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_filtered/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "warnings_other_column": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "b"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "b"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "warnings_count_star": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_count_star/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_count_star/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_count_star/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "3"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_count_star/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_count_star/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "3"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "warnings_other_column_exceeded": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column_exceeded/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column_exceeded/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column_exceeded/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "b"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column_exceeded/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_other_column_exceeded/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "b"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "warnings_create_table_as_select": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+                "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+              "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_create_table_as_select/a.csv",
+              "reason": "invalid"
+            }
+          ]
+        }
+      }
+    },
+    "warnings_many": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 3 byte_offset_to_start_of_line: 8 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 4 byte_offset_to_start_of_line: 12 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 5 byte_offset_to_start_of_line: 16 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 6 byte_offset_to_start_of_line: 20 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 7 byte_offset_to_start_of_line: 24 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 8 byte_offset_to_start_of_line: 28 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 9 byte_offset_to_start_of_line: 32 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 10 byte_offset_to_start_of_line: 36 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 11 byte_offset_to_start_of_line: 40 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 12 byte_offset_to_start_of_line: 44 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 13 byte_offset_to_start_of_line: 48 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 14 byte_offset_to_start_of_line: 52 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 15 byte_offset_to_start_of_line: 56 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 16 byte_offset_to_start_of_line: 60 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 17 byte_offset_to_start_of_line: 64 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 18 byte_offset_to_start_of_line: 68 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 19 byte_offset_to_start_of_line: 72 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 20 byte_offset_to_start_of_line: 76 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 21 byte_offset_to_start_of_line: 80 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 22 byte_offset_to_start_of_line: 84 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 23 byte_offset_to_start_of_line: 88 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 24 byte_offset_to_start_of_line: 92 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 25 byte_offset_to_start_of_line: 96 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 26 byte_offset_to_start_of_line: 100 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 27 byte_offset_to_start_of_line: 104 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 28 byte_offset_to_start_of_line: 108 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 29 byte_offset_to_start_of_line: 112 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 30 byte_offset_to_start_of_line: 116 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 31 byte_offset_to_start_of_line: 120 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 32 byte_offset_to_start_of_line: 124 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 33 byte_offset_to_start_of_line: 128 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 34 byte_offset_to_start_of_line: 132 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 35 byte_offset_to_start_of_line: 136 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 36 byte_offset_to_start_of_line: 140 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 37 byte_offset_to_start_of_line: 144 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 38 byte_offset_to_start_of_line: 148 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 39 byte_offset_to_start_of_line: 152 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 40 byte_offset_to_start_of_line: 156 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 41 byte_offset_to_start_of_line: 160 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 42 byte_offset_to_start_of_line: 164 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 43 byte_offset_to_start_of_line: 168 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 44 byte_offset_to_start_of_line: 172 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 45 byte_offset_to_start_of_line: 176 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 46 byte_offset_to_start_of_line: 180 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 47 byte_offset_to_start_of_line: 184 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 48 byte_offset_to_start_of_line: 188 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 49 byte_offset_to_start_of_line: 192 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 50 byte_offset_to_start_of_line: 196 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 51 byte_offset_to_start_of_line: 200 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 52 byte_offset_to_start_of_line: 204 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 53 byte_offset_to_start_of_line: 208 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 54 byte_offset_to_start_of_line: 212 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 55 byte_offset_to_start_of_line: 216 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 56 byte_offset_to_start_of_line: 220 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 57 byte_offset_to_start_of_line: 224 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 58 byte_offset_to_start_of_line: 228 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 59 byte_offset_to_start_of_line: 232 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 60 byte_offset_to_start_of_line: 236 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 61 byte_offset_to_start_of_line: 240 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 62 byte_offset_to_start_of_line: 244 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 63 byte_offset_to_start_of_line: 248 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 64 byte_offset_to_start_of_line: 252 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 65 byte_offset_to_start_of_line: 256 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 66 byte_offset_to_start_of_line: 260 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 67 byte_offset_to_start_of_line: 264 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 68 byte_offset_to_start_of_line: 268 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 69 byte_offset_to_start_of_line: 272 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 70 byte_offset_to_start_of_line: 276 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 71 byte_offset_to_start_of_line: 280 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 72 byte_offset_to_start_of_line: 284 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 73 byte_offset_to_start_of_line: 288 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 74 byte_offset_to_start_of_line: 292 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 75 byte_offset_to_start_of_line: 296 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 76 byte_offset_to_start_of_line: 300 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 77 byte_offset_to_start_of_line: 304 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 78 byte_offset_to_start_of_line: 308 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 79 byte_offset_to_start_of_line: 312 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 80 byte_offset_to_start_of_line: 316 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 81 byte_offset_to_start_of_line: 320 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 82 byte_offset_to_start_of_line: 324 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 83 byte_offset_to_start_of_line: 328 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 84 byte_offset_to_start_of_line: 332 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 85 byte_offset_to_start_of_line: 336 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 86 byte_offset_to_start_of_line: 340 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 87 byte_offset_to_start_of_line: 344 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 88 byte_offset_to_start_of_line: 348 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 89 byte_offset_to_start_of_line: 352 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 90 byte_offset_to_start_of_line: 356 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 91 byte_offset_to_start_of_line: 360 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 92 byte_offset_to_start_of_line: 364 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 93 byte_offset_to_start_of_line: 368 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 94 byte_offset_to_start_of_line: 372 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 95 byte_offset_to_start_of_line: 376 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 96 byte_offset_to_start_of_line: 380 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 97 byte_offset_to_start_of_line: 384 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 98 byte_offset_to_start_of_line: 388 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 99 byte_offset_to_start_of_line: 392 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 100 byte_offset_to_start_of_line: 396 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "message": "Error while reading data, error message: Unable to parse; line_number: 101 byte_offset_to_start_of_line: 400 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 3 byte_offset_to_start_of_line: 8 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 4 byte_offset_to_start_of_line: 12 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 5 byte_offset_to_start_of_line: 16 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 6 byte_offset_to_start_of_line: 20 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 7 byte_offset_to_start_of_line: 24 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 8 byte_offset_to_start_of_line: 28 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 9 byte_offset_to_start_of_line: 32 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 10 byte_offset_to_start_of_line: 36 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 11 byte_offset_to_start_of_line: 40 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 12 byte_offset_to_start_of_line: 44 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 13 byte_offset_to_start_of_line: 48 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 14 byte_offset_to_start_of_line: 52 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 15 byte_offset_to_start_of_line: 56 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 16 byte_offset_to_start_of_line: 60 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 17 byte_offset_to_start_of_line: 64 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 18 byte_offset_to_start_of_line: 68 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 19 byte_offset_to_start_of_line: 72 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 20 byte_offset_to_start_of_line: 76 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 21 byte_offset_to_start_of_line: 80 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 22 byte_offset_to_start_of_line: 84 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 23 byte_offset_to_start_of_line: 88 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 24 byte_offset_to_start_of_line: 92 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 25 byte_offset_to_start_of_line: 96 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 26 byte_offset_to_start_of_line: 100 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 27 byte_offset_to_start_of_line: 104 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 28 byte_offset_to_start_of_line: 108 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 29 byte_offset_to_start_of_line: 112 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 30 byte_offset_to_start_of_line: 116 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 31 byte_offset_to_start_of_line: 120 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 32 byte_offset_to_start_of_line: 124 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 33 byte_offset_to_start_of_line: 128 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 34 byte_offset_to_start_of_line: 132 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 35 byte_offset_to_start_of_line: 136 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 36 byte_offset_to_start_of_line: 140 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 37 byte_offset_to_start_of_line: 144 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 38 byte_offset_to_start_of_line: 148 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 39 byte_offset_to_start_of_line: 152 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 40 byte_offset_to_start_of_line: 156 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 41 byte_offset_to_start_of_line: 160 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 42 byte_offset_to_start_of_line: 164 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 43 byte_offset_to_start_of_line: 168 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 44 byte_offset_to_start_of_line: 172 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 45 byte_offset_to_start_of_line: 176 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 46 byte_offset_to_start_of_line: 180 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 47 byte_offset_to_start_of_line: 184 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 48 byte_offset_to_start_of_line: 188 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 49 byte_offset_to_start_of_line: 192 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 50 byte_offset_to_start_of_line: 196 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 51 byte_offset_to_start_of_line: 200 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 52 byte_offset_to_start_of_line: 204 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 53 byte_offset_to_start_of_line: 208 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 54 byte_offset_to_start_of_line: 212 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 55 byte_offset_to_start_of_line: 216 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 56 byte_offset_to_start_of_line: 220 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 57 byte_offset_to_start_of_line: 224 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 58 byte_offset_to_start_of_line: 228 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 59 byte_offset_to_start_of_line: 232 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 60 byte_offset_to_start_of_line: 236 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 61 byte_offset_to_start_of_line: 240 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 62 byte_offset_to_start_of_line: 244 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 63 byte_offset_to_start_of_line: 248 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 64 byte_offset_to_start_of_line: 252 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 65 byte_offset_to_start_of_line: 256 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 66 byte_offset_to_start_of_line: 260 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 67 byte_offset_to_start_of_line: 264 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 68 byte_offset_to_start_of_line: 268 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 69 byte_offset_to_start_of_line: 272 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 70 byte_offset_to_start_of_line: 276 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 71 byte_offset_to_start_of_line: 280 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 72 byte_offset_to_start_of_line: 284 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 73 byte_offset_to_start_of_line: 288 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 74 byte_offset_to_start_of_line: 292 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 75 byte_offset_to_start_of_line: 296 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 76 byte_offset_to_start_of_line: 300 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 77 byte_offset_to_start_of_line: 304 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 78 byte_offset_to_start_of_line: 308 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 79 byte_offset_to_start_of_line: 312 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 80 byte_offset_to_start_of_line: 316 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 81 byte_offset_to_start_of_line: 320 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 82 byte_offset_to_start_of_line: 324 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 83 byte_offset_to_start_of_line: 328 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 84 byte_offset_to_start_of_line: 332 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 85 byte_offset_to_start_of_line: 336 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 86 byte_offset_to_start_of_line: 340 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 87 byte_offset_to_start_of_line: 344 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 88 byte_offset_to_start_of_line: 348 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 89 byte_offset_to_start_of_line: 352 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 90 byte_offset_to_start_of_line: 356 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 91 byte_offset_to_start_of_line: 360 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 92 byte_offset_to_start_of_line: 364 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 93 byte_offset_to_start_of_line: 368 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 94 byte_offset_to_start_of_line: 372 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 95 byte_offset_to_start_of_line: 376 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 96 byte_offset_to_start_of_line: 380 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 97 byte_offset_to_start_of_line: 384 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 98 byte_offset_to_start_of_line: 388 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 99 byte_offset_to_start_of_line: 392 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 100 byte_offset_to_start_of_line: 396 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "message": "Error while reading data, error message: Unable to parse; line_number: 101 byte_offset_to_start_of_line: 400 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: gs://johejo-sandbox-us/ogj6cok4pl35drtorqgjhk34iz/warnings_many/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "order_csv_same_size": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "message": "Error while reading table: johejo-sandbox.bqa_ogj6cok4pl35drtorqgjhk34iz_order_csv_same_size.t, error message: CSV processing encountered too many errors, giving up. Rows: 4; errors: 2; max bad: 1; error percent: 0",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "order_csv_bytes_records": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "message": "Error while reading table: johejo-sandbox.bqa_ogj6cok4pl35drtorqgjhk34iz_order_csv_bytes_records.t, error message: CSV processing encountered too many errors, giving up. Rows: 6; errors: 2; max bad: 1; error percent: 0",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "order_csv_three_first": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "message": "Error while reading table: johejo-sandbox.bqa_ogj6cok4pl35drtorqgjhk34iz_order_csv_three_first.t, error message: CSV processing encountered too many errors, giving up. Rows: 9; errors: 3; max bad: 1; error percent: 0",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "order_csv_three_last": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "message": "Error while reading table: johejo-sandbox.bqa_ogj6cok4pl35drtorqgjhk34iz_order_csv_three_last.t, error message: CSV processing encountered too many errors, giving up. Rows: 9; errors: 3; max bad: 2; error percent: 0",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "order_json_files": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "message": "Error while reading table: johejo-sandbox.bqa_ogj6cok4pl35drtorqgjhk34iz_order_json_files.t, error message: JSON processing encountered too many errors, giving up. Rows: 6; errors: 3; max bad: 2; error percent: 0",
+          "reason": "invalid",
+          "status": 400
         }
       }
     }

@@ -53,7 +53,9 @@ class FileSource : public TableSource {
     return std::vector<FieldSchema>{{.name = "value", .type = FieldType::kInteger}};
   }
 
-  std::optional<TableRead> ReadQuery(const TableReference& /*table*/) override { return prepare_; }
+  std::optional<TableRead> ReadQuery(const TableReference& /*table*/) override {
+    return [prepare = prepare_](TableReadContext& context) { return prepare(context.files); };
+  }
 
  private:
   Preparation prepare_;

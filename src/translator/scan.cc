@@ -9,6 +9,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -795,6 +796,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     }
     Relation result;
     std::vector<std::string> projections;
+    std::set<std::string> names;
     for (int i = 0; i < table->column_list_size(); ++i) {
       const auto& column = table->column_list(i);
       if (!DuckDbType(column.type(), scope.context.timestamp_precision) ||
@@ -802,10 +804,10 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
         return Unsupported(scope, "column type " + column.type()->DebugString());
       }
       const std::string alias = ColumnName(column.column_id());
+      const std::string name = table->table()->GetColumn(table->column_index_list(i))->Name();
+      names.insert(name);
       projections.push_back(
-          StoredColumn(
-              QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()),
-              column.type(), scope.context.timestamp_precision) +
+          StoredColumn(QuoteIdentifier(name), column.type(), scope.context.timestamp_precision) +
           " AS " + alias);
       result.columns.emplace(column.column_id(), "q." + alias);
     }
@@ -816,7 +818,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
         history || stored_table == nullptr
             ? std::nullopt
             : StatementResources::ReadQuery(stored_table->reference(), stored_table->ReadQuery(),
-                                            scope.context.resources);
+                                            scope.context.resources, names);
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +
                  (history                ? "(" + *history + ") AS v"

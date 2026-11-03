@@ -63,8 +63,8 @@ class StagedProvider : public ExternalTableProvider {
 
   TableRead Read(GcsExternalData /*definition*/, std::vector<FieldSchema> /*schema*/,
                  std::string /*table_name*/) override {
-    return [payload = payload_, path = &path_](TemporaryFiles& files) {
-      *path = files.Write(*payload);
+    return [payload = payload_, path = &path_](TableReadContext& context) {
+      *path = context.files.Write(*payload);
       return "SELECT content FROM read_text(" + QuoteLiteral(*path) + ")";
     };
   }

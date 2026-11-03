@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -30,26 +32,44 @@ struct CsvReadOptions {
   bool quoted_nulls = true;
   // Whether staged records begin with their number, which FileReadQuery reads as the column
   // "bad.record", and FileReadQuery leaves out a record with a value its reader cannot convert,
-  // which the caller counts as bad, rather than failing.
+  // which the caller finds and counts as bad, rather than failing.
   bool numbered_records = false;
 };
 
+// A record a read skips as bad, of which BigQuery warns.
+struct BadRecord {
+  // Its number among the records of the read, counting from 1.
+  int64_t number = 0;
+  std::string uri = {};
+  // BigQuery's message of the record, without the File it names.
+  std::string message = {};
+  // Whether BigQuery counts it among the Rows of its message of an exceeded limit, which a CSV
+  // record of too many values is not.
+  bool row = true;
+};
+
+// Where a CSV record of a read starts.
+struct RecordPosition {
+  size_t line = 0;
+  size_t offset = 0;
+};
+
 // The bad records a read skips, at most `limit`, its maxBadRecords. `records` numbers the records
-// the read has reached, bad ones included. With `numbered`, a check of the read's results enforces
-// the limit, so staging skips every bad record and writes the number of each other one.
+// the read has reached, bad ones included. With `stops`, staging fails at the record that exceeds
+// the limit; otherwise it skips every bad record, and the caller enforces the limit once it has
+// found them all.
 struct BadRecords {
   int64_t limit = 0;
   int64_t records = 0;
-  int64_t skipped = 0;
-  bool numbered = false;
+  bool stops = false;
+  std::vector<BadRecord> found = {};
+  // Of each CSV record, by number, which StageCsvSources records.
+  std::vector<RecordPosition> positions = {};
 
-  // Counts one more bad record, and whether the read may skip it.
-  bool Skip() {
-    if (!numbered && skipped >= limit) {
-      return false;
-    }
-    ++skipped;
-    return true;
+  // Adds `record`, and whether the read may skip it.
+  bool Skip(BadRecord record) {
+    found.push_back(std::move(record));
+    return !stops || std::cmp_less_equal(found.size(), limit);
   }
 };
 struct JsonReadOptions {

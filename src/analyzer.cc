@@ -339,6 +339,9 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision pr
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
   options.set_language(AnalyzerLanguageOptions(precision));
+  // A table scan lists only the columns the statement reads, which are all that BigQuery
+  // converts of an external table's sources.
+  options.set_prune_unused_columns(true);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
   // SELECT WITH DIFFERENTIAL_PRIVACY aggregates each privacy unit's contributions first, and

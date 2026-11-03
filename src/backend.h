@@ -29,6 +29,8 @@ struct QueryResult {
   int64_t affected_rows = -1;  // Rows changed by a DML statement, -1 when not applicable.
 
   [[nodiscard]] nlohmann::json SchemaToJson() const;
+  // The rows of a result of VARCHAR columns, each value as text or NULL.
+  [[nodiscard]] std::vector<std::vector<std::optional<std::string>>> TextRows() const;
 };
 
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.

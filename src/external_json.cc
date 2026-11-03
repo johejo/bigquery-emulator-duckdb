@@ -221,13 +221,20 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool c
   object = std::move(canonical);
 }
 
-// BigQuery's message when the record of `source` that `bad` reached exceeds its limit, which
-// counts that record among the errors.
-[[noreturn]] void TooManyErrors(const BadRecords& bad, const FileSource& source) {
-  throw ApiError::Invalid(
-      std::format("JSON table encountered too many errors, giving up. Rows: {}; errors: {}. Please "
-                  "look into the errors[] collection for more details. File: {}",
-                  bad.records, bad.limit + 1, source.uri));
+// Adds the record of `source` that starts at `start`, which BigQuery rejects for `detail`, to
+// `bad`, or throws BigQuery's error when `bad` is null or the record exceeds its limit.
+void Bad(std::string_view detail, std::size_t start, const FileSource& source, BadRecords* bad) {
+  const std::string message =
+      std::format("JSON parsing error in row starting at position {}: {}", start, detail);
+  if (bad == nullptr) {
+    throw ApiError::Invalid(message + " File: " + source.uri);
+  }
+  if (!bad->Skip({.number = bad->records, .uri = source.uri, .message = message})) {
+    throw ApiError::Invalid(std::format(
+        "JSON table encountered too many errors, giving up. Rows: {}; errors: {}. Please look "
+        "into the errors[] collection for more details. File: {}",
+        bad->records, bad->found.size(), source.uri));
+  }
 }
 
 FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>& schema,
@@ -271,28 +278,14 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
         if (std::string_view(error.what()).starts_with(kUnsupported)) {
           throw;
         }
-        if (bad == nullptr) {
-          throw error.WithMessage(
-              std::format("JSON parsing error in row starting at position {}: {} File: {}", start,
-                          error.what(), source.uri));
-        }
-        if (!bad->Skip()) {
-          TooManyErrors(*bad, source);
-        }
+        Bad(error.what(), start, source, bad);
       }
     } else if (line.find_first_of(" \t") != std::string_view::npos) {
       // BigQuery reads an empty line, but not one of spaces.
       if (bad != nullptr) {
         ++bad->records;
       }
-      if (bad == nullptr) {
-        throw ApiError::Invalid(std::format(
-            "JSON parsing error in row starting at position {}: Unexpected token File: {}", start,
-            source.uri));
-      }
-      if (!bad->Skip()) {
-        TooManyErrors(*bad, source);
-      }
+      Bad("Unexpected token", start, source, bad);
     }
     start = end + 1;
   }

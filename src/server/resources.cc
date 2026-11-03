@@ -122,6 +122,11 @@ json JobStatus(const Job& job) {
   if (job.error.has_value()) {
     status["errorResult"] = ErrorProto(*job.error);
     status["errors"] = json::array({ErrorProto(*job.error)});
+  } else if (job.query() != nullptr && !job.query()->warnings.empty()) {
+    status["errors"] = json::array();
+    for (const ApiError& warning : job.query()->warnings) {
+      status["errors"].push_back(ErrorProto(warning));
+    }
   }
   return status;
 }
@@ -258,7 +263,9 @@ json RowsForResponse(const QueryResult& result, int64_t begin, int64_t end, bool
 // Fills the result fields shared by jobs.query and jobs.getQueryResults responses. A failed job
 // fails the request with its error, as BigQuery does; a response's `errors` would go unnoticed
 // by clients that only read its rows.
-void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
+// With `messages`, as jobs.getQueryResults reports the job's warnings, which jobs.query reports
+// without their messages.
+void AddQueryResults(const Job& job, const ResultPage& page, json& response, bool messages) {
   if (job.error.has_value()) {
     throw ApiError(*job.error);
   }
@@ -266,6 +273,16 @@ void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
   response["jobComplete"] = true;
   response["totalBytesProcessed"] = "0";
   response["cacheHit"] = false;
+  if (job.query() != nullptr && !job.query()->warnings.empty()) {
+    response["errors"] = json::array();
+    for (const ApiError& warning : job.query()->warnings) {
+      json error = ErrorProto(warning);
+      if (!messages) {
+        error.erase("message");
+      }
+      response["errors"].push_back(std::move(error));
+    }
+  }
   // Job sets exactly one of `result` and `error`, but nothing in the type system says so.
   if (!job.result.has_value()) {
     throw ApiError::Internal("Job has neither a result nor an error");
@@ -401,13 +418,13 @@ json QueryResponse(const Job& job, const ResultPage& page) {
     return DryRunQueryResponse(job);
   }
   json response = {{"kind", "bigquery#queryResponse"}};
-  AddQueryResults(job, page, response);
+  AddQueryResults(job, page, response, false);
   return response;
 }
 
 json GetQueryResultsResponse(const Job& job, const ResultPage& page) {
   json response = {{"kind", "bigquery#getQueryResultsResponse"}, {"etag", kEtag}};
-  AddQueryResults(job, page, response);
+  AddQueryResults(job, page, response, true);
   return response;
 }
 

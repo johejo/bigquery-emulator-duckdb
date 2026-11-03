@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "absl/strings/escaping.h"
 #include "src/api_error.h"
 #include "src/csv_records.h"
 #include "src/field_schema.h"
@@ -22,9 +23,25 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-[[noreturn]] void Reject(std::string_view detail, size_t line) {
-  throw ApiError::Invalid(
-      std::format("Error while reading data, error message: {}; line_number: {}", detail, line));
+// The name of `type` in standard SQL.
+std::string_view SqlTypeName(FieldType type) {
+  switch (type) {
+    case FieldType::kInteger:
+      return "INT64";
+    case FieldType::kFloat:
+      return "FLOAT64";
+    case FieldType::kBoolean:
+      return "BOOL";
+    default:
+      return FieldTypeName(type);
+  }
+}
+
+// A record of `position` that BigQuery rejects, as CsvRecordError describes it.
+[[noreturn]] void Reject(std::string_view detail, const RecordPosition& position,
+                         const FieldSchema* field = nullptr, size_t index = 0,
+                         const std::optional<std::string>& value = std::nullopt) {
+  throw ApiError::Invalid(CsvRecordError(detail, position, field, index, value));
 }
 
 void AppendQuoted(std::string& out, std::string_view text) {
@@ -52,14 +69,15 @@ std::string Printable(std::string text, const CsvReadOptions& options) {
   return text;
 }
 
-// The value of `cell`, of `field`, in record `line`, or none for NULL. An absent cell is an
-// unquoted empty value, as is a value a jagged row leaves out.
+// The value of `cell`, of `field`, the column `index` of the record at `position`, or none for
+// NULL. An absent cell is an unquoted empty value, as is a value a jagged row leaves out.
 std::optional<std::string> Value(const std::optional<CsvCell>& cell, const FieldSchema& field,
-                                 const CsvReadOptions& options, size_t line) {
+                                 size_t index, const CsvReadOptions& options,
+                                 const RecordPosition& position) {
   const std::string empty;
   const std::string& text = cell ? cell->text : empty;
   if (!options.preserve_ascii_control_characters && text.find('\0') != std::string::npos) {
-    Reject("Bad character (ASCII 0) encountered.", line);
+    Reject("Bad character (ASCII 0) encountered.", position, &field, index, text);
   }
   if (!options.null_marker && !options.null_markers) {
     if (!cell || (cell->text.empty() && options.quoted_nulls)) {
@@ -77,12 +95,29 @@ std::optional<std::string> Value(const std::optional<CsvCell>& cell, const Field
     Reject(std::format("Null marker is set to '{}' but empty value found for field {} that is "
                        "of type different than STRING or BYTES.",
                        markers.front(), field.name),
-           line);
+           position, &field, index, text);
   }
   return Printable(text, options);
 }
 
 }  // namespace
+
+std::string CsvRecordError(std::string_view detail, const RecordPosition& position,
+                           const FieldSchema* field, size_t index,
+                           const std::optional<std::string>& value) {
+  std::string message = std::format(
+      "Error while reading data, error message: {}; line_number: {} "
+      "byte_offset_to_start_of_line: {}",
+      detail, position.line, position.offset);
+  if (field != nullptr) {
+    message += std::format(" column_index: {} column_name: \"{}\" column_type: {}", index,
+                           absl::CEscape(field->name), SqlTypeName(field->type));
+  }
+  if (field != nullptr && value) {
+    message += std::format(" value: \"{}\"", absl::CEscape(*value));
+  }
+  return message;
+}
 
 std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                                         const CsvReadOptions& options,
@@ -101,13 +136,19 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
     for (size_t row = std::min<size_t>(options.skip_leading_rows, records.size());
          row < records.size(); ++row) {
       const CsvRecord& record = records.at(row);
+      const RecordPosition position{.line = record.line, .offset = record.offset};
       const size_t found = record.cells.size();
+      const bool too_many = found > columns && !options.ignore_unknown_values;
       std::string line;
+      if (bad != nullptr) {
+        ++bad->records;
+        bad->positions.push_back(position);
+      }
       try {
-        if (found > columns && !options.ignore_unknown_values) {
+        if (too_many) {
           Reject(std::format("Too many values in line. Found {} column(s) when expecting {}.",
                              found, columns),
-                 record.line);
+                 position);
         }
         for (size_t column = 0; column < columns; ++column) {
           const FieldSchema& field = schema.at(column);
@@ -118,31 +159,29 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
             Reject(std::format("CSV table references column position {}, but line contains only "
                                "{} columns.",
                                column, found),
-                   record.line);
+                   position, &field, column);
           }
           const auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field,
-                                   options, record.line);
+                                   column, options, position);
           if (value) {
             AppendQuoted(line, *value);
           } else if (column >= found && field.mode == FieldMode::kRequired) {
-            Reject("Required column value is missing.", record.line);
+            Reject("Required column value is missing.", position, &field, column);
           }
         }
-      } catch (const ApiError&) {
-        if (bad == nullptr) {
-          throw;
-        }
-        ++bad->records;
-        if (!bad->Skip()) {
+      } catch (const ApiError& error) {
+        if (bad == nullptr || !bad->Skip({
+                                  .number = bad->records,
+                                  .uri = source.uri,
+                                  .message = error.what(),
+                                  .row = !too_many,
+                              })) {
           throw;
         }
         continue;
       }
-      if (bad != nullptr) {
-        ++bad->records;
-        if (bad->numbered) {
-          rewritten += std::to_string(bad->records) + ',';
-        }
+      if (bad != nullptr && options.numbered_records) {
+        rewritten += std::to_string(bad->records) + ',';
       }
       rewritten += line + '\n';
     }

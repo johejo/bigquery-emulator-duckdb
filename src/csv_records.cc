@@ -20,7 +20,7 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
   const auto line_break = [&] { return contents.at(i) == '\n' || contents.at(i) == '\r'; };
   const auto line_end = [&] { return i >= contents.size() || line_break(); };
   while (i < contents.size() && records.size() < limit) {
-    CsvRecord record{.cells = {}, .line = line};
+    CsvRecord record{.cells = {}, .line = line, .offset = i};
     const size_t record_line = line;
     while (true) {
       CsvCell cell;

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -334,33 +335,104 @@ std::vector<FileSource> StageSources(const GcsExternalData& definition, std::str
   return sources;
 }
 
-// `read`, whose sources StageCsvSources numbered with `bad`, without the numbers, and failing as
-// BigQuery does, with the number of the bad record that exceeds the limit, when more records than
-// it are bad. A record is bad when its number is missing: staging skipped it, or the reader could
-// not convert one of its values. No column of BigQuery's is named with a period.
-std::string CheckedBadRecords(const std::string& read, const BadRecords& bad,
-                              std::string_view table_name) {
-  const std::string number = QuoteIdentifier("bad.record");
-  if (bad.limit >= bad.records) {
-    return std::format("SELECT * EXCLUDE ({}) FROM ({})", number, read);
+// Adds to `bad` the records of the CSV `sources`, which StageCsvSources numbered with `bad`, that
+// have a value of one of the `read` columns of `schema` the reader cannot convert, naming the
+// first such column. `first` gives the number of the first record of each source.
+void AddUnparsable(const std::vector<FileSource>& sources, const std::vector<int64_t>& first,
+                   const CsvReadOptions& options, const std::vector<FieldSchema>& schema,
+                   const std::vector<bool>& read, const TextQuery& query, BadRecords& bad) {
+  std::vector<FieldSchema> text = schema;
+  for (FieldSchema& field : text) {
+    field.type = FieldType::kString;
   }
-  const std::string records = QuoteIdentifier("bad.records");
-  const std::string source = QuoteIdentifier("bad.read");
-  const std::string exceeding = std::format(
-      "(SELECT CAST(range AS VARCHAR) FROM (SELECT range FROM range(1, {0}) EXCEPT SELECT {1} "
-      "FROM {2}) ORDER BY range LIMIT 1 OFFSET {3})",
-      bad.records + 1, number, source, bad.limit);
-  return std::format(
-      "WITH {0} AS ({1}) SELECT * EXCLUDE ({2}) FROM (SELECT unnest({3}) FROM (SELECT "
-      "unnest(CASE WHEN count(*) < {4} THEN error({5} || {6} || {7}) ELSE list({3}) END) AS {3} "
-      "FROM {0} AS {3}))",
-      source, read, number, records, bad.records - bad.limit,
-      QuoteLiteral(std::format("Error while reading table: {}, error message: CSV processing "
-                               "encountered too many errors, giving up. Rows: ",
-                               table_name)),
-      exceeding,
-      QuoteLiteral(
-          std::format("; errors: {}; max bad: {}; error percent: 0", bad.limit + 1, bad.limit)));
+  const std::string number = QuoteIdentifier("bad.record");
+  // The records a read of each column alone keeps. The reader converts only the values a query
+  // returns, so these return them.
+  std::vector<std::string> reads;
+  for (size_t column = 0; column < schema.size(); ++column) {
+    if (!read.at(column) || schema.at(column).type == FieldType::kString) {
+      continue;
+    }
+    std::vector<FieldSchema> typed = text;
+    typed.at(column) = schema.at(column);
+    reads.push_back(std::format("SELECT '{}', CAST({} AS VARCHAR), CAST({} AS VARCHAR) FROM ({})",
+                                column, number, QuoteIdentifier(schema.at(column).name),
+                                FileReadQuery(options, sources, typed)));
+  }
+  if (reads.empty()) {
+    return;
+  }
+  std::set<int64_t> skipped;
+  std::ranges::transform(bad.found, std::inserter(skipped, skipped.end()), &BadRecord::number);
+  std::map<size_t, std::set<int64_t>> kept;
+  for (const auto& row : query(Join(reads, " UNION ALL "))) {
+    kept[std::stoul(row.at(0).value_or(""))].insert(std::stoll(row.at(1).value_or("")));
+  }
+  // The first column of each record that a read of it leaves out.
+  std::map<int64_t, size_t> unparsable;
+  for (size_t column = 0; column < schema.size(); ++column) {
+    if (!read.at(column) || schema.at(column).type == FieldType::kString) {
+      continue;
+    }
+    for (int64_t record = 1; record <= bad.records; ++record) {
+      if (!skipped.contains(record) && !kept[column].contains(record)) {
+        unparsable.try_emplace(record, column);
+      }
+    }
+  }
+  if (unparsable.empty()) {
+    return;
+  }
+  std::map<size_t, std::vector<std::string>> records;
+  for (const auto& [record, column] : unparsable) {
+    records[column].push_back(std::to_string(record));
+  }
+  std::vector<std::string> values;
+  values.reserve(records.size());
+  for (const auto& [column, numbers] : records) {
+    values.push_back(
+        std::format("SELECT CAST({0} AS VARCHAR), CAST({1} AS VARCHAR) FROM ({2}) "
+                    "WHERE {0} IN ({3})",
+                    number, QuoteIdentifier(schema.at(column).name),
+                    FileReadQuery(options, sources, text), Join(numbers, ", ")));
+  }
+  for (const auto& row : query(Join(values, " UNION ALL "))) {
+    const int64_t record = std::stoll(row.at(0).value_or(""));
+    const size_t column = unparsable.at(record);
+    const auto source = std::ranges::upper_bound(first, record) - first.begin() - 1;
+    bad.found.push_back({
+        .number = record,
+        .uri = sources.at(source).uri,
+        .message = CsvRecordError("Unable to parse", bad.positions.at(record - 1),
+                                  &schema.at(column), column, row.at(1)),
+    });
+  }
+}
+
+// Fails as BigQuery does when more records of the external table `table_name` than its limit are
+// bad, and otherwise warns of each one in order. As BigQuery's answers in
+// external_table_bad_records.api.answers.json show, it reads every source before it fails, and
+// counts every bad record and every record but those of too many values; a JSON table of several
+// files fails with the CSV message's form, after StageExternalJson has read all of them.
+void ReportBadRecords(BadRecords& bad, bool csv, std::string_view table_name,
+                      const TableReadContext& context) {
+  std::ranges::sort(bad.found, {}, &BadRecord::number);
+  if (std::cmp_greater(bad.found.size(), bad.limit)) {
+    throw ApiError::Invalid(std::format(
+        "Error while reading table: {}, error message: {} processing encountered too many errors, "
+        "giving up. Rows: {}; errors: {}; max bad: {}; error percent: 0",
+        table_name, csv ? "CSV" : "JSON",
+        bad.records -
+            std::ranges::count_if(bad.found, [](const BadRecord& record) { return !record.row; }),
+        bad.found.size(), bad.limit));
+  }
+  for (const BadRecord& record : bad.found) {
+    const std::string message =
+        csv ? record.message
+            : std::format("Error while reading table: {}, error message: {}", table_name,
+                          record.message);
+    context.warn(ApiError::Invalid(message + " File: " + record.uri).WithLocation(record.uri));
+  }
 }
 
 }  // namespace
@@ -446,13 +518,17 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
                           std::string table_name, GcsClient client) {
   return [definition = std::move(definition), schema = std::move(schema),
           table_name = std::move(table_name),
-          client = std::move(client)](TemporaryFiles& files) mutable {
+          client = std::move(client)](TableReadContext& context) mutable {
+    TemporaryFiles& files = context.files;
     const bool csv = definition.format == "CSV";
     const bool json = definition.format == "NEWLINE_DELIMITED_JSON";
     const auto sources = StageSources(definition, table_name, client, files);
-    // BigQuery ignores maxBadRecords for Parquet. The limit of a CSV table counts the values its
-    // reader cannot convert too, which only its results show.
-    BadRecords bad{.limit = definition.max_bad_records.value_or(0), .numbered = csv};
+    // BigQuery ignores maxBadRecords for Parquet. A JSON table of one file fails at the record
+    // that exceeds the limit.
+    BadRecords bad{
+        .limit = definition.max_bad_records.value_or(0),
+        .stops = json && sources.size() == 1,
+    };
     BadRecords* const skips = bad.limit > 0 && (csv || json) ? &bad : nullptr;
     // A partitioned table reads its keys from each source's path rather than its contents.
     const HivePartitioning* hive =
@@ -491,6 +567,23 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     };
     std::vector<FieldSchema> read_schema;
     std::ranges::transform(file_schema, std::back_inserter(read_schema), Unenforced);
+    // A CSV table that skips bad records converts only the columns the statement reads, as
+    // BigQuery does, and reads the others as NULL.
+    std::vector<bool> read(read_schema.size(), true);
+    std::vector<FieldSchema> converted = read_schema;
+    std::vector<std::string> unread;
+    if (csv && skips != nullptr && context.columns) {
+      for (size_t i = 0; i < read_schema.size(); ++i) {
+        if (!context.columns->contains(read_schema.at(i).name)) {
+          read.at(i) = false;
+          converted.at(i).type = FieldType::kString;
+          unread.push_back(std::format("CAST(NULL AS {}) AS {}", ToDuckDbType(read_schema.at(i)),
+                                       QuoteIdentifier(read_schema.at(i).name)));
+        }
+      }
+    }
+    std::vector<FileSource> staged_csv;
+    std::vector<int64_t> first_records;
     // An autodetected table reads each file with the delimiter and header rows BigQuery detects
     // in the alphabetically last one, which gives its schema, and matches columns by position.
     std::string delimiter = definition.field_delimiter.value_or(",");
@@ -503,6 +596,10 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       delimiter = std::string(1, detected.delimiter);
       skip_leading_rows = detected.skipped_rows;
     }
+    CsvReadOptions csv_options = CsvOptions(definition);
+    csv_options.skip_leading_rows = skip_leading_rows;
+    csv_options.field_delimiter = delimiter;
+    csv_options.numbered_records = skips != nullptr;
     std::vector<std::string> reads;
     for (const auto& source : sources) {
       if (json) {
@@ -522,14 +619,14 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         continue;
       }
       if (csv) {
-        CsvReadOptions options = CsvOptions(definition);
-        options.skip_leading_rows = skip_leading_rows;
-        options.field_delimiter = delimiter;
-        options.numbered_records = skips != nullptr;
-        reads.push_back(select(
-            source,
-            FileReadQuery(options, StageCsvSources({source}, options, read_schema, files, skips),
-                          read_schema)));
+        first_records.push_back(bad.records + 1);
+        const auto staged = StageCsvSources({source}, csv_options, read_schema, files, skips);
+        std::ranges::copy(staged, std::back_inserter(staged_csv));
+        std::string read_csv = FileReadQuery(csv_options, staged, converted);
+        if (!unread.empty()) {
+          read_csv = std::format("SELECT * REPLACE ({}) FROM ({})", Join(unread, ", "), read_csv);
+        }
+        reads.push_back(select(source, read_csv));
         continue;
       }
       const ThriftValue metadata = SourceMetadata(source);
@@ -564,10 +661,30 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     if (reads.empty()) {
       throw ApiError::Invalid("External table source URIs match no files");
     }
+    if (skips == nullptr) {
+      return Join(reads, " UNION ALL ");
+    }
     // Of a JSON table, only the records StageExternalJson rejects count as bad; a value its
     // reader cannot convert still fails the read.
-    return csv && skips != nullptr ? CheckedBadRecords(Join(reads, " UNION ALL "), bad, table_name)
-                                   : Join(reads, " UNION ALL ");
+    if (csv) {
+      AddUnparsable(staged_csv, first_records, csv_options, read_schema, read, context.query, bad);
+    }
+    ReportBadRecords(bad, csv, table_name, context);
+    if (!csv) {
+      return Join(reads, " UNION ALL ");
+    }
+    // The reader leaves out a record with a value it cannot convert only where a query uses that
+    // value, so the read leaves out every bad record by its number.
+    const std::string number = QuoteIdentifier("bad.record");
+    std::string read_csv =
+        std::format("SELECT * EXCLUDE ({}) FROM ({})", number, Join(reads, " UNION ALL "));
+    if (!bad.found.empty()) {
+      std::vector<std::string> numbers;
+      std::ranges::transform(bad.found, std::back_inserter(numbers),
+                             [](const BadRecord& record) { return std::to_string(record.number); });
+      read_csv += std::format(" WHERE {} NOT IN ({})", number, Join(numbers, ", "));
+    }
+    return read_csv;
   };
 }
 

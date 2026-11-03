@@ -11,8 +11,11 @@ version: 1
 # as it is; an ISO-8859-1 gzip source decodes, but a UTF-16LE one fails, its values split before
 # they are decoded. The DDL encoding applies to JSON too, as jsonOptions.encoding, which takes
 # ISO-8859-1, and a UTF-16 or UTF-32 byte order mark is skipped. INFORMATION_SCHEMA's DDL leaves out
-# UTF-8, which TABLE_OPTIONS lists. maxBadRecords counts the records of all of a query's sources,
-# and BigQuery's message when they exceed it gives the number of the record that does.
+# UTF-8, which TABLE_OPTIONS lists. maxBadRecords counts the records of all of a query's sources.
+# A query within it has an errors[] entry, of reason invalid and the source's location, for each
+# record it skips. When more are bad, BigQuery's message gives the Rows of every record of a CSV
+# table but those of too many values, and of a JSON table of one file the number of the record
+# that exceeds the limit.
 description: >-
   compression, maxBadRecords and csvOptions.encoding or jsonOptions.encoding of external tables.
 vars:
@@ -481,6 +484,74 @@ cases:
     vars:
       ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], compression = 'ZSTD')
     expect: {"create": {"status": 400, "reason": "invalidQuery", "message": "'ZSTD' is not a valid value; failed to set 'compression' in external table OPTIONS"}}
+  - name: max_bad_records_csv_within
+    template: external
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      create_resource: queries
+      create_body:
+        useLegacySql: false
+        location: US
+        timeoutMs: 200000
+        query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "get": {"external": {"maxBadRecords": 2, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}}, "options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "max_bad_records"}, {"v": "INT64"}, {"v": "2"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=2,\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}}
+  - name: max_bad_records_csv_exceeded
+    template: external_unreadable
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      create_resource: queries
+      create_body:
+        useLegacySql: false
+        location: US
+        timeoutMs: 200000
+        query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 1)
+    expect: {"create": {"status": 200}, "get": {"external": {"maxBadRecords": 1, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}}, "options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "max_bad_records"}, {"v": "INT64"}, {"v": "1"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=1,\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 3; errors: 2; max bad: 1; error percent: 0"}}
+  - name: max_bad_records_csv_files
+    template: two_unreadable
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      object_b: b.csv
+      source_b: '${bad_csv_b}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/*.csv'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 5; errors: 3; max bad: 2; error percent: 0"}}
+  - name: max_bad_records_api
+    template: external
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      create_resource: datasets/${dataset}/tables
+      create_body:
+        tableReference: {tableId: t}
+        schema: '${schema}'
+        externalDataConfiguration:
+          sourceFormat: CSV
+          sourceUris: ['${prefix}/a.csv']
+          maxBadRecords: 2
+    expect: {"create": {"status": 200}, "get": {"external": {"maxBadRecords": 2, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}}, "options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"CSV\""}]}, {"f": [{"v": "max_bad_records"}, {"v": "INT64"}, {"v": "2"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.csv\"]"}]}]}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=2,\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}}
+  - name: max_bad_records_json_within
+    template: external
+    vars:
+      object: a.json
+      source: '${bad_json}'
+      create_resource: queries
+      create_body:
+        useLegacySql: false
+        location: US
+        timeoutMs: 200000
+        query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "get": {"external": {"maxBadRecords": 2, "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}}, "options": {"rows": [{"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"NEWLINE_DELIMITED_JSON\""}]}, {"f": [{"v": "max_bad_records"}, {"v": "INT64"}, {"v": "2"}]}, {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.json\"]"}]}]}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=2,\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"${prefix}/a.json\"]\n);"}]}]}, "query": {"errors": [{"location": "${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}}
+  - name: max_bad_records_csv_files_swapped
+    template: two_unreadable
+    vars:
+      object: a.csv
+      source: '${bad_csv_b}'
+      object_b: b.csv
+      source_b: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/*.csv'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 5; errors: 3; max bad: 2; error percent: 0"}}
   - name: max_bad_records_json_exceeded
     template: external_unreadable
     vars:

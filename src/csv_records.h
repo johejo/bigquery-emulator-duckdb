@@ -26,6 +26,8 @@ struct CsvRecord {
   std::vector<std::optional<CsvCell>> cells;
   // The line it starts on, counting from 1.
   size_t line = 0;
+  // The byte it starts at, counting from 0.
+  size_t offset = 0;
 };
 
 // Splits `contents` into at most `limit` records, skipping blank lines. Throws ApiError::Invalid

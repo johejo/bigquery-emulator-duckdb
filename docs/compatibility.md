@@ -104,11 +104,10 @@ JSON options other than `jsonOptions.encoding` are unsupported.
 CSV and JSON tables support `compression`, `encoding` / `csvOptions.encoding` and
 `jsonOptions.encoding`, and `max_bad_records` / `maxBadRecords`. A gzip source with compression
 `NONE`, which BigQuery reads without decompressing it, or in UTF-16 or UTF-32, and an invalid
-UTF-16 or UTF-32 sequence, are unsupported. A query that skips bad records leaves out the
-`errors[]` entries BigQuery returns for them, and one that exceeds the limit numbers the records
-of several files in the order of their URIs, which can differ from BigQuery's. A CSV value of a
-BIGNUMERIC, BYTES, INTERVAL, RANGE or GEOGRAPHY column, or a JSON value of a valid record, that
-fails to convert still fails the query rather than counting as bad.
+UTF-16 or UTF-32 sequence, are unsupported. A CSV value of a BIGNUMERIC, BYTES, INTERVAL, RANGE
+or GEOGRAPHY column, or a JSON value of a valid record, that fails to convert still fails the
+query rather than counting as bad. The warning for a malformed JSON line does not name the token
+BigQuery expected.
 
 [Hive partitioning](../third_party/bigquery_docs/hive-partitioned-queries.md), through
 `WITH PARTITION COLUMNS` or `hivePartitioningOptions`, takes its keys and their types from the
