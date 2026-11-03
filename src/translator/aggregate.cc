@@ -194,19 +194,19 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!array.empty()) {
     // List aggregates stay inside the enclosing conditional branch, unlike a correlated
     // scalar subquery, which DuckDB can evaluate even in an unselected branch. Keep the
-    // forms to one argument and a plain aggregate rule. ARRAY_AGG decorates each value
-    // with its sort key so sorting and deduplication also stay within list expressions.
+    // forms to one argument and a rule whose DuckDB call takes one argument; the rule's
+    // finish then reads the list aggregate's result as it does the aggregate's. ARRAY_AGG
+    // decorates each value with its sort key so sorting and deduplication also stay within
+    // list expressions.
+    const std::string row = scope.context.FreshName("_value");
+    const std::vector<std::string> row_arguments = AggregateArguments(*rule, {row});
     if (aggregate == nullptr || arguments.size() != 1 || !collation->empty() ||
-        rule->finish != nullptr || !rule->arguments.empty() || rule->skip_nulls ||
+        row_arguments.size() != 1 || rule->distinct == AggregateRule::Distinct::kRequired ||
+        rule->distinct == AggregateRule::Distinct::kAlways ||
         (name != "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty())) ||
         aggregate->limit() != nullptr ||
         (name != "SUM" && name != "AVG" && name != "MIN" && name != "MAX" && name != "COUNT" &&
          name != "ARRAY_AGG") ||
-        // DuckDB's floating aggregates differ on NaN and finite overflow, and its decimal
-        // AVG passes through DOUBLE. Do not expose those overloads through list_aggregate.
-        ((name == "SUM" || name == "AVG" || name == "MIN" || name == "MAX") &&
-         call.argument_list(0)->type()->IsDouble()) ||
-        (name == "AVG" && !call.argument_list(0)->type()->IsInt64()) ||
         (name != "ARRAY_AGG" && call.null_handling_modifier() ==
                                     googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS)) {
       return Unsupported(scope, "horizontal aggregate " + name + " with this type or modifiers");
@@ -251,9 +251,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
     std::string values =
         "list_transform(COALESCE(" + array + ", []), lambda " + element + ": " + value + ")";
-    if (name == "ARRAY_AGG" && call.null_handling_modifier() ==
-                                   googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
-      const std::string row = scope.context.FreshName("_value");
+    if (rule->skip_nulls ||
+        (name == "ARRAY_AGG" && call.null_handling_modifier() ==
+                                    googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS)) {
       values = "list_filter(" + values + ", lambda " + row + ": " + row +
                (decorated ? ".value" : "") + " IS NOT NULL)";
     }
@@ -267,12 +267,16 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       if (!aggregate->order_by_item_list().empty()) {
         values = "list_sort(" + values + ", 'ASC', 'NULLS FIRST')";
       }
-      const std::string row = scope.context.FreshName("_value");
       values = "list_transform(" + values + ", lambda " + row + ": " + row + ".value)";
     }
+    if (!rule->arguments.empty()) {
+      values = "list_transform(" + values + ", lambda " + row + ": " + row_arguments.at(0) + ")";
+    }
+    const std::string sql = "list_aggregate(" + values + ", " + QuoteLiteral(rule->function) + ")";
     const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
-    return type ? std::optional("CAST(list_aggregate(" + values + ", " +
-                                QuoteLiteral(rule->function) + ") AS " + *type + ")")
+    return type ? std::optional("CAST(" +
+                                (rule->finish == nullptr ? sql : rule->finish(sql, arguments, "")) +
+                                " AS " + *type + ")")
                 : std::nullopt;
   }
   std::vector<std::string> keyed = arguments;

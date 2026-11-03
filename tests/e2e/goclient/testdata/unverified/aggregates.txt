@@ -1,0 +1,8 @@
+# SUM's error message for a FLOAT64 overflow, which the documentation leaves open.
+SELECT SUM(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+?>
+
+# Whether SUM fails where a partial sum overflows though the total does not, as the reference
+# implementation's exact sum does not.
+SELECT SUM(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64), CAST('-1.7976931348623157e308' AS FLOAT64)]) AS x
+?>

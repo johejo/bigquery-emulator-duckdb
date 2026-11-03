@@ -366,6 +366,81 @@ void RegisterAverage(duckdb_connection connection) {
   }
 }
 
+// SUM of FLOAT64 as GoogleSQL's reference implementation computes it: a sum that fails only
+// where the total, rather than a partial sum, is beyond FLOAT64's range. The reference
+// implementation sums exactly; a long double has the range to hold any partial sum, and
+// DuckDB's sum() returns an infinity where BigQuery fails.
+struct Sum {
+  long double sum;  // NOLINT(google-runtime-float)
+  bool any;
+};
+
+Sum& SumState(duckdb_aggregate_state state) { return *reinterpret_cast<Sum*>(state); }
+
+idx_t SumSize(duckdb_function_info /*info*/) { return sizeof(Sum); }
+
+void InitSum(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
+  SumState(state) = {.sum = 0, .any = false};
+}
+
+void UpdateSums(duckdb_function_info /*info*/, duckdb_data_chunk input,
+                duckdb_aggregate_state* states) {
+  for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
+    const Arguments arguments(input, row);
+    if (arguments.IsNull(0)) {
+      continue;
+    }
+    Sum& state = SumState(states[row]);
+    state.sum += arguments.Double(0);
+    state.any = true;
+  }
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DuckDB's callback.
+void CombineSums(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
+                 duckdb_aggregate_state* target, idx_t count) {
+  for (idx_t i = 0; i < count; ++i) {
+    // DuckDB may combine a window's states again, so the source stays as it is.
+    const Sum& from = SumState(source[i]);
+    Sum& to = SumState(target[i]);
+    to.sum += from.sum;
+    to.any = to.any || from.any;
+  }
+}
+
+// The sum as FLOAT64, or NULL where no value reached it.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): DuckDB's callback.
+void FinalizeSums(duckdb_function_info info, duckdb_aggregate_state* source, duckdb_vector result,
+                  idx_t count, idx_t offset) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  duckdb_vector_ensure_validity_writable(result);
+  for (idx_t i = 0; i < count; ++i) {
+    const Sum& state = SumState(source[i]);
+    if (std::isfinite(state.sum) && std::abs(state.sum) > std::numeric_limits<double>::max()) {
+      duckdb_aggregate_function_set_error(info, "double overflow");
+      return;
+    }
+    SetResult(result, offset + i,
+              state.any ? std::optional<double>(static_cast<double>(state.sum)) : std::nullopt);
+  }
+}
+
+void RegisterSum(duckdb_connection connection) {
+  Handle<duckdb_aggregate_function, duckdb_destroy_aggregate_function> const function(
+      duckdb_create_aggregate_function());
+  duckdb_aggregate_function_set_name(function.get(), "bq_sum_double");
+  LogicalType const float64(duckdb_create_logical_type(kDouble));
+  duckdb_aggregate_function_add_parameter(function.get(), float64.get());
+  duckdb_aggregate_function_set_return_type(function.get(), float64.get());
+  duckdb_aggregate_function_set_functions(function.get(), SumSize, InitSum, UpdateSums, CombineSums,
+                                          FinalizeSums);
+  // UpdateSums skips NULL values itself.
+  duckdb_aggregate_function_set_special_handling(function.get());
+  if (duckdb_register_aggregate_function(connection, function.get()) == DuckDBError) {
+    throw BackendError("DuckDB failed to register bq_sum_double");
+  }
+}
+
 // AVG of the non-NULL NUMERIC values that list() collects, rounded half away from zero, which
 // is in range even where SUM overflows.
 void NumericAverage(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -487,6 +562,7 @@ void RegisterMathFunctions(duckdb_connection connection, const Options& options)
     // The reference implementation's type, whose precision depends on the platform.
     RegisterAverage<long double>(connection);  // NOLINT(google-runtime-float)
   }
+  RegisterSum(connection);
   Register(connection, "bq_cosine_distance", {kAny, kAny}, kDouble, Distance<true>);
   Register(connection, "bq_euclidean_distance", {kAny, kAny}, kDouble, Distance<false>);
 }

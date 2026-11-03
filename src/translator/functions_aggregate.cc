@@ -121,6 +121,11 @@ std::string Unhex(const std::string& sql, const std::vector<std::string>& /*argu
   return "unhex(" + sql + ")";
 }
 
+std::string ExtractValue(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                         const std::string& /*tail*/) {
+  return "struct_extract(" + sql + ", 'value')";
+}
+
 std::string Flatten(const std::string& sql, const std::vector<std::string>& /*arguments*/,
                     const std::string& /*tail*/) {
   return "flatten(" + sql + ")";
@@ -311,6 +316,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
   static constexpr std::string_view kIntervalSecondKey[] = {"$1", "bq_interval_key($2)"};
   static constexpr std::string_view kCollationKey[] = {"$2"};
   static constexpr std::string_view kValueAndCollationKey[] = {"$1", "$2"};
+  static constexpr std::string_view kNanFirst[] = {"{'number': NOT isnan($1), 'value': $1}"};
   static constexpr std::string_view kQuantileArguments[] = {
       "$1",
       "list_transform(range($2 + 1), lambda i: i / $2)",
@@ -399,6 +405,8 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  },
                  IntervalAggregate<kIntervalSumDistinct>(AggregateRule::Distinct::kRequired),
                  IntervalAggregate<kIntervalSum>(),
+                 // src/googlesql_functions_duckdb/math.cc; DuckDB's sum() overflows to infinity.
+                 {.function = "bq_sum_double", .type = googlesql::TYPE_DOUBLE},
                  {.function = "sum"},
              },
              {
@@ -430,6 +438,15 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .function = "arg_min",
                      .type = googlesql::TYPE_INTERVAL,
                      .arguments = kIntervalValueAndKey,
+                 },
+                 // DuckDB orders NaN above the other values, as MAX needs, and BigQuery's MIN
+                 // also returns NaN where any value is NaN.
+                 {
+                     .function = "min",
+                     .type = googlesql::TYPE_DOUBLE,
+                     .arguments = kNanFirst,
+                     .skip_nulls = true,
+                     .finish = ExtractValue,
                  },
                  {
                      .function = "arg_min",

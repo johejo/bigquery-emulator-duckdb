@@ -148,23 +148,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Floating-point arithmetic returns an infinity where BigQuery fails with an overflow, or returns NULL under SAFE"
-  label: "aggregation_distinct_queries_test:aggregation_distinct_sum_9"
-  label: "aggregation_distinct_queries_test:aggregation_distinct_sum_9_with_group_by"
-  label: "aggregation_queries_test:aggregation_sum_6"
-  label: "analytic_sum_test:analytic_sum_distinct_overflow_double_1"
-  label: "analytic_sum_test:analytic_sum_distinct_overflow_double_2"
-  label: "analytic_sum_test:analytic_sum_double_overflow_1"
-  label: "analytic_sum_test:analytic_sum_double_overflow_2"
-  label: "code:ArraySum_ARRAY<FLOAT64>_<-1@79769_1L-8QnCUN9A_157e@308>"
-  label: "code:ArraySum_ARRAY<FLOAT64>_<-1@79769_fka48YXkpZ4_08, NULL>"
-  label: "code:ArraySum_ARRAY<FLOAT64>_<1@797693_GfHVLeBf_2w_157e@308>"
-  label: "code:ArraySum_ARRAY<FLOAT64>_<1@797693_T8J8HAmbqYA_08, NULL>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "NaN does not compare as BigQuery orders it, such as in MIN, MAX and IN"
+  reason: "NaN does not compare as BigQuery orders it, such as in IN"
   label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_2_FLOAT64_nan_FLOAT64_3@14"
   label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_nan"
   label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_nan_FLOAT64_3@14"
@@ -923,9 +907,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "MIN and MAX do not order NaN, and arrays with NULL or NaN elements, as BigQuery does"
-  label: "aggregation_queries_test:aggregation_min_max_1"
-  label: "aggregation_queries_test:aggregation_min_max_2"
+  reason: "MIN and MAX do not order arrays with NULL or NaN elements as BigQuery does"
   label: "aggregation_queries_test:aggregation_min_max_array_null_nan_appended"
   label: "aggregation_queries_test:aggregation_min_max_array_null_nan_in_the_middle"
   label: "aggregation_queries_test:aggregation_min_max_array_null_nan_vs_negative_inf"
@@ -1045,8 +1027,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 sums, averages and statistics in long double, and the emulator's results differ from it"
-  label: "analytic_sum_test:analytic_sum_double_overflow_3"
+  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 averages and statistics in long double, and the emulator's results differ from it"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params_2"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_stddev_samp_double_extreme"
