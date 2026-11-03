@@ -157,9 +157,10 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
                external.preserve_ascii_control_characters || external.ignore_unknown_values) {
       throw ApiError::Unsupported("CSV options on non-CSV external tables");
     }
-    // Detection reads DATE, DATETIME, TIME and TIMESTAMP values in their default forms, where
-    // BigQuery's, as its answers in external_table_types_followups.api.answers.json show, take
-    // date_format.
+    // CSV detection takes these options, and JSON detection date_format, as BigQuery's do in its
+    // answers in external_table_types_followups.api.answers.json and
+    // external_table_types_open.api.answers.json; how the others change JSON detection is not
+    // known.
     for (const auto& [name, value] : {
              std::pair{"time_zone", &external.time_zone},
              {"date_format", &external.date_format},
@@ -167,7 +168,8 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
              {"time_format", &external.time_format},
              {"timestamp_format", &external.timestamp_format},
          }) {
-      if (*value && external.autodetect.value_or(false)) {
+      if (*value && external.autodetect.value_or(false) && external.format != "CSV" &&
+          (value != &external.date_format || external.format != "NEWLINE_DELIMITED_JSON")) {
         throw ApiError::Unsupported(std::string(name) + " with schema auto-detection");
       }
     }

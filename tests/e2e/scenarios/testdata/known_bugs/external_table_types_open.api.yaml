@@ -1,32 +1,38 @@
 version: 1
 # Each case expects BigQuery's answer, which the emulator does not give: its comment
 # says what differs.
-# Recorded on BigQuery in project johejo-sandbox, run wwvjukwmmf2k2uozb63t4dgpuu, with
-# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the
-# observations. BigQuery's answers settle which declared types a Parquet external table reads each
-# Parquet type as: the Parquet conversions of third_party/bigquery_docs/
-# loading-data-cloud-storage-parquet.md give the detected type only. Each case declares
-# one column of types.parquet, which DuckDB 2.0.0 wrote uncompressed, of one row:
-# bool BOOLEAN = true; i32 INT32 (INT_32), i64 INT64 (INT_64), i8 INT32 (INT_8), u32 INT32
-# (UINT_32) and u64 INT64 (UINT_64) = 42; f32 FLOAT and f64 DOUBLE = 1.5; dec9 INT32
-# DECIMAL(9, 2), dec18 INT64 DECIMAL(18, 4) and dec38 FIXED_LEN_BYTE_ARRAY DECIMAL(38, 9) =
-# 1.25; s = 'a', s_int = '42', s_date = '2024-01-02', s_datetime = '2024-01-02 03:04:05',
-# s_json = '{"a":1}' and s_wkt = 'POINT(1 2)', BYTE_ARRAY (UTF8); b BYTE_ARRAY = b'a';
-# b_wkb BYTE_ARRAY = the WKB of POINT(1 2); d INT32 (DATE) = 2024-01-02; t INT64
-# TIME(MICROS) = 03:04:05.000006; ts INT64 TIMESTAMP(MICROS, isAdjustedToUTC) and tsl
-# INT64 TIMESTAMP(MICROS, not adjusted) = 2024-01-02 03:04:05.000006; tsms TIMESTAMP(MILLIS,
-# not adjusted) = 2024-01-02 03:04:05.006; tsns TIMESTAMP(NANOS, not adjusted) =
-# 2024-01-02 03:04:05.000006007. wide.parquet, written by arrow-go v18.8.0 without
-# statistics or dictionaries, has one row of dec50 FIXED_LEN_BYTE_ARRAY DECIMAL(50, 20) =
-# 1.25.
+# Recorded on BigQuery in project johejo-sandbox, run 7d66b5tzdcdehezgqc5taknfnh, with sources in the
+# bucket johejo-sandbox-us; the answers sidecar keeps the observations.
+# BigQuery's answers settle questions those in external_table_csv_types,
+# external_table_json_types, external_table_parquet_types and external_table_types_followups
+# leave open: Parquet DECIMALs that NUMERIC does not hold, of other values, scales and widths;
+# other Parquet columns read as TIMESTAMP; CSV and JSON schema detection with the date and time
+# options; and the warnings of malformed JSON lines. types.parquet is that of
+# external_table_parquet_types.api.yaml. The other Parquet files, written by arrow-go v18.8.0
+# without statistics or dictionaries, each have one nullable column:
+# - dec50_frac, dec50_big and dec50_null: dec50 FIXED_LEN_BYTE_ARRAY DECIMAL(50, 20) of one row
+#   1.0123456789, one row 1e29, and rows NULL and 1.25.
+# - dec38_20 and dec38_20_frac: dec38 FIXED_LEN_BYTE_ARRAY DECIMAL(38, 20) of one row 1.25 and
+#   1.0123456789.
+# - dec18_10: dec18 INT64 DECIMAL(18, 10) of one row 1.25.
+# - dec76_40: dec76 FIXED_LEN_BYTE_ARRAY DECIMAL(76, 40) of one row 1.25.
+# - s_null: s BYTE_ARRAY (UTF8) of rows 'a' and NULL.
 description: >-
-  Declared types of Parquet external table columns other than the detected ones.
+  External table DECIMAL and TIMESTAMP reads, schema detection with date and time options, and
+  malformed JSON lines.
 vars:
   dataset: bqa_${run}_${case}
   prefix: gs://${bucket}/${run}/${case}
   query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
   types: "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"
-  wide: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAGxrk1uLvUAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAABkMGBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGRwcAAAAhQAAAFBBUjE="
+  dec50_frac: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAFfOlvIdmdtAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIMAAABQQVIx"
+  dec50_big: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEG15+CMo6j2mHgZuuy+IoAAAAAAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIMAAABQQVIx"
+  dec50_null: "UEFSMRUAFTYVNiwVBBUAFQYVBhwAAAACAAAAAwIAAAAAAAAAAAAAAAAGxrk1uLvUAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgQZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYEFlwWXCYISRwVABUAFQIAAAAWXBYEJggWXBQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIMAAABQQVIx"
+  dec38_20: "UEFSMRUAFSwVLCwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAABsa5Nbi71AAAFQQZLEgGc2NoZW1hFQIAFQ4VIBUCGAVkZWMzOCUKFSgVTCxcFSgVTAAAABYCGRwZHCYIHBUOGSUABhkYBWRlYzM4FQAWAhZSFlImCEkcFQAVABUCAAAAFlIWAiYIFlIUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZHBwAAACDAAAAUEFSMQ=="
+  dec38_20_frac: "UEFSMRUAFSwVLCwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAABXzpbyHZnbQAFQQZLEgGc2NoZW1hFQIAFQ4VIBUCGAVkZWMzOCUKFSgVTCxcFSgVTAAAABYCGRwZHCYIHBUOGSUABhkYBWRlYzM4FQAWAhZSFlImCEkcFQAVABUCAAAAFlIWAiYIFlIUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZHBwAAACDAAAAUEFSMQ=="
+  dec76_40: "UEFSMRUAFUwVTCwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAAAAAku/RuNDPN75aocrlAAAAAABUEGSxIBnNjaGVtYRUCABUOFUAVAhgFZGVjNzYlChVQFZgBLFwVUBWYAQAAABYCGRwZHCYIHBUOGSUABhkYBWRlYzc2FQAWAhZyFnImCEkcFQAVABUCAAAAFnIWAiYIFnIUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZHBwAAACFAAAAUEFSMQ=="
+  dec18_10: "UEFSMRUAFRwVHCwVAhUAFQYVBhwAAAACAAAAAgEA3Q7pAgAAABUEGSxIBnNjaGVtYRUCABUEJQIYBWRlYzE4JQoVFBUkLFwVFBUkAAAAFgIZHBkcJggcFQQZJQAGGRgFZGVjMTgVABYCFkIWQiYISRwVABUAFQIAAAAWQhYCJggWQhQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIEAAABQQVIx"
+  s_null: "UEFSMRUAFRYVFiwVBBUAFQYVBhwAAAACAAAAAwEBAAAAYRUEGSxIBnNjaGVtYRUCABUMJQIYAXMlAEwcAAAAFgQZHBkcJggcFQwZJQAGGRgBcxUAFgQWPBY8JghJHBUAFQAVAgAAABY8FgQmCBY8FAAAKBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGRwcAAAAcQAAAFBBUjE="
 templates:
   # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
   # `source`, and runs `query` on it.
@@ -60,6 +66,28 @@ templates:
         observe:
           external: /body/externalDataConfiguration
           schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
       - name: query
         rest:
           method: POST
@@ -118,6 +146,28 @@ templates:
         observe:
           external: /body/externalDataConfiguration
           schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
       - name: query
         rest:
           method: POST
@@ -179,6 +229,28 @@ templates:
         observe:
           external: /body/externalDataConfiguration
           schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
       - name: query
         rest:
           method: POST
@@ -261,6 +333,28 @@ templates:
         observe:
           external: /body/externalDataConfiguration
           schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
       - name: query
         rest:
           method: POST
@@ -312,13 +406,14 @@ templates:
       - name: delete_source
         gcs: {method: DELETE, object: '${run}/${case}/${object}'}
 cases:
-  # Known bug: a BYTE_ARRAY read as TIMESTAMP, which BigQuery reads as 0, is unsupported.
-  - name: s_datetime_as_timestamp
-    template: ddl
+  # Known bug: reading a DOUBLE as TIMESTAMP, which BigQuery reads by its bits as microseconds,
+  #   is unsupported.
+  - name: f64_as_timestamp
+    template: ddl_failure
     vars:
       object: "types.parquet"
       source: "${types}"
-      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (s_datetime TIMESTAMP) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (f64 TIMESTAMP) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
     expect: {
         "create": {
           "status": 200
@@ -327,298 +422,62 @@ cases:
           "external": {
             "sourceFormat": "PARQUET",
             "sourceUris": [
-              "gs://${bucket}/${run}/s_datetime_as_timestamp/types.parquet"
+              "gs://${bucket}/${run}/f64_as_timestamp/types.parquet"
             ]
           },
           "schema": {
             "fields": [
               {
-                "name": "s_datetime",
+                "name": "f64",
                 "type": "TIMESTAMP"
               }
             ]
           }
         },
-        "job": {
-          "status": {
-            "state": "DONE"
-          }
-        },
-        "query": {
-          "jobComplete": true,
+        "ddl": {
           "rows": [
             {
               "f": [
                 {
-                  "v": "0.0"
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_f64_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://${bucket}/${run}/f64_as_timestamp/types.parquet\"]\n);"
                 }
               ]
             }
-          ],
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "s_datetime",
-                "type": "TIMESTAMP"
-              }
-            ]
-          },
-          "status": 200
-        }
-      }
-  # Known bug: a DECIMAL that NUMERIC does not hold is unsupported.
-  - name: dec50_as_bignumeric
-    template: ddl
-    vars:
-      object: "wide.parquet"
-      source: "${wide}"
-      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 BIGNUMERIC) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
-    expect: {
-        "create": {
-          "status": 200
+          ]
         },
-        "get": {
-          "external": {
-            "sourceFormat": "PARQUET",
-            "sourceUris": [
-              "gs://${bucket}/${run}/dec50_as_bignumeric/wide.parquet"
-            ]
-          },
-          "schema": {
-            "fields": [
-              {
-                "name": "dec50",
-                "type": "BIGNUMERIC"
-              }
-            ]
-          }
-        },
-        "job": {
-          "status": {
-            "state": "DONE"
-          }
-        },
-        "query": {
-          "jobComplete": true,
+        "options": {
           "rows": [
             {
               "f": [
                 {
-                  "v": "1.25"
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
                 }
               ]
-            }
-          ],
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "dec50",
-                "type": "BIGNUMERIC"
-              }
-            ]
-          },
-          "status": 200
-        }
-      }
-  # Known bug: a DECIMAL that NUMERIC does not hold is unsupported.
-  - name: dec50_as_numeric
-    template: ddl
-    vars:
-      object: "wide.parquet"
-      source: "${wide}"
-      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 NUMERIC) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
-    expect: {
-        "create": {
-          "status": 200
-        },
-        "get": {
-          "external": {
-            "sourceFormat": "PARQUET",
-            "sourceUris": [
-              "gs://${bucket}/${run}/dec50_as_numeric/wide.parquet"
-            ]
-          },
-          "schema": {
-            "fields": [
-              {
-                "name": "dec50",
-                "type": "NUMERIC"
-              }
-            ]
-          }
-        },
-        "job": {
-          "status": {
-            "state": "DONE"
-          }
-        },
-        "query": {
-          "jobComplete": true,
-          "rows": [
+            },
             {
               "f": [
                 {
-                  "v": "1.25"
-                }
-              ]
-            }
-          ],
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "dec50",
-                "type": "NUMERIC"
-              }
-            ]
-          },
-          "status": 200
-        }
-      }
-  # Known bug: a DECIMAL that NUMERIC does not hold is unsupported.
-  - name: dec50_as_string
-    template: ddl
-    vars:
-      object: "wide.parquet"
-      source: "${wide}"
-      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 STRING) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
-    expect: {
-        "create": {
-          "status": 200
-        },
-        "get": {
-          "external": {
-            "sourceFormat": "PARQUET",
-            "sourceUris": [
-              "gs://${bucket}/${run}/dec50_as_string/wide.parquet"
-            ]
-          },
-          "schema": {
-            "fields": [
-              {
-                "name": "dec50",
-                "type": "STRING"
-              }
-            ]
-          }
-        },
-        "job": {
-          "status": {
-            "state": "DONE"
-          }
-        },
-        "query": {
-          "jobComplete": true,
-          "rows": [
-            {
-              "f": [
+                  "v": "uris"
+                },
                 {
-                  "v": "1.25"
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/f64_as_timestamp/types.parquet\"]"
                 }
               ]
             }
-          ],
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "dec50",
-                "type": "STRING"
-              }
-            ]
-          },
-          "status": 200
-        }
-      }
-  # Known bug: a DECIMAL that NUMERIC does not hold is unsupported.
-  - name: dec50_as_float64
-    template: ddl_failure
-    vars:
-      object: "wide.parquet"
-      source: "${wide}"
-      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 FLOAT64) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
-    expect: {
-        "create": {
-          "status": 200
-        },
-        "get": {
-          "external": {
-            "sourceFormat": "PARQUET",
-            "sourceUris": [
-              "gs://${bucket}/${run}/dec50_as_float64/wide.parquet"
-            ]
-          },
-          "schema": {
-            "fields": [
-              {
-                "name": "dec50",
-                "type": "FLOAT"
-              }
-            ]
-          }
+          ]
         },
         "query": {
           "status": 400,
           "reason": "invalidQuery",
-          "message": "Column 'dec50' has unsupported Parquet type(FIXED_LEN_BYTE_ARRAY) for GoogleSQL type(FLOAT64)"
-        }
-      }
-  # Known bug: a DECIMAL that NUMERIC does not hold is unsupported.
-  - name: dec50_detected
-    template: ddl
-    vars:
-      object: "wide.parquet"
-      source: "${wide}"
-      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t`  OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
-    expect: {
-        "create": {
-          "status": 200
-        },
-        "get": {
-          "external": {
-            "autodetect": true,
-            "sourceFormat": "PARQUET",
-            "sourceUris": [
-              "gs://${bucket}/${run}/dec50_detected/wide.parquet"
-            ]
-          },
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "dec50",
-                "type": "NUMERIC"
-              }
-            ]
-          }
-        },
-        "job": {
-          "status": {
-            "state": "DONE"
-          }
-        },
-        "query": {
-          "jobComplete": true,
-          "rows": [
-            {
-              "f": [
-                {
-                  "v": "1.25"
-                }
-              ]
-            }
-          ],
-          "schema": {
-            "fields": [
-              {
-                "mode": "NULLABLE",
-                "name": "dec50",
-                "type": "NUMERIC"
-              }
-            ]
-          },
-          "status": 200
+          "message": "Cannot return an invalid timestamp value of 4609434218613702656 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field f64"
         }
       }

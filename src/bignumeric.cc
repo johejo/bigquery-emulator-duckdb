@@ -126,7 +126,7 @@ std::string BigNumericTypeName(int64_t precision, int64_t scale) {
 
 absl::StatusOr<googlesql::BigNumericValue> BigNumericFromDecimalBytes(std::string_view bytes,
                                                                       int64_t scale) {
-  if (bytes.empty() || scale < 0 || std::cmp_greater(scale, kScale)) {
+  if (bytes.empty() || scale < 0) {
     return absl::InvalidArgumentError("Invalid Parquet DECIMAL");
   }
   // GoogleSQL reads the little endian two's complement of an integer, without the bytes that
@@ -154,6 +154,10 @@ absl::StatusOr<googlesql::BigNumericValue> BigNumericFromDecimalBytes(std::strin
     digits.insert(0, point + 1 - digits.size(), '0');
   }
   digits.insert(digits.size() - point, ".");
+  // Of a scale above BIGNUMERIC's, only digits beyond it that are zeros can go.
+  while (digits.size() - digits.find('.') - 1 > kScale && digits.back() == '0') {
+    digits.pop_back();
+  }
   return googlesql::BigNumericValue::FromStringStrict((negative ? "-" : "") + digits);
 }
 

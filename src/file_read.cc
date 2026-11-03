@@ -530,7 +530,7 @@ std::string ReadMaybeGzip(const std::string& path) {
 }
 
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
-                                   bool list_inference) {
+                                   bool list_inference, bool decimal_bytes) {
   ParquetSources sources;
   for (const FileSource& input : inputs) {
     const std::string& path = input.path;
@@ -601,6 +601,14 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
     }
     std::vector<size_t> wide;
     WideDecimals(columns, wide);
+    if (decimal_bytes) {
+      for (const ParquetColumn& column : columns.children) {
+        if (column.IsDecimal() && !column.IsWideDecimal() && !column.HoldsNumeric() &&
+            (column.type == parquet::kFixedLenByteArray || column.type == parquet::kByteArray)) {
+          wide.push_back(column.element);
+        }
+      }
+    }
     if (wide.empty() && !geo) {
       sources.sources.push_back(input);
       continue;

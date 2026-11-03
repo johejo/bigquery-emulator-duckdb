@@ -539,6 +539,231 @@
         }
       }
     },
+    "geography_invalid": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_invalid/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_geography_invalid.t, error message: Unexpected 'INVALID' at position 0.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_invalid/s.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_geography_invalid.t, error message: Unexpected 'INVALID' at position 0.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_invalid/s.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "geography_spellings": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv",
+                "message": "Error while reading data, error message: Unexpected 'INVALID' at position 0.; line_number: 9 byte_offset_to_start_of_line: 195 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv",
+                "message": "Error while reading data, error message: Latitude must be between -90 and 90 degrees. Actual value was 91; line_number: 12 byte_offset_to_start_of_line: 244 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"POINT(1 91)\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/geography_spellings/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": "LINESTRING(0 0, 1 1)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POLYGON((0 0, 1 0, 1 1, 0 0))"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
     "json_invalid": {
       "project": "johejo-sandbox",
       "run": "ysncep57lqwczakpjuta2ymnxk",

@@ -44,6 +44,77 @@ std::string Folded(std::string_view name) {
 void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts,
                     const DatetimeFormats& formats);
 
+// BigQuery's message for the line `line`, which is not a JSON object, as its answers in
+// external_table_json_types.api.answers.json, external_table_bad_records.api.answers.json and
+// external_table_types_open.api.answers.json show: an array, a string, a line that ends where a
+// key of the row is expected and a bracket that closes the row are named, and other malformed
+// lines take its most common message. Other JSON values are unsupported.
+std::string_view NotObjectMessage(std::string_view line) {
+  const std::size_t first = line.find_first_not_of(" \t\r");
+  if (line.at(first) == '[') {
+    return "Start of array encountered without start of object.";
+  }
+  if (line.at(first) == '"' && json::accept(line)) {
+    return "Value encountered without start of object.";
+  }
+  try {
+    (void)json::parse(line);
+  } catch (const json::parse_error& error) {
+    // The containers open where the parser stopped.
+    const std::size_t at = std::min<std::size_t>(error.byte - 1, line.size());
+    std::vector<char> open;
+    bool in_string = false;
+    for (std::size_t i = 0; i < at; ++i) {
+      const char c = line.at(i);
+      if (in_string) {
+        if (c == '\\') {
+          ++i;
+        } else if (c == '"') {
+          in_string = false;
+        }
+      } else if (c == '"') {
+        in_string = true;
+      } else if (c == '{' || c == '[') {
+        open.push_back(c);
+      } else if ((c == '}' || c == ']') && !open.empty()) {
+        open.pop_back();
+      }
+    }
+    const bool row = open.size() == 1 && open.front() == '{';
+    if (row &&
+        std::string_view(error.what()).find("while parsing object key - unexpected end of input") !=
+            std::string_view::npos) {
+      return "Expected key";
+    }
+    if (row && at < line.size() && line.at(at) == ']') {
+      return "Expected , or } after key:value pair";
+    }
+    return "Parser terminated before end of string";
+  }
+  throw ApiError::Unsupported("reading a JSON row that is a number, a BOOL or null");
+}
+
+// `line` without the comma after the last member of its object, which BigQuery accepts, as its
+// answers in external_table_types_open.api.answers.json show, or none when it has none.
+std::optional<std::string> WithoutTrailingComma(std::string_view line) {
+  const std::size_t close = line.find_last_not_of(" \t\r");
+  if (close == std::string_view::npos || close == 0 || line.at(close) != '}') {
+    return std::nullopt;
+  }
+  const std::size_t comma = line.find_last_not_of(" \t\r", close - 1);
+  if (comma == std::string_view::npos || comma == 0 || line.at(comma) != ',') {
+    return std::nullopt;
+  }
+  // Whether BigQuery reads {,} is not known.
+  const std::size_t before = line.find_last_not_of(" \t\r", comma - 1);
+  if (before == std::string_view::npos || line.at(before) == '{' || line.at(before) == ',') {
+    return std::nullopt;
+  }
+  std::string without(line);
+  without.erase(comma, 1);
+  return json::accept(without) ? std::optional(std::move(without)) : std::nullopt;
+}
+
 // Whether `formats` set how a DATE, TIME or TIMESTAMP `type` value is parsed.
 bool FormatsApply(FieldType type, const DatetimeFormats& formats) {
   switch (type) {
@@ -382,12 +453,14 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
         };
         // NUMERIC and BIGNUMERIC numbers, and with `converts` those of STRING fields, are read
         // as their text, which ValidateValue converts.
+        const std::optional<std::string> without_comma = WithoutTrailingComma(line);
+        const std::string_view row = without_comma ? std::string_view(*without_comma) : line;
         const std::string text =
-            quotes ? QuotedJsonNumerics(line, schema, converts, /*bignumeric_text=*/true)
-                   : std::string(line);
+            quotes ? QuotedJsonNumerics(row, schema, converts, /*bignumeric_text=*/true)
+                   : std::string(row);
         auto object = json::parse(text, unique_keys, false);
-        if (object.is_discarded()) {
-          throw ApiError::Invalid("Invalid JSON in " + source.uri);
+        if (object.is_discarded() || !object.is_object()) {
+          throw ApiError::Invalid(std::string(NotObjectMessage(line)));
         }
         ValidateObject(object, schema, converts, formats);
         rewritten += object.dump() + '\n';

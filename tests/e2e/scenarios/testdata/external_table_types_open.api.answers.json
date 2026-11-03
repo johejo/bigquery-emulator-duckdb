@@ -1,0 +1,3387 @@
+{
+  "cases": {
+    "autodetect_date_format_default_form": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_default_form/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_date_format_default_form.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_default_form/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_default_form/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_default_form/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_date_format_integer": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "YYYYMMDD",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_integer/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_date_format_integer.t`\nOPTIONS(\n  date_format=\"YYYYMMDD\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_integer/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "YYYYMMDD",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_integer/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYYMMDD\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_integer/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_date_format_mismatch": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mismatch/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_date_format_mismatch.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mismatch/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mismatch/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mismatch/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024/01/02"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_date_format_mixed": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mixed/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_date_format_mixed.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mixed/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mixed/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_mixed/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "01/02/2024"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2024-01-03"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "string_field_0",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_date_format_no_header": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_no_header/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "date_field_0",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_date_format_no_header.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_no_header/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_no_header/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "date_field_0",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_date_format_no_header/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2024-01-03"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "date_field_0",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_datetime_format": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "datetimeFormat": "MM/DD/YYYY HH24:MI:SS",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_datetime_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_datetime_format.t`\nOPTIONS(\n  datetime_format=\"MM/DD/YYYY HH24:MI:SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_datetime_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "datetimeFormat": "MM/DD/YYYY HH24:MI:SS",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_datetime_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "datetime_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_datetime_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_time_format": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_format/s.csv"
+            ],
+            "timeFormat": "HH24.MI.SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_time_format.t`\nOPTIONS(\n  time_format=\"HH24.MI.SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_format/s.csv"
+            ],
+            "timeFormat": "HH24.MI.SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"HH24.MI.SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "03:04:05"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_time_zone": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_zone/s.csv"
+            ],
+            "timeZone": "Asia/Tokyo"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_time_zone.t`\nOPTIONS(\n  time_zone=\"Asia/Tokyo\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_zone/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_zone/s.csv"
+            ],
+            "timeZone": "Asia/Tokyo"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"Asia/Tokyo\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_time_zone/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "autodetect_timestamp_format": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_timestamp_format/s.csv"
+            ],
+            "timestampFormat": "MM/DD/YYYY HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_autodetect_timestamp_format.t`\nOPTIONS(\n  timestamp_format=\"MM/DD/YYYY HH24:MI:SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_timestamp_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_timestamp_format/s.csv"
+            ],
+            "timestampFormat": "MM/DD/YYYY HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "timestamp_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/autodetect_timestamp_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "b_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_b_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/b_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/b_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "b",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/b_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "bool_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_bool_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/bool_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/bool_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "bool",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/bool_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.0E-6"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "bool",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ddl_autodetect_date_format": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_ddl_autodetect_date_format.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/ddl_autodetect_date_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/ddl_autodetect_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/ddl_autodetect_date_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec18_10_detected": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec18_10_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec18_10_detected/dec18_10.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec18_10_detected/dec18_10.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec18_10_detected/dec18_10.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec38_20_detected": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec38_20_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_detected/dec38_20.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_detected/dec38_20.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_detected/dec38_20.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec38_20_frac_numeric": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec38_20_frac_numeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_frac_numeric/dec38_20_frac.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_frac_numeric/dec38_20_frac.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec38",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_frac_numeric/dec38_20_frac.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'dec38' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 16; scale: 20; input data: 00000000000000057ce96f21d99db400 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_frac_numeric/dec38_20_frac.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'dec38' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 16; scale: 20; input data: 00000000000000057ce96f21d99db400 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec38_20_frac_numeric/dec38_20_frac.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec50_big_detected": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec50_big_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_detected/dec50_big.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_detected/dec50_big.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_detected/dec50_big.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 21; scale: 20; input data: 06d79f82328ea3da61e066ebb2f88a000000000000 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_detected/dec50_big.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 21; scale: 20; input data: 06d79f82328ea3da61e066ebb2f88a000000000000 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_detected/dec50_big.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec50_big_numeric": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec50_big_numeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_numeric/dec50_big.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_numeric/dec50_big.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_numeric/dec50_big.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 21; scale: 20; input data: 06d79f82328ea3da61e066ebb2f88a000000000000 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_numeric/dec50_big.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 21; scale: 20; input data: 06d79f82328ea3da61e066ebb2f88a000000000000 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_big_numeric/dec50_big.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec50_frac_detected": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec50_frac_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_detected/dec50_frac.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_detected/dec50_frac.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_detected/dec50_frac.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 21; scale: 20; input data: 000000000000000000000000057ce96f21d99db400 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_detected/dec50_frac.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 21; scale: 20; input data: 000000000000000000000000057ce96f21d99db400 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_detected/dec50_frac.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec50_frac_numeric": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec50_frac_numeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_numeric/dec50_frac.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_numeric/dec50_frac.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_numeric/dec50_frac.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 21; scale: 20; input data: 000000000000000000000000057ce96f21d99db400 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_numeric/dec50_frac.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'dec50' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 21; scale: 20; input data: 000000000000000000000000057ce96f21d99db400 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_frac_numeric/dec50_frac.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec50_null_detected": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec50_null_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_null_detected/dec50_null.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_null_detected/dec50_null.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec50_null_detected/dec50_null.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec76_40_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec76_40_bignumeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_bignumeric/dec76_40.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_bignumeric/dec76_40.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec76",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_bignumeric/dec76_40.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec76",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec76_40_detected": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec76_40_detected.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_detected/dec76_40.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_detected/dec76_40.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec76",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_detected/dec76_40.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec76",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec76_40_string": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_dec76_40_string.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_string/dec76_40.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_string/dec76_40.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec76",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_string/dec76_40.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Decimal type exceeds the valid range for BIGNUMERIC. Precision: 76, scale: 40 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_string/dec76_40.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Decimal type exceeds the valid range for BIGNUMERIC. Precision: 76, scale: 40 File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/dec76_40_string/dec76_40.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "i32_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_i32_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/i32_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/i32_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/i32_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "4.2E-5"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i64_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_i64_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/i64_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/i64_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i64",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/i64_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "4.2E-5"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_autodetect_date_format": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_autodetect_date_format/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_autodetect_date_format.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_autodetect_date_format/s.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_autodetect_date_format/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_autodetect_date_format/s.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_malformed_lines": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t`\n(\n  id INT64,\n  v JSON\n)\nOPTIONS(\n  max_bad_records=100,\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 9: Expected key File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 21: Parser terminated before end of string File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 30: Start of array encountered without start of object. File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 34: Expected , or } after key:value pair File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 43: Parser terminated before end of string File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 51: Parser terminated before end of string File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 55: Parser terminated before end of string File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 65: Parser terminated before end of string File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 77: Value encountered without start of object. File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_json_malformed_lines.t, error message: JSON parsing error in row starting at position 81: Parser terminated before end of string File: gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/json_malformed_lines/s.json",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_s_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_int_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_s_int_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_int_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_int_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_int",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_int_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s_int",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_json_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_s_json_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_json_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_json_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_json",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_json_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s_json",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_null_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_s_null_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_null_as_timestamp/s_null.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_null_as_timestamp/s_null.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/s_null_as_timestamp/s_null.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

@@ -17,6 +17,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/schema_detect.h"
 #include "src/unordered_map_order.h"
 
@@ -40,24 +41,26 @@ struct Node {
   std::vector<Node> fields = {};
 };
 
-void MergeObject(std::vector<Node>& fields, const ordered_json& object);
+void MergeObject(std::vector<Node>& fields, const ordered_json& object,
+                 const DatetimeFormats& formats);
 
 // `element` is a value of an array, whose own arrays BigQuery flattens when it detects the
 // schema and rejects when it reads them.
-void MergeValue(Node& node, const ordered_json& value, bool element = false) {
+void MergeValue(Node& node, const ordered_json& value, const DatetimeFormats& formats,
+                bool element = false) {
   if (value.is_null()) {
     return;
   }
   if (value.is_array()) {
     node.repeated = node.repeated || !element;
     for (const ordered_json& item : value) {
-      MergeValue(node, item, true);
+      MergeValue(node, item, formats, true);
     }
     return;
   }
   if (value.is_object()) {
     node.record = true;
-    MergeObject(node.fields, value);
+    MergeObject(node.fields, value, formats);
     return;
   }
   DetectedKind kind = DetectedKind::kString;
@@ -72,19 +75,31 @@ void MergeValue(Node& node, const ordered_json& value, bool element = false) {
   } else if (value.is_number_float()) {
     kind = DetectedKind::kFloat;
   } else {
-    kind = DetectValue(value.get_ref<const std::string&>()).kind;
+    const auto& text = value.get_ref<const std::string&>();
+    kind = DetectValue(text).kind;
+    if (formats != DatetimeFormats{}) {
+      // Whether a DATE of the default form is a STRING given a date format, as it is in CSV, is
+      // not known.
+      const DetectedKind formatted = FormattedKind(text, kind, formats);
+      if (kind == DetectedKind::kDate && formatted == DetectedKind::kString) {
+        throw ApiError::Unsupported("detecting the type of JSON value " + text +
+                                    " with date_format");
+      }
+      kind = formatted;
+    }
   }
   node.kind = node.kind ? MergeKinds(*node.kind, kind) : kind;
 }
 
 // Names differing only in case are different fields until the schema is checked.
-void MergeObject(std::vector<Node>& fields, const ordered_json& object) {
+void MergeObject(std::vector<Node>& fields, const ordered_json& object,
+                 const DatetimeFormats& formats) {
   for (const auto& [name, value] : object.items()) {
     auto field = std::ranges::find(fields, name, &Node::name);
     if (field == fields.end()) {
       field = fields.insert(fields.end(), Node{.name = name});
     }
-    MergeValue(*field, value);
+    MergeValue(*field, value, formats);
   }
 }
 
@@ -135,7 +150,8 @@ std::vector<FieldSchema> Fields(const std::vector<Node>& appeared, std::string_v
 
 }  // namespace
 
-std::vector<FieldSchema> DetectJson(const FileSource& source, std::string_view table_id) {
+std::vector<FieldSchema> DetectJson(const FileSource& source, std::string_view table_id,
+                                    const DatetimeFormats& formats) {
   const std::string contents = ReadMaybeGzip(source.path);
   const std::string file = source.uri.substr(source.uri.rfind('/') + 1);
   std::vector<ordered_json> rows;
@@ -174,7 +190,7 @@ std::vector<FieldSchema> DetectJson(const FileSource& source, std::string_view t
   }
   std::vector<Node> nodes;
   for (const ordered_json& row : rows) {
-    MergeObject(nodes, row);
+    MergeObject(nodes, row, formats);
   }
   if (nodes.empty()) {
     throw ApiError::InvalidQuery(std::format("Schema has no fields. Table: {}", table_id));

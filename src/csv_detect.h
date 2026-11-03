@@ -6,6 +6,7 @@
 
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/temporary_files.h"
 
 namespace bigquery_emulator_duckdb {
@@ -26,9 +27,10 @@ struct DetectedCsv {
 // Detects the delimiter, header and column types of CSV `sources` as BigQuery does. An empty
 // `field_delimiter` detects one; `skip_leading_rows` is absent when the job leaves it out.
 // Without `rows`, the result has no sources, and a quote that does not close ends at the end of
-// its line rather than failing, as in BigQuery's detection for external tables.
+// its line rather than failing, as in BigQuery's detection for external tables. Values take an
+// external table's date and time `formats` as FormattedKind gives them.
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
                       std::optional<int> skip_leading_rows, TemporaryFiles& downloads,
-                      bool rows = true);
+                      bool rows = true, const DatetimeFormats& formats = {});
 
 }  // namespace bigquery_emulator_duckdb

@@ -40,6 +40,7 @@ vars:
   datetime: "MSwyMDI0LTAxLTAyIDAzOjA0OjA1CjIsMjAyNC0wMS0wMlQwMzowNDowNQozLDIwMjQtMDEtMDIgMDM6MDQ6MDUuMTIzNDU2CjQsMjAyNC0wMS0wMiAwMzowNDowNS4xMjM0NTY3CjUsMjAyNC0wMS0wMiAzOjQ6NQo2LDIwMjQtMDEtMDIKNywyMDI0LTAxLTAyIDAzOjA0CjgsMjAyNC0wMS0wMiAwMzowNDowNSBVVEMKOSwyMDI0LTAxLTAyIDAzOjA0OjA1KzAwOjAwCjEwLDIwMjQvMDEvMDIgMDM6MDQ6MDUKMTEsIDIwMjQtMDEtMDIgMDM6MDQ6MDUKMTIsMjAyNC0wMS0wMiAwMzowNDowNSAKMTMsMDAwMS0wMS0wMSAwMDowMDowMAoxNCw5OTk5LTEyLTMxIDIzOjU5OjU5Ljk5OTk5OQoxNSwyMDI0LTEtMiAwMzowNDowNQoxNiwyMDI0LTAxLTAyIDI0OjAwOjAwCjE3LDIwMjQtMDItMzAgMDA6MDA6MDAKMTgsMjAyNC0wMS0wMlQwMzowNDowNVoKMTksCg=="
   bignumeric: "MSwxLjUKMiwtMC4wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMQozLDAuMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5CjQsMWUzCjUsIDEKNiw1Nzg5NjA0NDYxODY1ODA5NzcxMTc4NTQ5MjUwNDM0Mzk1MzkyNjYuMzQ5OTIzMzI4MjAyODIwMTk3Mjg3OTIwMDM5NTY1NjQ4MTk5NjcKNyw1Nzg5NjA0NDYxODY1ODA5NzcxMTc4NTQ5MjUwNDM0Mzk1MzkyNjcKOCwrMQo5LC41CjEwLDUuCjExLE5hTgoxMiwweDEwCjEzLCIxLDAwMCIKMTQsCjE1LC01Nzg5NjA0NDYxODY1ODA5NzcxMTc4NTQ5MjUwNDM0Mzk1MzkyNjYuMzQ5OTIzMzI4MjAyODIwMTk3Mjg3OTIwMDM5NTY1NjQ4MTk5NjgK"
   json: "MSwieyIiYSIiOjF9IgoyLCJbMSwyXSIKMywiIiJzIiIiCjQsMQo1LG51bGwKNix0cnVlCjcsInsiImEiIjoxIgo4LGFiYwo5LCJ7IiJhIiI6MSwiImEiIjoyfSIKMTAsCjExLCIgeyIiYSIiOiAxfSAiCjEyLCJ7IiJiIiI6MiwiImEiIjoxfSIKMTMsMS4wZTIKMTQsMTIzNDU2Nzg5MDEyMzQ1Njc4OTAKMTUsInsiImEiIjoiIlx1MDBlOSIifSIK"
+  geography: "MSxQT0lOVCgxIDIpCjIscG9pbnQoMSAyKQozLFNSSUQ9NDMyNjtQT0lOVCgxIDIpCjQsInsiInR5cGUiIjoiIlBvaW50IiIsIiJjb29yZGluYXRlcyIiOlsxLDJdfSIKNSwwMTAxMDAwMDAwMDAwMDAwMDAwMDAwRjAzRjAwMDAwMDAwMDAwMDAwNDAKNixQT0lOVCBFTVBUWQo3LFBPSU5UKDIwMCAwKQo4LCJMSU5FU1RSSU5HKDAgMCwgMSAxKSIKOSxJTlZBTElECjEwLCJQT0xZR09OKCgwIDAsIDEgMCwgMSAxLCAwIDApKSIKMTEsCjEyLFBPSU5UKDEgOTEpCg=="
 templates:
   # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
   # `source`, and runs `query` on it.
@@ -1230,5 +1231,220 @@ cases:
             ]
           },
           "status": 200
+        }
+      }
+  - name: geography_spellings
+    template: ddl
+    vars:
+      object: "s.csv"
+      source: "${geography}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'CSV', uris = ['${prefix}/s.csv'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_spellings/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+                "message": "Error while reading data, error message: Unexpected 'INVALID' at position 0.; line_number: 9 byte_offset_to_start_of_line: 195 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://${bucket}/${run}/geography_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+                "message": "Error while reading data, error message: Latitude must be between -90 and 90 degrees. Actual value was 91; line_number: 12 byte_offset_to_start_of_line: 244 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"POINT(1 91)\" File: gs://${bucket}/${run}/geography_spellings/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": "LINESTRING(0 0, 1 1)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POLYGON((0 0, 1 0, 1 1, 0 0))"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: geography_invalid
+    template: ddl_failure
+    vars:
+      object: "s.csv"
+      source: "MSxJTlZBTElECg=="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'CSV', uris = ['${prefix}/s.csv'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_invalid/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalid",
+          "message": "Error while reading table: ${project}.bqa_${run}_geography_invalid.t, error message: Unexpected 'INVALID' at position 0.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://${bucket}/${run}/geography_invalid/s.csv"
         }
       }

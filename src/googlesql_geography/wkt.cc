@@ -65,13 +65,16 @@ class WktReader {
     return value;
   }
 
-  // Fails saying the next token, a number or else one character, was unexpected.
+  // Fails saying the next token, a number, a word or else one character, was unexpected.
   [[nodiscard]] absl::Status Unexpected() {
     Spaces();
+    const auto number = [](char c) {
+      return std::isdigit(static_cast<unsigned char>(c)) != 0 || c == '.' || c == '-' || c == '+';
+    };
+    const auto letter = [](char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; };
+    const bool word = position_ < text_.size() && letter(text_.at(position_));
     size_t end = position_;
-    while (end < text_.size() &&
-           (std::isdigit(static_cast<unsigned char>(text_.at(end))) != 0 || text_.at(end) == '.' ||
-            text_.at(end) == '-' || text_.at(end) == '+')) {
+    while (end < text_.size() && (word ? letter(text_.at(end)) : number(text_.at(end)))) {
       ++end;
     }
     if (end == position_ && end < text_.size()) {
@@ -84,14 +87,27 @@ class WktReader {
         " at position " + std::to_string(position_) + ".");
   }
 
-  // Whether the next character starts a word.
-  bool Letter() {
-    Spaces();
-    return position_ < text_.size() &&
-           std::isalpha(static_cast<unsigned char>(text_.at(position_))) != 0;
+  // Skips the EWKT prefix SRID=4326;, which ST_GEOGFROMTEXT takes, as BigQuery's answers in
+  // tests/e2e/goclient/testdata/scalars/geography.txt show; another SRID is unsupported.
+  absl::Status Srid() {
+    constexpr std::string_view kSrid = "SRID=4326;";
+    if (text_.starts_with(kSrid)) {
+      position_ = kSrid.size();
+    } else if (text_.starts_with("SRID=")) {
+      return absl::UnimplementedError("The emulator does not support ST_GEOGFROMTEXT of " +
+                                      std::string(text_));
+    }
+    return absl::OkStatus();
   }
 
-  [[nodiscard]] std::string_view Text() const { return text_; }
+  // Fails on Z, M or ZM after a geometry type, which BigQuery does not take.
+  absl::Status NoDimensions() {
+    if (Word("Z") || Word("M") || Word("ZM")) {
+      return absl::InvalidArgumentError(std::string(failed_) +
+                                        "Z and M extensions are not supported.");
+    }
+    return absl::OkStatus();
+  }
 
   absl::Status End() {
     Spaces();
@@ -208,6 +224,7 @@ absl::Status ReadGeometry(WktReader& reader, std::vector<Part>& parts) {
     return absl::OkStatus();
   }
   if (reader.Word("POINT")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     if (reader.Word("EMPTY")) {
       return absl::OkStatus();
     }
@@ -217,12 +234,15 @@ absl::Status ReadGeometry(WktReader& reader, std::vector<Part>& parts) {
     return absl::OkStatus();
   }
   if (reader.Word("LINESTRING")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     return ReadLine(reader, parts);
   }
   if (reader.Word("POLYGON")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     return ReadPolygon(reader, parts);
   }
   if (reader.Word("MULTIPOINT")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     return ReadItems(
                reader,
                [&]() -> absl::Status {
@@ -246,19 +266,19 @@ absl::Status ReadGeometry(WktReader& reader, std::vector<Part>& parts) {
         .status();
   }
   if (reader.Word("MULTILINESTRING")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     return ReadItems(reader, [&] { return ReadLine(reader, parts); }).status();
   }
   if (reader.Word("MULTIPOLYGON")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     return ReadItems(reader, [&] { return ReadPolygon(reader, parts); }).status();
   }
   if (reader.Word("GEOMETRYCOLLECTION")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.NoDimensions());
     return ReadItems(reader, [&] { return ReadGeometry(reader, parts); }).status();
   }
-  if (!reader.Letter()) {
-    return reader.Unexpected();
-  }
-  return absl::UnimplementedError("The emulator does not support ST_GEOGFROMTEXT of " +
-                                  std::string(reader.Text()));
+  // BigQuery fails on a word of another geometry type, or of none, as on any unexpected token.
+  return reader.Unexpected();
 }
 
 }  // namespace
@@ -266,6 +286,7 @@ absl::Status ReadGeometry(WktReader& reader, std::vector<Part>& parts) {
 absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented, std::string_view failed,
                                   bool planar, bool make_valid) {
   WktReader reader(text, failed);
+  GOOGLESQL_RETURN_IF_ERROR(reader.Srid());
   std::vector<Part> parts;
   GOOGLESQL_RETURN_IF_ERROR(ReadGeometry(reader, parts));
   GOOGLESQL_RETURN_IF_ERROR(reader.End());

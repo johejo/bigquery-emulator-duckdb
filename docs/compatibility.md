@@ -77,7 +77,7 @@ file when it is created, so creation reads the sources. Columns and their fields
 Parquet types that the
 [Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md) convert
 to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a TIMESTAMP of nanoseconds, which
-reads as its INT64 value, a DECIMAL that NUMERIC holds, or a group, which is a RECORD; a repeated
+reads as its INT64 value, a DECIMAL, which is NUMERIC, or a group, which is a RECORD; a repeated
 field is REPEATED. By default a LIST or MAP group is a RECORD of its repeated field. DDL
 `enable_list_inference` and REST `parquetOptions.enableListInference` can unwrap LIST groups into
 REPEATED fields. Unlike loads, external reads preserve NULL LIST elements. An explicit schema
@@ -85,9 +85,13 @@ gives each nested field the type detected for it. A top-level column can also re
 a DECIMAL as NUMERIC or BIGNUMERIC, a DECIMAL as STRING or, as BigQuery does, by its unscaled
 value as INT64, a BYTE_ARRAY as STRING or BYTES, a TIMESTAMP of milliseconds or microseconds as
 DATETIME, a DATE or a TIMESTAMP of nanoseconds, whose value BigQuery reads as microseconds, as
-TIMESTAMP, and a STRING of WKT or a BYTE_ARRAY of WKB as GEOGRAPHY; other combinations fail as
-BigQuery's do or are unsupported. A DECIMAL that NUMERIC does not hold, ENUM, GeoParquet, column
-name conversions and the options that select other types are unsupported. Every source file must
+TIMESTAMP, and, as BigQuery does, a BYTE_ARRAY as the TIMESTAMP 0 and a BOOLEAN or a signed
+integer by its value as microseconds of a TIMESTAMP, and a STRING of WKT or a BYTE_ARRAY of WKB
+as GEOGRAPHY; other combinations, such as a FLOAT or DOUBLE as TIMESTAMP, fail as BigQuery's do or
+are unsupported. A DECIMAL that NUMERIC does not hold fails on a value NUMERIC does not hold, as
+BigQuery's does for one of bytes, and is unsupported for an INT32 or INT64 one, of both too many
+integer and fractional digits, and of more than 38 integer digits; a nested one, ENUM,
+GeoParquet, column name conversions and the options that select other types are unsupported. Every source file must
 have each REQUIRED and REPEATED column and field of the schema.
 
 CSV takes a flat schema of the scalar types listed above, given or detected as
@@ -117,13 +121,20 @@ JSON options other than `jsonOptions.encoding` are unsupported.
 CSV and JSON tables support `compression`, `encoding` / `csvOptions.encoding` and
 `jsonOptions.encoding`, `max_bad_records` / `maxBadRecords`, and `time_zone`, `date_format`,
 `datetime_format`, `time_format` and `timestamp_format` / `timeZone`, `dateFormat`,
-`datetimeFormat`, `timeFormat` and `timestampFormat`, which schema detection does not take. A
+`datetimeFormat`, `timeFormat` and `timestampFormat`. CSV schema detection takes them all, and
+JSON detection only `date_format` / `dateFormat`: a value a format parses has its type, and a
+DATE of the default form is a STRING given a date format. A value several formats parse, a TIME
+or TIMESTAMP of the default form given a format of its type or, for a TIMESTAMP, a DATETIME
+format, a detected DATETIME CSV column without a header, and a JSON DATE of the default form given
+a date format are unsupported. A
 gzip source with compression `NONE`, which BigQuery reads without decompressing it, or in UTF-16
 or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A CSV value of a BYTES,
 INTERVAL or RANGE column, or a JSON value of a valid record other than a BIGNUMERIC, DATETIME,
 TIMESTAMP or GEOGRAPHY one or one a format parses, that fails to convert still fails the query
-rather than counting as bad. GEOGRAPHY WKT of a word other than a geometry type is unsupported. The
-warning for a malformed JSON line does not name the token BigQuery expected.
+rather than counting as bad. A JSON row that is a number, a
+BOOL or null is unsupported, and the messages for malformed JSON lines other than those of
+[BigQuery's answers](../tests/e2e/scenarios/testdata/external_table_types_open.api.yaml) take its
+most common one.
 
 [Hive partitioning](../third_party/bigquery_docs/hive-partitioned-queries.md), through
 `WITH PARTITION COLUMNS` or `hivePartitioningOptions`, takes its keys and their types from the

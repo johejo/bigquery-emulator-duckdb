@@ -258,7 +258,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job, JobLocatio
     } catch (const ApiError& error) {
       job->error = error;
     } catch (const std::exception& error) {
-      job->error = job->query() != nullptr ? ApiError::InvalidQuery(error.what())
+      job->error = job->query() != nullptr ? ApiError::QueryFailure(error.what())
                                            : ApiError::Invalid(error.what());
     }
     job->location = location.Resolve();

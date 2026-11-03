@@ -276,7 +276,7 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
   try {
     return backend_.ExecuteAll(statements, setup);
   } catch (const BackendError& error) {
-    throw ApiError::InvalidQuery(error.what());
+    throw ApiError::QueryFailure(error.what());
   }
 }
 

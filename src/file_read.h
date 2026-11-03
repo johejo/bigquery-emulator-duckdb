@@ -54,10 +54,11 @@ struct ParquetSources {
 };
 
 // Removes wide DECIMAL annotations and GeoParquet metadata in staged copies, preserving
-// conversion metadata in columns. Rejects incompatible schemas and unsupported GeoParquet
-// encodings or coordinate systems. list_inference selects the schema shape.
+// conversion metadata in columns. With `decimal_bytes`, also those of top-level DECIMALs of bytes
+// that NUMERIC does not hold, so that DuckDB reads their bytes. Rejects incompatible schemas and
+// unsupported GeoParquet encodings or coordinate systems. list_inference selects the schema shape.
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
-                                   bool list_inference);
+                                   bool list_inference, bool decimal_bytes = false);
 
 // Restores GEOGRAPHY and wide DECIMAL types and REQUIRED modes in an inferred schema. Wide
 // decimals require BIGNUMERIC in targets.

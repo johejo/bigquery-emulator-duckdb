@@ -33,6 +33,7 @@ vars:
   datetime: "eyJpZCI6MSwidiI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUifQp7ImlkIjoyLCJ2IjoiMjAyNC0wMS0wMlQwMzowNDowNS4xMjM0NTYifQp7ImlkIjozLCJ2IjoiMjAyNC0wMS0wMiJ9CnsiaWQiOjQsInYiOiIyMDI0LTAxLTAyIDAzOjA0In0KeyJpZCI6NSwidiI6MX0KeyJpZCI6NiwidiI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUgVVRDIn0KeyJpZCI6NywidiI6IjIwMjQtMDEtMDJUMDM6MDQ6MDVaIn0KeyJpZCI6OCwidiI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUuMTIzNDU2NyJ9CnsiaWQiOjksInYiOiIyMDI0LTAxLTAyIDM6NDo1In0KeyJpZCI6MTAsInYiOnRydWV9CnsiaWQiOjExLCJ2Ijp7ImEiOjF9fQp7ImlkIjoxMiwidiI6bnVsbH0K"
   bignumeric: "eyJpZCI6MSwidiI6MS41fQp7ImlkIjoyLCJ2IjoiMS41In0KeyJpZCI6MywidiI6MWUzfQp7ImlkIjo0LCJ2IjoiMWUzIn0KeyJpZCI6NSwidiI6MC4xMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODl9CnsiaWQiOjYsInYiOjU3ODk2MDQ0NjE4NjU4MDk3NzExNzg1NDkyNTA0MzQzOTUzOTI2Ni4zNDk5MjMzMjgyMDI4MjAxOTcyODc5MjAwMzk1NjU2NDgxOTk2N30KeyJpZCI6NywidiI6MWU0MH0KeyJpZCI6OCwidiI6dHJ1ZX0KeyJpZCI6OSwidiI6ImFiYyJ9CnsiaWQiOjEwLCJ2IjoiIDEifQp7ImlkIjoxMSwidiI6bnVsbH0KeyJpZCI6MTIsInYiOi0wLjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxfQo="
   json: "eyJpZCI6MSwidiI6eyJhIjoxfX0KeyJpZCI6MiwidiI6WzEsMl19CnsiaWQiOjMsInYiOiJzIn0KeyJpZCI6NCwidiI6IntcImFcIjoxfSJ9CnsiaWQiOjUsInYiOjF9CnsiaWQiOjYsInYiOjEuNX0KeyJpZCI6NywidiI6MTIzNDU2Nzg5MDEyMzQ1Njc4OTB9CnsiaWQiOjgsInYiOnRydWV9CnsiaWQiOjksInYiOm51bGx9CnsiaWQiOjEwLCJ2Ijp7ImEiOnsiYiI6WzEsbnVsbF19fX0KeyJpZCI6MTEsInYiOnt9fQp7ImlkIjoxMiwidiI6eyJiIjoyLCJhIjoxfX0K"
+  geography: "eyJpZCI6MSwidiI6IlBPSU5UKDEgMikifQp7ImlkIjoyLCJ2Ijp7InR5cGUiOiJQb2ludCIsImNvb3JkaW5hdGVzIjpbMSwyXX19CnsiaWQiOjMsInYiOiJ7XCJ0eXBlXCI6XCJQb2ludFwiLFwiY29vcmRpbmF0ZXNcIjpbMSwyXX0ifQp7ImlkIjo0LCJ2IjoiMDEwMTAwMDAwMDAwMDAwMDAwMDAwMEYwM0YwMDAwMDAwMDAwMDAwMDQwIn0KeyJpZCI6NSwidiI6MX0KeyJpZCI6NiwidiI6IlBPSU5UKDIwMCAwKSJ9CnsiaWQiOjcsInYiOiJJTlZBTElEIn0KeyJpZCI6OCwidiI6bnVsbH0KeyJpZCI6OSwidiI6IlBPSU5UIEVNUFRZIn0KeyJpZCI6MTAsInYiOiJTUklEPTQzMjY7UE9JTlQoMSAyKSJ9Cg=="
 templates:
   # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
   # `source`, and runs `query` on it.
@@ -1097,5 +1098,235 @@ cases:
             ]
           },
           "status": 200
+        }
+      }
+  - name: geography_spellings
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "${geography}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_geography_spellings.t, error message: JSON parsing error in row starting at position 26: JSON object specified for non-record field: v File: gs://${bucket}/${run}/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_geography_spellings.t, error message: JSON parsing error in row starting at position 192: Could not convert JSON value to geography. Field: v; Value: 1 File: gs://${bucket}/${run}/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: json_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6WzEsfQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v JSON) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/json_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalid",
+          "message": "Error while reading table: ${project}.bqa_${run}_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://${bucket}/${run}/json_invalid/s.json"
+        }
+      }
+  - name: geography_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6IklOVkFMSUQifQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID"
         }
       }

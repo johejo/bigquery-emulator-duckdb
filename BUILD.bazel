@@ -1213,6 +1213,7 @@ cc_library(
     deps = [
         ":field_schema",
         ":file_read",
+        ":file_read_options",
         ":temporary_files",
     ],
 )
@@ -1225,10 +1226,14 @@ cc_library(
     implementation_deps = [
         ":api_error",
         ":duckdb_sql",
+        ":external_values",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public/functions:date_time_util",
     ],
-    deps = [":field_schema"],
+    deps = [
+        ":field_schema",
+        ":file_read_options",
+    ],
 )
 
 cc_library(

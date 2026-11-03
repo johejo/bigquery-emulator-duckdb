@@ -16,7 +16,6 @@ version: 1
 # order_csv_three_first, and Rows every record of a CSV table but those of too many values, as
 # max_bad_records_csv_files of external_table_read_options.api.yaml also shows. The message of a
 # JSON table of several files takes the form of CSV's, and its Rows counts a malformed line too.
-# known_bugs/external_table_bad_records.api.yaml has the warnings of a JSON table.
 description: >-
   Warnings for skipped bad records, and the failure of tables of several files with too many,
   in queries of CSV and JSON external tables with max_bad_records.
@@ -395,3 +394,11 @@ cases:
       source_b: '${bad_json_b}'
       ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'JSON', uris = ['${prefix}/*.json'], max_bad_records = 2)
     expect: {"create": {"status": 200}, "query": {"message": "Error while reading table: ${project}.${dataset}.t, error message: JSON processing encountered too many errors, giving up. Rows: 6; errors: 3; max bad: 2; error percent: 0", "reason": "invalid", "status": 400}}
+  - name: warnings_json
+    template: warnings
+    vars:
+      object: a.json
+      source: '${bad_json}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'], max_bad_records = 2)
+      query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 20: Could not convert value 'number_value: \t \"2.5\"' to integer. Field: id; Value: 2.5 File: ${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 42: Expected key File: ${prefix}/a.json", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 20: Could not convert value 'number_value: \t \"2.5\"' to integer. Field: id; Value: 2.5 File: ${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 42: Expected key File: ${prefix}/a.json", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}]}}

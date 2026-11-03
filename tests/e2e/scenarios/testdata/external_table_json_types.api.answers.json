@@ -447,6 +447,260 @@
         }
       }
     },
+    "geography_invalid": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "geography_spellings": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_geography_spellings.t, error message: JSON parsing error in row starting at position 26: JSON object specified for non-record field: v File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_geography_spellings.t, error message: JSON parsing error in row starting at position 192: Could not convert JSON value to geography. Field: v; Value: 1 File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_invalid": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_invalid/s.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_invalid/s.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
     "json_spellings": {
       "project": "johejo-sandbox",
       "run": "pt7rubsgsvcxs2qkywarngjwp4",

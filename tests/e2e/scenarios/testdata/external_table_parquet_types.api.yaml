@@ -24,6 +24,7 @@ vars:
   prefix: gs://${bucket}/${run}/${case}
   query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
   types: "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"
+  wide: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAGxrk1uLvUAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAABkMGBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGRwcAAAAhQAAAFBBUjE="
 templates:
   # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
   # `source`, and runs `query` on it.
@@ -3989,6 +3990,310 @@ cases:
                 "mode": "NULLABLE",
                 "name": "dec9",
                 "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: s_datetime_as_timestamp
+    template: ddl
+    vars:
+      object: "types.parquet"
+      source: "${types}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (s_datetime TIMESTAMP) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/s_datetime_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_datetime",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s_datetime",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: dec50_as_bignumeric
+    template: ddl
+    vars:
+      object: "wide.parquet"
+      source: "${wide}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 BIGNUMERIC) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/dec50_as_bignumeric/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: dec50_as_numeric
+    template: ddl
+    vars:
+      object: "wide.parquet"
+      source: "${wide}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 NUMERIC) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/dec50_as_numeric/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: dec50_as_string
+    template: ddl
+    vars:
+      object: "wide.parquet"
+      source: "${wide}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 STRING) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/dec50_as_string/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: dec50_as_float64
+    template: ddl_failure
+    vars:
+      object: "wide.parquet"
+      source: "${wide}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec50 FLOAT64) OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/dec50_as_float64/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Column 'dec50' has unsupported Parquet type(FIXED_LEN_BYTE_ARRAY) for GoogleSQL type(FLOAT64)"
+        }
+      }
+  - name: dec50_detected
+    template: ddl
+    vars:
+      object: "wide.parquet"
+      source: "${wide}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t`  OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/dec50_detected/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
               }
             ]
           },
