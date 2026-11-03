@@ -388,10 +388,16 @@ SELECT AVG(x) OVER () FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CA
 SELECT AVG(x) FROM UNNEST([9223372036854775807, 9223372036854775807, 9223372036854775806]) AS x
 => "9.223372036854776E18"
 
+# Observed BigQuery answers recorded with tools/bqanswers. FLOAT64 SUM fails on overflow, also
+# where only a partial sum overflows, which the reference implementation's exact sum does not.
+SELECT SUM(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: Error in SUM aggregation: floating point overflow
+
+SELECT SUM(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64), CAST('-1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: Error in SUM aggregation: floating point overflow
+
 # SUM fails on overflow, and SUM, MIN and MAX return NaN where any value is NaN.
 # third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
-SELECT SUM(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
-=> error:
 
 SELECT SUM(x) OVER () FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x LIMIT 1
 => error:

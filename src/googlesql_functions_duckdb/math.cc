@@ -366,58 +366,82 @@ void RegisterAverage(duckdb_connection connection) {
   }
 }
 
-// SUM of FLOAT64 as GoogleSQL's reference implementation computes it: a sum that fails only
-// where the total, rather than a partial sum, is beyond FLOAT64's range. The reference
-// implementation sums exactly; a long double has the range to hold any partial sum, and
-// DuckDB's sum() returns an infinity where BigQuery fails.
+// SUM of FLOAT64 as GoogleSQL's reference implementation and BigQuery compute it, failing on
+// overflow where DuckDB's sum() returns an infinity. The reference implementation sums exactly,
+// so that only a total beyond FLOAT64's range fails; a long double holds any partial sum where
+// it is wider than a double. BigQuery sums in a double and fails where a partial sum overflows.
+constexpr char kSumOverflow[] = "Error in SUM aggregation: floating point overflow";
+
+template <typename Float>
 struct Sum {
-  long double sum;  // NOLINT(google-runtime-float)
+  Float sum;
   bool any;
 };
 
-Sum& SumState(duckdb_aggregate_state state) { return *reinterpret_cast<Sum*>(state); }
-
-idx_t SumSize(duckdb_function_info /*info*/) { return sizeof(Sum); }
-
-void InitSum(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
-  SumState(state) = {.sum = 0, .any = false};
+template <typename Float>
+Sum<Float>& SumState(duckdb_aggregate_state state) {
+  return *reinterpret_cast<Sum<Float>*>(state);
 }
 
-void UpdateSums(duckdb_function_info /*info*/, duckdb_data_chunk input,
+template <typename Float>
+idx_t SumSize(duckdb_function_info /*info*/) {
+  return sizeof(Sum<Float>);
+}
+
+template <typename Float>
+void InitSum(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
+  SumState<Float>(state) = {.sum = 0, .any = false};
+}
+
+template <typename Float>
+bool AddToSum(duckdb_function_info info, Sum<Float>& state, Float value) {
+  absl::Status error;
+  if (!fn::Add(state.sum, value, &state.sum, &error)) {
+    duckdb_aggregate_function_set_error(info, kSumOverflow);
+    return false;
+  }
+  state.any = true;
+  return true;
+}
+
+template <typename Float>
+void UpdateSums(duckdb_function_info info, duckdb_data_chunk input,
                 duckdb_aggregate_state* states) {
   for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
     const Arguments arguments(input, row);
     if (arguments.IsNull(0)) {
       continue;
     }
-    Sum& state = SumState(states[row]);
-    state.sum += arguments.Double(0);
-    state.any = true;
+    if (!AddToSum<Float>(info, SumState<Float>(states[row]), arguments.Double(0))) {
+      return;
+    }
   }
 }
 
+template <typename Float>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DuckDB's callback.
-void CombineSums(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
+void CombineSums(duckdb_function_info info, duckdb_aggregate_state* source,
                  duckdb_aggregate_state* target, idx_t count) {
   for (idx_t i = 0; i < count; ++i) {
     // DuckDB may combine a window's states again, so the source stays as it is.
-    const Sum& from = SumState(source[i]);
-    Sum& to = SumState(target[i]);
-    to.sum += from.sum;
-    to.any = to.any || from.any;
+    const Sum<Float>& from = SumState<Float>(source[i]);
+    if (from.any && !AddToSum<Float>(info, SumState<Float>(target[i]), from.sum)) {
+      return;
+    }
   }
 }
 
 // The sum as FLOAT64, or NULL where no value reached it.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters): DuckDB's callback.
+template <typename Float>
 void FinalizeSums(duckdb_function_info info, duckdb_aggregate_state* source, duckdb_vector result,
                   idx_t count, idx_t offset) {
   // NOLINTEND(bugprone-easily-swappable-parameters)
   duckdb_vector_ensure_validity_writable(result);
   for (idx_t i = 0; i < count; ++i) {
-    const Sum& state = SumState(source[i]);
+    const Sum<Float>& state = SumState<Float>(source[i]);
     if (std::isfinite(state.sum) && std::abs(state.sum) > std::numeric_limits<double>::max()) {
-      duckdb_aggregate_function_set_error(info, "double overflow");
+      duckdb_aggregate_function_set_error(info, kSumOverflow);
       return;
     }
     SetResult(result, offset + i,
@@ -425,6 +449,7 @@ void FinalizeSums(duckdb_function_info info, duckdb_aggregate_state* source, duc
   }
 }
 
+template <typename Float>
 void RegisterSum(duckdb_connection connection) {
   Handle<duckdb_aggregate_function, duckdb_destroy_aggregate_function> const function(
       duckdb_create_aggregate_function());
@@ -432,8 +457,9 @@ void RegisterSum(duckdb_connection connection) {
   LogicalType const float64(duckdb_create_logical_type(kDouble));
   duckdb_aggregate_function_add_parameter(function.get(), float64.get());
   duckdb_aggregate_function_set_return_type(function.get(), float64.get());
-  duckdb_aggregate_function_set_functions(function.get(), SumSize, InitSum, UpdateSums, CombineSums,
-                                          FinalizeSums);
+  duckdb_aggregate_function_set_functions(function.get(), SumSize<Float>, InitSum<Float>,
+                                          UpdateSums<Float>, CombineSums<Float>,
+                                          FinalizeSums<Float>);
   // UpdateSums skips NULL values itself.
   duckdb_aggregate_function_set_special_handling(function.get());
   if (duckdb_register_aggregate_function(connection, function.get()) == DuckDBError) {
@@ -562,7 +588,11 @@ void RegisterMathFunctions(duckdb_connection connection, const Options& options)
     // The reference implementation's type, whose precision depends on the platform.
     RegisterAverage<long double>(connection);  // NOLINT(google-runtime-float)
   }
-  RegisterSum(connection);
+  if (options.double_sum) {
+    RegisterSum<double>(connection);
+  } else {
+    RegisterSum<long double>(connection);  // NOLINT(google-runtime-float)
+  }
   Register(connection, "bq_cosine_distance", {kAny, kAny}, kDouble, Distance<true>);
   Register(connection, "bq_euclidean_distance", {kAny, kAny}, kDouble, Distance<false>);
 }
