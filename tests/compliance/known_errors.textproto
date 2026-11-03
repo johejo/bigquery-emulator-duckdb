@@ -830,23 +830,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "GoogleSQL-only ARRAY_AVG rewrites to AVG, which differs on extreme FLOAT64 inputs; BigQuery has no ARRAY_AVG"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_1L-8QnCUN9A_157e@308>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_MMZF774CJJk_08, NULL>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_esyov0xpM84_157e@308>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_fka48YXkpZ4_08, NULL>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-inf, -inf, NULL>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-inf, -inf>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<1@797693_Bp2WzTW8zgg_08, NULL>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<1@797693_GfHVLeBf_2w_157e@308>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<1@797693_IXQ6Nl6Vyw8_157e@308>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<1@797693_T8J8HAmbqYA_08, NULL>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<inf, inf, NULL>"
-  label: "code:ArrayAvg_ARRAY<FLOAT64>_<inf, inf>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "AVG over windows differs on FLOAT64 frames with extreme offsets or special values"
   label: "analytic_avg_test:analytic_avg_range_current_and_following_double_asc"
   label: "analytic_avg_test:analytic_avg_range_current_and_following_double_desc"

@@ -6,14 +6,6 @@
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
 
-# AVG boundary answers recorded with tools/bqanswers while checking ARRAY_AVG.
-# These are separate aggregate bugs, not evidence that BigQuery supports ARRAY_AVG.
-SELECT AVG(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
-!> "1.7976931348623157E308"
-
-SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x
-!> "NaN"
-
 # BigQuery fails for an extremely large epsilon such as 1e308, though 1e300 runs
 # (differential_privacy.txt).
 # third_party/bigquery_docs/reference/standard-sql/query-syntax.md

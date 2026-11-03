@@ -313,10 +313,16 @@ SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, [2] AS y), (2, [1])])
 SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, ST_GEOGPOINT(1, 2) AS y)])
 => error contains: must support ordering; Type GEOGRAPHY does not
 
-# Observed BigQuery answer recorded with tools/bqanswers: the average fits a NUMERIC though
-# the sum does not.
+# Observed BigQuery answers recorded with tools/bqanswers: the average fits a NUMERIC or a
+# FLOAT64 though the sum does not, and infinities average to NaN.
 SELECT AVG(x) FROM UNNEST([NUMERIC '99999999999999999999999999999.999999999', NUMERIC '99999999999999999999999999999.999999999']) AS x
 => "99999999999999999999999999999.999999999"
+
+SELECT AVG(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> "1.7976931348623157E308"
+
+SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x
+=> "NaN"
 
 SELECT AVG(x) FROM UNNEST([NULL, NUMERIC '1.5']) AS x
 => "1.5"
@@ -337,3 +343,12 @@ SELECT AVG(x) FROM UNNEST([NUMERIC '-0.000000001', 0]) AS x
 
 SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0, 0]) AS x
 => "0"
+
+SELECT AVG(x) FROM UNNEST([NULL, 1.5]) AS x
+=> "1.5"
+
+SELECT AVG(x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT AVG(DISTINCT x) FROM UNNEST([1.0, 1, 4]) AS x
+=> "2.5"

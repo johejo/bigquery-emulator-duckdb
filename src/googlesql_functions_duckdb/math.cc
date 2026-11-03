@@ -25,6 +25,7 @@
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
+#include "src/backend_error.h"
 #include "src/duckdb_functions/apply.h"
 #include "src/duckdb_functions/register.h"
 #include "src/duckdb_functions/scalar.h"
@@ -255,6 +256,103 @@ bool RoundWithMode(T in, int64_t digits, T* out, absl::Status* error) {
   return fn::RoundDecimalWithRoundingMode(in, digits, kMode, out, error);
 }
 
+// AVG of FLOAT64 as GoogleSQL's reference implementation computes it: a running mean that adds
+// (value - mean) / count for each value. No sum overflows, so two maximum values average to the
+// maximum, and two infinities give NaN, as BigQuery answers; DuckDB's avg() divides an
+// overflowing sum instead. The mean is a long double, as the reference implementation's is, so
+// both overflow on the same inputs on each platform.
+using MeanFloat = long double;  // NOLINT(google-runtime-float): see above.
+
+struct Mean {
+  MeanFloat mean;
+  uint64_t count;
+};
+
+Mean& MeanState(duckdb_aggregate_state state) { return *reinterpret_cast<Mean*>(state); }
+
+idx_t MeanSize(duckdb_function_info /*info*/) { return sizeof(Mean); }
+
+void InitMean(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
+  MeanState(state) = {.mean = 0, .count = 0};
+}
+
+// Moves `mean` toward `value`, the mean of `count` more values, as `mean` already counts
+// `state.count` values; reports a GoogleSQL arithmetic error to `info`.
+bool AddToMean(duckdb_function_info info, Mean& state, MeanFloat value, uint64_t count) {
+  state.count += count;
+  MeanFloat delta = 0;
+  absl::Status error;
+  if (!fn::Subtract(value, state.mean, &delta, &error) ||
+      !fn::Add(state.mean,
+               delta * static_cast<MeanFloat>(count) / static_cast<MeanFloat>(state.count),
+               &state.mean, &error)) {
+    duckdb_aggregate_function_set_error(info, std::string(error.message()).c_str());
+    return false;
+  }
+  return true;
+}
+
+void UpdateMeans(duckdb_function_info info, duckdb_data_chunk input,
+                 duckdb_aggregate_state* states) {
+  for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
+    const Arguments arguments(input, row);
+    if (arguments.IsNull(0)) {
+      continue;
+    }
+    if (!AddToMean(info, MeanState(states[row]), arguments.Double(0), 1)) {
+      return;
+    }
+  }
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DuckDB's callback.
+void CombineMeans(duckdb_function_info info, duckdb_aggregate_state* source,
+                  duckdb_aggregate_state* target, idx_t count) {
+  for (idx_t i = 0; i < count; ++i) {
+    // DuckDB may combine a window's states again, so the source stays as it is.
+    const Mean& from = MeanState(source[i]);
+    Mean& to = MeanState(target[i]);
+    if (from.count == 0) {
+      continue;
+    }
+    if (to.count == 0) {
+      to = from;
+    } else if (!AddToMean(info, to, from.mean, from.count)) {
+      return;
+    }
+  }
+}
+
+// The mean as FLOAT64, or NULL where no value reached it.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): DuckDB's callback.
+void FinalizeMeans(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
+                   duckdb_vector result, idx_t count, idx_t offset) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  duckdb_vector_ensure_validity_writable(result);
+  for (idx_t i = 0; i < count; ++i) {
+    const Mean& state = MeanState(source[i]);
+    SetResult(
+        result, offset + i,
+        state.count == 0 ? std::nullopt : std::optional<double>(static_cast<double>(state.mean)));
+  }
+}
+
+void RegisterDoubleAverage(duckdb_connection connection) {
+  Handle<duckdb_aggregate_function, duckdb_destroy_aggregate_function> const function(
+      duckdb_create_aggregate_function());
+  duckdb_aggregate_function_set_name(function.get(), "bq_avg_double");
+  LogicalType const float64(duckdb_create_logical_type(kDouble));
+  duckdb_aggregate_function_add_parameter(function.get(), float64.get());
+  duckdb_aggregate_function_set_return_type(function.get(), float64.get());
+  duckdb_aggregate_function_set_functions(function.get(), MeanSize, InitMean, UpdateMeans,
+                                          CombineMeans, FinalizeMeans);
+  // UpdateMeans skips NULL values itself.
+  duckdb_aggregate_function_set_special_handling(function.get());
+  if (duckdb_register_aggregate_function(connection, function.get()) == DuckDBError) {
+    throw BackendError("DuckDB failed to register bq_avg_double");
+  }
+}
+
 // AVG of the non-NULL NUMERIC values that list() collects, rounded half away from zero, which
 // is in range even where SUM overflows.
 void NumericAverage(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -370,6 +468,7 @@ void RegisterMathFunctions(duckdb_connection connection, const Options& options)
                       ApplyWithContext<GenerateArray<double>>, options.extended_array_limits);
   RegisterDecimalMath<googlesql::NumericValue>(connection, "_numeric",
                                                options.extended_array_limits);
+  RegisterDoubleAverage(connection);
   Register(connection, "bq_cosine_distance", {kAny, kAny}, kDouble, Distance<true>);
   Register(connection, "bq_euclidean_distance", {kAny, kAny}, kDouble, Distance<false>);
 }
