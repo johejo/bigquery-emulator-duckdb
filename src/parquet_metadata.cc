@@ -424,6 +424,13 @@ ThriftValue ThriftValue::Int32(int32_t value) {
   return result;
 }
 
+ThriftValue ThriftValue::Binary(std::string value) {
+  ThriftValue result;
+  result.type = Type::kBinary;
+  result.bytes = std::move(value);
+  return result;
+}
+
 ThriftValue ThriftValue::Struct(std::vector<ThriftField> fields) {
   ThriftValue result;
   result.fields = std::move(fields);
