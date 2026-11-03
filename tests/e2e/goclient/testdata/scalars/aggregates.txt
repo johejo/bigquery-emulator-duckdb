@@ -326,3 +326,14 @@ SELECT AVG(x) FROM UNNEST([CAST(NULL AS NUMERIC)]) AS x
 
 SELECT AVG(DISTINCT x) FROM UNNEST([NUMERIC '1', 1, 4]) AS x
 => "2.5"
+
+# Observed BigQuery answers recorded with tools/bqanswers: a NUMERIC mean rounds half away from
+# zero to nine fractional digits.
+SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0]) AS x
+=> "0.000000001"
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '-0.000000001', 0]) AS x
+=> "-0.000000001"
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0, 0]) AS x
+=> "0"
