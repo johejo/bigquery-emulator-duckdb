@@ -6,16 +6,13 @@
 #include <limits>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
-#include "absl/status/status.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/csv_records.h"
 #include "src/duckdb_sql.h"
-#include "src/external_values.h"
 #include "src/field_schema.h"
 #include "src/gcs_uri.h"
 #include "src/references.h"
@@ -35,27 +32,14 @@ json ParseComment(const std::optional<std::string>& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
-// Whether `field` or one of its fields has a type or setting external reads of `format` do not
-// support. CSV and JSON read DATETIME, BIGNUMERIC, JSON and GEOGRAPHY as ExternalValue takes them,
-// and Parquet reads, or rejects as BigQuery does, the first three as ParquetConversion gives them.
-bool UnsupportedExternalField(const FieldSchema& field, std::string_view format) {
-  const bool csv = format == "CSV";
-  const bool json_lines = format == "NEWLINE_DELIMITED_JSON";
-  const bool parquet = format == "PARQUET";
-  const bool supported = field.type == FieldType::kInteger || field.type == FieldType::kString ||
-                         field.type == FieldType::kBoolean || field.type == FieldType::kFloat ||
-                         field.type == FieldType::kBytes || field.type == FieldType::kNumeric ||
-                         field.type == FieldType::kDate || field.type == FieldType::kTime ||
-                         field.type == FieldType::kTimestamp || field.type == FieldType::kRecord ||
-                         ((csv || json_lines || parquet) && (field.type == FieldType::kDatetime ||
-                                                             field.type == FieldType::kBigNumeric ||
-                                                             field.type == FieldType::kJson)) ||
-                         ((csv || json_lines) && field.type == FieldType::kGeography);
+// Whether `field` or one of its fields has a type or setting external reads do not support. CSV
+// and JSON read DATETIME, BIGNUMERIC, JSON and GEOGRAPHY as ExternalValue takes them, and Parquet
+// reads, or rejects as BigQuery does, each as ParquetConversion gives it.
+bool UnsupportedExternalField(const FieldSchema& field) {
   return field.max_length || field.precision || field.scale || field.collation ||
-         !field.default_value_expression.empty() || !supported ||
-         std::ranges::any_of(field.fields, [format](const FieldSchema& child) {
-           return UnsupportedExternalField(child, format);
-         });
+         !field.default_value_expression.empty() || field.type == FieldType::kInterval ||
+         field.type == FieldType::kRange ||
+         std::ranges::any_of(field.fields, UnsupportedExternalField);
 }
 
 // The cloneDefinition or snapshotDefinition `definition` that the emulator recorded in a table
@@ -173,7 +157,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
                external.preserve_ascii_control_characters || external.ignore_unknown_values) {
       throw ApiError::Unsupported("CSV options on non-CSV external tables");
     }
-    // As BigQuery's answers in external_table_datetime_formats.api.answers.json show.
+    // Detection reads DATE, DATETIME, TIME and TIMESTAMP values in their default forms, where
+    // BigQuery's, as its answers in external_table_types_followups.api.answers.json show, take
+    // date_format.
     for (const auto& [name, value] : {
              std::pair{"time_zone", &external.time_zone},
              {"date_format", &external.date_format},
@@ -181,28 +167,11 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
              {"time_format", &external.time_format},
              {"timestamp_format", &external.timestamp_format},
          }) {
-      if (*value && external.format == "PARQUET") {
-        throw ApiError::InvalidQuery(
-            std::format("Option '{}' not supported for format PARQUET", name));
-      }
-      // Detection reads DATE, DATETIME, TIME and TIMESTAMP values in their default forms.
       if (*value && external.autodetect.value_or(false)) {
         throw ApiError::Unsupported(std::string(name) + " with schema auto-detection");
       }
     }
-    if (const absl::Status formats = CheckDatetimeFormats({
-            .time_zone = external.time_zone.value_or(""),
-            .date = external.date_format.value_or(""),
-            .datetime = external.datetime_format.value_or(""),
-            .time = external.time_format.value_or(""),
-            .timestamp = external.timestamp_format.value_or(""),
-        });
-        !formats.ok()) {
-      throw ApiError::InvalidQuery(std::string(formats.message()));
-    }
-    const auto unsupported = std::ranges::find_if(schema, [&external](const FieldSchema& field) {
-      return UnsupportedExternalField(field, external.format);
-    });
+    const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);
     if (unsupported != schema.end()) {
       throw ApiError::Unsupported("this external table column definition: " + unsupported->name);
     }

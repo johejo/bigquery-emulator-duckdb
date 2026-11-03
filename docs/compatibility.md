@@ -84,11 +84,11 @@ REPEATED fields. Unlike loads, external reads preserve NULL LIST elements. An ex
 gives each nested field the type detected for it. A top-level column can also read an integer or
 a DECIMAL as NUMERIC or BIGNUMERIC, a DECIMAL as STRING or, as BigQuery does, by its unscaled
 value as INT64, a BYTE_ARRAY as STRING or BYTES, a TIMESTAMP of milliseconds or microseconds as
-DATETIME, and a DATE or a TIMESTAMP of nanoseconds, whose value BigQuery reads as microseconds, as
-TIMESTAMP; other combinations fail as BigQuery's do or, such as GEOGRAPHY, are unsupported. A
-DECIMAL that NUMERIC does not hold, ENUM, GeoParquet, column name conversions and the options
-that select other types are unsupported. Every source file must have each REQUIRED and REPEATED
-column and field of the schema.
+DATETIME, a DATE or a TIMESTAMP of nanoseconds, whose value BigQuery reads as microseconds, as
+TIMESTAMP, and a STRING of WKT or a BYTE_ARRAY of WKB as GEOGRAPHY; other combinations fail as
+BigQuery's do or are unsupported. A DECIMAL that NUMERIC does not hold, ENUM, GeoParquet, column
+name conversions and the options that select other types are unsupported. Every source file must
+have each REQUIRED and REPEATED column and field of the schema.
 
 CSV takes a flat schema of the scalar types listed above, given or detected as
 [loads detect it](#loads-extracts-and-copies), and a given schema can also have DATETIME,
@@ -104,8 +104,9 @@ types. Given a schema, scalar values must use their native JSON representation, 
 accepts decimal strings, BOOL accepts its text spellings, and BYTES requires base64 strings.
 NUMERIC accepts decimal numbers or strings with at most 29 integer digits and nine fractional
 digits, without exponent notation. DATE and TIME accept canonical `YYYY-MM-DD` and
-`HH:MM:SS[.SSSSSS]` strings, and TIMESTAMP only `YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z` unless a format
-or time zone applies. A table created without a schema takes the one BigQuery
+`HH:MM:SS[.SSSSSS]` strings unless a format applies, and TIMESTAMP strings in the forms of the
+[CSV data types](../third_party/bigquery_docs/loading-data-cloud-storage-csv.md) other than a
+Unix epoch time. A table created without a schema takes the one BigQuery
 [detects](../third_party/bigquery_docs/schema-detect.md) from the alphabetically last source
 file, and its reads also take strings in the forms detection converts, and numbers and BOOL
 values for STRING fields. The order of detected columns can differ from BigQuery's for objects of
@@ -117,12 +118,10 @@ CSV and JSON tables support `compression`, `encoding` / `csvOptions.encoding` an
 `jsonOptions.encoding`, `max_bad_records` / `maxBadRecords`, and `time_zone`, `date_format`,
 `datetime_format`, `time_format` and `timestamp_format` / `timeZone`, `dateFormat`,
 `datetimeFormat`, `timeFormat` and `timestampFormat`, which schema detection does not take. A
-TIMESTAMP that `time_zone` applies to without a format takes the forms of the
-[CSV data types](../third_party/bigquery_docs/loading-data-cloud-storage-csv.md) but not a Unix
-epoch time. A gzip source with compression `NONE`, which BigQuery reads without decompressing it,
-or in UTF-16 or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A CSV value of
-a BYTES, INTERVAL or RANGE column, or a JSON value of a valid record other than a BIGNUMERIC,
-DATETIME or GEOGRAPHY one or one a format parses, that fails to convert still fails the query
+gzip source with compression `NONE`, which BigQuery reads without decompressing it, or in UTF-16
+or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A CSV value of a BYTES,
+INTERVAL or RANGE column, or a JSON value of a valid record other than a BIGNUMERIC, DATETIME,
+TIMESTAMP or GEOGRAPHY one or one a format parses, that fails to convert still fails the query
 rather than counting as bad. GEOGRAPHY WKT of a word other than a geometry type is unsupported. The
 warning for a malformed JSON line does not name the token BigQuery expected.
 

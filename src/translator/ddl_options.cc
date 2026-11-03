@@ -14,12 +14,14 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/api_error.h"
+#include "src/datetime_formats.h"
 #include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -550,6 +552,26 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   }
   if (external && (!format || metadata.external_data->uris.empty())) {
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
+  }
+  // As BigQuery's answers in external_table_datetime_formats.api.answers.json show.
+  if (external) {
+    const GcsExternalData& data = *metadata.external_data;
+    for (const auto& [name, value] : {
+             std::pair{"time_zone", &data.time_zone},
+             {"date_format", &data.date_format},
+             {"datetime_format", &data.datetime_format},
+             {"time_format", &data.time_format},
+             {"timestamp_format", &data.timestamp_format},
+         }) {
+      if (*value && data.format == "PARQUET") {
+        throw ApiError::InvalidQuery(
+            std::format("Option '{}' not supported for format PARQUET", name));
+      }
+    }
+    if (const absl::Status formats = CheckDatetimeFormats(ExternalFormats(data), /*ddl=*/true);
+        !formats.ok()) {
+      throw ApiError::InvalidQuery(std::string(formats.message()));
+    }
   }
   return metadata;
 }

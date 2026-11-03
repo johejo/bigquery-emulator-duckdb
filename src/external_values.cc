@@ -6,13 +6,11 @@
 #include <set>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/time/civil_time.h"
 #include "absl/time/clock.h"
@@ -22,9 +20,9 @@
 #include "googlesql/public/functions/cast_date_time.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/numeric_value.h"
-#include "googlesql/public/type.pb.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/datetime_formats.h"
 #include "src/field_schema.h"
 #include "src/file_read_options.h"
 #include "src/googlesql_geography/input.h"
@@ -102,6 +100,15 @@ absl::StatusOr<std::string> Geography(std::string_view text) {
   return std::string(geography);
 }
 
+}  // namespace
+
+bool IsEpoch(std::string_view text) {
+  static const std::regex epoch(R"([0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)?)");
+  return std::regex_match(text.begin(), text.end(), epoch);
+}
+
+namespace {
+
 // Today in UTC, of which CAST ... FORMAT takes the parts a format leaves out.
 int32_t CurrentDate() {
   return static_cast<int32_t>(absl::ToCivilDay(absl::Now(), absl::UTCTimeZone()) -
@@ -113,15 +120,9 @@ std::string TimestampText(absl::Time time) {
   return absl::FormatTime("%Y-%m-%d %H:%M:%E6S+00", time, absl::UTCTimeZone());
 }
 
-absl::StatusOr<absl::TimeZone> TimeZone(const std::string& name) {
-  absl::TimeZone zone = absl::UTCTimeZone();
-  if (!name.empty() && !absl::LoadTimeZone(name, &zone)) {
-    return absl::InvalidArgumentError("time_zone " + name + " is not valid.");
-  }
-  return zone;
-}
-
-// The TIMESTAMP `text` in the forms of the CSV data types, without a UTC offset in `zone`.
+// The TIMESTAMP `text` in the forms of the CSV data types, without a UTC offset in `zone`, or a
+// Unix epoch time in seconds, as BigQuery's answers in
+// external_table_types_followups.api.answers.json show.
 absl::StatusOr<std::string> ZonedTimestamp(std::string_view text, absl::TimeZone zone) {
   static const std::regex pattern(
       R"(([0-9]{4})[-/]([0-9]{1,2})[-/]([0-9]{1,2})[ T]([0-9]{1,2}):([0-9]{2})(?::([0-9]{2})(\.[0-9]{1,6})?)? *(Z|UTC|[+-][0-9]{1,2}(?::?[0-9]{2})?)?)");
@@ -133,10 +134,24 @@ absl::StatusOr<std::string> ZonedTimestamp(std::string_view text, absl::TimeZone
   };
   std::cmatch match;
   if (!std::regex_match(text.begin(), text.end(), match, pattern)) {
-    static const std::regex epoch(R"([0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)?)");
-    if (std::regex_match(text.begin(), text.end(), epoch)) {
-      return absl::UnimplementedError(std::string(kUnsupported) +
-                                      "Unix epoch TIMESTAMP values with time_zone");
+    if (IsEpoch(text)) {
+      // Seconds, as microseconds rounded to an INT64.
+      const auto seconds = googlesql::BigNumericValue::FromStringStrict(text);
+      const auto micros =
+          seconds.ok() ? seconds->Multiply(googlesql::BigNumericValue(1000000)) : seconds;
+      const auto rounded = micros.ok() ? micros->Round(0) : micros;
+      const auto integer = rounded.ok() ? rounded->To<int64_t>() : rounded.status();
+      if (!integer.ok()) {
+        return absl::UnimplementedError(std::string(kUnsupported) +
+                                        "Unix epoch TIMESTAMP values beyond INT64 microseconds");
+      }
+      if (*integer > 253402300799999999) {
+        return absl::InvalidArgumentError(
+            "Cannot return an invalid timestamp value of " + std::to_string(*integer) +
+            " microseconds relative to the Unix epoch. The range of valid timestamp values is "
+            "[0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]");
+      }
+      return TimestampText(absl::FromUnixMicros(*integer));
     }
     return unparsable();
   }
@@ -200,7 +215,7 @@ absl::StatusOr<std::string> Formatted(FieldType type, std::string_view text,
       return out;
     }
     default: {
-      GOOGLESQL_ASSIGN_OR_RETURN(const absl::TimeZone zone, TimeZone(formats.time_zone));
+      GOOGLESQL_ASSIGN_OR_RETURN(const absl::TimeZone zone, FormatTimeZone(formats.time_zone));
       absl::Time time;
       GOOGLESQL_RETURN_IF_ERROR(
           functions::CastStringToTimestamp(formats.timestamp, text, zone, absl::Now(), &time));
@@ -210,29 +225,6 @@ absl::StatusOr<std::string> Formatted(FieldType type, std::string_view text,
 }
 
 }  // namespace
-
-absl::Status CheckDatetimeFormats(const DatetimeFormats& formats) {
-  if (const auto zone = TimeZone(formats.time_zone); !zone.ok()) {
-    return absl::InvalidArgumentError(zone.status().message());
-  }
-  for (const auto& [name, format, kind] : {
-           std::tuple{"date_format", &formats.date, googlesql::TYPE_DATE},
-           {"datetime_format", &formats.datetime, googlesql::TYPE_DATETIME},
-           {"time_format", &formats.time, googlesql::TYPE_TIME},
-           {"timestamp_format", &formats.timestamp, googlesql::TYPE_TIMESTAMP},
-       }) {
-    if (format->empty()) {
-      continue;
-    }
-    if (const absl::Status valid =
-            googlesql::functions::ValidateFormatStringForParsing(*format, kind);
-        !valid.ok()) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid format for option '", name, "': ", valid.message()));
-    }
-  }
-  return absl::OkStatus();
-}
 
 absl::StatusOr<std::string> ExternalValue(FieldType type, std::string_view text,
                                           const DatetimeFormats& formats) {
@@ -246,8 +238,8 @@ absl::StatusOr<std::string> ExternalValue(FieldType type, std::string_view text,
   if (datetime && !format.empty()) {
     return Formatted(type, text, formats);
   }
-  if (type == FieldType::kTimestamp && !formats.time_zone.empty()) {
-    GOOGLESQL_ASSIGN_OR_RETURN(const absl::TimeZone zone, TimeZone(formats.time_zone));
+  if (type == FieldType::kTimestamp) {
+    GOOGLESQL_ASSIGN_OR_RETURN(const absl::TimeZone zone, FormatTimeZone(formats.time_zone));
     return ZonedTimestamp(text, zone);
   }
   switch (type) {

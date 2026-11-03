@@ -247,17 +247,25 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts,
     case FieldType::kDate:
     case FieldType::kTime:
     case FieldType::kTimestamp:
-      if (value.is_string() && FormatsApply(field.type, formats)) {
-        const auto converted =
-            ExternalValue(field.type, value.get_ref<const std::string&>(), formats);
+      // A TIMESTAMP of a table with a given schema takes the forms ExternalValue takes.
+      if (value.is_string() && (FormatsApply(field.type, formats) ||
+                                (field.type == FieldType::kTimestamp && !converts))) {
+        const auto& text = value.get_ref<const std::string&>();
+        const bool zoned = field.type == FieldType::kTimestamp && formats.timestamp.empty();
+        if (zoned && IsEpoch(text)) {
+          throw ApiError::Unsupported("JSON external representation for " + field.name);
+        }
+        const auto converted = ExternalValue(field.type, text, formats);
         if (!converted.ok()) {
-          // As BigQuery's answers in external_table_datetime_formats.api.answers.json show, a
-          // value its format does not parse fails as a query error with CAST's message.
-          if (absl::IsUnimplemented(converted.status()) ||
-              (field.type == FieldType::kTimestamp && formats.timestamp.empty())) {
+          if (absl::IsUnimplemented(converted.status())) {
             throw ApiError::Unsupported("JSON external representation for " + field.name);
           }
-          throw ApiError::InvalidQuery(std::string(converted.status().message()));
+          // As BigQuery's answers in external_table_datetime_formats.api.answers.json and
+          // external_table_types_followups.api.answers.json show, a value that does not parse
+          // fails as a query error, with CAST's message where a format applies.
+          const std::string message(converted.status().message());
+          throw ApiError::InvalidQuery(
+              zoned ? std::format("{} Field: {}; Value: {}", message, field.name, text) : message);
         }
         value = *converted;
         return;

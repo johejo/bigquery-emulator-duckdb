@@ -831,6 +831,22 @@ TableMetadata TableMetadataFromJson(const json& table) {
         *value = config[name].get<std::string>();
       }
     }
+    // As BigQuery's answers in external_table_types_followups.api.answers.json show, a Parquet
+    // table rejects them by their DDL names.
+    if (format == "PARQUET") {
+      for (const auto& [name, value] : {
+               std::pair{"time_zone", &metadata.external_data->time_zone},
+               {"date_format", &metadata.external_data->date_format},
+               {"datetime_format", &metadata.external_data->datetime_format},
+               {"time_format", &metadata.external_data->time_format},
+               {"timestamp_format", &metadata.external_data->timestamp_format},
+           }) {
+        if (*value) {
+          throw ApiError::Invalid(
+              std::format("Unsupported option '{}' for format STORAGE_FORMAT_PARQUET", name));
+        }
+      }
+    }
     if (config.contains("hivePartitioningOptions")) {
       metadata.external_data->hive_partitioning =
           HivePartitioningFromJson(config["hivePartitioningOptions"]);

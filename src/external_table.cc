@@ -14,10 +14,12 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "src/api_error.h"
 #include "src/csv_detect.h"
 #include "src/csv_records.h"
 #include "src/csv_stage.h"
+#include "src/datetime_formats.h"
 #include "src/duckdb_sql.h"
 #include "src/external_json.h"
 #include "src/field_schema.h"
@@ -267,7 +269,8 @@ std::string_view PhysicalName(const ParquetColumn& column) {
 // external_table_parquet_types.api.answers.json show, it reads an integer or a DECIMAL as NUMERIC
 // or BIGNUMERIC, a DECIMAL as STRING and, by its unscaled value, as INT64, a BYTE_ARRAY as STRING
 // or BYTES, a TIMESTAMP of milliseconds or microseconds as DATETIME, and a DATE, and a TIMESTAMP of
-// nanoseconds, by their INT32 or INT64 value, as microseconds of a TIMESTAMP.
+// nanoseconds, by their INT32 or INT64 value, as microseconds of a TIMESTAMP; and, as its answers
+// in external_table_types_followups.api.answers.json show, a STRING or BYTE_ARRAY as GEOGRAPHY.
 std::string ParquetConversion(const FieldSchema& field, const ThriftValue& element,
                               const ParquetColumn& column, FieldType detected,
                               std::string_view uri) {
@@ -370,6 +373,14 @@ std::string ParquetConversion(const FieldSchema& field, const ThriftValue& eleme
             field.name, column.type + 1));
       }
       break;
+    case FieldType::kGeography:
+      // The reader reads WKT from a STRING and WKB from other bytes, as BigQuery's answers in
+      // external_table_types_followups.api.answers.json show.
+      if (detected == FieldType::kString ||
+          (detected == FieldType::kBytes && column.type == parquet::kByteArray)) {
+        return "";
+      }
+      break;
     case FieldType::kTimestamp:
       if (detected == FieldType::kDate || nanos) {
         const std::string micros =
@@ -438,17 +449,6 @@ std::optional<int> CsvSkipLeadingRows(const GcsExternalData& definition) {
   return static_cast<int>(*definition.skip_leading_rows);
 }
 
-// The time_zone, date_format, datetime_format, time_format and timestamp_format of `definition`.
-DatetimeFormats Formats(const GcsExternalData& definition) {
-  return {
-      .time_zone = definition.time_zone.value_or(""),
-      .date = definition.date_format.value_or(""),
-      .datetime = definition.datetime_format.value_or(""),
-      .time = definition.time_format.value_or(""),
-      .timestamp = definition.timestamp_format.value_or(""),
-  };
-}
-
 // The reader settings of a CSV table's options other than its delimiter and leading rows.
 CsvReadOptions CsvOptions(const GcsExternalData& definition) {
   return {
@@ -462,7 +462,7 @@ CsvReadOptions CsvOptions(const GcsExternalData& definition) {
       .preserve_ascii_control_characters =
           definition.preserve_ascii_control_characters.value_or(false),
       .external_values = true,
-      .formats = Formats(definition),
+      .formats = ExternalFormats(definition),
   };
 }
 
@@ -703,6 +703,12 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     TemporaryFiles& files = context.files;
     const bool csv = definition.format == "CSV";
     const bool json = definition.format == "NEWLINE_DELIMITED_JSON";
+    // tables.insert stores formats and time zones that a query then rejects.
+    if (const absl::Status formats =
+            CheckDatetimeFormats(ExternalFormats(definition), /*ddl=*/false);
+        !formats.ok()) {
+      throw ApiError::InvalidQuery(std::string(formats.message()));
+    }
     const auto sources = StageSources(definition, table_name, client, files);
     // BigQuery ignores maxBadRecords for Parquet. A JSON table of one file fails at the record
     // that exceeds the limit.
@@ -788,7 +794,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         try {
           staged =
               StageExternalJson({source}, file_schema, files, definition.autodetect.value_or(false),
-                                Formats(definition), skips);
+                                ExternalFormats(definition), skips);
         } catch (const ApiError& error) {
           if (std::string_view(error.what()).starts_with(kUnsupported) ||
               error.reason() == "invalidQuery") {
