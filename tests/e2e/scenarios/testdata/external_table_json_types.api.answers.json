@@ -1,0 +1,1060 @@
+{
+  "cases": {
+    "bignumeric_invalid": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/bignumeric_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Invalid BIGNUMERIC value: abc Field: v; Value: abc",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Invalid BIGNUMERIC value: abc Field: v; Value: abc",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bignumeric_spellings": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/bignumeric_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Invalid BIGNUMERIC value: 0.123456789012345678901234567890123456789 Field: v; Value: 0.123456789012345678901234567890123456789",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "query",
+                "message": "Invalid BIGNUMERIC value: 1e40 Field: v; Value: 1e40",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/bignumeric_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_bignumeric_spellings.t, error message: JSON parsing error in row starting at position 237: Could not convert value to numeric/bignumeric type. Field: v; Value: 1 File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/bignumeric_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Invalid BIGNUMERIC value: abc Field: v; Value: abc",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/bignumeric_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "1000"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1000"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "578960446186580977117854925043439539266.34992332820282019728792003956564819967"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": "-0.00000000000000000000000000000000000001"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "datetime_invalid": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Invalid datetime string \"2024/01/02 03:04:05\" Field: v; Value: 2024/01/02 03:04:05",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Invalid datetime string \"2024/01/02 03:04:05\" Field: v; Value: 2024/01/02 03:04:05",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "datetime_spellings": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02 03:04\" Field: v; Value: 2024-01-02 03:04",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_datetime_spellings.t, error message: JSON parsing error in row starting at position 135: Could not convert non-string JSON value to DATETIME type. Field: v; Value: 1 File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02 03:04:05 UTC\" Field: v; Value: 2024-01-02 03:04:05 UTC",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02T03:04:05Z\" Field: v; Value: 2024-01-02T03:04:05Z",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02 03:04:05.1234567\" Field: v; Value: 2024-01-02 03:04:05.1234567",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_datetime_spellings.t, error message: JSON parsing error in row starting at position 300: Could not convert non-string JSON value to DATETIME type. Field: v; Value: 1 File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_datetime_spellings.t, error message: JSON parsing error in row starting at position 319: JSON object specified for non-record field: v File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/datetime_spellings/s.json",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "2024-01-02T03:04:05.123456"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "2024-01-02T00:00:00"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "geography_invalid": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "geography_spellings": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_geography_spellings.t, error message: JSON parsing error in row starting at position 26: JSON object specified for non-record field: v File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_geography_spellings.t, error message: JSON parsing error in row starting at position 192: Could not convert JSON value to geography. Field: v; Value: 1 File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_invalid": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_invalid/s.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_pt7rubsgsvcxs2qkywarngjwp4_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_invalid/s.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "json_spellings": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/json_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "{\"a\":1}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "[1,2]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "\"s\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "\"{\\\"a\\\":1}\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "12345678901234567890"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "null"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "{\"a\":{\"b\":[1,null]}}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": "{}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": "{\"a\":1,\"b\":2}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "nested": {
+      "project": "johejo-sandbox",
+      "run": "pt7rubsgsvcxs2qkywarngjwp4",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/pt7rubsgsvcxs2qkywarngjwp4/nested/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "dt",
+                    "type": "DATETIME"
+                  },
+                  {
+                    "name": "j",
+                    "type": "JSON"
+                  },
+                  {
+                    "name": "g",
+                    "type": "GEOGRAPHY"
+                  },
+                  {
+                    "name": "bn",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "bns",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "js",
+                "type": "JSON"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "dts",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "2024-01-02T03:04:05"
+                      },
+                      {
+                        "v": "{\"a\":1}"
+                      },
+                      {
+                        "v": "POINT(1 2)"
+                      },
+                      {
+                        "v": "1.5"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": [
+                    {
+                      "v": "1.5"
+                    },
+                    {
+                      "v": "2.5"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "{\"a\":1}"
+                    },
+                    {
+                      "v": "2"
+                    },
+                    {
+                      "v": "null"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "2024-01-02T03:04:05"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "dt",
+                    "type": "DATETIME"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "j",
+                    "type": "JSON"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "g",
+                    "type": "GEOGRAPHY"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "bn",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "bns",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "js",
+                "type": "JSON"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "dts",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

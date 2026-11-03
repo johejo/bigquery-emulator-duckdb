@@ -43,8 +43,8 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
 | [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 5 | 0 | 2 | 16 |
-| [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 9 | 1 | 0 | 0 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 5 | 0 | 2 | 11 |
+| [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 14 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE format](#create-external-table-format) | 0 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE uris](#create-external-table-uris) | 1 | 0 | 0 | 0 |
 | [CREATE EXTERNAL TABLE hive_partition_uri_prefix](#create-external-table-hive_partition_uri_prefix) | 1 | 0 | 0 | 0 |
@@ -301,11 +301,6 @@ the emulator rejected.
 | [`sheet_range`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`source_column_match`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
-| [`time_zone`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`date_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`datetime_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`time_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`timestamp_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 
 ## CREATE EXTERNAL TABLE CSV
 
@@ -321,6 +316,11 @@ the emulator rejected.
 | [`preserve_ascii_control_characters`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`quote`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`skip_leading_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
+| [`time_zone`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`date_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`datetime_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`time_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`timestamp_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
 ## CREATE EXTERNAL TABLE format
 

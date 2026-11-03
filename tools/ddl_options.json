@@ -436,23 +436,28 @@
       },
       {
         "name": "time_zone",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'America/Los_Angeles'"]
       },
       {
         "name": "date_format",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'MM/DD/YYYY'"]
       },
       {
         "name": "datetime_format",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'YYYY/MM/DD HH24:MI:SS'"]
       },
       {
         "name": "time_format",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'HH24.MI.SS'"]
       },
       {
         "name": "timestamp_format",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'MM/DD/YYYY HH24:MI:SS TZH'"]
       },
       {
         "name": "uris",
@@ -1912,14 +1917,14 @@
       "name": "CREATE EXTERNAL TABLE",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "exclude": ["format", "uris", "hive_partition_uri_prefix", "require_hive_partition_filter", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding"],
+      "exclude": ["format", "uris", "hive_partition_uri_prefix", "require_hive_partition_filter", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})"
     },
     {
       "name": "CREATE EXTERNAL TABLE CSV",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "only": ["field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding"],
+      "only": ["field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], {option})"
     },
     {

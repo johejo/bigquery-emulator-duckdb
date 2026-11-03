@@ -17,6 +17,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/file_read_options.h"
 #include "src/schema_detect.h"
 #include "src/temporary_files.h"
 
@@ -84,13 +85,25 @@ constexpr std::array kKinds = {
     KindInfo{.kind = Kind::kFloat, .type = FieldType::kFloat, .prefix = "double"},
     KindInfo{.kind = Kind::kBoolean, .type = FieldType::kBoolean, .prefix = "bool"},
     KindInfo{.kind = Kind::kDate, .type = FieldType::kDate, .prefix = "date"},
+    // The prefix of a DATETIME column, which a datetime format detects, is not known.
+    KindInfo{.kind = Kind::kDatetime, .type = FieldType::kDatetime, .prefix = ""},
     KindInfo{.kind = Kind::kTime, .type = FieldType::kTime, .prefix = "time"},
     KindInfo{.kind = Kind::kTimestamp, .type = FieldType::kTimestamp, .prefix = "timestamp"},
 };
 
 const KindInfo& Info(Kind kind) { return *std::ranges::find(kKinds, kind, &KindInfo::kind); }
 
-DetectedValue Classify(const Cell& cell) { return cell ? DetectValue(*cell) : DetectedValue{}; }
+// The type of `cell` given an external table's date and time `formats`.
+DetectedValue Classify(const Cell& cell, const DatetimeFormats& formats) {
+  if (!cell) {
+    return {};
+  }
+  DetectedValue value = DetectValue(*cell);
+  if (formats != DatetimeFormats{}) {
+    value.kind = FormattedKind(*cell, value.kind, formats);
+  }
+  return value;
+}
 
 // Checks the characters of a column name taken from a header as BigQuery does with its default
 // character map: of the characters flexible column names do not support
@@ -129,7 +142,8 @@ std::string Quoted(std::string_view text) {
 }  // namespace
 
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
-                      std::optional<int> skip_leading_rows, TemporaryFiles& downloads, bool rows) {
+                      std::optional<int> skip_leading_rows, TemporaryFiles& downloads, bool rows,
+                      const DatetimeFormats& formats) {
   // BigQuery samples one of several files, and whether it then finds a header in each is not
   // known.
   if (sources.size() > 1) {
@@ -174,7 +188,8 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
     std::vector<DetectedValue>& values = typed.emplace_back();
     for (size_t column = 0; column < columns; ++column) {
       const Record& record = records.at(row);
-      values.push_back(column < record.size() ? Classify(record.at(column)) : DetectedValue{});
+      values.push_back(column < record.size() ? Classify(record.at(column), formats)
+                                              : DetectedValue{});
     }
   }
   const auto kinds = [&](size_t begin) {
@@ -224,6 +239,9 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
       name = *cell;
       CheckHeaderName(name);
     } else {
+      if (Info(types.at(column)).prefix.empty()) {
+        throw ApiError::Unsupported("naming a detected DATETIME CSV column without a header");
+      }
       name = std::format("{}_field_{}", Info(types.at(column)).prefix, column);
     }
     const std::string lower = ToLowerAscii(name);

@@ -353,7 +353,7 @@ QueryResult SqlRuntime::Execute(const std::string& sql, const std::vector<std::s
   try {
     return backend_.Execute(sql, setup, null_arrays);
   } catch (const BackendError& error) {
-    throw ApiError::InvalidQuery(error.what());
+    throw ApiError::QueryFailure(error.what());
   }
 }
 
@@ -361,7 +361,7 @@ QueryResult SqlRuntime::Prepare(const std::string& sql, const std::vector<std::s
   try {
     return backend_.Prepare(sql, setup);
   } catch (const BackendError& error) {
-    throw ApiError::InvalidQuery(error.what());
+    throw ApiError::QueryFailure(error.what());
   }
 }
 
@@ -418,7 +418,7 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
   try {
     snapshot = backend_.ExecuteStorageRead(translated.sql, std::move(schema), translated.resources);
   } catch (const BackendError& error) {
-    throw ApiError::InvalidQuery(error.what());
+    throw ApiError::QueryFailure(error.what());
   }
   const TableInfo after = GetTable(table, false);
   if (after.storage_id != info.storage_id ||

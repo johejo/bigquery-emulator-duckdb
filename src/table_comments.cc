@@ -6,6 +6,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -31,15 +32,13 @@ json ParseComment(const std::optional<std::string>& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
-// Whether `field` or one of its fields has a type or setting external reads do not support.
+// Whether `field` or one of its fields has a type or setting external reads do not support. CSV
+// and JSON read DATETIME, BIGNUMERIC, JSON and GEOGRAPHY as ExternalValue takes them, and Parquet
+// reads, or rejects as BigQuery does, each as ParquetConversion gives it.
 bool UnsupportedExternalField(const FieldSchema& field) {
   return field.max_length || field.precision || field.scale || field.collation ||
-         !field.default_value_expression.empty() ||
-         (field.type != FieldType::kInteger && field.type != FieldType::kString &&
-          field.type != FieldType::kBoolean && field.type != FieldType::kFloat &&
-          field.type != FieldType::kBytes && field.type != FieldType::kNumeric &&
-          field.type != FieldType::kDate && field.type != FieldType::kTime &&
-          field.type != FieldType::kTimestamp && field.type != FieldType::kRecord) ||
+         !field.default_value_expression.empty() || field.type == FieldType::kInterval ||
+         field.type == FieldType::kRange ||
          std::ranges::any_of(field.fields, UnsupportedExternalField);
 }
 
@@ -157,6 +156,22 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
                external.null_marker || external.null_markers ||
                external.preserve_ascii_control_characters || external.ignore_unknown_values) {
       throw ApiError::Unsupported("CSV options on non-CSV external tables");
+    }
+    // CSV detection takes these options, and JSON detection date_format, as BigQuery's do in its
+    // answers in external_table_types_followups.api.answers.json and
+    // external_table_types_open.api.answers.json; how the others change JSON detection is not
+    // known.
+    for (const auto& [name, value] : {
+             std::pair{"time_zone", &external.time_zone},
+             {"date_format", &external.date_format},
+             {"datetime_format", &external.datetime_format},
+             {"time_format", &external.time_format},
+             {"timestamp_format", &external.timestamp_format},
+         }) {
+      if (*value && external.autodetect.value_or(false) && external.format != "CSV" &&
+          (value != &external.date_format || external.format != "NEWLINE_DELIMITED_JSON")) {
+        throw ApiError::Unsupported(std::string(name) + " with schema auto-detection");
+      }
     }
     const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);
     if (unsupported != schema.end()) {

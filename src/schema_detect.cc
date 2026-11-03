@@ -13,13 +13,16 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <utility>
 
 #include "absl/time/time.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
+#include "src/external_values.h"
 #include "src/field_schema.h"
+#include "src/file_read_options.h"
 
 // The rules below follow BigQuery's answers in
 // tests/e2e/goclient/testdata/unverified/load_csv_autodetect.api.answers.json and
@@ -260,6 +263,39 @@ DetectedValue DetectValue(std::string_view input) {
   return {};
 }
 
+DetectedKind FormattedKind(std::string_view input, DetectedKind kind,
+                           const DatetimeFormats& formats) {
+  std::optional<DetectedKind> parsed;
+  for (const auto& [format, type, detected] : {
+           std::tuple{&formats.date, FieldType::kDate, DetectedKind::kDate},
+           {&formats.datetime, FieldType::kDatetime, DetectedKind::kDatetime},
+           {&formats.time, FieldType::kTime, DetectedKind::kTime},
+           {&formats.timestamp, FieldType::kTimestamp, DetectedKind::kTimestamp},
+       }) {
+    if (format->empty() || !ExternalValue(type, input, formats).ok()) {
+      continue;
+    }
+    if (parsed) {
+      throw ApiError::Unsupported("detecting the type of " + std::string(input) +
+                                  ", which several date and time formats parse");
+    }
+    parsed = detected;
+  }
+  if (parsed) {
+    return *parsed;
+  }
+  if (kind == DetectedKind::kDate && !formats.date.empty()) {
+    return DetectedKind::kString;
+  }
+  if ((kind == DetectedKind::kTime && !formats.time.empty()) ||
+      (kind == DetectedKind::kTimestamp &&
+       (!formats.timestamp.empty() || !formats.datetime.empty()))) {
+    throw ApiError::Unsupported("detecting the type of " + std::string(input) +
+                                " with a date or time format it does not take");
+  }
+  return kind;
+}
+
 DetectedKind MergeKinds(DetectedKind a, DetectedKind b) {
   if (a == b) {
     return a;
@@ -280,6 +316,8 @@ FieldType KindType(DetectedKind kind) {
       return FieldType::kBoolean;
     case DetectedKind::kDate:
       return FieldType::kDate;
+    case DetectedKind::kDatetime:
+      return FieldType::kDatetime;
     case DetectedKind::kTime:
       return FieldType::kTime;
     case DetectedKind::kTimestamp:

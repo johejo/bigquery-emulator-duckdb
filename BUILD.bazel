@@ -1135,6 +1135,51 @@ cc_library(
 )
 
 cc_library(
+    name = "datetime_formats",
+    srcs = ["src/datetime_formats.cc"],
+    hdrs = ["src/datetime_formats.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/public:type_cc_proto",
+        "@googlesql//googlesql/public/functions:cast_date_time",
+    ],
+    deps = [
+        ":file_read_options",
+        ":table_metadata",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/time",
+    ],
+)
+
+cc_library(
+    name = "external_values",
+    srcs = ["src/external_values.cc"],
+    hdrs = ["src/external_values.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":datetime_formats",
+        "//src/googlesql_geography",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/functions:cast_date_time",
+        "@googlesql//googlesql/public/functions:date_time_util",
+        "@nlohmann_json//:json",
+    ],
+    deps = [
+        ":field_schema",
+        ":file_read_options",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
     name = "csv_stage",
     srcs = ["src/csv_stage.cc"],
     hdrs = ["src/csv_stage.h"],
@@ -1142,6 +1187,8 @@ cc_library(
     implementation_deps = [
         ":api_error",
         ":csv_records",
+        ":external_values",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
     ],
     deps = [
@@ -1166,6 +1213,7 @@ cc_library(
     deps = [
         ":field_schema",
         ":file_read",
+        ":file_read_options",
         ":temporary_files",
     ],
 )
@@ -1178,10 +1226,14 @@ cc_library(
     implementation_deps = [
         ":api_error",
         ":duckdb_sql",
+        ":external_values",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public/functions:date_time_util",
     ],
-    deps = [":field_schema"],
+    deps = [
+        ":field_schema",
+        ":file_read_options",
+    ],
 )
 
 cc_library(
@@ -1818,10 +1870,13 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":bignumeric",
         ":csv_detect",
         ":csv_records",
         ":csv_stage",
+        ":datetime_formats",
         ":duckdb_sql",
+        ":external_values",
         ":field_schema",
         ":file_read",
         ":file_read_options",
@@ -1835,6 +1890,8 @@ cc_library(
         ":temporary_files",
         ":text_encoding",
         ":unordered_map_order",
+        "@abseil-cpp//absl/status",
+        "@googlesql//googlesql/public:numeric_value",
         "@nlohmann_json//:json",
     ],
 )

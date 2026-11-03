@@ -559,7 +559,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         return Unsupported("transactions that write to multiple databases");
       }
       transaction_failed_ = in_transaction_;
-      error_ = ApiError::InvalidQuery(error.what());
+      error_ = ApiError::QueryFailure(error.what());
       return googlesql::MakeScriptException() << error.what();
     }
     if (status.ok() || absl::IsUnimplemented(status) || absl::IsInternal(status)) {

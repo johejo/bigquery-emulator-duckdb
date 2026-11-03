@@ -1,0 +1,1332 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run pt7rubsgsvcxs2qkywarngjwp4, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the
+# observations. BigQuery's answers settle which JSON values of a NEWLINE_DELIMITED_JSON external
+#   table's
+# DATETIME, BIGNUMERIC, JSON and GEOGRAPHY fields it reads, and how, at the top level and
+# nested: third_party/bigquery_docs/loading-data-cloud-storage-json.md describes loads.
+# Records are {"id": N, "v": VALUE}, one value of the type per record:
+# - datetime: 1: "2024-01-02 03:04:05"; 2: "2024-01-02T03:04:05.123456"; 3: "2024-01-02"; 4:
+#   "2024-01-02 03:04"; 5: 1; 6: "2024-01-02 03:04:05 UTC"; 7: "2024-01-02T03:04:05Z"; 8:
+#   "2024-01-02 03:04:05.1234567"; 9: "2024-01-02 3:4:5"; 10: true; 11: {"a":1}; 12: null
+# - bignumeric: 1: 1.5; 2: "1.5"; 3: 1e3; 4: "1e3"; 5: 0.123456789012345678901234567890123456789; 6:
+#   578960446186580977117854925043439539266.34992332820282019728792003956564819967; 7: 1e40; 8:
+#   true; 9: "abc"; 10: " 1"; 11: null; 12: -0.00000000000000000000000000000000000001
+# - json: 1: {"a":1}; 2: [1,2]; 3: "s"; 4: "{\"a\":1}"; 5: 1; 6: 1.5; 7: 12345678901234567890; 8:
+#   true; 9: null; 10: {"a":{"b":[1,null]}}; 11: {}; 12: {"b":2,"a":1}
+# - geography: 1: "POINT(1 2)"; 2: {"type":"Point","coordinates":[1,2]}; 3:
+#   "{\"type\":\"Point\",\"coordinates\":[1,2]}"; 4: "0101000000000000000000F03F0000000000000040";
+#   5: 1; 6: "POINT(200 0)"; 7: "INVALID"; 8: null; 9: "POINT EMPTY"; 10: "SRID=4326;POINT(1 2)"
+# - datetime_invalid: {"id":1,"v":"2024/01/02 03:04:05"}
+# - bignumeric_invalid: {"id":1,"v":"abc"}
+# - json_invalid: {"id":1,"v":[1,}
+# - geography_invalid: {"id":1,"v":"INVALID"}
+# - nested: {"id":1,"r":{"dt":"2024-01-02 03:04:05","j":{"a":1},"g":"POINT(1
+#   2)","bn":"1.5"},"bns":[1.5,"2.5"],"js":[{"a":1},2,null],"dts":["2024-01-02 03:04:05"]}
+description: >-
+  DATETIME, BIGNUMERIC, JSON and GEOGRAPHY fields of JSON external tables with a given
+  schema.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+  datetime: "eyJpZCI6MSwidiI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUifQp7ImlkIjoyLCJ2IjoiMjAyNC0wMS0wMlQwMzowNDowNS4xMjM0NTYifQp7ImlkIjozLCJ2IjoiMjAyNC0wMS0wMiJ9CnsiaWQiOjQsInYiOiIyMDI0LTAxLTAyIDAzOjA0In0KeyJpZCI6NSwidiI6MX0KeyJpZCI6NiwidiI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUgVVRDIn0KeyJpZCI6NywidiI6IjIwMjQtMDEtMDJUMDM6MDQ6MDVaIn0KeyJpZCI6OCwidiI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUuMTIzNDU2NyJ9CnsiaWQiOjksInYiOiIyMDI0LTAxLTAyIDM6NDo1In0KeyJpZCI6MTAsInYiOnRydWV9CnsiaWQiOjExLCJ2Ijp7ImEiOjF9fQp7ImlkIjoxMiwidiI6bnVsbH0K"
+  bignumeric: "eyJpZCI6MSwidiI6MS41fQp7ImlkIjoyLCJ2IjoiMS41In0KeyJpZCI6MywidiI6MWUzfQp7ImlkIjo0LCJ2IjoiMWUzIn0KeyJpZCI6NSwidiI6MC4xMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODl9CnsiaWQiOjYsInYiOjU3ODk2MDQ0NjE4NjU4MDk3NzExNzg1NDkyNTA0MzQzOTUzOTI2Ni4zNDk5MjMzMjgyMDI4MjAxOTcyODc5MjAwMzk1NjU2NDgxOTk2N30KeyJpZCI6NywidiI6MWU0MH0KeyJpZCI6OCwidiI6dHJ1ZX0KeyJpZCI6OSwidiI6ImFiYyJ9CnsiaWQiOjEwLCJ2IjoiIDEifQp7ImlkIjoxMSwidiI6bnVsbH0KeyJpZCI6MTIsInYiOi0wLjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxfQo="
+  json: "eyJpZCI6MSwidiI6eyJhIjoxfX0KeyJpZCI6MiwidiI6WzEsMl19CnsiaWQiOjMsInYiOiJzIn0KeyJpZCI6NCwidiI6IntcImFcIjoxfSJ9CnsiaWQiOjUsInYiOjF9CnsiaWQiOjYsInYiOjEuNX0KeyJpZCI6NywidiI6MTIzNDU2Nzg5MDEyMzQ1Njc4OTB9CnsiaWQiOjgsInYiOnRydWV9CnsiaWQiOjksInYiOm51bGx9CnsiaWQiOjEwLCJ2Ijp7ImEiOnsiYiI6WzEsbnVsbF19fX0KeyJpZCI6MTEsInYiOnt9fQp7ImlkIjoxMiwidiI6eyJiIjoyLCJhIjoxfX0K"
+  geography: "eyJpZCI6MSwidiI6IlBPSU5UKDEgMikifQp7ImlkIjoyLCJ2Ijp7InR5cGUiOiJQb2ludCIsImNvb3JkaW5hdGVzIjpbMSwyXX19CnsiaWQiOjMsInYiOiJ7XCJ0eXBlXCI6XCJQb2ludFwiLFwiY29vcmRpbmF0ZXNcIjpbMSwyXX0ifQp7ImlkIjo0LCJ2IjoiMDEwMTAwMDAwMDAwMDAwMDAwMDAwMEYwM0YwMDAwMDAwMDAwMDAwMDQwIn0KeyJpZCI6NSwidiI6MX0KeyJpZCI6NiwidiI6IlBPSU5UKDIwMCAwKSJ9CnsiaWQiOjcsInYiOiJJTlZBTElEIn0KeyJpZCI6OCwidiI6bnVsbH0KeyJpZCI6OSwidiI6IlBPSU5UIEVNUFRZIn0KeyJpZCI6MTAsInYiOiJTUklEPTQzMjY7UE9JTlQoMSAyKSJ9Cg=="
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and runs `query` on it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the query fails.
+  ddl_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the statement fails.
+  create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As rest, where the query fails.
+  rest_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As rest, where tables.insert fails.
+  rest_create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  - name: datetime_spellings
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "${datetime}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v DATETIME) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/datetime_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02 03:04\" Field: v; Value: 2024-01-02 03:04",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "gs://${bucket}/${run}/datetime_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_datetime_spellings.t, error message: JSON parsing error in row starting at position 135: Could not convert non-string JSON value to DATETIME type. Field: v; Value: 1 File: gs://${bucket}/${run}/datetime_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02 03:04:05 UTC\" Field: v; Value: 2024-01-02 03:04:05 UTC",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02T03:04:05Z\" Field: v; Value: 2024-01-02T03:04:05Z",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "query",
+                "message": "Invalid datetime string \"2024-01-02 03:04:05.1234567\" Field: v; Value: 2024-01-02 03:04:05.1234567",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "gs://${bucket}/${run}/datetime_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_datetime_spellings.t, error message: JSON parsing error in row starting at position 300: Could not convert non-string JSON value to DATETIME type. Field: v; Value: 1 File: gs://${bucket}/${run}/datetime_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://${bucket}/${run}/datetime_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_datetime_spellings.t, error message: JSON parsing error in row starting at position 319: JSON object specified for non-record field: v File: gs://${bucket}/${run}/datetime_spellings/s.json",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "gs://${bucket}/${run}/datetime_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "gs://${bucket}/${run}/datetime_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://${bucket}/${run}/datetime_spellings/s.json",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "2024-01-02T03:04:05.123456"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "2024-01-02T00:00:00"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: bignumeric_spellings
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "${bignumeric}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v BIGNUMERIC) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/bignumeric_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Invalid BIGNUMERIC value: 0.123456789012345678901234567890123456789 Field: v; Value: 0.123456789012345678901234567890123456789",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "query",
+                "message": "Invalid BIGNUMERIC value: 1e40 Field: v; Value: 1e40",
+                "reason": "invalidQuery"
+              },
+              {
+                "location": "gs://${bucket}/${run}/bignumeric_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_bignumeric_spellings.t, error message: JSON parsing error in row starting at position 237: Could not convert value to numeric/bignumeric type. Field: v; Value: 1 File: gs://${bucket}/${run}/bignumeric_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Invalid BIGNUMERIC value: abc Field: v; Value: abc",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            },
+            {
+              "location": "gs://${bucket}/${run}/bignumeric_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "1000"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1000"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "578960446186580977117854925043439539266.34992332820282019728792003956564819967"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": "-0.00000000000000000000000000000000000001"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: json_spellings
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "${json}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v JSON) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/json_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "{\"a\":1}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "[1,2]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "\"s\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "\"{\\\"a\\\":1}\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "12345678901234567890"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "null"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "{\"a\":{\"b\":[1,null]}}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": "{}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": "{\"a\":1,\"b\":2}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: datetime_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6IjIwMjQvMDEvMDIgMDM6MDQ6MDUifQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v DATETIME) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/datetime_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Invalid datetime string \"2024/01/02 03:04:05\" Field: v; Value: 2024/01/02 03:04:05"
+        }
+      }
+  - name: bignumeric_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6ImFiYyJ9Cg=="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v BIGNUMERIC) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/bignumeric_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Invalid BIGNUMERIC value: abc Field: v; Value: abc"
+        }
+      }
+  - name: nested
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwiciI6eyJkdCI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUiLCJqIjp7ImEiOjF9LCJnIjoiUE9JTlQoMSAyKSIsImJuIjoiMS41In0sImJucyI6WzEuNSwiMi41Il0sImpzIjpbeyJhIjoxfSwyLG51bGxdLCJkdHMiOlsiMjAyNC0wMS0wMiAwMzowNDowNSJdfQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, r STRUCT<dt DATETIME, j JSON, g GEOGRAPHY, bn BIGNUMERIC>, bns ARRAY<BIGNUMERIC>, js ARRAY<JSON>, dts ARRAY<DATETIME>) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/nested/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "name": "dt",
+                    "type": "DATETIME"
+                  },
+                  {
+                    "name": "j",
+                    "type": "JSON"
+                  },
+                  {
+                    "name": "g",
+                    "type": "GEOGRAPHY"
+                  },
+                  {
+                    "name": "bn",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "bns",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "js",
+                "type": "JSON"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "dts",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "2024-01-02T03:04:05"
+                      },
+                      {
+                        "v": "{\"a\":1}"
+                      },
+                      {
+                        "v": "POINT(1 2)"
+                      },
+                      {
+                        "v": "1.5"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": [
+                    {
+                      "v": "1.5"
+                    },
+                    {
+                      "v": "2.5"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "{\"a\":1}"
+                    },
+                    {
+                      "v": "2"
+                    },
+                    {
+                      "v": "null"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "2024-01-02T03:04:05"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "dt",
+                    "type": "DATETIME"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "j",
+                    "type": "JSON"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "g",
+                    "type": "GEOGRAPHY"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "bn",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "bns",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "js",
+                "type": "JSON"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "dts",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: geography_spellings
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "${geography}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_geography_spellings.t, error message: JSON parsing error in row starting at position 26: JSON object specified for non-record field: v File: gs://${bucket}/${run}/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_geography_spellings.t, error message: JSON parsing error in row starting at position 192: Could not convert JSON value to geography. Field: v; Value: 1 File: gs://${bucket}/${run}/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: json_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6WzEsfQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v JSON) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/json_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalid",
+          "message": "Error while reading table: ${project}.bqa_${run}_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://${bucket}/${run}/json_invalid/s.json"
+        }
+      }
+  - name: geography_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6IklOVkFMSUQifQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID"
+        }
+      }

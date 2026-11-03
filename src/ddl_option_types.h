@@ -57,6 +57,11 @@ enum class DdlOptionId : uint8_t {
   kCompression,
   kMaxBadRecords,
   kEncoding,
+  kTimeZone,
+  kDateFormat,
+  kDatetimeFormat,
+  kTimeFormat,
+  kTimestampFormat,
   kHivePartitionUriPrefix,
   kRequireHivePartitionFilter,
 };

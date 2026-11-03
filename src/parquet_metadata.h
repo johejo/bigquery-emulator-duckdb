@@ -97,9 +97,12 @@ inline constexpr int16_t kLogicalTime = 7;
 inline constexpr int16_t kLogicalTimestamp = 8;
 inline constexpr int16_t kLogicalInteger = 10;
 // TimeType and TimestampType: unit, a TimeUnit, whose members are MILLIS, MICROS and NANOS.
+// TimeType and TimestampType: isAdjustedToUTC, a bool.
+inline constexpr int16_t kTimeAdjustedToUtc = 1;
 inline constexpr int16_t kTimeUnit = 2;
 inline constexpr int16_t kTimeUnitMillis = 1;
 inline constexpr int16_t kTimeUnitMicros = 2;
+inline constexpr int16_t kTimeUnitNanos = 3;
 inline constexpr int16_t kDecimalScale = 1;
 inline constexpr int16_t kDecimalPrecision = 2;
 inline constexpr int16_t kRowGroupColumns = 1;
@@ -135,6 +138,8 @@ inline constexpr int64_t kConvertedTimestampMicros = 10;
 // UINT_8 to INT_64.
 inline constexpr int64_t kConvertedFirstInteger = 11;
 inline constexpr int64_t kConvertedLastInteger = 18;
+// INT_8, the first signed one.
+inline constexpr int64_t kConvertedFirstSignedInteger = 15;
 }  // namespace parquet
 
 // A column of a Parquet file in the shape BigQuery loads it: a group is a STRUCT, and a LIST group
@@ -175,6 +180,8 @@ struct ParquetColumn {
   [[nodiscard]] bool IsDecimal() const;
   // A DECIMAL wider than DuckDB's, which it reads as a DOUBLE.
   [[nodiscard]] bool IsWideDecimal() const;
+  // Whether this is a DECIMAL that NUMERIC holds every value of.
+  [[nodiscard]] bool HoldsNumeric() const;
   // An INT32 or INT64 that DuckDB reads as an integer.
   [[nodiscard]] bool IsInteger() const;
   // Whether this column or a descendant is a kMap, unwrapped, nullable or has null_elements, which

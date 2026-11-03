@@ -1,0 +1,483 @@
+version: 1
+# Each case expects BigQuery's answer, which the emulator does not give: its comment
+# says what differs.
+# Recorded on BigQuery in project johejo-sandbox, run 7d66b5tzdcdehezgqc5taknfnh, with sources in the
+# bucket johejo-sandbox-us; the answers sidecar keeps the observations.
+# BigQuery's answers settle questions those in external_table_csv_types,
+# external_table_json_types, external_table_parquet_types and external_table_types_followups
+# leave open: Parquet DECIMALs that NUMERIC does not hold, of other values, scales and widths;
+# other Parquet columns read as TIMESTAMP; CSV and JSON schema detection with the date and time
+# options; and the warnings of malformed JSON lines. types.parquet is that of
+# external_table_parquet_types.api.yaml. The other Parquet files, written by arrow-go v18.8.0
+# without statistics or dictionaries, each have one nullable column:
+# - dec50_frac, dec50_big and dec50_null: dec50 FIXED_LEN_BYTE_ARRAY DECIMAL(50, 20) of one row
+#   1.0123456789, one row 1e29, and rows NULL and 1.25.
+# - dec38_20 and dec38_20_frac: dec38 FIXED_LEN_BYTE_ARRAY DECIMAL(38, 20) of one row 1.25 and
+#   1.0123456789.
+# - dec18_10: dec18 INT64 DECIMAL(18, 10) of one row 1.25.
+# - dec76_40: dec76 FIXED_LEN_BYTE_ARRAY DECIMAL(76, 40) of one row 1.25.
+# - s_null: s BYTE_ARRAY (UTF8) of rows 'a' and NULL.
+description: >-
+  External table DECIMAL and TIMESTAMP reads, schema detection with date and time options, and
+  malformed JSON lines.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+  types: "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"
+  dec50_frac: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAFfOlvIdmdtAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIMAAABQQVIx"
+  dec50_big: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEG15+CMo6j2mHgZuuy+IoAAAAAAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIMAAABQQVIx"
+  dec50_null: "UEFSMRUAFTYVNiwVBBUAFQYVBhwAAAACAAAAAwIAAAAAAAAAAAAAAAAGxrk1uLvUAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgQZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYEFlwWXCYISRwVABUAFQIAAAAWXBYEJggWXBQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIMAAABQQVIx"
+  dec38_20: "UEFSMRUAFSwVLCwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAABsa5Nbi71AAAFQQZLEgGc2NoZW1hFQIAFQ4VIBUCGAVkZWMzOCUKFSgVTCxcFSgVTAAAABYCGRwZHCYIHBUOGSUABhkYBWRlYzM4FQAWAhZSFlImCEkcFQAVABUCAAAAFlIWAiYIFlIUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZHBwAAACDAAAAUEFSMQ=="
+  dec38_20_frac: "UEFSMRUAFSwVLCwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAABXzpbyHZnbQAFQQZLEgGc2NoZW1hFQIAFQ4VIBUCGAVkZWMzOCUKFSgVTCxcFSgVTAAAABYCGRwZHCYIHBUOGSUABhkYBWRlYzM4FQAWAhZSFlImCEkcFQAVABUCAAAAFlIWAiYIFlIUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZHBwAAACDAAAAUEFSMQ=="
+  dec76_40: "UEFSMRUAFUwVTCwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAAAAAku/RuNDPN75aocrlAAAAAABUEGSxIBnNjaGVtYRUCABUOFUAVAhgFZGVjNzYlChVQFZgBLFwVUBWYAQAAABYCGRwZHCYIHBUOGSUABhkYBWRlYzc2FQAWAhZyFnImCEkcFQAVABUCAAAAFnIWAiYIFnIUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZHBwAAACFAAAAUEFSMQ=="
+  dec18_10: "UEFSMRUAFRwVHCwVAhUAFQYVBhwAAAACAAAAAgEA3Q7pAgAAABUEGSxIBnNjaGVtYRUCABUEJQIYBWRlYzE4JQoVFBUkLFwVFBUkAAAAFgIZHBkcJggcFQQZJQAGGRgFZGVjMTgVABYCFkIWQiYISRwVABUAFQIAAAAWQhYCJggWQhQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBkcHAAAAIEAAABQQVIx"
+  s_null: "UEFSMRUAFRYVFiwVBBUAFQYVBhwAAAACAAAAAwEBAAAAYRUEGSxIBnNjaGVtYRUCABUMJQIYAXMlAEwcAAAAFgQZHBkcJggcFQwZJQAGGRgBcxUAFgQWPBY8JghJHBUAFQAVAgAAABY8FgQmCBY8FAAAKBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGRwcAAAAcQAAAFBBUjE="
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and runs `query` on it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the query fails.
+  ddl_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the statement fails.
+  create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As rest, where the query fails.
+  rest_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As rest, where tables.insert fails.
+  rest_create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  # Known bug: reading a DOUBLE as TIMESTAMP, which BigQuery reads by its bits as microseconds,
+  #   is unsupported.
+  - name: f64_as_timestamp
+    template: ddl_failure
+    vars:
+      object: "types.parquet"
+      source: "${types}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (f64 TIMESTAMP) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/f64_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_f64_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://${bucket}/${run}/f64_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/f64_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Cannot return an invalid timestamp value of 4609434218613702656 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field f64"
+        }
+      }

@@ -1,0 +1,1269 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run l3mnlojrl7xh7mhuzcwoxd27w6, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the
+# observations. Questions BigQuery's answers in external_table_csv_types, external_table_json_types,
+# external_table_parquet_types and external_table_datetime_formats leave open: Parquet
+# columns read as GEOGRAPHY, the tables.insert forms of the date and time options that DDL
+# rejects, schema detection with dateFormat, and TIMESTAMP forms of JSON and with
+# time_zone. types.parquet is that of external_table_parquet_types.api.yaml.
+description: >-
+  Follow-up questions about external table types and date/time options.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+  types: "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"
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and runs `query` on it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the query fails.
+  ddl_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the statement fails.
+  create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As rest, where the query fails.
+  rest_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As rest, where tables.insert fails.
+  rest_create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  # A STRING column read as GEOGRAPHY.
+  - name: s_wkt_as_geography
+    template: ddl
+    vars:
+      object: "types.parquet"
+      source: "${types}"
+      query: "SELECT ST_ASTEXT(s_wkt) FROM `${project}.${dataset}.t`"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (s_wkt GEOGRAPHY) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_s_wkt_as_geography.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://${bucket}/${run}/s_wkt_as_geography/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/s_wkt_as_geography/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_wkt",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/s_wkt_as_geography/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "f0_",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  # A BYTE_ARRAY column of WKB read as GEOGRAPHY.
+  - name: b_wkb_as_geography
+    template: ddl
+    vars:
+      object: "types.parquet"
+      source: "${types}"
+      query: "SELECT ST_ASTEXT(b_wkb) FROM `${project}.${dataset}.t`"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (b_wkb GEOGRAPHY) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_b_wkb_as_geography.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://${bucket}/${run}/b_wkb_as_geography/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/b_wkb_as_geography/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "b_wkb",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/b_wkb_as_geography/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "f0_",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  # tables.insert with a C-style dateFormat, which DDL rejects.
+  - name: rest_c_date_format
+    template: rest_failure
+    vars:
+      object: "s.csv"
+      source: "MSwwMS8wMi8yMDI0Cg=="
+      table: {"tableReference": {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}, "externalDataConfiguration": {"sourceUris": ["${prefix}/${object}"], "sourceFormat": "CSV", "dateFormat": "%m/%d/%Y", "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "v", "type": "DATE"}]}}}
+    expect: {
+        "create": {
+          "external": {
+            "dateFormat": "%m/%d/%Y",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/rest_c_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_rest_c_date_format.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  date_format=\"%m/%d/%Y\",\n  format=\"CSV\",\n  uris=[\"gs://${bucket}/${run}/rest_c_date_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "%m/%d/%Y",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/rest_c_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"%m/%d/%Y\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/rest_c_date_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Cannot find matched format element at 0"
+        }
+      }
+  # tables.insert with a timeZone that DDL rejects.
+  - name: rest_offset_time_zone
+    template: rest_failure
+    vars:
+      object: "s.csv"
+      source: "MSwyMDI0LTAxLTAyCg=="
+      table: {"tableReference": {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}, "externalDataConfiguration": {"sourceUris": ["${prefix}/${object}"], "sourceFormat": "CSV", "timeZone": "+09:00", "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "v", "type": "DATE"}]}}}
+    expect: {
+        "create": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/rest_offset_time_zone/s.csv"
+            ],
+            "timeZone": "+09:00"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_rest_offset_time_zone.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  time_zone=\"+09:00\",\n  format=\"CSV\",\n  uris=[\"gs://${bucket}/${run}/rest_offset_time_zone/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/rest_offset_time_zone/s.csv"
+            ],
+            "timeZone": "+09:00"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"+09:00\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/rest_offset_time_zone/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Cannot set desired timezone: +09:00."
+        }
+      }
+  # tables.insert of a Parquet table with dateFormat, which DDL rejects.
+  - name: rest_parquet_date_format
+    template: rest_create_failure
+    vars:
+      object: "types.parquet"
+      source: "${types}"
+      table: {"tableReference": {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}, "externalDataConfiguration": {"sourceUris": ["${prefix}/${object}"], "sourceFormat": "PARQUET", "dateFormat": "MM/DD/YYYY"}}
+    expect: {
+        "create": {
+          "status": 400,
+          "reason": "invalid",
+          "message": "Unsupported option 'date_format' for format STORAGE_FORMAT_PARQUET"
+        }
+      }
+  # The TIMESTAMP strings of a JSON table without time_zone: {"id": N, "v": VALUE} with 2024-01-02
+  #   03:04:05, 2024-01-02T03:04:05+09:00, 2024/01/02 03:04, 2024-01-02 03:04:05 UTC and 2024-01-02.
+  - name: json_timestamp_forms
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6IDEsICJ2IjogIjIwMjQtMDEtMDIgMDM6MDQ6MDUifQp7ImlkIjogMiwgInYiOiAiMjAyNC0wMS0wMlQwMzowNDowNSswOTowMCJ9CnsiaWQiOiAzLCAidiI6ICIyMDI0LzAxLzAyIDAzOjA0In0KeyJpZCI6IDQsICJ2IjogIjIwMjQtMDEtMDIgMDM6MDQ6MDUgVVRDIn0KeyJpZCI6IDUsICJ2IjogIjIwMjQtMDEtMDIifQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v TIMESTAMP) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_json_timestamp_forms.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://${bucket}/${run}/json_timestamp_forms/s.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/json_timestamp_forms/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Could not parse '2024-01-02' as a timestamp. Required format is YYYY-MM-DD HH:MM[:SS[.SSSSSS]] or YYYY/MM/DD HH:MM[:SS[.SSSSSS]] Field: v; Value: 2024-01-02",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/json_timestamp_forms/s.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "1.70416464E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  # Unix epoch TIMESTAMP values of a CSV table with time_zone: 1534680695 and 1.534680695e12.
+  - name: csv_timestamp_epoch_time_zone
+    template: ddl
+    vars:
+      object: "s.csv"
+      source: "MSwxNTM0NjgwNjk1CjIsMS41MzQ2ODA2OTVlMTIK"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v TIMESTAMP) OPTIONS (format = 'CSV', uris = ['${prefix}/s.csv'], time_zone = 'Asia/Tokyo', max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_csv_timestamp_epoch_time_zone.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  time_zone=\"Asia/Tokyo\",\n  format=\"CSV\",\n  uris=[\"gs://${bucket}/${run}/csv_timestamp_epoch_time_zone/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/csv_timestamp_epoch_time_zone/s.csv"
+            ],
+            "timeZone": "Asia/Tokyo"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://${bucket}/${run}/csv_timestamp_epoch_time_zone/s.csv",
+                "message": "Error while reading data, error message: Cannot return an invalid timestamp value of 1534680695000000000 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; line_number: 2 byte_offset_to_start_of_line: 13 column_index: 1 column_name: \"v\" column_type: TIMESTAMP value: \"1.534680695e12\" File: gs://${bucket}/${run}/csv_timestamp_epoch_time_zone/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"Asia/Tokyo\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/csv_timestamp_epoch_time_zone/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://${bucket}/${run}/csv_timestamp_epoch_time_zone/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.534680695E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  - name: rest_autodetect_date_format
+    template: rest
+    vars:
+      object: "s.csv"
+      source: "ZAowMS8wMi8yMDI0Cg=="
+      table: {"tableReference": {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}, "externalDataConfiguration": {"sourceUris": ["${prefix}/${object}"], "sourceFormat": "CSV", "autodetect": true, "dateFormat": "MM/DD/YYYY"}}
+    expect: {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/rest_autodetect_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_rest_autodetect_date_format.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://${bucket}/${run}/rest_autodetect_date_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/rest_autodetect_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/rest_autodetect_date_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }

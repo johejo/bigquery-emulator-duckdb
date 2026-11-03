@@ -37,10 +37,12 @@ std::string ReadMaybeGzip(const std::string& path);
 // Whether StageJsonNumerics rewrites the sources of `schema`.
 bool QuotesJsonNumerics(const std::vector<FieldSchema>& schema, bool string_numbers = false);
 
-// The JSON value `line` with its numbers rewritten as StageJsonNumerics rewrites them. Throws
-// ApiError::Invalid for malformed JSON and invalid BIGNUMERIC values.
+// The JSON value `line` with its numbers rewritten as StageJsonNumerics rewrites them, or with
+// `bignumeric_text` those of BIGNUMERIC fields as strings of their text, as NUMERIC ones are, and
+// their strings left as they are. Throws ApiError::Invalid for malformed JSON and invalid
+// BIGNUMERIC values.
 std::string QuotedJsonNumerics(std::string_view line, const std::vector<FieldSchema>& schema,
-                               bool string_numbers = false);
+                               bool string_numbers = false, bool bignumeric_text = false);
 
 std::vector<FileSource> StageJsonNumerics(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
@@ -52,10 +54,11 @@ struct ParquetSources {
 };
 
 // Removes wide DECIMAL annotations and GeoParquet metadata in staged copies, preserving
-// conversion metadata in columns. Rejects incompatible schemas and unsupported GeoParquet
-// encodings or coordinate systems. list_inference selects the schema shape.
+// conversion metadata in columns. With `decimal_bytes`, also those of top-level DECIMALs of bytes
+// that NUMERIC does not hold, so that DuckDB reads their bytes. Rejects incompatible schemas and
+// unsupported GeoParquet encodings or coordinate systems. list_inference selects the schema shape.
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
-                                   bool list_inference);
+                                   bool list_inference, bool decimal_bytes = false);
 
 // Restores GEOGRAPHY and wide DECIMAL types and REQUIRED modes in an inferred schema. Wide
 // decimals require BIGNUMERIC in targets.

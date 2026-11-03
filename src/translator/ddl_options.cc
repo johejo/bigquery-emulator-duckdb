@@ -14,12 +14,14 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/api_error.h"
+#include "src/datetime_formats.h"
 #include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -442,6 +444,22 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    if (decoded && external &&
+        (decoded->id == DdlOptionId::kTimeZone || decoded->id == DdlOptionId::kDateFormat ||
+         decoded->id == DdlOptionId::kDatetimeFormat || decoded->id == DdlOptionId::kTimeFormat ||
+         decoded->id == DdlOptionId::kTimestampFormat)) {
+      if (!decoded->value.is_null()) {
+        GcsExternalData& data = *metadata.external_data;
+        std::optional<std::string>& value =
+            decoded->id == DdlOptionId::kTimeZone         ? data.time_zone
+            : decoded->id == DdlOptionId::kDateFormat     ? data.date_format
+            : decoded->id == DdlOptionId::kDatetimeFormat ? data.datetime_format
+            : decoded->id == DdlOptionId::kTimeFormat     ? data.time_format
+                                                          : data.timestamp_format;
+        value = decoded->value.string_value();
+      }
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kMaxBadRecords) {
       if (!decoded->value.is_null()) {
         if (decoded->value.int64_value() < 0) {
@@ -534,6 +552,26 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   }
   if (external && (!format || metadata.external_data->uris.empty())) {
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
+  }
+  // As BigQuery's answers in external_table_datetime_formats.api.answers.json show.
+  if (external) {
+    const GcsExternalData& data = *metadata.external_data;
+    for (const auto& [name, value] : {
+             std::pair{"time_zone", &data.time_zone},
+             {"date_format", &data.date_format},
+             {"datetime_format", &data.datetime_format},
+             {"time_format", &data.time_format},
+             {"timestamp_format", &data.timestamp_format},
+         }) {
+      if (*value && data.format == "PARQUET") {
+        throw ApiError::InvalidQuery(
+            std::format("Option '{}' not supported for format PARQUET", name));
+      }
+    }
+    if (const absl::Status formats = CheckDatetimeFormats(ExternalFormats(data), /*ddl=*/true);
+        !formats.ok()) {
+      throw ApiError::InvalidQuery(std::string(formats.message()));
+    }
   }
   return metadata;
 }

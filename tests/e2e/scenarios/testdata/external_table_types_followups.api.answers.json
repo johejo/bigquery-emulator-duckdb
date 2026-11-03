@@ -1,0 +1,906 @@
+{
+  "version": 1,
+  "cases": {
+    "b_wkb_as_geography": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_b_wkb_as_geography.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/b_wkb_as_geography/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/b_wkb_as_geography/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "b_wkb",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/b_wkb_as_geography/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "f0_",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "csv_timestamp_epoch_time_zone": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_csv_timestamp_epoch_time_zone.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  time_zone=\"Asia/Tokyo\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/csv_timestamp_epoch_time_zone/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/csv_timestamp_epoch_time_zone/s.csv"
+            ],
+            "timeZone": "Asia/Tokyo"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/csv_timestamp_epoch_time_zone/s.csv",
+                "message": "Error while reading data, error message: Cannot return an invalid timestamp value of 1534680695000000000 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; line_number: 2 byte_offset_to_start_of_line: 13 column_index: 1 column_name: \"v\" column_type: TIMESTAMP value: \"1.534680695e12\" File: gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/csv_timestamp_epoch_time_zone/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"Asia/Tokyo\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/csv_timestamp_epoch_time_zone/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/csv_timestamp_epoch_time_zone/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.534680695E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_timestamp_forms": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_json_timestamp_forms.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/json_timestamp_forms/s.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/json_timestamp_forms/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Could not parse '2024-01-02' as a timestamp. Required format is YYYY-MM-DD HH:MM[:SS[.SSSSSS]] or YYYY/MM/DD HH:MM[:SS[.SSSSSS]] Field: v; Value: 2024-01-02",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/json_timestamp_forms/s.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "1.70416464E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "rest_c_date_format": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "external": {
+            "dateFormat": "%m/%d/%Y",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_c_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_rest_c_date_format.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  date_format=\"%m/%d/%Y\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_c_date_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "%m/%d/%Y",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_c_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"%m/%d/%Y\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_c_date_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Cannot find matched format element at 0",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Cannot find matched format element at 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "rest_offset_time_zone": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_offset_time_zone/s.csv"
+            ],
+            "timeZone": "+09:00"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_rest_offset_time_zone.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  time_zone=\"+09:00\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_offset_time_zone/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_offset_time_zone/s.csv"
+            ],
+            "timeZone": "+09:00"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"+09:00\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_offset_time_zone/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Cannot set desired timezone: +09:00.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Cannot set desired timezone: +09:00.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "rest_parquet_date_format": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported option 'date_format' for format STORAGE_FORMAT_PARQUET",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported option 'date_format' for format STORAGE_FORMAT_PARQUET",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "s_wkt_as_geography": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_s_wkt_as_geography.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/s_wkt_as_geography/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/s_wkt_as_geography/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_wkt",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/s_wkt_as_geography/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "f0_",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "rest_autodetect_date_format": {
+      "project": "johejo-sandbox",
+      "run": "l3mnlojrl7xh7mhuzcwoxd27w6",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_autodetect_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_l3mnlojrl7xh7mhuzcwoxd27w6_rest_autodetect_date_format.t`\nOPTIONS(\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_autodetect_date_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "dateFormat": "MM/DD/YYYY",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_autodetect_date_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/l3mnlojrl7xh7mhuzcwoxd27w6/rest_autodetect_date_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  }
+}

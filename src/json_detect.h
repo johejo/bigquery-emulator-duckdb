@@ -5,6 +5,7 @@
 
 #include "src/field_schema.h"
 #include "src/file_read.h"
+#include "src/file_read_options.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -13,7 +14,9 @@ namespace bigquery_emulator_duckdb {
 // and a field with only nulls or empty arrays a STRING. Values of a field merge as MergeKinds
 // does, and an object or an array outweighs a scalar, so that reads of the scalar fail. The fields
 // of each object come in the order UnorderedMapOrder gives their names in order of appearance.
-// Throws ApiError for a row that is not an object, and for names BigQuery rejects.
-std::vector<FieldSchema> DetectJson(const FileSource& source, std::string_view table_id);
+// Strings take an external table's date and time `formats` as FormattedKind gives them. Throws
+// ApiError for a row that is not an object, and for names BigQuery rejects.
+std::vector<FieldSchema> DetectJson(const FileSource& source, std::string_view table_id,
+                                    const DatetimeFormats& formats = {});
 
 }  // namespace bigquery_emulator_duckdb

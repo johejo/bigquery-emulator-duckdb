@@ -17,8 +17,12 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/bignumeric.h"
+#include "src/external_values.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
 #include "src/file_read_options.h"
@@ -37,14 +41,160 @@ std::string Folded(std::string_view name) {
   return folded;
 }
 
-void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts);
+void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts,
+                    const DatetimeFormats& formats);
+
+// BigQuery's message for the line `line`, which is not a JSON object, as its answers in
+// external_table_json_types.api.answers.json, external_table_bad_records.api.answers.json and
+// external_table_types_open.api.answers.json show: an array, a string, a line that ends where a
+// key of the row is expected and a bracket that closes the row are named, and other malformed
+// lines take its most common message. Other JSON values are unsupported.
+std::string_view NotObjectMessage(std::string_view line) {
+  const std::size_t first = line.find_first_not_of(" \t\r");
+  if (line.at(first) == '[') {
+    return "Start of array encountered without start of object.";
+  }
+  if (line.at(first) == '"' && json::accept(line)) {
+    return "Value encountered without start of object.";
+  }
+  try {
+    (void)json::parse(line);
+  } catch (const json::parse_error& error) {
+    // The containers open where the parser stopped.
+    const std::size_t at = std::min<std::size_t>(error.byte - 1, line.size());
+    std::vector<char> open;
+    bool in_string = false;
+    for (std::size_t i = 0; i < at; ++i) {
+      const char c = line.at(i);
+      if (in_string) {
+        if (c == '\\') {
+          ++i;
+        } else if (c == '"') {
+          in_string = false;
+        }
+      } else if (c == '"') {
+        in_string = true;
+      } else if (c == '{' || c == '[') {
+        open.push_back(c);
+      } else if ((c == '}' || c == ']') && !open.empty()) {
+        open.pop_back();
+      }
+    }
+    const bool row = open.size() == 1 && open.front() == '{';
+    if (row &&
+        std::string_view(error.what()).find("while parsing object key - unexpected end of input") !=
+            std::string_view::npos) {
+      return "Expected key";
+    }
+    if (row && at < line.size() && line.at(at) == ']') {
+      return "Expected , or } after key:value pair";
+    }
+    return "Parser terminated before end of string";
+  }
+  throw ApiError::Unsupported("reading a JSON row that is a number, a BOOL or null");
+}
+
+// `line` without the comma after the last member of its object, which BigQuery accepts, as its
+// answers in external_table_types_open.api.answers.json show, or none when it has none.
+std::optional<std::string> WithoutTrailingComma(std::string_view line) {
+  const std::size_t close = line.find_last_not_of(" \t\r");
+  if (close == std::string_view::npos || close == 0 || line.at(close) != '}') {
+    return std::nullopt;
+  }
+  const std::size_t comma = line.find_last_not_of(" \t\r", close - 1);
+  if (comma == std::string_view::npos || comma == 0 || line.at(comma) != ',') {
+    return std::nullopt;
+  }
+  // Whether BigQuery reads {,} is not known.
+  const std::size_t before = line.find_last_not_of(" \t\r", comma - 1);
+  if (before == std::string_view::npos || line.at(before) == '{' || line.at(before) == ',') {
+    return std::nullopt;
+  }
+  std::string without(line);
+  without.erase(comma, 1);
+  return json::accept(without) ? std::optional(std::move(without)) : std::nullopt;
+}
+
+// Whether `formats` set how a DATE, TIME or TIMESTAMP `type` value is parsed.
+bool FormatsApply(FieldType type, const DatetimeFormats& formats) {
+  switch (type) {
+    case FieldType::kDate:
+      return !formats.date.empty();
+    case FieldType::kTime:
+      return !formats.time.empty();
+    case FieldType::kTimestamp:
+      return !formats.timestamp.empty() || !formats.time_zone.empty();
+    default:
+      return false;
+  }
+}
+
+// `value` as BigQuery's messages show it, a BOOL as 1 or 0.
+std::string Shown(const json& value) {
+  if (value.is_string()) {
+    return value.get<std::string>();
+  }
+  if (value.is_boolean()) {
+    return value.get<bool>() ? "1" : "0";
+  }
+  return value.dump();
+}
+
+// Converts `value`, of a DATETIME, BIGNUMERIC or GEOGRAPHY `field`, to the text the reader reads,
+// as ExternalValue takes it from a string, or a number for BIGNUMERIC, which StageSource quotes.
+// As BigQuery's answers in external_table_json_types.api.answers.json show, a string that does
+// not convert fails as a query error, and other values make their record unparsable.
+void ConvertValue(json& value, const FieldSchema& field, const DatetimeFormats& formats) {
+  if (value.is_object()) {
+    throw ApiError::Invalid("JSON object specified for non-record field: " + field.name);
+  }
+  if (!value.is_string()) {
+    if (value.is_array()) {
+      throw ApiError::Unsupported("JSON external representation for " + field.name);
+    }
+    const std::string shown = Shown(value);
+    throw ApiError::Invalid(
+        field.type == FieldType::kDatetime
+            ? std::format("Could not convert non-string JSON value to DATETIME type. Field: {}; "
+                          "Value: {}",
+                          field.name, shown)
+        : field.type == FieldType::kBigNumeric
+            ? std::format(
+                  "Could not convert value to numeric/bignumeric type. Field: {}; Value: {}",
+                  field.name, shown)
+            : std::format("Could not convert JSON value to geography. Field: {}; Value: {}",
+                          field.name, shown));
+  }
+  const auto& text = value.get_ref<const std::string&>();
+  const auto converted = ExternalValue(field.type, text, formats);
+  if (!converted.ok()) {
+    const std::string message(converted.status().message());
+    if (absl::IsUnimplemented(converted.status())) {
+      throw ApiError::Invalid(message);
+    }
+    throw ApiError::InvalidQuery(std::format(
+        "{}{} Field: {}; Value: {}",
+        field.type == FieldType::kGeography ? "Could not convert JSON value to geography: " : "",
+        message, field.name, text));
+  }
+  // The reader reads a BIGNUMERIC from the text of its units.
+  value = field.type == FieldType::kBigNumeric
+              ? BigNumericUnits(*googlesql::BigNumericValue::FromStringStrict(*converted))
+              : *converted;
+}
 
 // Reject unimplemented representations before DuckDB can coerce them, for example rounding a
 // fractional INT64. External read observations are retained in
 // external_table_json.api.answers.json, and those of autodetected tables, which `converts` the
 // values of, in external_table_json_autodetect.api.answers.json: a string converts to the type
 // DetectValue finds in it, or an INT64 to a FLOAT64, and a number or a BOOL to a STRING.
-void ValidateValue(json& value, const FieldSchema& field, bool converts, bool element = false) {
+void ValidateValue(json& value, const FieldSchema& field, bool converts,
+                   const DatetimeFormats& formats, bool element = false) {
+  // A JSON field holds any JSON value, null included, which the reader parses from its text.
+  if (field.type == FieldType::kJson && (element || field.mode != FieldMode::kRepeated)) {
+    value = value.dump();
+    return;
+  }
   if (value.is_null()) {
     if (element || field.mode == FieldMode::kRequired) {
       throw ApiError::Invalid("Only optional fields can be set to NULL. Field: " + field.name +
@@ -61,7 +211,7 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts, bool el
           "Repeated field must be imported as a JSON array. Field: " + field.name + ".");
     }
     for (auto& item : value) {
-      ValidateValue(item, field, converts, true);
+      ValidateValue(item, field, converts, formats, true);
     }
     return;
   }
@@ -81,7 +231,7 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts, bool el
         throw ApiError::Invalid("Flat value specified for record field. Field: " + field.name +
                                 "; Value: " + value.dump());
       }
-      ValidateObject(value, field.fields, converts);
+      ValidateObject(value, field.fields, converts, formats);
       return;
     case FieldType::kString:
     case FieldType::kBytes:
@@ -160,9 +310,37 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts, bool el
         }
       }
       break;
+    case FieldType::kDatetime:
+    case FieldType::kBigNumeric:
+    case FieldType::kGeography:
+      ConvertValue(value, field, formats);
+      return;
     case FieldType::kDate:
     case FieldType::kTime:
     case FieldType::kTimestamp:
+      // A TIMESTAMP of a table with a given schema takes the forms ExternalValue takes.
+      if (value.is_string() && (FormatsApply(field.type, formats) ||
+                                (field.type == FieldType::kTimestamp && !converts))) {
+        const auto& text = value.get_ref<const std::string&>();
+        const bool zoned = field.type == FieldType::kTimestamp && formats.timestamp.empty();
+        if (zoned && IsEpoch(text)) {
+          throw ApiError::Unsupported("JSON external representation for " + field.name);
+        }
+        const auto converted = ExternalValue(field.type, text, formats);
+        if (!converted.ok()) {
+          if (absl::IsUnimplemented(converted.status())) {
+            throw ApiError::Unsupported("JSON external representation for " + field.name);
+          }
+          // As BigQuery's answers in external_table_datetime_formats.api.answers.json and
+          // external_table_types_followups.api.answers.json show, a value that does not parse
+          // fails as a query error, with CAST's message where a format applies.
+          const std::string message(converted.status().message());
+          throw ApiError::InvalidQuery(
+              zoned ? std::format("{} Field: {}; Value: {}", message, field.name, text) : message);
+        }
+        value = *converted;
+        return;
+      }
       if (detected && KindType(detected->kind) == field.type) {
         value = detected->text;
         return;
@@ -192,7 +370,8 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts, bool el
   throw ApiError::Unsupported("JSON external representation for " + field.name);
 }
 
-void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts) {
+void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool converts,
+                    const DatetimeFormats& formats) {
   if (!object.is_object()) {
     throw ApiError::Invalid("Expected a JSON object");
   }
@@ -207,7 +386,7 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool c
     if (canonical.contains(field->name)) {
       throw ApiError::Unsupported("case variant duplicate JSON external field: " + name);
     }
-    ValidateValue(value, *field, converts);
+    ValidateValue(value, *field, converts, formats);
     canonical[field->name] = std::move(value);
   }
   for (const auto& field : schema) {
@@ -215,21 +394,28 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool c
       if (field.mode == FieldMode::kRequired) {
         throw ApiError::Invalid("Missing required field: " + field.name);
       }
-      ValidateValue(canonical[field.name], field, converts);
+      // A JSON field that the object leaves out is NULL rather than a JSON null.
+      if (field.type != FieldType::kJson || field.mode == FieldMode::kRepeated) {
+        ValidateValue(canonical[field.name], field, converts, formats);
+      }
     }
   }
   object = std::move(canonical);
 }
 
-// Adds the record of `source` that starts at `start`, which BigQuery rejects for `detail`, to
-// `bad`, or throws BigQuery's error when `bad` is null or the record exceeds its limit.
-void Bad(std::string_view detail, std::size_t start, const FileSource& source, BadRecords* bad) {
+// Adds the record of `source` that starts at `start`, which BigQuery rejects with `error`, to
+// `bad`, or throws BigQuery's error when `bad` is null or the record exceeds its limit. An
+// invalidQuery error, of a value that does not convert, keeps its message.
+void Bad(const ApiError& error, std::size_t start, const FileSource& source, BadRecords* bad) {
+  const bool query = error.reason() == "invalidQuery";
   const std::string message =
-      std::format("JSON parsing error in row starting at position {}: {}", start, detail);
+      query ? error.what()
+            : std::format("JSON parsing error in row starting at position {}: {}", start,
+                          error.what());
   if (bad == nullptr) {
-    throw ApiError::Invalid(message + " File: " + source.uri);
+    throw query ? error : ApiError::Invalid(message + " File: " + source.uri);
   }
-  if (!bad->Skip({.number = bad->records, .uri = source.uri, .message = message})) {
+  if (!bad->Skip({.number = bad->records, .uri = source.uri, .message = message, .query = query})) {
     throw ApiError::Invalid(std::format(
         "JSON table encountered too many errors, giving up. Rows: {}; errors: {}. Please look "
         "into the errors[] collection for more details. File: {}",
@@ -238,7 +424,8 @@ void Bad(std::string_view detail, std::size_t start, const FileSource& source, B
 }
 
 FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>& schema,
-                       TemporaryFiles& files, bool converts, BadRecords* bad) {
+                       TemporaryFiles& files, bool converts, const DatetimeFormats& formats,
+                       BadRecords* bad) {
   const std::string contents = ReadMaybeGzip(source.path);
   const bool quotes = QuotesJsonNumerics(schema, converts);
   std::string rewritten;
@@ -265,27 +452,30 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
           return true;
         };
         // NUMERIC and BIGNUMERIC numbers, and with `converts` those of STRING fields, are read
-        // as their text.
+        // as their text, which ValidateValue converts.
+        const std::optional<std::string> without_comma = WithoutTrailingComma(line);
+        const std::string_view row = without_comma ? std::string_view(*without_comma) : line;
         const std::string text =
-            quotes ? QuotedJsonNumerics(line, schema, converts) : std::string(line);
+            quotes ? QuotedJsonNumerics(row, schema, converts, /*bignumeric_text=*/true)
+                   : std::string(row);
         auto object = json::parse(text, unique_keys, false);
-        if (object.is_discarded()) {
-          throw ApiError::Invalid("Invalid JSON in " + source.uri);
+        if (object.is_discarded() || !object.is_object()) {
+          throw ApiError::Invalid(std::string(NotObjectMessage(line)));
         }
-        ValidateObject(object, schema, converts);
+        ValidateObject(object, schema, converts, formats);
         rewritten += object.dump() + '\n';
       } catch (const ApiError& error) {
         if (std::string_view(error.what()).starts_with(kUnsupported)) {
           throw;
         }
-        Bad(error.what(), start, source, bad);
+        Bad(error, start, source, bad);
       }
     } else if (line.find_first_of(" \t") != std::string_view::npos) {
       // BigQuery reads an empty line, but not one of spaces.
       if (bad != nullptr) {
         ++bad->records;
       }
-      Bad("Unexpected token", start, source, bad);
+      Bad(ApiError::Invalid("Unexpected token"), start, source, bad);
     }
     start = end + 1;
   }
@@ -297,10 +487,10 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
 std::vector<FileSource> StageExternalJson(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
                                           TemporaryFiles& files, bool autodetected,
-                                          BadRecords* bad) {
+                                          const DatetimeFormats& formats, BadRecords* bad) {
   std::vector<FileSource> staged;
   std::ranges::transform(sources, std::back_inserter(staged), [&](const FileSource& source) {
-    return StageSource(source, schema, files, autodetected, bad);
+    return StageSource(source, schema, files, autodetected, formats, bad);
   });
   return staged;
 }

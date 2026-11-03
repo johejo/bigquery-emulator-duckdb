@@ -261,6 +261,74 @@ SELECT ST_GEOGFROMTEXT('{"type": "Point", "coordinates": [1, 2]}')
 SELECT ST_GEOGFROMTEXT('0101000000000000000000F03F0000000000000040')
 => error: ST_GeogFromText failed: Unexpected '0101000000000000000000' at position 0.
 
+# A word of another geometry type, or of none, is unexpected; its token is its run of letters.
+
+SELECT ST_GEOGFROMTEXT('INVALID')
+=> error: ST_GeogFromText failed: Unexpected 'INVALID' at position 0.
+
+SELECT ST_GEOGFROMTEXT('invalid')
+=> error: ST_GeogFromText failed: Unexpected 'invalid' at position 0.
+
+SELECT ST_GEOGFROMTEXT('  INVALID')
+=> error: ST_GeogFromText failed: Unexpected 'INVALID' at position 2.
+
+SELECT ST_GEOGFROMTEXT('INVALID(1 2)')
+=> error: ST_GeogFromText failed: Unexpected 'INVALID' at position 0.
+
+SELECT ST_GEOGFROMTEXT('ABC1')
+=> error: ST_GeogFromText failed: Unexpected 'ABC' at position 0.
+
+SELECT ST_GEOGFROMTEXT('A_B')
+=> error: ST_GeogFromText failed: Unexpected 'A' at position 0.
+
+SELECT ST_GEOGFROMTEXT('POINTZ(1 2 3)')
+=> error: ST_GeogFromText failed: Unexpected 'POINTZ' at position 0.
+
+SELECT ST_GEOGFROMTEXT('POINT Z (1 2 3)')
+=> error: ST_GeogFromText failed: Z and M extensions are not supported.
+
+SELECT ST_GEOGFROMTEXT('POINTM(1 2 3)')
+=> error: ST_GeogFromText failed: Unexpected 'POINTM' at position 0.
+
+SELECT ST_GEOGFROMTEXT('POINTS(1 2)')
+=> error: ST_GeogFromText failed: Unexpected 'POINTS' at position 0.
+
+SELECT ST_GEOGFROMTEXT('GEOMETRY')
+=> error: ST_GeogFromText failed: Unexpected 'GEOMETRY' at position 0.
+
+SELECT ST_GEOGFROMTEXT('EMPTY')
+=> error: ST_GeogFromText failed: Unexpected 'EMPTY' at position 0.
+
+SELECT ST_GEOGFROMTEXT('SRID=4326;POINT(1 2)')
+=> "POINT(1 2)"
+
+SELECT ST_GEOGFROMTEXT('CIRCULARSTRING(0 0, 1 1, 2 0)')
+=> error: ST_GeogFromText failed: Unexpected 'CIRCULARSTRING' at position 0.
+
+SELECT ST_GEOGFROMTEXT('COMPOUNDCURVE((0 0, 1 1))')
+=> error: ST_GeogFromText failed: Unexpected 'COMPOUNDCURVE' at position 0.
+
+SELECT ST_GEOGFROMTEXT('CURVEPOLYGON((0 0, 1 0, 1 1, 0 0))')
+=> error: ST_GeogFromText failed: Unexpected 'CURVEPOLYGON' at position 0.
+
+SELECT ST_GEOGFROMTEXT('MULTICURVE((0 0, 1 1))')
+=> error: ST_GeogFromText failed: Unexpected 'MULTICURVE' at position 0.
+
+SELECT ST_GEOGFROMTEXT('MULTISURFACE(((0 0, 1 0, 1 1, 0 0)))')
+=> error: ST_GeogFromText failed: Unexpected 'MULTISURFACE' at position 0.
+
+SELECT ST_GEOGFROMTEXT('POLYHEDRALSURFACE(((0 0, 1 0, 1 1, 0 0)))')
+=> error: ST_GeogFromText failed: Unexpected 'POLYHEDRALSURFACE' at position 0.
+
+SELECT ST_GEOGFROMTEXT('TIN(((0 0, 1 0, 1 1, 0 0)))')
+=> error: ST_GeogFromText failed: Unexpected 'TIN' at position 0.
+
+SELECT ST_GEOGFROMTEXT('TRIANGLE((0 0, 1 0, 1 1, 0 0))')
+=> error: ST_GeogFromText failed: Unexpected 'TRIANGLE' at position 0.
+
+SELECT SAFE.ST_GEOGFROMTEXT('INVALID')
+=> null
+
 SELECT ST_GEOGFROMTEXT(NULL)
 => null
 

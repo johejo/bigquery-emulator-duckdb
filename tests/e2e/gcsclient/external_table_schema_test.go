@@ -337,7 +337,6 @@ func TestExternalParquetUndetectedTypes(t *testing.T) {
 	files := map[string][]byte{
 		"enum.parquet":  parquetColumns(t, parquetColumn{node: logicalNode(t, "e", required, schema.EnumLogicalType{}, parquet.Types.ByteArray, -1), values: []parquet.ByteArray{[]byte("A")}}),
 		"nanos.parquet": parquetColumns(t, parquetColumn{node: logicalNode(t, "ts", required, schema.NewTimestampLogicalType(true, schema.TimeUnitNanos), parquet.Types.Int64, -1), values: []int64{1}}),
-		"wide.parquet":  parquetColumns(t, parquetColumn{node: logicalNode(t, "n", required, schema.NewDecimalLogicalType(18, 10), parquet.Types.Int64, -1), values: []int64{1}}),
 	}
 	objects(t, files)
 	client := start(t)

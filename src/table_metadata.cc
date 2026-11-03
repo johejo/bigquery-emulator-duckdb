@@ -466,6 +466,17 @@ json TableMetadata::ToJson() const {
     if (external_data->max_bad_records) {
       fields["externalDataConfiguration"]["maxBadRecords"] = *external_data->max_bad_records;
     }
+    for (const auto& [name, value] : {
+             std::pair{"timeZone", &external_data->time_zone},
+             {"dateFormat", &external_data->date_format},
+             {"datetimeFormat", &external_data->datetime_format},
+             {"timeFormat", &external_data->time_format},
+             {"timestampFormat", &external_data->timestamp_format},
+         }) {
+      if (*value) {
+        fields["externalDataConfiguration"][name] = **value;
+      }
+    }
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
     }
@@ -676,7 +687,9 @@ TableMetadata TableMetadataFromJson(const json& table) {
       if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
           name != "autodetect" && name != "parquetOptions" && name != "csvOptions" &&
           name != "ignoreUnknownValues" && name != "hivePartitioningOptions" &&
-          name != "compression" && name != "maxBadRecords" && name != "jsonOptions") {
+          name != "compression" && name != "maxBadRecords" && name != "jsonOptions" &&
+          name != "timeZone" && name != "dateFormat" && name != "datetimeFormat" &&
+          name != "timeFormat" && name != "timestampFormat") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
@@ -801,6 +814,37 @@ TableMetadata TableMetadataFromJson(const json& table) {
               "externalDataConfiguration.parquetOptions.enableListInference must be a boolean");
         }
         metadata.external_data->enable_list_inference = value.get<bool>();
+      }
+    }
+    for (const auto& [name, value] : {
+             std::pair{"timeZone", &metadata.external_data->time_zone},
+             {"dateFormat", &metadata.external_data->date_format},
+             {"datetimeFormat", &metadata.external_data->datetime_format},
+             {"timeFormat", &metadata.external_data->time_format},
+             {"timestampFormat", &metadata.external_data->timestamp_format},
+         }) {
+      if (config.contains(name)) {
+        if (!config[name].is_string()) {
+          throw ApiError::Invalid(std::string("externalDataConfiguration.") + name +
+                                  " must be a string");
+        }
+        *value = config[name].get<std::string>();
+      }
+    }
+    // As BigQuery's answers in external_table_types_followups.api.answers.json show, a Parquet
+    // table rejects them by their DDL names.
+    if (format == "PARQUET") {
+      for (const auto& [name, value] : {
+               std::pair{"time_zone", &metadata.external_data->time_zone},
+               {"date_format", &metadata.external_data->date_format},
+               {"datetime_format", &metadata.external_data->datetime_format},
+               {"time_format", &metadata.external_data->time_format},
+               {"timestamp_format", &metadata.external_data->timestamp_format},
+           }) {
+        if (*value) {
+          throw ApiError::Invalid(
+              std::format("Unsupported option '{}' for format STORAGE_FORMAT_PARQUET", name));
+        }
       }
     }
     if (config.contains("hivePartitioningOptions")) {

@@ -100,8 +100,8 @@ bool HasType(const std::vector<FieldSchema>& fields, FieldType type) {
 // case. It implements json::sax_parse's interface.
 class NumericQuoter {
  public:
-  NumericQuoter(const std::vector<FieldSchema>& schema, bool string_numbers)
-      : schema_(schema), string_numbers_(string_numbers) {}
+  NumericQuoter(const std::vector<FieldSchema>& schema, bool string_numbers, bool bignumeric_text)
+      : schema_(schema), string_numbers_(string_numbers), bignumeric_text_(bignumeric_text) {}
 
   [[nodiscard]] const std::string& Output() const { return out_; }
 
@@ -122,7 +122,7 @@ class NumericQuoter {
   }
   bool string(json::string_t& value) {
     Separate();
-    if (IsField(FieldType::kBigNumeric)) {
+    if (IsField(FieldType::kBigNumeric) && !bignumeric_text_) {
       WriteBigNumeric(value);
     } else {
       out_ += json(value).dump();
@@ -214,9 +214,10 @@ class NumericQuoter {
 
   bool Number(const std::string& text) {
     Separate();
-    if (IsField(FieldType::kBigNumeric)) {
+    if (IsField(FieldType::kBigNumeric) && !bignumeric_text_) {
       WriteBigNumeric(text);
-    } else if (IsField(FieldType::kNumeric) || (string_numbers_ && IsField(FieldType::kString))) {
+    } else if (IsField(FieldType::kNumeric) || IsField(FieldType::kBigNumeric) ||
+               (string_numbers_ && IsField(FieldType::kString))) {
       out_ += json(text).dump();
     } else {
       out_ += text;
@@ -235,6 +236,7 @@ class NumericQuoter {
 
   const std::vector<FieldSchema>& schema_;
   bool string_numbers_;
+  bool bignumeric_text_;
   std::vector<Frame> frames_;
   std::string out_;
 };
@@ -247,6 +249,18 @@ FieldSchema TextGeographies(FieldSchema field) {
   }
   for (FieldSchema& child : field.fields) {
     child = TextGeographies(std::move(child));
+  }
+  return field;
+}
+
+// `field` with each JSON in it, at any depth, a STRING: an external read stages a JSON value as
+// its text, which a cast to JSON parses, so that a JSON null is not NULL.
+FieldSchema TextJsons(FieldSchema field) {
+  if (field.type == FieldType::kJson) {
+    field.type = FieldType::kString;
+  }
+  for (FieldSchema& child : field.fields) {
+    child = TextJsons(std::move(child));
   }
   return field;
 }
@@ -311,6 +325,19 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
   throw ApiError::Unsupported(std::format(
       "loading BIGNUMERIC field {} from a Parquet column that is not a DECIMAL or an integer",
       field.name));
+}
+
+// The DuckDB value of the top-level column `name` of `parquet` as `field`, with its conversion
+// in `options` or else as ParquetValue reads it.
+std::string ParquetConverted(const std::string& name, const FieldSchema& field,
+                             const ParquetColumn& parquet, const ParquetReadOptions& options) {
+  const auto conversion = options.conversions.find(field.name);
+  if (conversion == options.conversions.end()) {
+    return ParquetValue(name, field, parquet.Child(field.name), 0);
+  }
+  return std::format("CAST({} AS {})",
+                     std::vformat(conversion->second, std::make_format_args(name)),
+                     ToDuckDbType(field));
 }
 
 // The DuckDB value `sql` of `column` in the shape BigQuery loads it, with each unwrapped STRUCT
@@ -503,7 +530,7 @@ std::string ReadMaybeGzip(const std::string& path) {
 }
 
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
-                                   bool list_inference) {
+                                   bool list_inference, bool decimal_bytes) {
   ParquetSources sources;
   for (const FileSource& input : inputs) {
     const std::string& path = input.path;
@@ -574,6 +601,14 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
     }
     std::vector<size_t> wide;
     WideDecimals(columns, wide);
+    if (decimal_bytes) {
+      for (const ParquetColumn& column : columns.children) {
+        if (column.IsDecimal() && !column.IsWideDecimal() && !column.HoldsNumeric() &&
+            (column.type == parquet::kFixedLenByteArray || column.type == parquet::kByteArray)) {
+          wide.push_back(column.element);
+        }
+      }
+    }
     if (wide.empty() && !geo) {
       sources.sources.push_back(input);
       continue;
@@ -615,8 +650,8 @@ bool QuotesJsonNumerics(const std::vector<FieldSchema>& schema, bool string_numb
 }
 
 std::string QuotedJsonNumerics(std::string_view line, const std::vector<FieldSchema>& schema,
-                               bool string_numbers) {
-  NumericQuoter quoter(schema, string_numbers);
+                               bool string_numbers, bool bignumeric_text) {
+  NumericQuoter quoter(schema, string_numbers, bignumeric_text);
   json::sax_parse(line, &quoter);
   return quoter.Output();
 }
@@ -732,7 +767,8 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     if (explicit_schema) {
       std::vector<std::string> columns;
       std::ranges::transform(schema, std::back_inserter(columns), [](const FieldSchema& field) {
-        return QuoteLiteral(field.name) + ": " + QuoteLiteral(ToDuckDbType(JsonTextFields(field)));
+        return QuoteLiteral(field.name) + ": " +
+               QuoteLiteral(ToDuckDbType(JsonTextFields(TextJsons(TextGeographies(field)))));
       });
       sql += ", auto_detect=false, columns={" + Join(columns, ", ") + "}";
     }
@@ -778,9 +814,10 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     for (const FieldSchema& field : schema) {
       const std::string name = QuoteIdentifier(field.name);
       const std::string value =
-          is_parquet
-              ? CheckedWriteValue(ParquetValue(name, field, parquet.Child(field.name), 0), field)
-              : StoredValue(JsonValue(name, TextGeographies(field)), field);
+          is_parquet ? CheckedWriteValue(ParquetConverted(name, field, parquet,
+                                                          std::get<ParquetReadOptions>(options)),
+                                         field)
+                     : StoredValue(JsonValue(name, TextGeographies(field)), field);
       columns.push_back(std::format("{} AS {}", value, name));
     }
     sql = std::format("SELECT {} FROM ({}) AS source", Join(columns, ", "), sql);

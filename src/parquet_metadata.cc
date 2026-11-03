@@ -467,6 +467,10 @@ bool ParquetColumn::IsDecimal() const {
 
 bool ParquetColumn::IsWideDecimal() const { return IsDecimal() && precision > 38; }
 
+bool ParquetColumn::HoldsNumeric() const {
+  return IsDecimal() && scale >= 0 && scale <= 9 && precision - scale <= 29;
+}
+
 bool ParquetColumn::IsInteger() const {
   return kind == Kind::kLeaf && (type == parquet::kInt32 || type == parquet::kInt64) &&
          (converted == -1 || (converted >= parquet::kConvertedFirstInteger &&

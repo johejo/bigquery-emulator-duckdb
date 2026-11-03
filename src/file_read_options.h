@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -12,6 +13,17 @@ namespace bigquery_emulator_duckdb {
 
 enum class FileFormat : uint8_t { kCsv, kJson, kParquet };
 enum class DecimalTargetType : uint8_t { kNumeric, kBigNumeric, kString };
+
+// time_zone, date_format, datetime_format, time_format and timestamp_format of an external CSV or
+// JSON table, each empty when the table leaves it out or empty.
+struct DatetimeFormats {
+  std::string time_zone = {};
+  std::string date = {};
+  std::string datetime = {};
+  std::string time = {};
+  std::string timestamp = {};
+  bool operator==(const DatetimeFormats&) const = default;
+};
 
 // Reader settings only. Callers validate their own load or external-table options before
 // mapping them to these settings; destination and schema-update policies do not belong here.
@@ -34,6 +46,13 @@ struct CsvReadOptions {
   // "bad.record", and FileReadQuery leaves out a record with a value its reader cannot convert,
   // which the caller finds and counts as bad, rather than failing.
   bool numbered_records = false;
+  // Whether a value of a DATETIME, BIGNUMERIC, JSON or GEOGRAPHY column is staged as ExternalValue
+  // takes it, as BigQuery's external reads do, and a value it rejects makes its record bad,
+  // rather than read as DuckDB reads it.
+  bool external_values = false;
+  // With `external_values`, the formats ExternalValue parses DATE, DATETIME, TIME and TIMESTAMP
+  // values with.
+  DatetimeFormats formats = {};
 };
 
 // A record a read skips as bad, of which BigQuery warns.
@@ -46,6 +65,9 @@ struct BadRecord {
   // Whether BigQuery counts it among the Rows of its message of an exceeded limit, which a CSV
   // record of too many values is not.
   bool row = true;
+  // Whether BigQuery warns of it as a query error, of reason invalidQuery and location query,
+  // with `message` alone, as it does of a JSON value that does not convert.
+  bool query = false;
 };
 
 // Where a CSV record of a read starts.
@@ -81,6 +103,9 @@ struct ParquetReadOptions {
   bool allow_missing_columns = false;
   // External reads preserve NULL LIST elements; loads reject them.
   bool allow_null_list_elements = false;
+  // The DuckDB values of top-level columns of the schema, by name, with {} for the column, that
+  // replace the casts of those columns to their types.
+  std::map<std::string, std::string> conversions = {};
 };
 using FileReadOptions = std::variant<CsvReadOptions, JsonReadOptions, ParquetReadOptions>;
 
