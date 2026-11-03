@@ -34,6 +34,10 @@ struct CsvReadOptions {
   // "bad.record", and FileReadQuery leaves out a record with a value its reader cannot convert,
   // which the caller finds and counts as bad, rather than failing.
   bool numbered_records = false;
+  // Whether a DATETIME value other than YYYY-MM-DD HH:MM:SS[.SSSSSS], the form the data types of
+  // third_party/bigquery_docs/loading-data-cloud-storage-csv.md give, is unsupported rather than
+  // read as DuckDB reads it.
+  bool canonical_datetimes = false;
 };
 
 // A record a read skips as bad, of which BigQuery warns.

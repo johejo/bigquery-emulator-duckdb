@@ -286,6 +286,7 @@ CsvReadOptions CsvOptions(const GcsExternalData& definition) {
       .null_markers = definition.null_markers,
       .preserve_ascii_control_characters =
           definition.preserve_ascii_control_characters.value_or(false),
+      .canonical_datetimes = true,
   };
 }
 

@@ -732,7 +732,8 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
     if (explicit_schema) {
       std::vector<std::string> columns;
       std::ranges::transform(schema, std::back_inserter(columns), [](const FieldSchema& field) {
-        return QuoteLiteral(field.name) + ": " + QuoteLiteral(ToDuckDbType(JsonTextFields(field)));
+        return QuoteLiteral(field.name) + ": " +
+               QuoteLiteral(ToDuckDbType(JsonTextFields(TextGeographies(field))));
       });
       sql += ", auto_detect=false, columns={" + Join(columns, ", ") + "}";
     }

@@ -1,0 +1,97 @@
+version: 1
+# Sources hold the values of the data types of
+# [Loading CSV data](third_party/bigquery_docs/loading-data-cloud-storage-csv.md) and
+# [Loading JSON data](third_party/bigquery_docs/loading-data-cloud-storage-json.md): DATETIME as
+# YYYY-MM-DD HH:MM:SS[.SSSSSS], GEOGRAPHY as WKT or GeoJSON text, and a CSV JSON value with its
+# quotes escaped as "". Queries convert each value to its text, which the conversion functions
+# define. Sources, base64-encoded:
+# - csv: '1,2024-01-02 03:04:05,1.5,"{""a"":1}",POINT(1 2)\n2,2024-01-02 03:04:05.123456,,,
+#   "{ ""type"": ""Point"", ""coordinates"": [1, 2] }"\n'
+# - json: '{"id":1,"dt":"2024-01-02 03:04:05","g":"POINT(1 2)"}\n{"id":2,"dt":"2024-01-02
+#   03:04:05.123456","g":"{ \"type\": \"Point\", \"coordinates\": [1, 2] }"}\n
+#   {"id":3,"r":{"dt":"2024-01-02 03:04:05","g":"POINT(1 2)"}}\n'
+description: >-
+  DATETIME, BIGNUMERIC, JSON and GEOGRAPHY columns of CSV and JSON external tables with a given
+  schema.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  csv: MSwyMDI0LTAxLTAyIDAzOjA0OjA1LDEuNSwieyIiYSIiOjF9IixQT0lOVCgxIDIpCjIsMjAyNC0wMS0wMiAwMzowNDowNS4xMjM0NTYsLCwieyAiInR5cGUiIjogIiJQb2ludCIiLCAiImNvb3JkaW5hdGVzIiI6IFsxLCAyXSB9Igo=
+  json: eyJpZCI6MSwiZHQiOiIyMDI0LTAxLTAyIDAzOjA0OjA1IiwiZyI6IlBPSU5UKDEgMikifQp7ImlkIjoyLCJkdCI6IjIwMjQtMDEtMDIgMDM6MDQ6MDUuMTIzNDU2IiwiZyI6InsgXCJ0eXBlXCI6IFwiUG9pbnRcIiwgXCJjb29yZGluYXRlc1wiOiBbMSwgMl0gfSJ9CnsiaWQiOjMsInIiOnsiZHQiOiIyMDI0LTAxLTAyIDAzOjA0OjA1IiwiZyI6IlBPSU5UKDEgMikifX0K
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and runs `query` on it.
+  external:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  - name: csv
+    template: external
+    vars:
+      object: s.csv
+      source: ${csv}
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, dt DATETIME, bn BIGNUMERIC, j JSON, g GEOGRAPHY) OPTIONS (format = 'CSV', uris = ['${prefix}/s.csv'])
+      query: SELECT id, CAST(dt AS STRING), CAST(bn AS STRING), TO_JSON_STRING(j), ST_ASTEXT(g) FROM `${project}.${dataset}.t` ORDER BY id
+    expect:
+      create:
+        status: 200
+      query:
+        status: 200
+        rows:
+          - f: [{v: '1'}, {v: '2024-01-02 03:04:05'}, {v: '1.5'}, {v: '{"a":1}'}, {v: POINT(1 2)}]
+          - f: [{v: '2'}, {v: '2024-01-02 03:04:05.123456'}, {v: null}, {v: 'null'}, {v: POINT(1 2)}]
+  - name: json
+    template: external
+    vars:
+      object: s.json
+      source: ${json}
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, dt DATETIME, g GEOGRAPHY, r STRUCT<dt DATETIME, g GEOGRAPHY>) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])
+      query: SELECT id, CAST(dt AS STRING), ST_ASTEXT(g), CAST(r.dt AS STRING), ST_ASTEXT(r.g) FROM `${project}.${dataset}.t` ORDER BY id
+    expect:
+      create:
+        status: 200
+      query:
+        status: 200
+        rows:
+          - f: [{v: '1'}, {v: '2024-01-02 03:04:05'}, {v: POINT(1 2)}, {v: null}, {v: null}]
+          - f: [{v: '2'}, {v: '2024-01-02 03:04:05.123456'}, {v: POINT(1 2)}, {v: null}, {v: null}]
+          - f: [{v: '3'}, {v: null}, {v: null}, {v: '2024-01-02 03:04:05'}, {v: POINT(1 2)}]

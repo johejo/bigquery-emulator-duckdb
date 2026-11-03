@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <format>
 #include <optional>
+#include <regex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -163,6 +164,13 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
           }
           const auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field,
                                    column, options, position);
+          if (value && options.canonical_datetimes && field.type == FieldType::kDatetime) {
+            static const std::regex datetime(
+                R"([0-9]{4}-[0-9]{2}-[0-9]{2} ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]{1,6})?)");
+            if (!std::regex_match(*value, datetime)) {
+              throw ApiError::Unsupported("CSV external representation for " + field.name);
+            }
+          }
           if (value) {
             AppendQuoted(line, *value);
           } else if (column >= found && field.mode == FieldMode::kRequired) {
@@ -170,12 +178,13 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
           }
         }
       } catch (const ApiError& error) {
-        if (bad == nullptr || !bad->Skip({
-                                  .number = bad->records,
-                                  .uri = source.uri,
-                                  .message = error.what(),
-                                  .row = !too_many,
-                              })) {
+        if (bad == nullptr || std::string_view(error.what()).starts_with(kUnsupported) ||
+            !bad->Skip({
+                .number = bad->records,
+                .uri = source.uri,
+                .message = error.what(),
+                .row = !too_many,
+            })) {
           throw;
         }
         continue;

@@ -6,6 +6,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -31,16 +32,27 @@ json ParseComment(const std::optional<std::string>& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
-// Whether `field` or one of its fields has a type or setting external reads do not support.
-bool UnsupportedExternalField(const FieldSchema& field) {
+// Whether `field` or one of its fields has a type or setting external reads of `format` do not
+// support. CSV and JSON read DATETIME and GEOGRAPHY in the forms of the data types of
+// third_party/bigquery_docs/loading-data-cloud-storage-csv.md and
+// loading-data-cloud-storage-json.md, and CSV, as loads do, BIGNUMERIC and JSON too.
+bool UnsupportedExternalField(const FieldSchema& field, std::string_view format) {
+  const bool csv = format == "CSV";
+  const bool json_lines = format == "NEWLINE_DELIMITED_JSON";
+  const bool supported =
+      field.type == FieldType::kInteger || field.type == FieldType::kString ||
+      field.type == FieldType::kBoolean || field.type == FieldType::kFloat ||
+      field.type == FieldType::kBytes || field.type == FieldType::kNumeric ||
+      field.type == FieldType::kDate || field.type == FieldType::kTime ||
+      field.type == FieldType::kTimestamp || field.type == FieldType::kRecord ||
+      ((csv || json_lines) &&
+       (field.type == FieldType::kDatetime || field.type == FieldType::kGeography)) ||
+      (csv && (field.type == FieldType::kBigNumeric || field.type == FieldType::kJson));
   return field.max_length || field.precision || field.scale || field.collation ||
-         !field.default_value_expression.empty() ||
-         (field.type != FieldType::kInteger && field.type != FieldType::kString &&
-          field.type != FieldType::kBoolean && field.type != FieldType::kFloat &&
-          field.type != FieldType::kBytes && field.type != FieldType::kNumeric &&
-          field.type != FieldType::kDate && field.type != FieldType::kTime &&
-          field.type != FieldType::kTimestamp && field.type != FieldType::kRecord) ||
-         std::ranges::any_of(field.fields, UnsupportedExternalField);
+         !field.default_value_expression.empty() || !supported ||
+         std::ranges::any_of(field.fields, [format](const FieldSchema& child) {
+           return UnsupportedExternalField(child, format);
+         });
 }
 
 // The cloneDefinition or snapshotDefinition `definition` that the emulator recorded in a table
@@ -158,7 +170,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
                external.preserve_ascii_control_characters || external.ignore_unknown_values) {
       throw ApiError::Unsupported("CSV options on non-CSV external tables");
     }
-    const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);
+    const auto unsupported = std::ranges::find_if(schema, [&external](const FieldSchema& field) {
+      return UnsupportedExternalField(field, external.format);
+    });
     if (unsupported != schema.end()) {
       throw ApiError::Unsupported("this external table column definition: " + unsupported->name);
     }

@@ -160,7 +160,14 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts, bool el
         }
       }
       break;
+    case FieldType::kGeography:
+      // As WKT, hex WKB or GeoJSON text, which the reader converts.
+      if (value.is_string()) {
+        return;
+      }
+      break;
     case FieldType::kDate:
+    case FieldType::kDatetime:
     case FieldType::kTime:
     case FieldType::kTimestamp:
       if (detected && KindType(detected->kind) == field.type) {
@@ -169,17 +176,20 @@ void ValidateValue(json& value, const FieldSchema& field, bool converts, bool el
       }
       if (value.is_string()) {
         const auto& text = value.get_ref<const std::string&>();
-        // Only canonical dates, times and UTC timestamps are accepted. The typed reader
-        // validates calendar dates; these guards prevent out-of-range years and time rounding.
+        // Only canonical dates, datetimes, times and UTC timestamps are accepted. The typed
+        // reader validates calendar dates; these guards prevent out-of-range years and time
+        // rounding.
         static const std::string date = "[0-9]{4}-[0-9]{2}-[0-9]{2}";
         static const std::string time =
             R"(([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]{1,6})?)";
         static const std::regex date_pattern(date);
+        static const std::regex datetime_pattern(date + " " + time);
         static const std::regex time_pattern(time);
         static const std::regex timestamp_pattern(date + "T" + time + "Z");
-        const auto& pattern = field.type == FieldType::kDate   ? date_pattern
-                              : field.type == FieldType::kTime ? time_pattern
-                                                               : timestamp_pattern;
+        const auto& pattern = field.type == FieldType::kDate       ? date_pattern
+                              : field.type == FieldType::kDatetime ? datetime_pattern
+                              : field.type == FieldType::kTime     ? time_pattern
+                                                                   : timestamp_pattern;
         if (std::regex_match(text, pattern) &&
             (field.type == FieldType::kTime || !text.starts_with("0000"))) {
           return;

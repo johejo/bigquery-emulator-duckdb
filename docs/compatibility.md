@@ -85,19 +85,24 @@ options that select other types are unsupported. Every source file must have eac
 REPEATED column and field of the schema.
 
 CSV takes a flat schema of the scalar types listed above, given or detected as
-[loads detect it](#loads-extracts-and-copies). It supports
+[loads detect it](#loads-extracts-and-copies), and a given schema can also have DATETIME,
+BIGNUMERIC, JSON and GEOGRAPHY columns. A DATETIME value must have the form
+`YYYY-MM-DD HH:MM:SS[.SSSSSS]` of the
+[CSV data types](../third_party/bigquery_docs/loading-data-cloud-storage-csv.md); other forms are
+unsupported. It supports
 `skip_leading_rows` / `csvOptions.skipLeadingRows`, a single ASCII
 `field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL, and the
 [CSV options](#loads-extracts-and-copies) loads take. Schema detection does not take a quote,
 quoted line breaks or NULL markers. Other CSV options are unsupported.
 
-JSON takes a schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, TIME or TIMESTAMP
-fields, RECORDs of those fields, or repeated fields of those types. Given a schema, scalar values
-must use their native JSON representation, except INT64 also accepts decimal strings, BOOL accepts
-its text spellings, and BYTES requires base64 strings. NUMERIC accepts decimal numbers or strings
+JSON takes a schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, DATETIME, TIME,
+TIMESTAMP or GEOGRAPHY fields, RECORDs of those fields, or repeated fields of those types. Given
+a schema, scalar values must use their native JSON representation, except INT64 also accepts
+decimal strings, BOOL accepts its text spellings, and BYTES requires base64 strings. NUMERIC accepts decimal numbers or strings
 with at most 29 integer digits and nine fractional digits, without exponent notation. DATE and
-TIME accept canonical `YYYY-MM-DD` and `HH:MM:SS[.SSSSSS]` strings, and TIMESTAMP accepts only
-`YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z`. A table created without a schema takes the one BigQuery
+TIME accept canonical `YYYY-MM-DD` and `HH:MM:SS[.SSSSSS]` strings, DATETIME
+`YYYY-MM-DD HH:MM:SS[.SSSSSS]`, and TIMESTAMP only `YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z`. GEOGRAPHY
+accepts WKT, hex WKB or GeoJSON strings. A table created without a schema takes the one BigQuery
 [detects](../third_party/bigquery_docs/schema-detect.md) from the alphabetically last source
 file, and its reads also take strings in the forms detection converts, and numbers and BOOL
 values for STRING fields. The order of detected columns can differ from BigQuery's for objects of
