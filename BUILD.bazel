@@ -1142,6 +1142,7 @@ cc_library(
     implementation_deps = [
         ":api_error",
         ":csv_records",
+        "@abseil-cpp//absl/strings",
     ],
     deps = [
         ":field_schema",
@@ -1387,6 +1388,7 @@ cc_library(
     hdrs = ["src/statement_resources.h"],
     copts = ["-std=c++20"],
     deps = [
+        ":api_error",
         ":references",
         ":temporary_files",
     ],

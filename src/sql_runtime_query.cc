@@ -462,7 +462,8 @@ TranslatedStatement SqlRuntime::Translate(
           .temporary = nullptr,
           .source = source.get(),
           .resources = std::make_shared<StatementResources>(
-              dry_run ? StatementResources::Mode::kDryRun : StatementResources::Mode::kExecute),
+              dry_run ? StatementResources::Mode::kDryRun : StatementResources::Mode::kExecute,
+              [this](const std::string& sql) { return Execute(sql, {}, true).TextRows(); }),
           .has_session_user = has_session_user_,
           .stores_result = stores_result,
           .evaluate =
@@ -660,6 +661,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   query.ddl_target_table = translation.ddl_target_table;
   query.ddl_target_dataset = translation.ddl_target_dataset;
   query.ddl_target_routine = translation.ddl_target_routine;
+  if (translation.resources) {
+    query.warnings = translation.resources->warnings();
+  }
   if (!request.dry_run && !request.destination_table.has_value()) {
     return RunStatement(translation, setup, request.null_arrays, nullptr, &location);
   }

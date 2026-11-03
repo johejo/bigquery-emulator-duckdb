@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
+#include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
@@ -108,6 +109,8 @@ struct QueryJob {
   std::optional<TableReference> ddl_target_table = {};
   std::optional<DatasetReference> ddl_target_dataset = {};
   std::optional<RoutineReference> ddl_target_routine = {};
+  // The warnings of a job that succeeds, such as of bad records its reads skip.
+  std::vector<ApiError> warnings = {};
 };
 
 // SQL execution options shared by runtime callers and the application's query requests.

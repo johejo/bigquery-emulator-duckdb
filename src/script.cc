@@ -849,21 +849,25 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     std::string unsupported;
     const auto variables = SystemVariables(executor);
-    const std::optional<TranslatedStatement> translation = TranslateStatement(
-        host_.functions(), analyzed.statement(), parameters,
-        DefaultDataset{
-            .project = settings.default_project,
-            .dataset = settings.default_dataset,
-            .temporary = catalog.temporary.get(),
-            .source = catalog.source.get(),
-            .resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute),
-            .has_session_user = host_.has_session_user(),
-            .evaluate =
-                [this](const std::string& sql, const googlesql::Type* type) {
-                  return ResultValue(backend_->Execute(sql, setup_, true), type);
-                },
-        },
-        &unsupported, &variables);
+    const std::optional<TranslatedStatement> translation =
+        TranslateStatement(host_.functions(), analyzed.statement(), parameters,
+                           DefaultDataset{
+                               .project = settings.default_project,
+                               .dataset = settings.default_dataset,
+                               .temporary = catalog.temporary.get(),
+                               .source = catalog.source.get(),
+                               .resources = std::make_shared<StatementResources>(
+                                   StatementResources::Mode::kExecute,
+                                   [this](const std::string& sql) {
+                                     return backend_->Execute(sql, setup_, true).TextRows();
+                                   }),
+                               .has_session_user = host_.has_session_user(),
+                               .evaluate =
+                                   [this](const std::string& sql, const googlesql::Type* type) {
+                                     return ResultValue(backend_->Execute(sql, setup_, true), type);
+                                   },
+                           },
+                           &unsupported, &variables);
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }
@@ -892,7 +896,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                 host_.functions().timestamp_precision(), settings));
     std::string unsupported;
     const auto variables = SystemVariables(executor);
-    const auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
+    const auto resources = std::make_shared<StatementResources>(
+        StatementResources::Mode::kExecute,
+        [this](const std::string& sql) { return backend_->Execute(sql, setup_, true).TextRows(); });
     const std::optional<std::string> query =
         TranslateExpression(host_.functions(), analyzed.expression(), parameters,
                             DefaultDataset{
