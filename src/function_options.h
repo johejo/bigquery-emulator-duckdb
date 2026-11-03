@@ -16,6 +16,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .unpadded_iso_year = true,
       .extended_array_limits = true,
       .rounding_early_positive_zero = true,
+      .double_average = true,
       .json_strict_numbers = true,
       .json_preserve_negative_zero = true,
       .json_keys_rejects_safe = true,

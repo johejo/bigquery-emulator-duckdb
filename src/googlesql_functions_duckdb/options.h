@@ -25,6 +25,8 @@ struct Options {
   bool extended_array_limits = false;
   // FLOAT64 ROUND and TRUNC with digits return positive zero at their early zero exits.
   bool rounding_early_positive_zero = false;
+  // FLOAT64 AVG keeps its running mean in a double rather than a long double.
+  bool double_average = false;
   // JSON_ARRAY_APPEND and JSON_ARRAY_INSERT reject numbers they would round, and keep the sign
   // of a negative zero.
   bool json_strict_numbers = false;
