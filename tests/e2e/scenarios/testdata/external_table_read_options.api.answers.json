@@ -1,0 +1,2808 @@
+{
+  "version": 1,
+  "cases": {
+    "compression_gzip_ddl": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_ddl/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_gzip_ddl.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"GZIP\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_ddl/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_ddl/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_gzip_api": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_api/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_gzip_api.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"GZIP\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_api/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_api/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_none_api": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "NONE",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_none_api/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_none_api.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"NONE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_none_api/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NONE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_none_api/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_gzip_json": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_json/a.json.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_gzip_json.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"GZIP\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_json/a.json.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_json/a.json.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_unset_gzip_source": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_unset_gzip_source/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_unset_gzip_source.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_unset_gzip_source/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_unset_gzip_source/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_none_gzip_source": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'NONE' is not a valid value; failed to set 'compression' in external table OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'NONE' is not a valid value; failed to set 'compression' in external table OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "compression_gzip_plain_source": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_plain_source/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_gzip_plain_source.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"GZIP\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_plain_source/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_plain_source/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_gzip_plain_source.t, error message: Decompression failed: Invalid gzip file: unrecognized format. File: gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_plain_source/a.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_gzip_plain_source.t, error message: Decompression failed: Invalid gzip file: unrecognized format. File: gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_gzip_plain_source/a.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "compression_lowercase": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_lowercase/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_lowercase.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"GZIP\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_lowercase/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_lowercase/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_empty_api": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_empty_api/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_compression_empty_api.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_empty_api/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/compression_empty_api/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_zstd": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'ZSTD' is not a valid value; failed to set 'compression' in external table OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'ZSTD' is not a valid value; failed to set 'compression' in external table OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "max_bad_records_json_exceeded": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 1,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_exceeded/a.json"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_json_exceeded.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=1,\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_exceeded/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_exceeded/a.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_json_exceeded.t, error message: JSON table encountered too many errors, giving up. Rows: 3; errors: 2. Please look into the errors[] collection for more details. File: gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_exceeded/a.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_json_exceeded.t, error message: JSON table encountered too many errors, giving up. Rows: 3; errors: 2. Please look into the errors[] collection for more details. File: gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_exceeded/a.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "max_bad_records_negative": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "max_bad_records may not be negative.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "max_bad_records may not be negative.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_iso_8859_1": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "ISO-8859-1"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_iso_8859_1/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_iso_8859_1.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"ISO-8859-1\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_iso_8859_1/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"ISO-8859-1\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_iso_8859_1/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_iso_8859_1_underscore": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "ISO-8859-1"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_iso_8859_1_underscore/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_iso_8859_1_underscore.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"ISO-8859-1\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_iso_8859_1_underscore/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"ISO-8859-1\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_iso_8859_1_underscore/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf8_without_hyphen": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-8"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf8_without_hyphen/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf8_without_hyphen.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf8_without_hyphen/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-8\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf8_without_hyphen/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf16le": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf16le.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf16le_byte_order_mark": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_byte_order_mark/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf16le_byte_order_mark.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_byte_order_mark/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_byte_order_mark/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf16be": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-16BE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16be/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf16be.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16BE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16be/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16BE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16be/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf32le": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-32LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf32le/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf32le.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-32LE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf32le/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-32LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf32le/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf32be": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-32BE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf32be/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf32be.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-32BE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf32be/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-32BE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf32be/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf16le_gzip": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "csvOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_gzip/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf16le_gzip.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  compression=\"GZIP\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_gzip/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_gzip/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf16le_gzip.t, error message: Bad character (ASCII 0) encountered.; byte_offset_to_start_of_line: 13 column_index: 0 column_name: \"id\" column_type: INT64 value: \"\\0002\\000\" File: gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_gzip/a.csv.gz",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_utf16le_gzip.t, error message: Bad character (ASCII 0) encountered.; byte_offset_to_start_of_line: 13 column_index: 0 column_name: \"id\" column_type: INT64 value: \"\\0002\\000\" File: gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_utf16le_gzip/a.csv.gz",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_api": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_api/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_api.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_api/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_api/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_lowercase": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-8"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_lowercase/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_lowercase.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_lowercase/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-8\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_lowercase/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_unknown": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'EBCDIC' is not a valid value; failed to set 'encoding' in external table OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'EBCDIC' is not a valid value; failed to set 'encoding' in external table OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_json_api": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "jsonOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_api/a.json"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_json_api.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_api/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_api/a.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_json_api_iso_8859_1": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "jsonOptions": {
+              "encoding": "ISO-8859-1"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_api_iso_8859_1/a.json"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_json_api_iso_8859_1.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"ISO-8859-1\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_api_iso_8859_1/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"ISO-8859-1\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_api_iso_8859_1/a.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_json_ddl": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "jsonOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_ddl/a.json"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_encoding_json_ddl.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_ddl/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/encoding_json_ddl/a.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "compression_none_api_gzip_source": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "NONE",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/compression_none_api_gzip_source/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_compression_none_api_gzip_source.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  compression=\"NONE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/compression_none_api_gzip_source/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NONE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/compression_none_api_gzip_source/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_compression_none_api_gzip_source.t, error message: CSV table references column position 1, but line contains only 1 columns.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"s\" column_type: STRING File: gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/compression_none_api_gzip_source/a.csv.gz",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_compression_none_api_gzip_source.t, error message: CSV table references column position 1, but line contains only 1 columns.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"s\" column_type: STRING File: gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/compression_none_api_gzip_source/a.csv.gz",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "compression_api_lowercase": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid value for compression: gzip is not a valid value",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value for compression: gzip is not a valid value",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "compression_ddl_empty": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'' is not a valid value; failed to set 'compression' in external table OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'' is not a valid value; failed to set 'compression' in external table OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_iso_8859_1_gzip": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "compression": "GZIP",
+            "csvOptions": {
+              "encoding": "ISO-8859-1"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_iso_8859_1_gzip/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_encoding_iso_8859_1_gzip.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"ISO-8859-1\",\n  compression=\"GZIP\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_iso_8859_1_gzip/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "compression"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"GZIP\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"ISO-8859-1\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_iso_8859_1_gzip/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_utf16le_gzip_without_compression": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-16LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf16le_gzip_without_compression/a.csv.gz"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_encoding_utf16le_gzip_without_compression.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-16LE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf16le_gzip_without_compression/a.csv.gz\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-16LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf16le_gzip_without_compression/a.csv.gz\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_encoding_utf16le_gzip_without_compression.t, error message: Bad character (ASCII 0) encountered.; byte_offset_to_start_of_line: 13 column_index: 0 column_name: \"id\" column_type: INT64 value: \"\\0002\\000\" File: gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf16le_gzip_without_compression/a.csv.gz",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_encoding_utf16le_gzip_without_compression.t, error message: Bad character (ASCII 0) encountered.; byte_offset_to_start_of_line: 13 column_index: 0 column_name: \"id\" column_type: INT64 value: \"\\0002\\000\" File: gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf16le_gzip_without_compression/a.csv.gz",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_utf32le_byte_order_mark": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "csvOptions": {
+              "encoding": "UTF-32LE"
+            },
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf32le_byte_order_mark/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_encoding_utf32le_byte_order_mark.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  encoding=\"UTF-32LE\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf32le_byte_order_mark/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "encoding"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"UTF-32LE\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/jkuzqacy4awgmgefozp4uve2bm/encoding_utf32le_byte_order_mark/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "café"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "ü€"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_api_alias": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid value for csvOptions.encoding: UTF8 is not a valid value",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value for csvOptions.encoding: UTF8 is not a valid value",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "max_bad_records_api_negative": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "must be a positive number.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "must be a positive number.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

@@ -43,8 +43,8 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
 | [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 3 | 0 | 2 | 19 |
-| [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 8 | 1 | 0 | 0 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 5 | 0 | 2 | 16 |
+| [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 9 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE format](#create-external-table-format) | 0 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE uris](#create-external-table-uris) | 1 | 0 | 0 | 0 |
 | [CREATE EXTERNAL TABLE hive_partition_uri_prefix](#create-external-table-hive_partition_uri_prefix) | 1 | 0 | 0 | 0 |
@@ -284,17 +284,16 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`compression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`compression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`decimal_target_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`enable_list_inference`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`enable_logical_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
-| [`encoding`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`enum_as_string`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
 | [`file_set_spec_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`json_extension`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`max_bad_records`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
+| [`max_bad_records`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
 | [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
 | [`object_metadata`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`projection_fields`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
@@ -314,6 +313,7 @@ the emulator rejected.
 | --- | --- | --- | --- |
 | [`allow_jagged_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`allow_quoted_newlines`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
+| [`encoding`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`field_delimiter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], field_delimiter = 'ab')`. |
 | [`ignore_unknown_values`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`null_marker`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |

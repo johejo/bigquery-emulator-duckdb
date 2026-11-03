@@ -23,6 +23,7 @@
 #include "src/field_schema.h"
 #include "src/json_int64.h"
 #include "src/location.h"
+#include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -447,12 +448,23 @@ json TableMetadata::ToJson() const {
     if (external_data->preserve_ascii_control_characters) {
       csv["preserveAsciiControlCharacters"] = *external_data->preserve_ascii_control_characters;
     }
+    if (external_data->encoding) {
+      fields["externalDataConfiguration"]
+            [external_data->format == "CSV" ? "csvOptions" : "jsonOptions"]["encoding"] =
+                *external_data->encoding;
+    }
     if (csv.is_null()) {
       fields["externalDataConfiguration"].erase("csvOptions");
     }
     if (external_data->ignore_unknown_values) {
       fields["externalDataConfiguration"]["ignoreUnknownValues"] =
           *external_data->ignore_unknown_values;
+    }
+    if (external_data->compression) {
+      fields["externalDataConfiguration"]["compression"] = *external_data->compression;
+    }
+    if (external_data->max_bad_records) {
+      fields["externalDataConfiguration"]["maxBadRecords"] = *external_data->max_bad_records;
     }
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
@@ -638,6 +650,18 @@ HivePartitioning HivePartitioningFromJson(const json& options) {
   return hive;
 }
 
+// The encoding `value` of csvOptions or jsonOptions, `options`. BigQuery's answers in
+// external_table_read_options.api.answers.json: tables.insert takes only the names tables.get
+// gives.
+std::string RestEncoding(const json& value, std::string_view options) {
+  const auto& name = value.get_ref<const std::string&>();
+  if (!ParseTextEncoding(name)) {
+    throw ApiError::Invalid(
+        std::format("Invalid value for {}.encoding: {} is not a valid value", options, name));
+  }
+  return name;
+}
+
 }  // namespace
 
 TableMetadata TableMetadataFromJson(const json& table) {
@@ -651,7 +675,8 @@ TableMetadata TableMetadataFromJson(const json& table) {
     for (const auto& [name, value] : config.items()) {
       if (name != "sourceFormat" && name != "sourceUris" && name != "schema" &&
           name != "autodetect" && name != "parquetOptions" && name != "csvOptions" &&
-          name != "ignoreUnknownValues" && name != "hivePartitioningOptions") {
+          name != "ignoreUnknownValues" && name != "hivePartitioningOptions" &&
+          name != "compression" && name != "maxBadRecords" && name != "jsonOptions") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
@@ -700,10 +725,64 @@ TableMetadata TableMetadataFromJson(const json& table) {
           metadata.external_data->allow_jagged_rows = value.get<bool>();
         } else if (name == "preserveAsciiControlCharacters" && value.is_boolean()) {
           metadata.external_data->preserve_ascii_control_characters = value.get<bool>();
+        } else if (name == "encoding" && value.is_string()) {
+          metadata.external_data->encoding = RestEncoding(value, "csvOptions");
         } else {
           throw ApiError::Unsupported("externalDataConfiguration.csvOptions." + name);
         }
       }
+    }
+    if (config.contains("jsonOptions")) {
+      if (format != "NEWLINE_DELIMITED_JSON") {
+        throw ApiError::Unsupported("jsonOptions on a non-JSON external table");
+      }
+      const auto& options = config["jsonOptions"];
+      if (!options.is_object()) {
+        throw ApiError::Invalid("externalDataConfiguration.jsonOptions must be an object");
+      }
+      for (const auto& [name, value] : options.items()) {
+        if (name != "encoding") {
+          throw ApiError::Unsupported("externalDataConfiguration.jsonOptions." + name);
+        }
+        if (!value.is_string()) {
+          throw ApiError::Invalid(
+              "externalDataConfiguration.jsonOptions.encoding must be a string");
+        }
+        metadata.external_data->encoding = RestEncoding(value, "jsonOptions");
+      }
+    }
+    if (config.contains("compression")) {
+      if (!config["compression"].is_string()) {
+        throw ApiError::Invalid("externalDataConfiguration.compression must be a string");
+      }
+      // BigQuery stores no compression for an empty one.
+      const auto& compression = config["compression"].get_ref<const std::string&>();
+      if (!compression.empty() && compression != "GZIP" && compression != "NONE") {
+        throw ApiError::Invalid("Invalid value for compression: " + compression +
+                                " is not a valid value");
+      }
+      if (!compression.empty()) {
+        metadata.external_data->compression = compression;
+      }
+    }
+    if (config.contains("maxBadRecords")) {
+      const auto& value = config["maxBadRecords"];
+      int64_t records = 0;
+      if (value.is_number_integer()) {
+        records = value.get<int64_t>();
+      } else if (value.is_string()) {
+        const auto& text = value.get_ref<const std::string&>();
+        const auto result = std::from_chars(text.data(), text.data() + text.size(), records);
+        if (result.ec != std::errc{} || result.ptr != text.data() + text.size()) {
+          throw ApiError::Invalid("Invalid externalDataConfiguration.maxBadRecords");
+        }
+      } else {
+        throw ApiError::Invalid("Invalid externalDataConfiguration.maxBadRecords");
+      }
+      if (records < 0) {
+        throw ApiError::Invalid("must be a positive number.");
+      }
+      metadata.external_data->max_bad_records = records;
     }
     if (config.contains("parquetOptions")) {
       if (format != "PARQUET") {

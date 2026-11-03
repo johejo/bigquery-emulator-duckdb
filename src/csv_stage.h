@@ -11,10 +11,12 @@ namespace bigquery_emulator_duckdb {
 
 // Reads CSV `sources` with `options` as BigQuery does for `schema`, and writes copies that
 // FileReadQuery reads: comma-delimited records of every column, each value quoted and each NULL
-// an unquoted empty value. Throws ApiError::Invalid for a record BigQuery rejects.
+// an unquoted empty value. Throws ApiError::Invalid for a record BigQuery rejects, unless `bad`
+// counts it and may skip it, which leaves it out; a `bad` that numbers records puts each kept
+// record's number first.
 std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                                         const CsvReadOptions& options,
                                         const std::vector<FieldSchema>& schema,
-                                        TemporaryFiles& files);
+                                        TemporaryFiles& files, BadRecords* bad = nullptr);
 
 }  // namespace bigquery_emulator_duckdb

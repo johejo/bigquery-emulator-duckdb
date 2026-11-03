@@ -42,6 +42,11 @@ struct GcsExternalData {
   std::optional<std::vector<std::string>> null_markers = std::nullopt;
   std::optional<bool> preserve_ascii_control_characters = std::nullopt;
   std::optional<bool> ignore_unknown_values = std::nullopt;
+  // GZIP or NONE, as given.
+  std::optional<std::string> compression = std::nullopt;
+  std::optional<int64_t> max_bad_records = std::nullopt;
+  // csvOptions.encoding of a CSV table, or jsonOptions.encoding of a JSON one, as given.
+  std::optional<std::string> encoding = std::nullopt;
   std::optional<HivePartitioning> hive_partitioning = std::nullopt;
   bool operator==(const GcsExternalData&) const = default;
 };

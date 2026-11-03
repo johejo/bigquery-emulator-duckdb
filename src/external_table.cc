@@ -30,6 +30,7 @@
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
+#include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -287,6 +288,81 @@ CsvReadOptions CsvOptions(const GcsExternalData& definition) {
   };
 }
 
+FileFormat Format(const GcsExternalData& definition) {
+  if (definition.format == "CSV") {
+    return FileFormat::kCsv;
+  }
+  return definition.format == "NEWLINE_DELIMITED_JSON" ? FileFormat::kJson : FileFormat::kParquet;
+}
+
+// Downloads the sources of `definition`, the external table `table_name`, and decodes those of a
+// CSV or JSON table from its encoding. As BigQuery's answers in
+// external_table_read_options.api.answers.json show, compression GZIP fails on a source that is
+// not gzip. BigQuery reads a gzip source with compression NONE as it is, and splits one in UTF-16
+// or UTF-32 into values before it decodes them, which both fail on gzip data; the emulator, which
+// reads gzip whatever the compression, rejects them as unsupported.
+std::vector<FileSource> StageSources(const GcsExternalData& definition, std::string_view table_name,
+                                     GcsClient& client, TemporaryFiles& files) {
+  const FileFormat format = Format(definition);
+  std::vector<FileSource> sources = StageFileSources(definition.uris, format, client, files);
+  if (format == FileFormat::kParquet) {
+    return sources;
+  }
+  const TextEncoding encoding =
+      ParseTextEncoding(definition.encoding.value_or("UTF-8")).value_or(TextEncoding::kUtf8);
+  for (FileSource& source : sources) {
+    // StageFileSources gives a gzip source the suffix .gz.
+    const bool gzip = source.path.ends_with(".gz");
+    if (definition.compression == "GZIP" && !gzip) {
+      throw ApiError::Invalid(std::format(
+          "Error while reading table: {}, error message: Decompression failed: Invalid gzip "
+          "file: unrecognized format. File: {}",
+          table_name, source.uri));
+    }
+    if (gzip && definition.compression == "NONE") {
+      throw ApiError::Unsupported("reading a gzip external source with compression NONE: " +
+                                  source.uri);
+    }
+    if (gzip && encoding != TextEncoding::kUtf8 && encoding != TextEncoding::kIso88591) {
+      throw ApiError::Unsupported("reading a gzip external source in " +
+                                  std::string(TextEncodingName(encoding)) + ": " + source.uri);
+    }
+    if (encoding != TextEncoding::kUtf8) {
+      source.path = files.Write(DecodeText(ReadMaybeGzip(source.path), encoding));
+    }
+  }
+  return sources;
+}
+
+// `read`, whose sources StageCsvSources numbered with `bad`, without the numbers, and failing as
+// BigQuery does, with the number of the bad record that exceeds the limit, when more records than
+// it are bad. A record is bad when its number is missing: staging skipped it, or the reader could
+// not convert one of its values. No column of BigQuery's is named with a period.
+std::string CheckedBadRecords(const std::string& read, const BadRecords& bad,
+                              std::string_view table_name) {
+  const std::string number = QuoteIdentifier("bad.record");
+  if (bad.limit >= bad.records) {
+    return std::format("SELECT * EXCLUDE ({}) FROM ({})", number, read);
+  }
+  const std::string records = QuoteIdentifier("bad.records");
+  const std::string source = QuoteIdentifier("bad.read");
+  const std::string exceeding = std::format(
+      "(SELECT CAST(range AS VARCHAR) FROM (SELECT range FROM range(1, {0}) EXCEPT SELECT {1} "
+      "FROM {2}) ORDER BY range LIMIT 1 OFFSET {3})",
+      bad.records + 1, number, source, bad.limit);
+  return std::format(
+      "WITH {0} AS ({1}) SELECT * EXCLUDE ({2}) FROM (SELECT unnest({3}) FROM (SELECT "
+      "unnest(CASE WHEN count(*) < {4} THEN error({5} || {6} || {7}) ELSE list({3}) END) AS {3} "
+      "FROM {0} AS {3}))",
+      source, read, number, records, bad.records - bad.limit,
+      QuoteLiteral(std::format("Error while reading table: {}, error message: CSV processing "
+                               "encountered too many errors, giving up. Rows: ",
+                               table_name)),
+      exceeding,
+      QuoteLiteral(
+          std::format("; errors: {}; max bad: {}; error percent: 0", bad.limit + 1, bad.limit)));
+}
+
 }  // namespace
 
 std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definition,
@@ -303,11 +379,7 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
         "schemas must be the same.");
   }
   TemporaryFiles files;
-  const auto sources = StageFileSources(definition.uris,
-                                        csv    ? FileFormat::kCsv
-                                        : json ? FileFormat::kJson
-                                               : FileFormat::kParquet,
-                                        client, files);
+  const auto sources = StageSources(definition, table_id, client, files);
   if (sources.empty()) {
     throw ApiError::Invalid("External table source URIs match no files");
   }
@@ -377,11 +449,11 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
           client = std::move(client)](TemporaryFiles& files) mutable {
     const bool csv = definition.format == "CSV";
     const bool json = definition.format == "NEWLINE_DELIMITED_JSON";
-    const auto sources = StageFileSources(definition.uris,
-                                          csv    ? FileFormat::kCsv
-                                          : json ? FileFormat::kJson
-                                                 : FileFormat::kParquet,
-                                          client, files);
+    const auto sources = StageSources(definition, table_name, client, files);
+    // BigQuery ignores maxBadRecords for Parquet. The limit of a CSV table counts the values its
+    // reader cannot convert too, which only its results show.
+    BadRecords bad{.limit = definition.max_bad_records.value_or(0), .numbered = csv};
+    BadRecords* const skips = bad.limit > 0 && (csv || json) ? &bad : nullptr;
     // A partitioned table reads its keys from each source's path rather than its contents.
     const HivePartitioning* hive =
         definition.hive_partitioning && !definition.hive_partitioning->mode.empty()
@@ -437,7 +509,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         std::vector<FileSource> staged;
         try {
           staged = StageExternalJson({source}, file_schema, files,
-                                     definition.autodetect.value_or(false));
+                                     definition.autodetect.value_or(false), skips);
         } catch (const ApiError& error) {
           if (std::string_view(error.what()).starts_with(kUnsupported)) {
             throw;
@@ -453,9 +525,11 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         CsvReadOptions options = CsvOptions(definition);
         options.skip_leading_rows = skip_leading_rows;
         options.field_delimiter = delimiter;
+        options.numbered_records = skips != nullptr;
         reads.push_back(select(
-            source, FileReadQuery(options, StageCsvSources({source}, options, read_schema, files),
-                                  read_schema)));
+            source,
+            FileReadQuery(options, StageCsvSources({source}, options, read_schema, files, skips),
+                          read_schema)));
         continue;
       }
       const ThriftValue metadata = SourceMetadata(source);
@@ -490,7 +564,10 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     if (reads.empty()) {
       throw ApiError::Invalid("External table source URIs match no files");
     }
-    return Join(reads, " UNION ALL ");
+    // Of a JSON table, only the records StageExternalJson rejects count as bad; a value its
+    // reader cannot convert still fails the read.
+    return csv && skips != nullptr ? CheckedBadRecords(Join(reads, " UNION ALL "), bad, table_name)
+                                   : Join(reads, " UNION ALL ");
   };
 }
 

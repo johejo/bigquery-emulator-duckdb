@@ -122,6 +122,10 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       ddl += std::string("  enable_list_inference=") +
              (*external->enable_list_inference ? "true" : "false") + ",\n";
     }
+    // BigQuery's DDL leaves out UTF-8, which TABLE_OPTIONS lists.
+    if (external->encoding && *external->encoding != "UTF-8") {
+      ddl += "  encoding=" + StringOptionValue(*external->encoding) + ",\n";
+    }
     // BigQuery's DDL leaves out null_markers and the default field_delimiter and quote.
     if (external->field_delimiter && *external->field_delimiter != ",") {
       ddl += "  field_delimiter=" + StringOptionValue(*external->field_delimiter) + ",\n";
@@ -138,6 +142,12 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       ddl += "  skip_leading_rows=" + std::to_string(*external->skip_leading_rows) + ",\n";
     }
     flag("ignore_unknown_values", external->ignore_unknown_values);
+    if (external->compression) {
+      ddl += "  compression=" + StringOptionValue(*external->compression) + ",\n";
+    }
+    if (external->max_bad_records) {
+      ddl += "  max_bad_records=" + std::to_string(*external->max_bad_records) + ",\n";
+    }
     ddl += "  format=" + StringOptionValue(external->format) + ",\n";
     if (hive) {
       ddl +=
@@ -394,6 +404,20 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
               .name = "field_delimiter",
               .type = "STRING",
               .value = StringOptionValue(*external.field_delimiter),
+          });
+        }
+        for (const auto& [name, value] :
+             {std::pair{"compression", &external.compression}, {"encoding", &external.encoding}}) {
+          if (*value) {
+            options.push_back(
+                {.name = name, .type = "STRING", .value = StringOptionValue(**value)});
+          }
+        }
+        if (external.max_bad_records) {
+          options.push_back({
+              .name = "max_bad_records",
+              .type = "INT64",
+              .value = std::to_string(*external.max_bad_records),
           });
         }
         if (external.skip_leading_rows) {

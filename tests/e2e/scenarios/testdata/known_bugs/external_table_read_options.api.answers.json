@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "cases": {
+    "max_bad_records_csv_within": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 2,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_within/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_csv_within.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=2,\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_within/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "2"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_within/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_within/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_within/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "max_bad_records_csv_exceeded": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 1,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_exceeded/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_csv_exceeded.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=1,\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_exceeded/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_csv_exceeded/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_csv_exceeded.t, error message: CSV processing encountered too many errors, giving up. Rows: 3; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_csv_exceeded.t, error message: CSV processing encountered too many errors, giving up. Rows: 3; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "max_bad_records_csv_files": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_csv_files.t, error message: CSV processing encountered too many errors, giving up. Rows: 5; errors: 3; max bad: 2; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_csv_files.t, error message: CSV processing encountered too many errors, giving up. Rows: 5; errors: 3; max bad: 2; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "max_bad_records_api": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 2,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_api/a.csv"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_api.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=2,\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_api/a.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "2"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_api/a.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_api/a.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_api/a.csv",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "max_bad_records_json_within": {
+      "project": "johejo-sandbox",
+      "run": "u7cpdqrvw5o36sz2dqity2hjp7",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 2,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_within/a.json"
+            ]
+          }
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7cpdqrvw5o36sz2dqity2hjp7_max_bad_records_json_within.t`\n(\n  id INT64,\n  s STRING\n)\nOPTIONS(\n  max_bad_records=2,\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_within/a.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "2"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_within/a.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_within/a.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/u7cpdqrvw5o36sz2dqity2hjp7/max_bad_records_json_within/a.json",
+              "reason": "invalid"
+            }
+          ],
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "max_bad_records_csv_files_swapped": {
+      "project": "johejo-sandbox",
+      "run": "jkuzqacy4awgmgefozp4uve2bm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_max_bad_records_csv_files_swapped.t, error message: CSV processing encountered too many errors, giving up. Rows: 5; errors: 3; max bad: 2; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_jkuzqacy4awgmgefozp4uve2bm_max_bad_records_csv_files_swapped.t, error message: CSV processing encountered too many errors, giving up. Rows: 5; errors: 3; max bad: 2; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

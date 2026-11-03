@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "cases": {
+    "warnings_script": {
+      "project": "johejo-sandbox",
+      "run": "ogj6cok4pl35drtorqgjhk34iz",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "d"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
