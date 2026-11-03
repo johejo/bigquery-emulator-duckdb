@@ -1,0 +1,82 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run ogj6cok4pl35drtorqgjhk34iz, with sources in
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. A script that reads
+# an external table within its max_bad_records has no warnings, unlike the statements of
+# known_bugs/external_table_bad_records.api.yaml.
+description: >-
+  A script that skips bad records of a CSV external table.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  # "1,a\nx,b\n3,c,extra\n4,d\n": a value INT64 cannot hold and one value too many.
+  bad_csv: MSxhCngsYgozLGMsZXh0cmEKNCxkCg==
+templates:
+  # Creates the table `t` with `ddl` over the object `${object}` of `source`, runs `query` with
+  # jobs.query, and reads the job's status and results.
+  warnings:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US&timeoutMs=200000
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  - name: warnings_script
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: SELECT 1 AS x; SELECT * FROM `${project}.${dataset}.t` ORDER BY id;
+    expect: {"create": {"status": 200}, "job": {"status": {"state": "DONE"}}, "query": {"rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}, "results": {"rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}]}}

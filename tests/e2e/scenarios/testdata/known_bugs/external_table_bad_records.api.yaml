@@ -1,0 +1,399 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run ogj6cok4pl35drtorqgjhk34iz, with sources in
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. These cases follow
+# external_table_read_options.api.yaml in this directory.
+#
+# A statement that skips bad records succeeds with a warning for each one, in record order and at
+# most 100: an entry of jobs.query's errors[], with only the reason invalid and the source's
+# location, and one of jobs.get's status.errors and jobs.getQueryResults' errors[] that adds
+# the message. A table read twice in one statement warns once, a CTAS warns as a query does, and
+# a script's job has no warnings. Only the values of the columns a statement reads are converted:
+# reading s alone, the value x of the INT64 id makes no record bad, so the table of
+# warnings_other_column_exceeded stays within its limit.
+#
+# BigQuery reads every file of a table before it fails for too many bad records, whatever their
+# order: errors counts every bad record, even above max_bad_records + 1 as in
+# order_csv_three_first, and Rows every record of a CSV table but those of too many values, as
+# max_bad_records_csv_files of external_table_read_options.api.yaml also shows. The message of a
+# JSON table of several files takes the form of CSV's, and its Rows counts a malformed line too.
+#
+# The emulator gives no warnings, converts every column, numbers records in the order of their
+# URIs and stops at the record that exceeds the limit.
+description: >-
+  Warnings for skipped bad records, and the failure of tables of several files with too many,
+  in queries of CSV and JSON external tables with max_bad_records.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  # "1,a\nx,b\n3,c,extra\n4,d\n": a value INT64 cannot hold and one value too many.
+  bad_csv: MSxhCngsYgozLGMsZXh0cmEKNCxkCg==
+  # '{"id": 1, "s": "a"}\n{"id": 2.5, "s": "b"}\n{"id": 3,\n{"id": 4, "s": "d"}\n': a fraction
+  # of an INT64 and a malformed line.
+  bad_json: eyJpZCI6IDEsICJzIjogImEifQp7ImlkIjogMi41LCAicyI6ICJiIn0KeyJpZCI6IDMsCnsiaWQiOiA0LCAicyI6ICJkIn0K
+  # '{"id": 5, "s": "e"}\n{"id": 6.5, "s": "f"}\n'
+  bad_json_b: eyJpZCI6IDUsICJzIjogImUifQp7ImlkIjogNi41LCAicyI6ICJmIn0K
+  # "1,a\n" followed by "x,b\n" 150 times.
+  many_bad_csv: MSxhCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCngsYgp4LGIKeCxiCg==
+  # "1,a\nx,b\n" and "y,c\n4,d\n": 8 bytes each, with the bad record second in the first and
+  # first in the second.
+  tie_a: MSxhCngsYgo=
+  tie_b: eSxjCjQsZAo=
+  # "x,a\n2,l...l\n", with 200 l's: 2 records in 207 bytes; and "y,b\n2,c\n3,d\n4,e\n": 4
+  # records in 16 bytes. Each starts with its bad record.
+  long_few: eCxhCjIsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGwK
+  short_many: eSxiCjIsYwozLGQKNCxlCg==
+  # "x,a\n2,b\n3,c\n4,d\n5,e\n", "y,f\n" and "z,g\n7,h\n8,i\n": 5, 1 and 3 records, each
+  # starting with its bad record.
+  three_a: eCxhCjIsYgozLGMKNCxkCjUsZQo=
+  three_b: eSxmCg==
+  three_c: eixnCjcsaAo4LGkK
+templates:
+  # Creates the table `t` with `ddl` over the object `${object}` of `source`, runs `query` with
+  # jobs.query, and reads the job's status and results.
+  warnings:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US&timeoutMs=200000
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As warnings, observing the 100th and 101st warnings rather than all of them.
+  warnings_cap:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          last: /body/errors/99
+          beyond: /body/errors/100
+          rows: /body/rows
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          state: /body/status/state
+          last: /body/status/errors/99
+          beyond: /body/status/errors/100
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US&timeoutMs=200000
+        observe:
+          last: /body/errors/99
+          beyond: /body/errors/100
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # A table of `ddl` over the objects `${object}` and `${object_b}`, which a query cannot read.
+  two_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: source_b
+        gcs: {method: PUT, object: '${run}/${case}/${object_b}', base64: '${source_b}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+      - name: delete_source_b
+        gcs: {method: DELETE, object: '${run}/${case}/${object_b}'}
+  # As two_unreadable, over the objects a.csv, b.csv and c.csv.
+  three_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${three_a}'}
+      - name: source_b
+        gcs: {method: PUT, object: '${run}/${case}/b.csv', base64: '${three_b}'}
+      - name: source_c
+        gcs: {method: PUT, object: '${run}/${case}/c.csv', base64: '${three_c}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+      - name: delete_source_b
+        gcs: {method: DELETE, object: '${run}/${case}/b.csv'}
+      - name: delete_source_c
+        gcs: {method: DELETE, object: '${run}/${case}/c.csv'}
+cases:
+  - name: warnings_csv
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}]}}
+  - name: warnings_json
+    template: warnings
+    vars:
+      object: a.json
+      source: '${bad_json}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'], max_bad_records = 2)
+      query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 20: Could not convert value 'number_value: \t \"2.5\"' to integer. Field: id; Value: 2.5 File: ${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 42: Expected key File: ${prefix}/a.json", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 20: Could not convert value 'number_value: \t \"2.5\"' to integer. Field: id; Value: 2.5 File: ${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 42: Expected key File: ${prefix}/a.json", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}]}}
+  # The table read twice in one statement.
+  - name: warnings_read_twice
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: SELECT * FROM `${project}.${dataset}.t` UNION ALL SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}, {"f": [{"v": "4"}, {"v": "d"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "1"}, {"v": "a"}]}, {"f": [{"v": "4"}, {"v": "d"}]}, {"f": [{"v": "4"}, {"v": "d"}]}]}}
+  # A filter that keeps only a record before the bad ones still warns of them.
+  - name: warnings_filtered
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: SELECT s FROM `${project}.${dataset}.t` WHERE id = 1
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "a"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "a"}]}]}}
+  # Only the column s, so the value x of id, which INT64 cannot hold, makes no record bad.
+  - name: warnings_other_column
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: SELECT s FROM `${project}.${dataset}.t` ORDER BY s
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "a"}]}, {"f": [{"v": "b"}]}, {"f": [{"v": "d"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "a"}]}, {"f": [{"v": "b"}]}, {"f": [{"v": "d"}]}]}}
+  # No column at all, which still counts records of too many values.
+  - name: warnings_count_star
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: SELECT COUNT(*) AS n FROM `${project}.${dataset}.t`
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "3"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "3"}]}]}}
+  # As warnings_other_column, within a limit that the value x of id would exceed.
+  - name: warnings_other_column_exceeded
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 1)
+      query: SELECT s FROM `${project}.${dataset}.t` ORDER BY s
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "a"}]}, {"f": [{"v": "b"}]}, {"f": [{"v": "d"}]}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "rows": [{"f": [{"v": "a"}]}, {"f": [{"v": "b"}]}, {"f": [{"v": "d"}]}]}}
+  - name: warnings_create_table_as_select
+    template: warnings
+    vars:
+      object: a.csv
+      source: '${bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 2)
+      query: CREATE TABLE `${project}.${dataset}.u` AS SELECT * FROM `${project}.${dataset}.t`
+    expect: {"create": {"status": 200}, "job": {"status": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}], "state": "DONE"}}, "query": {"errors": [{"location": "${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "reason": "invalid"}], "status": 200}, "results": {"errors": [{"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 4 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Too many values in line. Found 3 column(s) when expecting 2.; line_number: 3 byte_offset_to_start_of_line: 8 File: ${prefix}/a.csv", "reason": "invalid"}]}}
+  # 150 bad records, of which BigQuery warns of the first 100.
+  - name: warnings_many
+    template: warnings_cap
+    vars:
+      object: a.csv
+      source: '${many_bad_csv}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], max_bad_records = 1000)
+      query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+    expect: {"create": {"status": 200}, "query": {"status": 200, "last": {"location": "${prefix}/a.csv", "reason": "invalid"}, "rows": [{"f": [{"v": "1"}, {"v": "a"}]}]}, "job": {"state": "DONE", "last": {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 101 byte_offset_to_start_of_line: 400 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}}, "results": {"last": {"location": "${prefix}/a.csv", "message": "Error while reading data, error message: Unable to parse; line_number: 101 byte_offset_to_start_of_line: 400 column_index: 0 column_name: \"id\" column_type: INT64 value: \"x\" File: ${prefix}/a.csv", "reason": "invalid"}, "rows": [{"f": [{"v": "1"}, {"v": "a"}]}]}}
+  # Files of equal size. Rows: 4, every record, which is also the number of the record that
+  # exceeds the limit if BigQuery reads b.csv first.
+  - name: order_csv_same_size
+    template: two_unreadable
+    vars:
+      object: a.csv
+      source: '${tie_a}'
+      object_b: b.csv
+      source_b: '${tie_b}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/*.csv'], max_bad_records = 1)
+    expect: {"create": {"status": 200}, "query": {"message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 4; errors: 2; max bad: 1; error percent: 0", "reason": "invalid", "status": 400}}
+  # Rows: 6, every record, though the second bad record would be the 3rd if BigQuery read a.csv,
+  # of fewer records, first, and the 5th if b.csv, of fewer bytes.
+  - name: order_csv_bytes_records
+    template: two_unreadable
+    vars:
+      object: a.csv
+      source: '${long_few}'
+      object_b: b.csv
+      source_b: '${short_many}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/*.csv'], max_bad_records = 1)
+    expect: {"create": {"status": 200}, "query": {"message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 6; errors: 2; max bad: 1; error percent: 0", "reason": "invalid", "status": 400}}
+  # Rows: 9 and errors: 3, every record and every bad one, though the second bad record would
+  # be the 6th, 2nd or 4th as BigQuery read a.csv, b.csv or c.csv first.
+  - name: order_csv_three_first
+    template: three_unreadable
+    vars:
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/*.csv'], max_bad_records = 1)
+    expect: {"create": {"status": 200}, "query": {"message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 9; errors: 3; max bad: 1; error percent: 0", "reason": "invalid", "status": 400}}
+  # As order_csv_three_first, with a limit the third bad record exceeds.
+  - name: order_csv_three_last
+    template: three_unreadable
+    vars:
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'CSV', uris = ['${prefix}/*.csv'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "query": {"message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 9; errors: 3; max bad: 2; error percent: 0", "reason": "invalid", "status": 400}}
+  # Rows: 6, every line, the malformed one of a.json included, in the message of a CSV table.
+  - name: order_json_files
+    template: two_unreadable
+    vars:
+      object: a.json
+      source: '${bad_json}'
+      object_b: b.json
+      source_b: '${bad_json_b}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, s STRING) OPTIONS (format = 'JSON', uris = ['${prefix}/*.json'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "query": {"message": "Error while reading table: ${project}.${dataset}.t, error message: JSON processing encountered too many errors, giving up. Rows: 6; errors: 3; max bad: 2; error percent: 0", "reason": "invalid", "status": 400}}

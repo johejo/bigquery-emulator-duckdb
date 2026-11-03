@@ -5,10 +5,10 @@ version: 1
 # ../external_table_read_options.api.yaml skip bad records. A query that skips them succeeds with
 # an errors[] entry, of reason invalid and the source's location, for each one, which the emulator
 # leaves out. When a CSV table's bad records exceed max_bad_records, BigQuery fails with reason
-# invalid, the emulator with invalidQuery, since DuckDB raises the error. BigQuery numbers the
-# records of several files in an order other than the emulator's, which reads them in the order
-# of their URIs: with either file of max_bad_records_csv_files_swapped holding the source of the
-# other, BigQuery reports the same Rows, as when it reads the smaller file first.
+# invalid, the emulator with invalidQuery, since DuckDB raises the error. Of a table of several
+# files, BigQuery reports the Rows of every record but those of too many values, whatever the
+# order of the files, as external_table_bad_records.api.yaml shows; the emulator, the number of
+# the record that exceeds the limit, in the order of the files' URIs.
 description: >-
   Queries of CSV and JSON external tables that skip or exceed max_bad_records.
 vars:
