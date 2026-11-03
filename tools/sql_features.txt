@@ -16,6 +16,10 @@ setup CREATE TABLE d.t (id INT64, name STRING, tags ARRAY<STRING>, s STRUCT<a IN
 setup INSERT d.t (id, name, tags, s) VALUES (1, 'a', ['x'], STRUCT(1, 'p')), (2, 'b', [], NULL)
 setup CREATE TABLE d.u (id INT64, v INT64)
 setup INSERT d.u (id, v) VALUES (1, 10), (3, 30)
+setup CREATE TABLE d.places (id INT64, name STRING)
+setup INSERT d.places (id, name) VALUES (1, 'p'), (2, 'q')
+setup CREATE TABLE d.shops (id INT64, place_id INT64, other_place_id INT64)
+setup INSERT d.shops (id, place_id, other_place_id) VALUES (1, 1, 2)
 
 setup CREATE PROPERTY GRAPH d.g NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name)) EDGE TABLES (d.t AS friendships KEY (id) SOURCE KEY (id) REFERENCES t (id) DESTINATION KEY (id) REFERENCES t (id) LABEL Knows NO PROPERTIES)
 
@@ -33,6 +37,11 @@ query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH IF NOT EXISTS d.g NODE TAB
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name)); SELECT * FROM GRAPH_EXPAND('test.d.g2')
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name)); SELECT * FROM GRAPH_EXPAND('d.g2', start_node => 't')
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name)); SELECT * FROM GRAPH_EXPAND('d.g2', flatten_results => FALSE)
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id)); SELECT * FROM GRAPH_EXPAND('d.g2')
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id) PROPERTIES (id AS shop_id)); SELECT * FROM GRAPH_EXPAND('d.g2')
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places AS near KEY (id), d.places AS far KEY (id)) EDGE TABLES (d.shops AS near_edges KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES near (id), d.shops AS far_edges KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (other_place_id) REFERENCES far (id)); SELECT * FROM GRAPH_EXPAND('d.g2')
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n) RETURN n.id, LABELS(n) AS labels)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Person|Account) RETURN n.name, n.v)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Entity&!Person)-[e:Relation&Transfers]->(m:Account) RETURN n.id, e.v, LABELS(m) AS labels)
@@ -89,6 +98,7 @@ query GQL queries | GRAPH d.g LET x = [1, NULL, 2, 1] LET values = ARRAY_AGG(x I
 query GQL queries | GRAPH d.g LET x = [1, 2] LET values = ARRAY_AGG(x ORDER BY x LIMIT 1) RETURN values
 query GQL queries | GRAPH d.g MATCH ANY CHEAPEST (a:Person)-[e:Knows COST 1]->(b:Person) RETURN a.id
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
+note `GRAPH_EXPAND` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
 note GQL queries | [Graph limits](compatibility.md#graphs).
 

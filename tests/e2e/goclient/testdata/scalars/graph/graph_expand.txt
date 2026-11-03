@@ -1,0 +1,24 @@
+# GRAPH_EXPAND joins the documented StoreGraph from its root, Stores, to Locations. Sometown,
+# which no store references, drops out of the LEFT JOIN, and the inlined edge SL adds no columns.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
+SELECT TO_JSON_STRING(t) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') AS t WHERE S_name = 'Store 1'
+=> "{\"S_location_id\":101,\"S_name\":\"Store 1\",\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000}"
+SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreGraph')
+=> "2"
+SELECT SUM(L_population) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') GROUP BY S_location_id
+=> "2000"
+
+# start_node expands the subgraph reachable from that node table.
+SELECT STRING_AGG(L_name ORDER BY L_id) FROM GRAPH_EXPAND('scalar_graph.StoreGraph', start_node => 'L')
+=> "Anytown,Sometown"
+SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreLocations', start_node => 'S')
+=> "2"
+
+# Graphs that the documented input limitations exclude: multiple root node tables without
+# start_node, and a label other than the default one.
+SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreLocations')
+=> error:
+SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.LabeledStores')
+=> error:
+SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreGraph', start_node => 'Missing')
+=> error:

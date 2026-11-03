@@ -18,15 +18,15 @@ rejected.
 - **Unsupported**: the emulator rejects every query as unsupported.
 - **Broken**: a query translates but fails on DuckDB, which is a bug.
 
-| Section | Supported | Partial | Unsupported |
-| --- | --- | --- | --- |
-| [Graphs](#graphs) | 1 | 3 | 1 |
-| [Queries](#queries) | 34 | 2 | 0 |
-| [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 24 | 9 | 0 |
-| [Collation](#collation) | 15 | 0 | 0 |
-| [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
-| [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
+| Section | Supported | Partial |
+| --- | --- | --- |
+| [Graphs](#graphs) | 1 | 4 |
+| [Queries](#queries) | 34 | 2 |
+| [DML](#dml) | 9 | 0 |
+| [DDL](#ddl) | 24 | 9 |
+| [Collation](#collation) | 15 | 0 |
+| [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
+| [INFORMATION_SCHEMA](#information_schema) | 11 | 0 |
 
 ## Graphs
 
@@ -34,7 +34,7 @@ rejected.
 | --- | --- | --- |
 | `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: measures, property options or computed properties that call user-defined functions or read parameters, variables or constants. |
 | `DROP PROPERTY GRAPH` | Supported |  |
-| `GRAPH_EXPAND` | Unsupported |  |
+| `GRAPH_EXPAND` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: GRAPH_EXPAND of a node table related to more than one node table; GRAPH_EXPAND of an edge table with rows or properties of its own; GRAPH_EXPAND with flatten_results => FALSE. |
 | `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints. |
 | GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph costs or hints; horizontal aggregate ARRAY_AGG with this type or modifiers. |
 

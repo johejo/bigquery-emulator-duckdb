@@ -1,0 +1,79 @@
+version: 1
+description: >-
+  Record GRAPH_EXPAND's columns where the documentation shows no example: an edge table that is
+  not inlined because it has a property of its own, a node table related to two node tables, and
+  flatten_results => FALSE where a joined table has no matching row. Requires an Enterprise or
+  Enterprise Plus reservation.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  expand:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.Places` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING)
+              AS SELECT 1 AS id, 'p' AS name UNION ALL SELECT 2, 'q';
+              CREATE TABLE `${project}.${dataset}.Shops` (id INT64 PRIMARY KEY NOT ENFORCED,
+                place_id INT64, other_place_id INT64, size INT64)
+              AS SELECT 1 AS id, 1 AS place_id, 2 AS other_place_id, 3 AS size
+              UNION ALL SELECT 2, NULL, NULL, 4;
+              CREATE PROPERTY GRAPH `${project}.${dataset}.g`
+              NODE TABLES (`${project}.${dataset}.Shops` AS S, ${nodes})
+              EDGE TABLES (${edges});
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: expand
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT * FROM GRAPH_EXPAND('${project}.${dataset}.g'${arguments}) ORDER BY 1
+            useLegacySql: false
+        observe:
+          error: /body/error
+          errors: /body/errors
+          rows: /body/rows
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: edge_with_property
+    template: expand
+    vars:
+      nodes: '`${project}.${dataset}.Places` AS P'
+      edges: >-
+        `${project}.${dataset}.Shops` AS SP SOURCE KEY (id) REFERENCES S (id)
+        DESTINATION KEY (place_id) REFERENCES P (id) PROPERTIES (size AS edge_size)
+      arguments: ''
+  - name: two_related_tables
+    template: expand
+    vars:
+      nodes: '`${project}.${dataset}.Places` AS Near, `${project}.${dataset}.Places` AS Far'
+      edges: >-
+        `${project}.${dataset}.Shops` AS SN SOURCE KEY (id) REFERENCES S (id)
+        DESTINATION KEY (place_id) REFERENCES Near (id),
+        `${project}.${dataset}.Shops` AS SF SOURCE KEY (id) REFERENCES S (id)
+        DESTINATION KEY (other_place_id) REFERENCES Far (id)
+      arguments: ''
+  - name: unflattened_without_match
+    template: expand
+    vars:
+      nodes: '`${project}.${dataset}.Places` AS P'
+      edges: >-
+        `${project}.${dataset}.Shops` AS SP SOURCE KEY (id) REFERENCES S (id)
+        DESTINATION KEY (place_id) REFERENCES P (id)
+      arguments: ', flatten_results => FALSE'

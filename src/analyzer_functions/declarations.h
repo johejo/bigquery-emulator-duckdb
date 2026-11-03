@@ -10,5 +10,6 @@ namespace bigquery_emulator_duckdb::analyzer_functions {
 void AddTextAnalysisFunctions(googlesql::SimpleCatalog& catalog);
 void AddObjectRefFunctions(googlesql::SimpleCatalog& catalog);
 void AddRangeSessionize(googlesql::SimpleCatalog& catalog);
+void AddGraphExpand(googlesql::SimpleCatalog& catalog);
 
 }  // namespace bigquery_emulator_duckdb::analyzer_functions

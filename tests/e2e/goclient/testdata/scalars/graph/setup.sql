@@ -176,3 +176,20 @@ CREATE PROPERTY GRAPH scalar_fingraph.FinGraph
       DESTINATION KEY (to_id) REFERENCES Account (id)
       LABEL Transfers
   );
+
+-- GRAPH_EXPAND's documented StoreGraph, without its measure.
+-- third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
+CREATE TABLE scalar_graph.Locations (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, population INT64)
+AS (SELECT 101 AS id, 'Anytown' AS name, 1000 AS population
+  UNION ALL SELECT 102 AS id, 'Sometown' AS name, 500 AS population);
+CREATE TABLE scalar_graph.Stores (name STRING PRIMARY KEY NOT ENFORCED,
+  location_id INT64 REFERENCES scalar_graph.Locations(id) NOT ENFORCED)
+AS (SELECT 'Store 1' AS name, 101 AS location_id UNION ALL SELECT 'Store 2' AS name, 101 AS location_id);
+CREATE PROPERTY GRAPH scalar_graph.StoreGraph
+  NODE TABLES (scalar_graph.Stores AS S, scalar_graph.Locations AS L PROPERTIES (id, name, population))
+  EDGE TABLES (scalar_graph.Stores AS SL SOURCE KEY (location_id) REFERENCES L (id)
+    DESTINATION KEY (name) REFERENCES S (name));
+CREATE PROPERTY GRAPH scalar_graph.StoreLocations
+  NODE TABLES (scalar_graph.Stores AS S, scalar_graph.Locations AS L);
+CREATE PROPERTY GRAPH scalar_graph.LabeledStores
+  NODE TABLES (scalar_graph.Stores AS S LABEL Store);

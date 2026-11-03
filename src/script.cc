@@ -1022,7 +1022,16 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
     evaluator.ClearFailure();
     const absl::Status status = (*executor)->ExecuteNext();
     if (!status.ok()) {
-      const std::string message(status.message());
+      std::string message(status.message());
+      // As in a single statement's analysis, an error of the catalog's that the emulator does not
+      // support, such as EXTERNAL_QUERY's, is the statement's error, without its location.
+      if (const size_t nested = message.find("\nThe emulator does not support ");
+          nested != std::string::npos) {
+        message.erase(0, nested + 1);
+        if (const size_t at = message.rfind(" [at "); at != std::string::npos) {
+          message.resize(at);
+        }
+      }
       if (evaluator.failure().has_value() && !absl::IsUnimplemented(status)) {
         throw evaluator.failure()->WithMessage(message);
       }
