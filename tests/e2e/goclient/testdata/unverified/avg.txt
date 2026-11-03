@@ -1,0 +1,72 @@
+# AVG at the boundaries of its argument types
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+#
+# The documentation says AVG returns +/-Infinity or NaN for an infinite argument and fails on
+# numeric overflow, but not which of them, nor how it computes the mean. Inputs come from UNNEST
+# so that the analyzer cannot fold the expression into a constant.
+
+# Whether a FLOAT64 mean whose difference from the next value overflows fails, as GoogleSQL's
+# reference implementation does where its long double is a double, or averages to 0, as it does
+# with a wider long double.
+
+SELECT AVG(x) FROM UNNEST([CAST('-1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+?>
+
+SELECT AVG(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('-1.7976931348623157e308' AS FLOAT64)]) AS x
+?>
+
+# Whether a FLOAT64 sum that overflows, though no difference between values does, still
+# averages exactly.
+
+SELECT AVG(x) FROM UNNEST([CAST('1e308' AS FLOAT64), CAST('1e308' AS FLOAT64), CAST('1e308' AS FLOAT64)]) AS x
+?>
+
+# Which of Infinity and NaN infinities give. A running mean gives NaN for two infinities of the
+# same sign, which BigQuery answers for two positive ones, and for opposite signs.
+
+SELECT AVG(x) FROM UNNEST([CAST('-inf' AS FLOAT64), CAST('-inf' AS FLOAT64)]) AS x
+?>
+
+SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('-inf' AS FLOAT64)]) AS x
+?>
+
+# Whether one infinity among finite values gives Infinity. A running mean gives NaN where the
+# infinity comes first and Infinity where it comes last, so the answer may depend on the order.
+
+SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), 1]) AS x
+?>
+
+SELECT AVG(x) FROM UNNEST([1, CAST('inf' AS FLOAT64)]) AS x
+?>
+
+# Whether the mean of ordinary FLOAT64 values keeps the last digit that dividing their sum
+# gives, 0.20000000000000004 here, or the one a running mean gives.
+
+SELECT AVG(x) FROM UNNEST([0.1, 0.2, 0.3]) AS x
+?>
+
+# Whether a window, whose frames DuckDB combines from partial means, averages as an aggregate
+# does.
+
+SELECT AVG(x) OVER () FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x LIMIT 1
+?>
+
+SELECT AVG(x) OVER () FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x LIMIT 1
+?>
+
+# Whether the mean of INT64 values whose sum overflows INT64 keeps every digit a FLOAT64 can.
+
+SELECT AVG(x) FROM UNNEST([9223372036854775807, 9223372036854775807, 9223372036854775806]) AS x
+?>
+
+# How a NUMERIC mean beyond nine fractional digits rounds: half away from zero, as BIGNUMERIC's
+# does to 38 digits, or otherwise.
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0]) AS x
+?>
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '-0.000000001', 0]) AS x
+?>
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0, 0]) AS x
+?>
