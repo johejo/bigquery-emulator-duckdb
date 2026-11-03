@@ -132,6 +132,13 @@ std::string BigNumericSum(const std::string& sql, const std::vector<std::string>
   return "CAST(bq_bignumeric_sum(CAST(" + sql + " AS VARCHAR)) AS BIGNUM)";
 }
 
+// DuckDB's AVG of a DECIMAL passes through DOUBLE and its sum overflows, so
+// src/googlesql_functions_duckdb/math.cc averages the non-NULL values that list() collects.
+std::string NumericAvg(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                       const std::string& /*tail*/) {
+  return "bq_numeric_avg(" + sql + ")";
+}
+
 // A BIGNUMERIC aggregate that `kFunction`, of src/googlesql_functions_duckdb/bignumeric.cc,
 // computes as GoogleSQL does from the units of the non-NULL values that list() collects. A pair of
 // arguments is collected as the units of both joined by a comma, which is NULL where either is
@@ -400,6 +407,12 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
 
       Define("AVG",
              {
+                 {
+                     .function = "list",
+                     .type = googlesql::TYPE_NUMERIC,
+                     .skip_nulls = true,
+                     .finish = NumericAvg,
+                 },
                  BigNumericAggregate<kBigNumericAvg>(1),
                  IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
                  IntervalAggregate<kIntervalAvg>(),
