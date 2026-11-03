@@ -6,8 +6,11 @@
 #                                      ARRAY<@NAME>, and -ITEM removes one
 #   for $VAR in ITEM | ITEM... / end   repeats the lines in between with $VAR replaced by each type
 #   NAME(ARGS) -> RESULT               a signature; [, ARG] is optional, `literal TYPE` keeps the
-#                                      argument a literal, and TYPE = SAMPLE replaces its sample
+#                                      argument a literal, or inlines its type's sample as a
+#                                      constant, and TYPE = SAMPLE replaces its sample
 #   note NAME TEXT                     documents what the function's expansion leaves out
+#   over NAME (WINDOW)                 calls a window function over WINDOW, which can order by the
+#                                      INT64 column k
 #
 # A function's signatures keep the order in which these lines produce them.
 
@@ -582,3 +585,48 @@ ST_UNION_AGG(GEOGRAPHY) -> GEOGRAPHY
 ST_WITHIN(GEOGRAPHY, GEOGRAPHY) -> BOOL
 ST_X(GEOGRAPHY) -> FLOAT64
 ST_Y(GEOGRAPHY) -> FLOAT64
+
+# Window functions order by the column k, except the percentile functions, which take no ORDER BY.
+page navigation_functions
+for $T in @all
+  FIRST_VALUE($T) -> $T
+  LAST_VALUE($T) -> $T
+  NTH_VALUE($T, literal INT64 = 1) -> $T
+  LAG($T[, literal INT64 = 1[, literal $T]]) -> $T
+  LEAD($T[, literal INT64 = 1[, literal $T]]) -> $T
+end
+over FIRST_VALUE (ORDER BY k)
+over LAST_VALUE (ORDER BY k)
+over NTH_VALUE (ORDER BY k)
+over LAG (ORDER BY k)
+over LEAD (ORDER BY k)
+PERCENTILE_CONT(NUMERIC, literal NUMERIC = NUMERIC '0.5') -> NUMERIC
+PERCENTILE_CONT(NUMERIC, literal BIGNUMERIC = BIGNUMERIC '0.5') -> BIGNUMERIC
+PERCENTILE_CONT(NUMERIC, literal FLOAT64 = 0.5) -> FLOAT64
+PERCENTILE_CONT(BIGNUMERIC, literal NUMERIC = NUMERIC '0.5') -> BIGNUMERIC
+PERCENTILE_CONT(BIGNUMERIC, literal BIGNUMERIC = BIGNUMERIC '0.5') -> BIGNUMERIC
+PERCENTILE_CONT(BIGNUMERIC, literal FLOAT64 = 0.5) -> FLOAT64
+PERCENTILE_CONT(FLOAT64, literal NUMERIC = NUMERIC '0.5') -> FLOAT64
+PERCENTILE_CONT(FLOAT64, literal BIGNUMERIC = BIGNUMERIC '0.5') -> FLOAT64
+PERCENTILE_CONT(FLOAT64, literal FLOAT64 = 0.5) -> FLOAT64
+for $T in @orderable
+  PERCENTILE_DISC($T, literal NUMERIC = NUMERIC '0.5') -> $T
+  PERCENTILE_DISC($T, literal BIGNUMERIC = BIGNUMERIC '0.5') -> $T
+  PERCENTILE_DISC($T, literal FLOAT64 = 0.5) -> $T
+end
+over PERCENTILE_CONT ()
+over PERCENTILE_DISC ()
+
+page numbering_functions
+CUME_DIST() -> FLOAT64
+DENSE_RANK() -> INT64
+NTILE(literal INT64 = 2) -> INT64
+PERCENT_RANK() -> FLOAT64
+RANK() -> INT64
+ROW_NUMBER() -> INT64
+over CUME_DIST (ORDER BY k)
+over DENSE_RANK (ORDER BY k)
+over NTILE (ORDER BY k)
+over PERCENT_RANK (ORDER BY k)
+over RANK (ORDER BY k)
+over ROW_NUMBER (ORDER BY k)

@@ -20,6 +20,18 @@ func TestQueryBindsTypes(t *testing.T) {
 	}
 }
 
+func TestWindowCallInlinesConstants(t *testing.T) {
+	f := Function{Name: "LAG", Over: "(ORDER BY k)"}
+	sql, reason := Query(f, Signature{Arguments: []string{"DATE", "INT64", "DATE"}, Result: "DATE", Samples: []string{"", "1", ""}, LiteralArguments: []int{1, 2}})
+	want := "SELECT LAG(a0, 1, CAST('2024-01-15' AS DATE)) OVER (ORDER BY k) AS result FROM (SELECT CAST('2024-01-15' AS DATE) AS a0, CAST(1 AS INT64) AS k)"
+	if reason != "" || sql != want {
+		t.Fatalf("sql=%q reason=%q", sql, reason)
+	}
+	if sql, _ := Query(Function{Name: "RANK", Over: "(ORDER BY k)"}, Signature{Arguments: []string{}, Result: "INT64"}); sql != "SELECT RANK() OVER (ORDER BY k) AS result FROM (SELECT CAST(1 AS INT64) AS k)" {
+		t.Fatalf("sql=%q", sql)
+	}
+}
+
 func TestMissingSampleDoesNotDropForm(t *testing.T) {
 	sql, reason := Query(Function{Name: "F"}, Signature{Arguments: []string{"ARRAY<NO_SAMPLE>"}, Result: "DATE"})
 	if sql != "" || reason != "no sample for ARRAY<NO_SAMPLE>" {
@@ -33,7 +45,8 @@ func TestReadRejectsInvalidCatalog(t *testing.T) {
 		`{"functions":[]} {}`,
 		`{"functions":[{"name":"F","source":"https://example.com","signatures":[{"arguments":["INT64"],"result":"INT64"}]}]}`,
 		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[]}]}`,
-		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[{"arguments":["INT64"],"result":"INT64","literal_arguments":[0]}]}]}`,
+		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[{"arguments":["INT64"],"result":"INT64","literal_arguments":[1]}]}]}`,
+		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","over":"ORDER BY k","signatures":[{"arguments":["INT64"],"result":"INT64"}]}]}`,
 		`{"functions":[{"name":"F","source":"third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md","signatures":[{"arguments":["INT64"],"result":"INT64"},{"arguments":["INT64"],"result":"FLOAT64"}]}]}`,
 	} {
 		path := filepath.Join(t.TempDir(), "catalog.json")
