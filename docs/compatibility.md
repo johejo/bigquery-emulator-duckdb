@@ -476,6 +476,10 @@ Graph DDL rejects:
 - Views as element tables and graph options.
 - Edges whose endpoint nodes do not exist when the graph is created.
 
+`GRAPH_EXPAND` rejects arguments that are not literals, `flatten_results => FALSE`, node tables
+related to more than one node table, and edge tables that are not inlined into a node table
+because they have rows or properties of their own.
+
 `GRAPH_TABLE` and GQL queries reject:
 
 - Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.

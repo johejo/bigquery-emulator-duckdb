@@ -50,6 +50,7 @@ void AddBigQueryFunctionDeclarations(googlesql::SimpleCatalog& catalog) {
   AddTextAnalysisFunctions(catalog);
   AddObjectRefFunctions(catalog);
   AddRangeSessionize(catalog);
+  AddGraphExpand(catalog);
 }
 
 }  // namespace bigquery_emulator_duckdb::analyzer_functions
