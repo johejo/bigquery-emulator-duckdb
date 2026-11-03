@@ -6,6 +6,12 @@
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
 
+# Observed BigQuery answer recorded with tools/bqanswers: as a window function, AVG of two
+# infinities is Infinity, though the aggregate gives NaN (aggregates.txt). Which mean BigQuery's
+# windows compute is unknown; bq_avg_double gives NaN for both.
+SELECT AVG(x) OVER () FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x LIMIT 1
+!> "Infinity"
+
 # BigQuery fails for an extremely large epsilon such as 1e308, though 1e300 runs
 # (differential_privacy.txt).
 # third_party/bigquery_docs/reference/standard-sql/query-syntax.md

@@ -352,3 +352,38 @@ SELECT AVG(x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
 
 SELECT AVG(DISTINCT x) FROM UNNEST([1.0, 1, 4]) AS x
 => "2.5"
+
+# Observed BigQuery answers recorded with tools/bqanswers. A FLOAT64 mean moves by each value's
+# difference from it: the difference between the maximum and its negation overflows, a sum that
+# overflows does not, an infinity gives NaN where a later value is subtracted from it, and three
+# ordinary values average to 0.2, where dividing their sum gives 0.20000000000000004.
+SELECT AVG(x) FROM UNNEST([CAST('-1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: Error in AVERAGE aggregation: floating point overflow
+
+SELECT AVG(x) FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('-1.7976931348623157e308' AS FLOAT64)]) AS x
+=> error contains: Error in AVERAGE aggregation: floating point overflow
+
+SELECT AVG(x) FROM UNNEST([CAST('1e308' AS FLOAT64), CAST('1e308' AS FLOAT64), CAST('1e308' AS FLOAT64)]) AS x
+=> "1.0E308"
+
+SELECT AVG(x) FROM UNNEST([CAST('-inf' AS FLOAT64), CAST('-inf' AS FLOAT64)]) AS x
+=> "NaN"
+
+SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('-inf' AS FLOAT64)]) AS x
+=> "NaN"
+
+SELECT AVG(x) FROM UNNEST([CAST('inf' AS FLOAT64), 1]) AS x
+=> "NaN"
+
+SELECT AVG(x) FROM UNNEST([1, CAST('inf' AS FLOAT64)]) AS x
+=> "Infinity"
+
+SELECT AVG(x) FROM UNNEST([0.1, 0.2, 0.3]) AS x
+=> "0.2"
+
+SELECT AVG(x) OVER () FROM UNNEST([CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)]) AS x LIMIT 1
+=> "1.7976931348623157E308"
+
+# Observed BigQuery answer recorded with tools/bqanswers: an INT64 mean whose sum overflows INT64.
+SELECT AVG(x) FROM UNNEST([9223372036854775807, 9223372036854775807, 9223372036854775806]) AS x
+=> "9.223372036854776E18"
