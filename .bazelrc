@@ -50,6 +50,10 @@ build:macos --features=-parse_headers
 # CPython's cached native-code conversion needs a newer LLVM bitcode reader than Apple's.
 build:macos --linkopt=-fuse-ld=lld
 build:macos --host_linkopt=-fuse-ld=lld
+# apple_support's beta layering check builds its system module map from DEVELOPER_DIR, which
+# misses the SDK headers when SDKROOT comes from another Xcode installation. It checks only exec
+# tools on macOS; this repository's targets keep rules_cc's layering check.
+common:macos --repo_env=APPLE_SUPPORT_LAYERING_CHECK_BETA=0
 
 # clang-tidy uses the build's C++ toolchain and target parsing settings; see tools/clang_tidy/.
 build:clang-tidy --aspects=//tools/clang_tidy:clang_tidy.bzl%clang_tidy
