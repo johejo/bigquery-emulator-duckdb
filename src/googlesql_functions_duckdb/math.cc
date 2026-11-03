@@ -376,6 +376,9 @@ template <typename Float>
 struct Sum {
   Float sum;
   bool any;
+  // An overflow fails only in FinalizeSums: a DISTINCT window, such as SUM(DISTINCT x) OVER (),
+  // hangs where an earlier callback sets the error.
+  bool overflow;
 };
 
 template <typename Float>
@@ -390,44 +393,39 @@ idx_t SumSize(duckdb_function_info /*info*/) {
 
 template <typename Float>
 void InitSum(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
-  SumState<Float>(state) = {.sum = 0, .any = false};
+  SumState<Float>(state) = {.sum = 0, .any = false, .overflow = false};
 }
 
 template <typename Float>
-bool AddToSum(duckdb_function_info info, Sum<Float>& state, Float value) {
+void AddToSum(Sum<Float>& state, Float value) {
   absl::Status error;
-  if (!fn::Add(state.sum, value, &state.sum, &error)) {
-    duckdb_aggregate_function_set_error(info, kSumOverflow);
-    return false;
-  }
+  state.overflow = state.overflow || !fn::Add(state.sum, value, &state.sum, &error);
   state.any = true;
-  return true;
 }
 
 template <typename Float>
-void UpdateSums(duckdb_function_info info, duckdb_data_chunk input,
+void UpdateSums(duckdb_function_info /*info*/, duckdb_data_chunk input,
                 duckdb_aggregate_state* states) {
   for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
     const Arguments arguments(input, row);
-    if (arguments.IsNull(0)) {
-      continue;
-    }
-    if (!AddToSum<Float>(info, SumState<Float>(states[row]), arguments.Double(0))) {
-      return;
+    if (!arguments.IsNull(0)) {
+      AddToSum<Float>(SumState<Float>(states[row]), arguments.Double(0));
     }
   }
 }
 
 template <typename Float>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DuckDB's callback.
-void CombineSums(duckdb_function_info info, duckdb_aggregate_state* source,
+void CombineSums(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
                  duckdb_aggregate_state* target, idx_t count) {
   for (idx_t i = 0; i < count; ++i) {
     // DuckDB may combine a window's states again, so the source stays as it is.
     const Sum<Float>& from = SumState<Float>(source[i]);
-    if (from.any && !AddToSum<Float>(info, SumState<Float>(target[i]), from.sum)) {
-      return;
+    Sum<Float>& to = SumState<Float>(target[i]);
+    if (from.any) {
+      AddToSum<Float>(to, from.sum);
     }
+    to.overflow = to.overflow || from.overflow;
   }
 }
 
@@ -440,7 +438,8 @@ void FinalizeSums(duckdb_function_info info, duckdb_aggregate_state* source, duc
   duckdb_vector_ensure_validity_writable(result);
   for (idx_t i = 0; i < count; ++i) {
     const Sum<Float>& state = SumState<Float>(source[i]);
-    if (std::isfinite(state.sum) && std::abs(state.sum) > std::numeric_limits<double>::max()) {
+    if (state.overflow ||
+        (std::isfinite(state.sum) && std::abs(state.sum) > std::numeric_limits<double>::max())) {
       duckdb_aggregate_function_set_error(info, kSumOverflow);
       return;
     }

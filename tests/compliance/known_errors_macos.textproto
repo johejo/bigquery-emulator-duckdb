@@ -16,3 +16,9 @@ known_errors {
   label: "stat_aggregation_test:var_pop_double_extreme_inf"
   label: "stat_aggregation_test:var_samp_double_extreme_inf"
 }
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "GoogleSQL's reference implementation sums FLOAT64 exactly, which the emulator's long double sum holds only where a long double is wider than a double, so a partial sum's overflow fails on macOS"
+  label: "analytic_sum_test:analytic_sum_double_overflow_3"
+}
