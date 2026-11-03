@@ -57,6 +57,10 @@ documentation:
   [text analysis](../third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md)
   and [security functions](../third_party/bigquery_docs/reference/standard-sql/security_functions.md):
   the bucket functions, TEXT_ANALYZE, BAG_OF_WORDS and SESSION_USER.
+- [Navigation](../third_party/bigquery_docs/reference/standard-sql/navigation_functions.md) and
+  [numbering functions](../third_party/bigquery_docs/reference/standard-sql/numbering_functions.md):
+  values of every type with constant offsets and defaults, and percentile types, each over a
+  one-row window that all but the percentile functions order by an INT64 column.
 
 Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
 Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
@@ -66,9 +70,10 @@ exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
 could select another overload. Syntax-like options such as rounding modes, SPLIT delimiters,
-JSONPaths, `INTERVAL` steps, date parts, key types, `use_spheroid` and the constant sketch
-precisions, quantile counts and phi values remain literals; `DATE_PART` names a date part
-keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
+JSONPaths, `INTERVAL` steps, date parts, key types, `use_spheroid`, the constant sketch
+precisions, quantile counts and phi values, and window offsets, percentiles and bucket counts
+remain literals, and LAG and LEAD defaults inline their samples as constant expressions;
+`DATE_PART` names a date part keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
 documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
 valid sample, not every possible argument value. Rounding-mode calls use `ROUND_HALF_EVEN`.
@@ -82,7 +87,7 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **348 of 407 functions**. The remaining **59** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **361 of 407 functions**. The remaining **46** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Details by domain
 
@@ -102,7 +107,9 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 - [json](function-types/json.md)
 - [kll](function-types/kll.md)
 - [mathematical](function-types/mathematical.md)
+- [navigation](function-types/navigation.md)
 - [net](function-types/net.md)
+- [numbering](function-types/numbering.md)
 - [range](function-types/range.md)
 - [security](function-types/security.md)
 - [statistical-aggregate](function-types/statistical-aggregate.md)
@@ -181,7 +188,7 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | [COVAR_SAMP](function-types/statistical-aggregate.md#covar_samp) | 16 | Supported |
 | [CSC](function-types/mathematical.md#csc) | 4 | Supported |
 | [CSCH](function-types/mathematical.md#csch) | 4 | Supported |
-| `CUME_DIST` | 0 | Not enumerated |
+| [CUME_DIST](function-types/numbering.md#cume_dist) | 1 | Supported |
 | [CURRENT_DATE](function-types/date.md#current_date) | 2 | Supported |
 | [CURRENT_DATETIME](function-types/datetime.md#current_datetime) | 2 | Supported |
 | [CURRENT_TIME](function-types/time.md#current_time) | 2 | Supported |
@@ -199,7 +206,7 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | [DATE_FROM_UNIX_DATE](function-types/date.md#date_from_unix_date) | 1 | Supported |
 | [DATE_SUB](function-types/date.md#date_sub) | 1 | Supported |
 | [DATE_TRUNC](function-types/date.md#date_trunc) | 4 | Supported |
-| `DENSE_RANK` | 0 | Not enumerated |
+| [DENSE_RANK](function-types/numbering.md#dense_rank) | 1 | Supported |
 | `DESTINATION_NODE_ID` | 0 | Not enumerated |
 | [DETERMINISTIC_DECRYPT_BYTES](function-types/aead-encryption.md#deterministic_decrypt_bytes) | 1 | Supported |
 | [DETERMINISTIC_DECRYPT_STRING](function-types/aead-encryption.md#deterministic_decrypt_string) | 1 | Supported |
@@ -219,7 +226,7 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | `EXTERNAL_QUERY` | 0 | Not enumerated |
 | `EXTRACT` | 0 | Not enumerated |
 | [FARM_FINGERPRINT](function-types/hash.md#farm_fingerprint) | 2 | Supported |
-| `FIRST_VALUE` | 0 | Not enumerated |
+| [FIRST_VALUE](function-types/navigation.md#first_value) | 40 | Supported |
 | [FLOAT64](function-types/json.md#float64) | 1 | Supported |
 | [FLOOR](function-types/mathematical.md#floor) | 4 | Supported |
 | `FORMAT` | 0 | Not enumerated |
@@ -296,14 +303,14 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | [KLL_QUANTILES.MERGE_POINT_FLOAT64](function-types/kll.md#kll_quantilesmerge_point_float64) | 1 | Supported |
 | [KLL_QUANTILES.MERGE_POINT_INT64](function-types/kll.md#kll_quantilesmerge_point_int64) | 1 | Supported |
 | `LABELS` | 0 | Not enumerated |
-| `LAG` | 0 | Not enumerated |
+| [LAG](function-types/navigation.md#lag) | 120 | Supported |
 | [LAST_DAY](function-types/date.md#last_day) | 2 | Supported |
-| `LAST_VALUE` | 0 | Not enumerated |
+| [LAST_VALUE](function-types/navigation.md#last_value) | 40 | Supported |
 | [LAX_BOOL](function-types/json.md#lax_bool) | 1 | Supported |
 | [LAX_FLOAT64](function-types/json.md#lax_float64) | 1 | Supported |
 | [LAX_INT64](function-types/json.md#lax_int64) | 1 | Supported |
 | [LAX_STRING](function-types/json.md#lax_string) | 1 | Supported |
-| `LEAD` | 0 | Not enumerated |
+| [LEAD](function-types/navigation.md#lead) | 120 | Supported |
 | [LEAST](function-types/mathematical.md#least) | 30 | Broken |
 | [LEFT](function-types/string.md#left) | 2 | Supported |
 | [LENGTH](function-types/string.md#length) | 2 | Supported |
@@ -335,8 +342,8 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | `NODES` | 0 | Not enumerated |
 | [NORMALIZE](function-types/string.md#normalize) | 1 | Supported |
 | [NORMALIZE_AND_CASEFOLD](function-types/string.md#normalize_and_casefold) | 1 | Supported |
-| `NTH_VALUE` | 0 | Not enumerated |
-| `NTILE` | 0 | Not enumerated |
+| [NTH_VALUE](function-types/navigation.md#nth_value) | 40 | Supported |
+| [NTILE](function-types/numbering.md#ntile) | 1 | Supported |
 | [NULLIF](function-types/conditional.md#nullif) | 16 | Supported |
 | `OBJ.FETCH_METADATA` | 0 | Not enumerated |
 | `OBJ.GET_ACCESS_URL` | 0 | Not enumerated |
@@ -354,9 +361,9 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | `PATH_FIRST` | 0 | Not enumerated |
 | `PATH_LAST` | 0 | Not enumerated |
 | `PATH_LENGTH` | 0 | Not enumerated |
-| `PERCENTILE_CONT` | 0 | Not enumerated |
-| `PERCENTILE_DISC` | 0 | Not enumerated |
-| `PERCENT_RANK` | 0 | Not enumerated |
+| [PERCENTILE_CONT](function-types/navigation.md#percentile_cont) | 9 | Supported |
+| [PERCENTILE_DISC](function-types/navigation.md#percentile_disc) | 45 | Partial |
+| [PERCENT_RANK](function-types/numbering.md#percent_rank) | 1 | Supported |
 | [POW](function-types/mathematical.md#pow) | 16 | Supported |
 | [POWER](function-types/mathematical.md#power) | 16 | Supported |
 | [RAND](function-types/mathematical.md#rand) | 1 | Supported |
@@ -368,7 +375,7 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | [RANGE_OVERLAPS](function-types/range.md#range_overlaps) | 3 | Supported |
 | `RANGE_SESSIONIZE` | 0 | Not enumerated |
 | [RANGE_START](function-types/range.md#range_start) | 3 | Supported |
-| `RANK` | 0 | Not enumerated |
+| [RANK](function-types/numbering.md#rank) | 1 | Supported |
 | [REGEXP_CONTAINS](function-types/string.md#regexp_contains) | 2 | Supported |
 | [REGEXP_EXTRACT](function-types/string.md#regexp_extract) | 6 | Supported |
 | [REGEXP_EXTRACT_ALL](function-types/string.md#regexp_extract_all) | 2 | Supported |
@@ -380,7 +387,7 @@ Type signatures are enumerated for **348 of 407 functions**. The remaining **59*
 | [REVERSE](function-types/string.md#reverse) | 2 | Supported |
 | [RIGHT](function-types/string.md#right) | 2 | Supported |
 | [ROUND](function-types/mathematical.md#round) | 10 | Supported |
-| `ROW_NUMBER` | 0 | Not enumerated |
+| [ROW_NUMBER](function-types/numbering.md#row_number) | 1 | Supported |
 | [RPAD](function-types/string.md#rpad) | 4 | Supported |
 | [RTRIM](function-types/string.md#rtrim) | 3 | Supported |
 | [S2_CELLIDFROMPOINT](function-types/geography.md#s2_cellidfrompoint) | 2 | Supported |

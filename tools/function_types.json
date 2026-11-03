@@ -4420,6 +4420,17 @@
       ]
     },
     {
+      "name": "CUME_DIST",
+      "source": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "FLOAT64"
+        }
+      ]
+    },
+    {
       "name": "CURRENT_DATE",
       "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
       "signatures": [
@@ -4925,6 +4936,17 @@
       ]
     },
     {
+      "name": "DENSE_RANK",
+      "source": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
       "name": "DETERMINISTIC_DECRYPT_BYTES",
       "source": "third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md",
       "note": "Serialized keysets are enumerated; keyset chains need Cloud KMS and are not enumerated.",
@@ -5179,6 +5201,253 @@
             "BYTES"
           ],
           "result": "INT64"
+        }
+      ]
+    },
+    {
+      "name": "FIRST_VALUE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "ARRAY\u003cTIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
         }
       ]
     },
@@ -10237,6 +10506,1493 @@
       ]
     },
     {
+      "name": "LAG",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64",
+            "BOOL"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64",
+            "DATE"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64",
+            "DATETIME"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64",
+            "TIME"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64",
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64",
+            "INTERVAL"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64",
+            "JSON"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64",
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "ARRAY\u003cTIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "ARRAY\u003cTIME\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64",
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        }
+      ]
+    },
+    {
       "name": "LAST_DAY",
       "source": "third_party/bigquery_docs/reference/standard-sql/date_functions.md",
       "note": "The DATETIME form, documented with the datetime functions, is not yet enumerated.",
@@ -10260,6 +12016,253 @@
           "literal_arguments": [
             1
           ]
+        }
+      ]
+    },
+    {
+      "name": "LAST_VALUE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "ARRAY\u003cTIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
         }
       ]
     },
@@ -10308,6 +12311,1493 @@
             "JSON"
           ],
           "result": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "LEAD",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64"
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INT64",
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC"
+          ],
+          "result": "NUMERIC"
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC"
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64"
+          ],
+          "result": "FLOAT64"
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL"
+          ],
+          "result": "BOOL"
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64",
+            "BOOL"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRING"
+          ],
+          "result": "STRING"
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64",
+            "STRING"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES"
+          ],
+          "result": "BYTES"
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64",
+            "BYTES"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATE"
+          ],
+          "result": "DATE"
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64",
+            "DATE"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME"
+          ],
+          "result": "DATETIME"
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64",
+            "DATETIME"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIME"
+          ],
+          "result": "TIME"
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64",
+            "TIME"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP"
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64",
+            "TIMESTAMP"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL"
+          ],
+          "result": "INTERVAL"
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64",
+            "INTERVAL"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY"
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64",
+            "GEOGRAPHY"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "JSON"
+          ],
+          "result": "JSON"
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64",
+            "JSON"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64",
+            "RANGE\u003cDATE\u003e"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64",
+            "RANGE\u003cDATETIME\u003e"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64",
+            "RANGE\u003cTIMESTAMP\u003e"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64",
+            "STRUCT\u003cx INT64, label STRING\u003e"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64",
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64",
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "ARRAY\u003cINT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64",
+            "ARRAY\u003cINT64\u003e"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64",
+            "ARRAY\u003cNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64",
+            "ARRAY\u003cBIGNUMERIC\u003e"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64",
+            "ARRAY\u003cFLOAT64\u003e"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64",
+            "ARRAY\u003cBOOL\u003e"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64",
+            "ARRAY\u003cSTRING\u003e"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64",
+            "ARRAY\u003cBYTES\u003e"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "ARRAY\u003cDATE\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64",
+            "ARRAY\u003cDATE\u003e"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64",
+            "ARRAY\u003cDATETIME\u003e"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "ARRAY\u003cTIME\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64",
+            "ARRAY\u003cTIME\u003e"
+          ],
+          "result": "ARRAY\u003cTIME\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64",
+            "ARRAY\u003cTIMESTAMP\u003e"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64",
+            "ARRAY\u003cINTERVAL\u003e"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64",
+            "ARRAY\u003cGEOGRAPHY\u003e"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "ARRAY\u003cJSON\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64",
+            "ARRAY\u003cJSON\u003e"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64",
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1",
+            ""
+          ],
+          "literal_arguments": [
+            1,
+            2
+          ]
         }
       ]
     },
@@ -12144,6 +15634,592 @@
       ]
     },
     {
+      "name": "NTH_VALUE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "INT64"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "INT64"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "INT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "INT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "INT64"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "INT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "INT64"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "INT64"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "INT64"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "INT64"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "INT64"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "INT64"
+          ],
+          "result": "GEOGRAPHY",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "INT64"
+          ],
+          "result": "JSON",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cx INT64, label STRING\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINT64\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cNUMERIC\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBIGNUMERIC\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cFLOAT64\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBOOL\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRING\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cBYTES\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATE\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIME\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cINTERVAL\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cGEOGRAPHY\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cJSON\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "INT64"
+          ],
+          "result": "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+          "samples": [
+            "",
+            "1"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NTILE",
+      "source": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "2"
+          ],
+          "literal_arguments": [
+            0
+          ]
+        }
+      ]
+    },
+    {
       "name": "NULLIF",
       "source": "third_party/bigquery_docs/reference/standard-sql/conditional_expressions.md",
       "note": "Same-type comparable inputs are enumerated, except INTERVAL, which BigQuery rejects; mixed-type supertype combinations are not yet enumerated.",
@@ -12404,6 +16480,787 @@
             "'2024-01-15 10:20:30'",
             "'America/Los_Angeles'"
           ]
+        }
+      ]
+    },
+    {
+      "name": "PERCENTILE_CONT",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "()",
+      "signatures": [
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "NUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PERCENTILE_DISC",
+      "source": "third_party/bigquery_docs/reference/standard-sql/navigation_functions.md",
+      "over": "()",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "NUMERIC"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INT64",
+            "BIGNUMERIC"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INT64",
+            "FLOAT64"
+          ],
+          "result": "INT64",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "NUMERIC"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "FLOAT64"
+          ],
+          "result": "NUMERIC",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "NUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "BIGNUMERIC"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "FLOAT64"
+          ],
+          "result": "BIGNUMERIC",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "NUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "BIGNUMERIC"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "FLOAT64"
+          ],
+          "result": "FLOAT64",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "NUMERIC"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "BIGNUMERIC"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "FLOAT64"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "NUMERIC"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "BIGNUMERIC"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "FLOAT64"
+          ],
+          "result": "STRING",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "NUMERIC"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "BIGNUMERIC"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "FLOAT64"
+          ],
+          "result": "BYTES",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "NUMERIC"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "BIGNUMERIC"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "FLOAT64"
+          ],
+          "result": "DATE",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "NUMERIC"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "BIGNUMERIC"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "FLOAT64"
+          ],
+          "result": "DATETIME",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "NUMERIC"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "BIGNUMERIC"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "FLOAT64"
+          ],
+          "result": "TIME",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "NUMERIC"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "BIGNUMERIC"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "FLOAT64"
+          ],
+          "result": "TIMESTAMP",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "NUMERIC"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "BIGNUMERIC"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "FLOAT64"
+          ],
+          "result": "INTERVAL",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "NUMERIC"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "BIGNUMERIC"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "FLOAT64"
+          ],
+          "result": "RANGE\u003cDATE\u003e",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "NUMERIC"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "BIGNUMERIC"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "FLOAT64"
+          ],
+          "result": "RANGE\u003cDATETIME\u003e",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "NUMERIC"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "NUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "BIGNUMERIC"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "BIGNUMERIC '0.5'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "FLOAT64"
+          ],
+          "result": "RANGE\u003cTIMESTAMP\u003e",
+          "samples": [
+            "",
+            "0.5"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PERCENT_RANK",
+      "source": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "FLOAT64"
         }
       ]
     },
@@ -12934,6 +17791,17 @@
       ]
     },
     {
+      "name": "RANK",
+      "source": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "INT64"
+        }
+      ]
+    },
+    {
       "name": "REGEXP_CONTAINS",
       "source": "third_party/bigquery_docs/reference/standard-sql/string_functions.md",
       "signatures": [
@@ -13358,6 +18226,17 @@
             "INT64"
           ],
           "result": "FLOAT64"
+        }
+      ]
+    },
+    {
+      "name": "ROW_NUMBER",
+      "source": "third_party/bigquery_docs/reference/standard-sql/numbering_functions.md",
+      "over": "(ORDER BY k)",
+      "signatures": [
+        {
+          "arguments": [],
+          "result": "INT64"
         }
       ]
     },

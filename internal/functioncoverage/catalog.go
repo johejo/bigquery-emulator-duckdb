@@ -17,14 +17,18 @@ type Signature struct {
 	Result    string   `json:"result"`
 	// Samples overrides arguments whose valid values depend on the function, not just the type.
 	Samples []string `json:"samples,omitempty"`
-	// LiteralArguments names syntax-like options that must stay literals (such as rounding_mode).
+	// LiteralArguments names syntax-like options that must stay literals (such as rounding_mode),
+	// and arguments that must be constant expressions; one without a sample uses its type's.
 	LiteralArguments []int `json:"literal_arguments,omitempty"`
 }
 
 type Function struct {
-	Name       string      `json:"name"`
-	Source     string      `json:"source"`
-	Note       string      `json:"note,omitempty"`
+	Name   string `json:"name"`
+	Source string `json:"source"`
+	Note   string `json:"note,omitempty"`
+	// Over is the parenthesized window of a window function call, which can order by the INT64
+	// column k.
+	Over       string      `json:"over,omitempty"`
 	Signatures []Signature `json:"signatures"`
 }
 
@@ -61,6 +65,9 @@ func (c Catalog) Validate() error {
 		if !strings.HasPrefix(f.Source, "third_party/bigquery_docs/") || strings.Contains(f.Source, "..") || !strings.HasSuffix(f.Source, ".md") {
 			return fmt.Errorf("%s: invalid source %q", f.Name, f.Source)
 		}
+		if f.Over != "" && (!strings.HasPrefix(f.Over, "(") || !strings.HasSuffix(f.Over, ")") || strings.ContainsAny(f.Over, ";\n")) {
+			return fmt.Errorf("%s: invalid window %q", f.Name, f.Over)
+		}
 		if len(f.Signatures) == 0 {
 			return fmt.Errorf("%s: no signatures", f.Name)
 		}
@@ -75,8 +82,8 @@ func (c Catalog) Validate() error {
 				return fmt.Errorf("%s: samples must match argument count", f.Name)
 			}
 			for _, i := range s.LiteralArguments {
-				if i < 0 || i >= len(s.Samples) || s.Samples[i] == "" {
-					return fmt.Errorf("%s: literal argument %d needs a sample", f.Name, i)
+				if i < 0 || i >= len(s.Arguments) {
+					return fmt.Errorf("%s: invalid literal argument %d", f.Name, i)
 				}
 			}
 			for _, t := range append(slices.Clone(s.Arguments), s.Result) {
@@ -115,8 +122,9 @@ func Sample(t string) (string, bool) {
 }
 
 // Query binds data arguments as columns so literal coercion cannot change their input types.
-// Syntax-like options explicitly listed in LiteralArguments remain literals. Query returns a
-// reason instead of SQL when a sample is missing. This is not a result-value test.
+// Syntax-like options explicitly listed in LiteralArguments remain literals, and other
+// arguments listed there are inlined as their type's sample. Query returns a reason instead of
+// SQL when a sample is missing. This is not a result-value test.
 func Query(f Function, s Signature) (sql, reason string) {
 	var columns, args []string
 	for i, t := range s.Arguments {
@@ -128,14 +136,22 @@ func Query(f Function, s Signature) (sql, reason string) {
 			return "", "no sample for " + t
 		}
 		if slices.Contains(s.LiteralArguments, i) {
-			args = append(args, s.Samples[i])
+			if len(s.Samples) > i && s.Samples[i] != "" {
+				sample = s.Samples[i]
+			}
+			args = append(args, sample)
 			continue
 		}
 		name := fmt.Sprintf("a%d", i)
 		columns = append(columns, sample+" AS "+name)
 		args = append(args, name)
 	}
-	sql = "SELECT " + f.Name + "(" + strings.Join(args, ", ") + ") AS result"
+	sql = "SELECT " + f.Name + "(" + strings.Join(args, ", ") + ")"
+	if f.Over != "" {
+		sql += " OVER " + f.Over
+		columns = append(columns, "CAST(1 AS INT64) AS k")
+	}
+	sql += " AS result"
 	if len(columns) > 0 {
 		sql += " FROM (SELECT " + strings.Join(columns, ", ") + ")"
 	}

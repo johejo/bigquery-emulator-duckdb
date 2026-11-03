@@ -188,10 +188,13 @@ func TestSyntaxArity(t *testing.T) {
 		{"STRING_AGG(\n  [ DISTINCT ]\n  expression [, delimiter]\n  [ WHERE where_expression ]\n  [ ORDER BY key [ { ASC | DESC } ] [, ... ] ]\n  [ LIMIT n ]\n)\n[ OVER over_clause ]", arity{1, 2}},
 		{"ARRAY_AGG(\n  [ DISTINCT ]\n  expression\n  [ { IGNORE | RESPECT } NULLS ]\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{1, 1}},
 		{"CORR(\n  X1, X2\n  [ WHERE where_expression ]\n)\n[ OVER over_clause ]", arity{2, 2}},
+		{"NTH_VALUE (value_expression, constant_integer_expression [{RESPECT | IGNORE} NULLS])\nOVER over_clause", arity{2, 2}},
+		{"LAG (value_expression[, offset [, default_expression]])\nOVER over_clause", arity{1, 3}},
 		{"ANY_VALUE(\n  expression\n  [ HAVING { MAX | MIN } having_expression ]\n)", arity{1, 1}},
 		{"JSON_SET(\n  json_expr,\n  json_path_value_pair[, ...]\n  [, create_if_missing => { TRUE | FALSE } ]\n)", arity{3, -1}},
 	} {
 		name, _, _ := strings.Cut(c.syntax, "(")
+		name = strings.TrimSpace(name)
 		got, err := syntaxArities("```\n"+c.syntax+"\n```\n", name)
 		if err != nil || len(got) != 1 || got[0] != c.want {
 			t.Errorf("%s: got %v, %v; want %v", name, got, err, c.want)

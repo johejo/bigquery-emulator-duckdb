@@ -57,6 +57,10 @@ documentation:
   [text analysis](../third_party/bigquery_docs/reference/standard-sql/text-analysis-functions.md)
   and [security functions](../third_party/bigquery_docs/reference/standard-sql/security_functions.md):
   the bucket functions, TEXT_ANALYZE, BAG_OF_WORDS and SESSION_USER.
+- [Navigation](../third_party/bigquery_docs/reference/standard-sql/navigation_functions.md) and
+  [numbering functions](../third_party/bigquery_docs/reference/standard-sql/numbering_functions.md):
+  values of every type with constant offsets and defaults, and percentile types, each over a
+  one-row window that all but the percentile functions order by an INT64 column.
 
 Generic domains follow the [data type definitions and properties](../third_party/bigquery_docs/reference/standard-sql/data-types.md).
 Nested ARRAY/STRUCT shapes and variadic arities are representative, not exhaustive; graph and
@@ -66,9 +70,10 @@ exhaustive BigQuery type coverage.
 
 Each data argument is bound as an explicitly typed column, rather than a literal whose coercion
 could select another overload. Syntax-like options such as rounding modes, SPLIT delimiters,
-JSONPaths, `INTERVAL` steps, date parts, key types, `use_spheroid` and the constant sketch
-precisions, quantile counts and phi values remain literals; `DATE_PART` names a date part
-keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
+JSONPaths, `INTERVAL` steps, date parts, key types, `use_spheroid`, the constant sketch
+precisions, quantile counts and phi values, and window offsets, percentiles and bucket counts
+remain literals, and LAG and LEAD defaults inline their samples as constant expressions;
+`DATE_PART` names a date part keyword, which has no type. A **Supported** row means the call runs and its REST result type matches the
 documented return type, including nested field names, field types, array modes and range elements. It does not establish result-value, NULL, error, boundary, or
 short-circuit compatibility; those are checked by end-to-end tests. Each form uses a representative
 valid sample, not every possible argument value. Rounding-mode calls use `ROUND_HALF_EVEN`.

@@ -36,6 +36,7 @@ type domainExpander struct {
 	pages     map[string]string
 	functions map[string]*functioncoverage.Function
 	notes     map[string]string
+	windows   map[string]string
 	// arities holds the argument counts of each function's documented syntax lines.
 	arities map[string][]arity
 }
@@ -55,7 +56,7 @@ func expandDomains(root, text string) ([]functioncoverage.Function, error) {
 	e := &domainExpander{
 		root: root, lists: map[string][]string{}, pages: map[string]string{},
 		functions: map[string]*functioncoverage.Function{}, notes: map[string]string{},
-		arities: map[string][]arity{},
+		windows: map[string]string{}, arities: map[string][]arity{},
 	}
 	if err := e.run(lines, map[string]string{}); err != nil {
 		return nil, err
@@ -66,6 +67,13 @@ func expandDomains(root, text string) ([]functioncoverage.Function, error) {
 			return nil, fmt.Errorf("domains.txt: note for unenumerated function %s", name)
 		}
 		f.Note = note
+	}
+	for name, window := range e.windows {
+		f := e.functions[name]
+		if f == nil {
+			return nil, fmt.Errorf("domains.txt: window for unenumerated function %s", name)
+		}
+		f.Over = window
 	}
 	for name, f := range e.functions {
 		if err := checkArities(f, e.arities[name]); err != nil {
@@ -188,6 +196,13 @@ func (e *domainExpander) statement(text string) error {
 			return fmt.Errorf("invalid or duplicate note: %q", text)
 		}
 		e.notes[name] = note
+		return nil
+	case strings.HasPrefix(text, "over "):
+		name, window, ok := strings.Cut(strings.TrimPrefix(text, "over "), " ")
+		if !ok || e.windows[name] != "" || !strings.HasPrefix(window, "(") || !strings.HasSuffix(window, ")") {
+			return fmt.Errorf("invalid or duplicate window: %q", text)
+		}
+		e.windows[name] = window
 		return nil
 	}
 	m := signaturePattern.FindStringSubmatch(text)
@@ -413,8 +428,8 @@ func (a arity) String() string {
 }
 
 // syntaxArities reads the calls to name that start the lines of a section's code blocks, such
-// as 1. DATETIME(...) in a numbered list of forms. Only the call's parentheses are read, so an
-// aggregate's OVER clause is left out. Blocks after the first bold label, such as
+// as 1. DATETIME(...) in a numbered list of forms or FIRST_VALUE (...). Only the call's
+// parentheses are read, so an OVER clause is left out. Blocks after the first bold label, such as
 // **Description**, are examples whose array literals aren't syntax notation.
 func syntaxArities(section, name string) ([]arity, error) {
 	var result []arity
@@ -429,11 +444,11 @@ func syntaxArities(section, name string) ([]arity, error) {
 			} else {
 				j = len(block)
 			}
-			line = numberedForm.ReplaceAllString(line, "")
-			if !strings.HasPrefix(line, name+"(") {
+			line, ok := strings.CutPrefix(numberedForm.ReplaceAllString(line, ""), name)
+			if line = strings.TrimLeft(line, " "); !ok || !strings.HasPrefix(line, "(") {
 				continue
 			}
-			args, ok := callArguments(line[len(name):])
+			args, ok := callArguments(line)
 			if !ok {
 				return nil, fmt.Errorf("unbalanced syntax for %s: %q", name, block)
 			}
