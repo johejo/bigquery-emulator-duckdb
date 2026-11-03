@@ -118,3 +118,32 @@ GRAPH scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3)-[e:Knows]->{0,1}(b:P
 # Decorated sorting and deduplication must not move failing inputs out of their branch.
 GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = IF(TRUE, [1], ARRAY_AGG(DISTINCT DIV(2, x) ORDER BY DIV(2, x))) RETURN TO_JSON_STRING(r) AS result
 => "[1]"
+
+# FLOAT64, NUMERIC, BIGNUMERIC and INTERVAL overloads follow the ordinary aggregates: SUM fails
+# on overflow, SUM, MIN and MAX return NaN where any value is NaN, and AVG of two maximum values
+# is the maximum (aggregates.txt).
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+GRAPH scalar_graph.FinGraph LET x = [1.5, 2.5, NULL] LET r = SUM(x) RETURN r
+=> "4.0"
+GRAPH scalar_graph.FinGraph LET x = [CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)] LET r = SUM(x) RETURN r
+=> error:
+GRAPH scalar_graph.FinGraph LET x = [1, CAST('nan' AS FLOAT64)] LET r = SUM(x) RETURN r
+=> "NaN"
+GRAPH scalar_graph.FinGraph LET x = [1, CAST('nan' AS FLOAT64), CAST('-inf' AS FLOAT64), NULL] LET r = MIN(x) RETURN r
+=> "NaN"
+GRAPH scalar_graph.FinGraph LET x = [1, CAST('-inf' AS FLOAT64), NULL] LET r = MIN(x) RETURN r
+=> "-Infinity"
+GRAPH scalar_graph.FinGraph LET x = [1, CAST('nan' AS FLOAT64), CAST('inf' AS FLOAT64)] LET r = MAX(x) RETURN r
+=> "NaN"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS FLOAT64)] LET r = MIN(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [CAST('1.7976931348623157e308' AS FLOAT64), CAST('1.7976931348623157e308' AS FLOAT64)] LET r = AVG(x) RETURN r
+=> "1.7976931348623157E308"
+GRAPH scalar_graph.FinGraph LET x = [NUMERIC '99999999999999999999999999999.999999999', NUMERIC '99999999999999999999999999999.999999999'] LET r = AVG(x) RETURN r
+=> "99999999999999999999999999999.999999999"
+GRAPH scalar_graph.FinGraph LET x = [NUMERIC '1', NULL, NUMERIC '2'] LET r = AVG(x) RETURN r
+=> "1.5"
+GRAPH scalar_graph.FinGraph LET x = [BIGNUMERIC '1.5', 0.00000000000000000000000000000000000001] LET r = SUM(x) RETURN r
+=> "1.50000000000000000000000000000000000001"
+GRAPH scalar_graph.FinGraph LET x = [INTERVAL 1 DAY, NULL, INTERVAL 3 DAY] LET r = AVG(x) RETURN r
+=> "0-0 2 0:0:0"

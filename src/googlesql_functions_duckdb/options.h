@@ -27,6 +27,8 @@ struct Options {
   bool rounding_early_positive_zero = false;
   // FLOAT64 AVG keeps its running mean in a double rather than a long double.
   bool double_average = false;
+  // FLOAT64 SUM fails where a partial sum overflows, rather than only where the total does.
+  bool double_sum = false;
   // JSON_ARRAY_APPEND and JSON_ARRAY_INSERT reject numbers they would round, and keep the sign
   // of a negative zero.
   bool json_strict_numbers = false;
