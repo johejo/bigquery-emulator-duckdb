@@ -45,6 +45,7 @@ namespace {
 
 // Aggregate calls (with `aggregate` set) and analytic calls (with a non-empty `over`). An
 // aggregate's HAVING MAX/MIN modifier is the caller's to compute, as the rows `having` selects.
+// A rule that orders ties by input names, in `input_row`, the column that numbers the rows.
 std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunctionCallBase& call,
                                          const googlesql::ResolvedAggregateFunctionCall* aggregate,
                                          const std::string& over, const Scope& scope,
@@ -52,7 +53,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          std::vector<std::string>* intermediates = nullptr,
                                          const std::string& partition_order = "",
                                          const std::string& array = "",
-                                         const std::string& element = "") {
+                                         const std::string& element = "",
+                                         std::string* input_row = nullptr) {
   const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   // A graph value's STRUCT is equal to another exactly when their identities are, so functions
@@ -339,6 +341,15 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     order = " ORDER BY " + partition_order;
   } else if (const std::string items = AggregateOrder(*rule, arguments); !items.empty()) {
     order = " ORDER BY " + items;
+    if (rule->orders_ties_by_input) {
+      if (input_row == nullptr) {
+        return Unsupported(scope, "aggregate or analytic function " + name + " outside a window");
+      }
+      if (input_row->empty()) {
+        *input_row = scope.context.FreshName("_input_row");
+      }
+      order += ", q." + *input_row;
+    }
   }
   // LIMIT keeps the first elements of the list the aggregate would build; STRING_AGG builds it
   // from its non-NULL values and joins them afterwards.
@@ -1166,6 +1177,7 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
   std::vector<std::string> projections = {"q.*"};
   std::vector<std::string> intermediates;
   std::map<int, std::string> finishes;
+  std::string input_row;
   for (const auto& group : analytic.function_group_list()) {
     for (const auto& computed : group->analytic_function_list()) {
       if (!computed->expr()->Is<googlesql::ResolvedAnalyticFunctionCall>()) {
@@ -1206,8 +1218,8 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         return std::nullopt;
       }
       const std::size_t previous = intermediates.size();
-      const auto sql =
-          NonScalarCall(*call, nullptr, *over, scope, input_columns, "", &intermediates);
+      const auto sql = NonScalarCall(*call, nullptr, *over, scope, input_columns, "",
+                                     &intermediates, "", "", "", &input_row);
       if (!sql) {
         return std::nullopt;
       }
@@ -1222,6 +1234,9 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
     }
   }
   projections.insert(projections.end(), intermediates.begin(), intermediates.end());
+  if (!input_row.empty()) {
+    result->sql = "SELECT q.*, row_number() OVER () AS " + input_row + result->From();
+  }
   result->sql = "SELECT " + Join(projections, ", ") + result->From();
   ApplyFinishes(*result, finishes);
   return result;

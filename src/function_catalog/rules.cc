@@ -268,6 +268,7 @@ AggregateRule Own(const StaticAggregateRule& rule) {
       .conditions = OwnConditions(rule.conditions),
       .arguments = {rule.arguments.begin(), rule.arguments.end()},
       .order = rule.order,
+      .orders_ties_by_input = rule.orders_ties_by_input,
       .defaults = {rule.defaults.begin(), rule.defaults.end()},
       .nulls = rule.nulls,
       .distinct = rule.distinct,

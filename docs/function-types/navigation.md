@@ -464,15 +464,15 @@ Source: [PERCENTILE_DISC](../../third_party/bigquery_docs/reference/standard-sql
 | `TIMESTAMP, NUMERIC` | `TIMESTAMP` | Supported |  |
 | `TIMESTAMP, BIGNUMERIC` | `TIMESTAMP` | Supported |  |
 | `TIMESTAMP, FLOAT64` | `TIMESTAMP` | Supported |  |
-| `INTERVAL, NUMERIC` | `INTERVAL` | Unsupported | aggregate or analytic function PERCENTILE_DISC with INTERVAL |
-| `INTERVAL, BIGNUMERIC` | `INTERVAL` | Unsupported | aggregate or analytic function PERCENTILE_DISC with INTERVAL |
-| `INTERVAL, FLOAT64` | `INTERVAL` | Unsupported | aggregate or analytic function PERCENTILE_DISC with INTERVAL |
-| `RANGE<DATE>, NUMERIC` | `RANGE<DATE>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<DATE>, BIGNUMERIC` | `RANGE<DATE>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<DATE>, FLOAT64` | `RANGE<DATE>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<DATETIME>, NUMERIC` | `RANGE<DATETIME>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<DATETIME>, BIGNUMERIC` | `RANGE<DATETIME>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<DATETIME>, FLOAT64` | `RANGE<DATETIME>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<TIMESTAMP>, NUMERIC` | `RANGE<TIMESTAMP>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<TIMESTAMP>, BIGNUMERIC` | `RANGE<TIMESTAMP>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
-| `RANGE<TIMESTAMP>, FLOAT64` | `RANGE<TIMESTAMP>` | Unsupported | aggregate or analytic function PERCENTILE_DISC with RANGE |
+| `INTERVAL, NUMERIC` | `INTERVAL` | Supported |  |
+| `INTERVAL, BIGNUMERIC` | `INTERVAL` | Supported |  |
+| `INTERVAL, FLOAT64` | `INTERVAL` | Supported |  |
+| `RANGE<DATE>, NUMERIC` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATE>, BIGNUMERIC` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATE>, FLOAT64` | `RANGE<DATE>` | Supported |  |
+| `RANGE<DATETIME>, NUMERIC` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<DATETIME>, BIGNUMERIC` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<DATETIME>, FLOAT64` | `RANGE<DATETIME>` | Supported |  |
+| `RANGE<TIMESTAMP>, NUMERIC` | `RANGE<TIMESTAMP>` | Supported |  |
+| `RANGE<TIMESTAMP>, BIGNUMERIC` | `RANGE<TIMESTAMP>` | Supported |  |
+| `RANGE<TIMESTAMP>, FLOAT64` | `RANGE<TIMESTAMP>` | Supported |  |
