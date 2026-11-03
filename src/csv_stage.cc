@@ -4,14 +4,16 @@
 #include <cstddef>
 #include <format>
 #include <optional>
-#include <regex>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/strings/escaping.h"
 #include "src/api_error.h"
 #include "src/csv_records.h"
+#include "src/external_values.h"
 #include "src/field_schema.h"
 #include "src/file_read.h"
 #include "src/file_read_options.h"
@@ -115,7 +117,9 @@ std::string CsvRecordError(std::string_view detail, const RecordPosition& positi
                            absl::CEscape(field->name), SqlTypeName(field->type));
   }
   if (field != nullptr && value) {
-    message += std::format(" value: \"{}\"", absl::CEscape(*value));
+    // BigQuery shortens a value of more than 20 characters.
+    const std::string shown = value->size() > 20 ? value->substr(0, 17) + "..." : *value;
+    message += std::format(" value: \"{}\"", absl::CEscape(shown));
   }
   return message;
 }
@@ -162,14 +166,18 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                                column, found),
                    position, &field, column);
           }
-          const auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field,
-                                   column, options, position);
-          if (value && options.canonical_datetimes && field.type == FieldType::kDatetime) {
-            static const std::regex datetime(
-                R"([0-9]{4}-[0-9]{2}-[0-9]{2} ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]{1,6})?)");
-            if (!std::regex_match(*value, datetime)) {
-              throw ApiError::Unsupported("CSV external representation for " + field.name);
+          auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field, column,
+                             options, position);
+          if (value && options.external_values) {
+            auto converted = ExternalValue(field.type, *value, options.formats);
+            if (!converted.ok()) {
+              const std::string detail(converted.status().message());
+              if (absl::IsUnimplemented(converted.status())) {
+                throw ApiError::Invalid(detail);
+              }
+              Reject(detail, position, &field, column, value);
             }
+            value = *std::move(converted);
           }
           if (value) {
             AppendQuoted(line, *value);

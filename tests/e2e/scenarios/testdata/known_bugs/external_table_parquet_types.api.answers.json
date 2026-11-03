@@ -1,0 +1,313 @@
+{
+  "cases": {
+    "dec50_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec50_as_bignumeric/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec50_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec50_as_float64/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'dec50' has unsupported Parquet type(FIXED_LEN_BYTE_ARRAY) for GoogleSQL type(FLOAT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'dec50' has unsupported Parquet type(FIXED_LEN_BYTE_ARRAY) for GoogleSQL type(FLOAT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec50_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec50_as_numeric/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec50_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec50_as_string/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec50",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec50_detected": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec50_detected/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_datetime_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_datetime_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_datetime",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s_datetime",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

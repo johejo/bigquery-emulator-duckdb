@@ -1,0 +1,939 @@
+{
+  "cases": {
+    "bignumeric_invalid": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_invalid/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_bignumeric_invalid.t, error message: Invalid BIGNUMERIC value: abc; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"abc\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_invalid/s.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_bignumeric_invalid.t, error message: Invalid BIGNUMERIC value: abc; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"abc\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_invalid/s.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bignumeric_spellings": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid BIGNUMERIC value: 0.123456789012345678901234567890123456789; line_number: 3 byte_offset_to_start_of_line: 50 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"0.123456789012345...\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid BIGNUMERIC value: 578960446186580977117854925043439539267; line_number: 7 byte_offset_to_start_of_line: 186 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"57896044618658097...\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid BIGNUMERIC value: NaN; line_number: 11 byte_offset_to_start_of_line: 244 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"NaN\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid BIGNUMERIC value: 0x10; line_number: 12 byte_offset_to_start_of_line: 251 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"0x10\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid BIGNUMERIC value: 1,000; line_number: 13 byte_offset_to_start_of_line: 259 column_index: 1 column_name: \"v\" column_type: BIGNUMERIC value: \"1,000\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/bignumeric_spellings/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "-0.00000000000000000000000000000000000001"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1000"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "578960446186580977117854925043439539266.34992332820282019728792003956564819967"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "0.5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "5"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "14"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "15"
+                },
+                {
+                  "v": "-578960446186580977117854925043439539266.34992332820282019728792003956564819968"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "datetime_invalid": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_invalid/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_datetime_invalid.t, error message: Invalid datetime string \"2024/01/02 03:04:05\"; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024/01/02 03:04:05\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_invalid/s.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_datetime_invalid.t, error message: Invalid datetime string \"2024/01/02 03:04:05\"; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024/01/02 03:04:05\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_invalid/s.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "datetime_spellings": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 03:04:05.1234567\"; line_number: 4 byte_offset_to_start_of_line: 73 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04:...\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 03:04\"; line_number: 7 byte_offset_to_start_of_line: 135 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 03:04:05 UTC\"; line_number: 8 byte_offset_to_start_of_line: 154 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04:...\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 03:04:05+00:00\"; line_number: 9 byte_offset_to_start_of_line: 180 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04:...\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024/01/02 03:04:05\"; line_number: 10 byte_offset_to_start_of_line: 208 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024/01/02 03:04:05\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \" 2024-01-02 03:04:05\"; line_number: 11 byte_offset_to_start_of_line: 231 column_index: 1 column_name: \"v\" column_type: DATETIME value: \" 2024-01-02 03:04:05\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 03:04:05 \"; line_number: 12 byte_offset_to_start_of_line: 255 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04:05 \" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 24:00:00\"; line_number: 16 byte_offset_to_start_of_line: 353 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 24:00:00\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-02-30 00:00:00\"; line_number: 17 byte_offset_to_start_of_line: 376 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-02-30 00:00:00\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02T03:04:05Z\"; line_number: 18 byte_offset_to_start_of_line: 399 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02T03:04:05Z\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/datetime_spellings/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "2024-01-02T03:04:05.123456"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "2024-01-02T00:00:00"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "13"
+                },
+                {
+                  "v": "0001-01-01T00:00:00"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "14"
+                },
+                {
+                  "v": "9999-12-31T23:59:59.999999"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "15"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "19"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_invalid": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_invalid/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_json_invalid.t, error message: syntax error while parsing object key - unexpected end of input; expected string literal; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: JSON value: \"{\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_invalid/s.csv",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_ysncep57lqwczakpjuta2ymnxk_json_invalid.t, error message: syntax error while parsing object key - unexpected end of input; expected string literal; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: JSON value: \"{\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_invalid/s.csv",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "json_spellings": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv",
+                "message": "Error while reading data, error message: syntax error while parsing object - unexpected end of input; expected '}'; line_number: 7 byte_offset_to_start_of_line: 52 column_index: 1 column_name: \"v\" column_type: JSON value: \"{\\\"a\\\":1\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv",
+                "message": "Error while reading data, error message: syntax error while parsing value - invalid literal; last read: 'a'; line_number: 8 byte_offset_to_start_of_line: 65 column_index: 1 column_name: \"v\" column_type: JSON value: \"abc\" File: gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/json_spellings/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "{\"a\":1}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "[1,2]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "\"s\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "null"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "true"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "{\"a\":1}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": "{\"a\":1}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "12"
+                },
+                {
+                  "v": "{\"a\":1,\"b\":2}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "13"
+                },
+                {
+                  "v": "100.0"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "14"
+                },
+                {
+                  "v": "12345678901234567890"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "15"
+                },
+                {
+                  "v": "{\"a\":\"é\"}"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "rest_types": {
+      "project": "johejo-sandbox",
+      "run": "ysncep57lqwczakpjuta2ymnxk",
+      "steps": {
+        "create": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/rest_types/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "bn",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "j",
+                "type": "JSON"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "g",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/ysncep57lqwczakpjuta2ymnxk/rest_types/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "bn",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "j",
+                "type": "JSON"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "g",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "{\"a\":1}"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "bn",
+                "type": "BIGNUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "j",
+                "type": "JSON"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "g",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

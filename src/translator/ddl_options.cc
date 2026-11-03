@@ -442,6 +442,22 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    if (decoded && external &&
+        (decoded->id == DdlOptionId::kTimeZone || decoded->id == DdlOptionId::kDateFormat ||
+         decoded->id == DdlOptionId::kDatetimeFormat || decoded->id == DdlOptionId::kTimeFormat ||
+         decoded->id == DdlOptionId::kTimestampFormat)) {
+      if (!decoded->value.is_null()) {
+        GcsExternalData& data = *metadata.external_data;
+        std::optional<std::string>& value =
+            decoded->id == DdlOptionId::kTimeZone         ? data.time_zone
+            : decoded->id == DdlOptionId::kDateFormat     ? data.date_format
+            : decoded->id == DdlOptionId::kDatetimeFormat ? data.datetime_format
+            : decoded->id == DdlOptionId::kTimeFormat     ? data.time_format
+                                                          : data.timestamp_format;
+        value = decoded->value.string_value();
+      }
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kMaxBadRecords) {
       if (!decoded->value.is_null()) {
         if (decoded->value.int64_value() < 0) {

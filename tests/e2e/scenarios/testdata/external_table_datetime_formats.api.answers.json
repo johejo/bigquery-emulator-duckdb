@@ -1,0 +1,2504 @@
+{
+  "cases": {
+    "all_formats": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_all_formats.t`\n(\n  id INT64,\n  d DATE,\n  dt DATETIME,\n  t TIME,\n  ts TIMESTAMP\n)\nOPTIONS(\n  time_zone=\"Asia/Tokyo\",\n  date_format=\"YYYY/MM/DD\",\n  datetime_format=\"YYYY/MM/DD HH24:MI:SS\",\n  time_format=\"HH24.MI.SS\",\n  timestamp_format=\"YYYY/MM/DD HH24:MI:SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/all_formats/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "YYYY/MM/DD",
+            "datetimeFormat": "YYYY/MM/DD HH24:MI:SS",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/all_formats/s.csv"
+            ],
+            "timeFormat": "HH24.MI.SS",
+            "timeZone": "Asia/Tokyo",
+            "timestampFormat": "YYYY/MM/DD HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYY/MM/DD\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "datetime_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYY/MM/DD HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"HH24.MI.SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"Asia/Tokyo\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "timestamp_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYY/MM/DD HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/all_formats/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                },
+                {
+                  "v": "03:04:05"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "date_format_c": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Invalid format for option 'date_format': Cannot find matched format element at 0",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Invalid format for option 'date_format': Cannot find matched format element at 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "date_format_empty": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_date_format_empty.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  date_format=\"\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_empty/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_empty/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_empty/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "date_format_invalid": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Invalid format for option 'date_format': Cannot find matched format element at 0",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Invalid format for option 'date_format': Cannot find matched format element at 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "date_format_other_types": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_date_format_other_types.t`\n(\n  id INT64,\n  d DATE,\n  dt DATETIME,\n  ts TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_other_types/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "MM/DD/YYYY",
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_other_types/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_other_types/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"01/02/2024 03:04:05\"; line_number: 2 byte_offset_to_start_of_line: 53 column_index: 2 column_name: \"dt\" column_type: DATETIME value: \"01/02/2024 03:04:05\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_other_types/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_other_types/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_other_types/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "date_format_sql": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_date_format_sql.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  max_bad_records=100,\n  date_format=\"MM/DD/YYYY\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_sql/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "MM/DD/YYYY",
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_sql/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_sql/s.csv",
+                "message": "Error while reading data, error message: Failed to parse input timestamp string at 0 with format element 'MM'; line_number: 2 byte_offset_to_start_of_line: 13 column_index: 1 column_name: \"v\" column_type: DATE value: \"2024-01-02\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_sql/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_sql/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/date_format_sql/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "0024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "datetime_format": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_datetime_format.t`\n(\n  id INT64,\n  v DATETIME\n)\nOPTIONS(\n  max_bad_records=100,\n  datetime_format=\"MM/DD/YYYY HH24:MI:SS.FF3\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "datetimeFormat": "MM/DD/YYYY HH24:MI:SS.FF3",
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+                "message": "Error while reading data, error message: Entire timestamp string has been parsed before dealing with format element '.'; line_number: 2 byte_offset_to_start_of_line: 26 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"01/02/2024 03:04:05\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+                "message": "Error while reading data, error message: Illegal non-space trailing data '456' in timestamp string; line_number: 3 byte_offset_to_start_of_line: 48 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"01/02/2024 03:04:...\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+                "message": "Error while reading data, error message: Failed to parse input timestamp string at 0 with format element 'MM'; line_number: 4 byte_offset_to_start_of_line: 77 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04:05\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "datetime_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY HH24:MI:SS.FF3\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/datetime_format/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02T03:04:05.123000"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_date_format": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_json_date_format.t`\n(\n  id INT64,\n  v DATE\n)\nOPTIONS(\n  max_bad_records=100,\n  date_format=\"MM/DD/YYYY\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/json_date_format/s.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "MM/DD/YYYY",
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/json_date_format/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "query",
+                "message": "Failed to parse input timestamp string at 0 with format element 'MM'",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/json_date_format/s.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_time_zone": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_json_time_zone.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  time_zone=\"America/Los_Angeles\",\n  format=\"NEWLINE_DELIMITED_JSON\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/json_time_zone/s.json\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/json_time_zone/s.json"
+            ],
+            "timeZone": "America/Los_Angeles"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"NEWLINE_DELIMITED_JSON\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"America/Los_Angeles\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/json_time_zone/s.json\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704193445E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "parquet_date_format": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Option 'date_format' not supported for format PARQUET",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Option 'date_format' not supported for format PARQUET",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "rest_formats": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "external": {
+            "dateFormat": "YYYY/MM/DD",
+            "datetimeFormat": "YYYY/MM/DD HH24:MI:SS",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/rest_formats/s.csv"
+            ],
+            "timeFormat": "HH24.MI.SS",
+            "timeZone": "Asia/Tokyo",
+            "timestampFormat": "YYYY/MM/DD HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_rest_formats.t`\n(\n  id INT64,\n  d DATE,\n  dt DATETIME,\n  t TIME,\n  ts TIMESTAMP\n)\nOPTIONS(\n  time_zone=\"Asia/Tokyo\",\n  date_format=\"YYYY/MM/DD\",\n  datetime_format=\"YYYY/MM/DD HH24:MI:SS\",\n  time_format=\"HH24.MI.SS\",\n  timestamp_format=\"YYYY/MM/DD HH24:MI:SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/rest_formats/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "dateFormat": "YYYY/MM/DD",
+            "datetimeFormat": "YYYY/MM/DD HH24:MI:SS",
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/rest_formats/s.csv"
+            ],
+            "timeFormat": "HH24.MI.SS",
+            "timeZone": "Asia/Tokyo",
+            "timestampFormat": "YYYY/MM/DD HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "date_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYY/MM/DD\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "datetime_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYY/MM/DD HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"HH24.MI.SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"Asia/Tokyo\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "timestamp_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"YYYY/MM/DD HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/rest_formats/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                },
+                {
+                  "v": "03:04:05"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dt",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "time_format": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_time_format.t`\n(\n  id INT64,\n  v TIME\n)\nOPTIONS(\n  max_bad_records=100,\n  time_format=\"HH24:MI:SS.FF3\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv"
+            ],
+            "timeFormat": "HH24:MI:SS.FF3"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv",
+                "message": "Error while reading data, error message: Entire timestamp string has been parsed before dealing with format element '.'; line_number: 2 byte_offset_to_start_of_line: 15 column_index: 1 column_name: \"v\" column_type: TIME value: \"03:04:05\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv",
+                "message": "Error while reading data, error message: Illegal non-space trailing data '456' in timestamp string; line_number: 3 byte_offset_to_start_of_line: 26 column_index: 1 column_name: \"v\" column_type: TIME value: \"03:04:05.123456\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"HH24:MI:SS.FF3\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_format/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "03:04:05.123000"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "time_format_12_hour": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Invalid format for option 'time_format': Format element 'AM' is not supported for parsing",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Invalid format for option 'time_format': Format element 'AM' is not supported for parsing",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "time_zone_datetime": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_time_zone_datetime.t`\n(\n  id INT64,\n  v DATETIME\n)\nOPTIONS(\n  max_bad_records=100,\n  time_zone=\"America/Los_Angeles\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_datetime/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_datetime/s.csv"
+            ],
+            "timeZone": "America/Los_Angeles"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_datetime/s.csv",
+                "message": "Error while reading data, error message: Invalid datetime string \"2024-01-02 03:04:05 UTC\"; line_number: 2 byte_offset_to_start_of_line: 22 column_index: 1 column_name: \"v\" column_type: DATETIME value: \"2024-01-02 03:04:...\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_datetime/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"America/Los_Angeles\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_datetime/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_datetime/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "2024-01-02T03:04:05"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "time_zone_invalid": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "time_zone Mars/Base is not valid.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "time_zone Mars/Base is not valid.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "time_zone_name": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_time_zone_name.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  time_zone=\"America/Los_Angeles\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_name/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_name/s.csv"
+            ],
+            "timeZone": "America/Los_Angeles"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_name/s.csv",
+                "message": "Error while reading data, error message: Could not parse '2024-01-02' as a timestamp. Required format is YYYY-MM-DD HH:MM[:SS[.SSSSSS]] or YYYY/MM/DD HH:MM[:SS[.SSSSSS]]; line_number: 6 byte_offset_to_start_of_line: 118 column_index: 1 column_name: \"v\" column_type: TIMESTAMP value: \"2024-01-02\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_name/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"America/Los_Angeles\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_name/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_name/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704193445E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "1.719914645E9"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "time_zone_offset": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "time_zone +09:00 is not valid.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "time_zone +09:00 is not valid.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "time_zone_with_format": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_time_zone_with_format.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  time_zone=\"Asia/Tokyo\",\n  timestamp_format=\"MM/DD/YYYY HH24:MI:SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_with_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_with_format/s.csv"
+            ],
+            "timeZone": "Asia/Tokyo",
+            "timestampFormat": "MM/DD/YYYY HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "time_zone"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"Asia/Tokyo\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "timestamp_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/time_zone_with_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "timestamp_format": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_timestamp_format.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  timestamp_format=\"MM/DD/YYYY HH24:MI:SS\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv"
+            ],
+            "timestampFormat": "MM/DD/YYYY HH24:MI:SS"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv",
+                "message": "Error while reading data, error message: Failed to parse input timestamp string at 0 with format element 'MM'; line_number: 2 byte_offset_to_start_of_line: 22 column_index: 1 column_name: \"v\" column_type: TIMESTAMP value: \"2024-01-02 03:04:05\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv",
+                "message": "Error while reading data, error message: Illegal non-space trailing data '+09' in timestamp string; line_number: 3 byte_offset_to_start_of_line: 44 column_index: 1 column_name: \"v\" column_type: TIMESTAMP value: \"01/02/2024 03:04:...\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "timestamp_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY HH24:MI:SS\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704164645E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "timestamp_format_c": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Invalid format for option 'timestamp_format': Cannot find matched format element at 0",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Invalid format for option 'timestamp_format': Cannot find matched format element at 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "timestamp_format_zone": {
+      "project": "johejo-sandbox",
+      "run": "gp7vz4dwtnq36k2fkr2nw2redl",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_gp7vz4dwtnq36k2fkr2nw2redl_timestamp_format_zone.t`\n(\n  id INT64,\n  v TIMESTAMP\n)\nOPTIONS(\n  max_bad_records=100,\n  timestamp_format=\"MM/DD/YYYY HH24:MI:SS TZH\",\n  format=\"CSV\",\n  uris=[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format_zone/s.csv\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format_zone/s.csv"
+            ],
+            "timestampFormat": "MM/DD/YYYY HH24:MI:SS TZH"
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format_zone/s.csv",
+                "message": "Error while reading data, error message: Entire timestamp string has been parsed before dealing with format element ' '; line_number: 2 byte_offset_to_start_of_line: 26 column_index: 1 column_name: \"v\" column_type: TIMESTAMP value: \"01/02/2024 03:04:05\" File: gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format_zone/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"CSV\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "max_bad_records"
+                },
+                {
+                  "v": "INT64"
+                },
+                {
+                  "v": "100"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "timestamp_format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"MM/DD/YYYY HH24:MI:SS TZH\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format_zone/s.csv\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/gp7vz4dwtnq36k2fkr2nw2redl/timestamp_format_zone/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1.704132245E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

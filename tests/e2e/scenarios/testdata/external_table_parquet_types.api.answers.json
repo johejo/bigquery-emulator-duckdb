@@ -1,0 +1,4007 @@
+{
+  "cases": {
+    "b_as_bytes": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/b_as_bytes/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "b",
+                "type": "BYTES"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "YQ=="
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BYTES"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "b_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/b_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "b",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "bool_as_bool": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/bool_as_bool/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "bool",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "bool",
+                "type": "BOOLEAN"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "bool_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/bool_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "bool",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'bool' has unsupported Parquet type(BOOLEAN) for GoogleSQL type(INT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'bool' has unsupported Parquet type(BOOLEAN) for GoogleSQL type(INT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bool_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/bool_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "bool",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'bool' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found BOOLEAN). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/bool_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'bool' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found BOOLEAN). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/bool_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "d_as_date": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_date/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "d_as_datetime": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_datetime/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "d",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Datetime type (INT32) is not INT64 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_datetime/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Datetime type (INT32) is not INT64 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_datetime/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "d_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "d",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'd' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT32). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'd' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT32). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "d_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/d_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "d",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.019724"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec18_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec18_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec18",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec18_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec18_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec18",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'dec18' has unsupported Parquet type(INT64) for GoogleSQL type(FLOAT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'dec18' has unsupported Parquet type(INT64) for GoogleSQL type(FLOAT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec18_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec18_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec18",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec18_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec18_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec18",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec38_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec38_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec38",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec38_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec38_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec38",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'dec38' has unsupported Parquet type(FIXED_LEN_BYTE_ARRAY) for GoogleSQL type(FLOAT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'dec38' has unsupported Parquet type(FIXED_LEN_BYTE_ARRAY) for GoogleSQL type(FLOAT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec38_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec38_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec38",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec38_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec38_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec38",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec9_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec9_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec9_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec9_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'dec9' has unsupported Parquet type(INT32) for GoogleSQL type(FLOAT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'dec9' has unsupported Parquet type(INT32) for GoogleSQL type(FLOAT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "dec9_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec9_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "125"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec9_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec9_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "dec9_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/dec9_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "detected": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/detected/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec38",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "2024-01-02 03:04:05"
+                },
+                {
+                  "v": "{\"a\":1}"
+                },
+                {
+                  "v": "POINT(1 2)"
+                },
+                {
+                  "v": "YQ=="
+                },
+                {
+                  "v": "AQEAAAAAAAAAAADwPwAAAAAAAABA"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "03:04:05.000006"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                },
+                {
+                  "v": "1.704164645006E9"
+                },
+                {
+                  "v": "1704164645000006007"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "f32_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f32",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Reading column 'f32' of type FLOAT as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_bignumeric/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Reading column 'f32' of type FLOAT as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_bignumeric/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f32_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f32",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.5"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "f32",
+                "type": "FLOAT"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "f32_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f32",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'f32' has unsupported Parquet type(FLOAT) for GoogleSQL type(INT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'f32' has unsupported Parquet type(FLOAT) for GoogleSQL type(INT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f32_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f32",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Reading column 'f32' of type FLOAT as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_numeric/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Reading column 'f32' of type FLOAT as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_numeric/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f32_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f32",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'f32' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found FLOAT). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'f32' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found FLOAT). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f32_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f64_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Reading column 'f64' of type DOUBLE as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_bignumeric/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Reading column 'f64' of type DOUBLE as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_bignumeric/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f64_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.5"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "f64",
+                "type": "FLOAT"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "f64_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'f64' has unsupported Parquet type(DOUBLE) for GoogleSQL type(INT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'f64' has unsupported Parquet type(DOUBLE) for GoogleSQL type(INT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f64_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Reading column 'f64' of type DOUBLE as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_numeric/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Reading column 'f64' of type DOUBLE as NUMERIC type but its logical type is NONE, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_numeric/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "f64_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'f64' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found DOUBLE). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'f64' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found DOUBLE). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/f64_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "i32_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i32_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'i32' has unsupported Parquet type(INT32) for GoogleSQL type(FLOAT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'i32' has unsupported Parquet type(INT32) for GoogleSQL type(FLOAT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "i32_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i32_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i32_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'i32' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT32). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'i32' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT32). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i32_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "i64_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i64",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i64_as_float64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_float64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i64",
+                "type": "FLOAT"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 'i64' has unsupported Parquet type(INT64) for GoogleSQL type(FLOAT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 'i64' has unsupported Parquet type(INT64) for GoogleSQL type(FLOAT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "i64_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i64",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i64_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i64",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i64_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i64",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'i64' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'i64' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i64_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "i8_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i8_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i8",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i8",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i8_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i8_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i8",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i8",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "i8_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/i8_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i8",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i8",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "nested_coercion": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/nested_coercion/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "i32",
+                "type": "NUMERIC"
+              },
+              {
+                "name": "tsl",
+                "type": "DATETIME"
+              },
+              {
+                "name": "dec9",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "2024-01-02T03:04:05.000006"
+                },
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsl",
+                "type": "DATETIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_as_bytes": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_as_bytes/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s",
+                "type": "BYTES"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "YQ=="
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "BYTES"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_as_json": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_as_json/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "s_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "a"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "s_date_as_date": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_date_as_date/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_date",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Date type (7) is not int32 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_date_as_date/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Date type (7) is not int32 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_date_as_date/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "s_datetime_as_datetime": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_datetime_as_datetime/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_datetime",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Datetime type (BYTE_ARRAY) is not INT64 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_datetime_as_datetime/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Datetime type (BYTE_ARRAY) is not INT64 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_datetime_as_datetime/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "s_int_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_int_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_int",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Column 's_int' has unsupported Parquet type(BYTE_ARRAY) for GoogleSQL type(INT64)",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Column 's_int' has unsupported Parquet type(BYTE_ARRAY) for GoogleSQL type(INT64)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "s_int_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_int_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_int",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Reading column 's_int' of type BYTE_ARRAY as NUMERIC type but its logical type is UTF8, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_int_as_numeric/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Reading column 's_int' of type BYTE_ARRAY as NUMERIC type but its logical type is UTF8, expecting DECIMAL. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_int_as_numeric/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "s_json_as_json": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/s_json_as_json/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "s_json",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "t_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/t_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "t",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 't' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/t_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 't' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/t_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "t_as_time": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/t_as_time/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "t",
+                "type": "TIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "03:04:05.000006"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ts_as_date": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_date/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "ts",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Date type (3) is not int32 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_date/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Date type (3) is not int32 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_date/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ts_as_datetime": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_datetime/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "ts",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02T03:04:05.000006"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "ts_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "ts",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'ts' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'ts' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ts_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/ts_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.704164645000006E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "tsl_as_date": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_date/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsl",
+                "type": "DATE"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Date type (3) is not int32 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_date/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Date type (3) is not int32 File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_date/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "tsl_as_datetime": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_datetime/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsl",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02T03:04:05.000006"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "tsl",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "tsl_as_string": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_string/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsl",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Parquet type for field 'tsl' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_string/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Parquet type for field 'tsl' needs to be FIXED_LEN_BYTE_ARRAY or BYTE_ARRAY (found INT64). File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_string/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "tsl_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsl_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.704164645000006E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "tsms_as_datetime": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsms_as_datetime/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsms",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2024-01-02T03:04:05.006000"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "tsms",
+                "type": "DATETIME"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "tsms_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsms_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.704164645006E9"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "tsns_as_datetime": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsns_as_datetime/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsns",
+                "type": "DATETIME"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: Datetime type column (tsns) with type (3) is not annotated as a TIMESTAMP, please annotate it as TIMESTAMP_MILLIS or TIMESTAMP_MICROS. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsns_as_datetime/types.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: Datetime type column (tsns) with type (3) is not annotated as a TIMESTAMP, please annotate it as TIMESTAMP_MILLIS or TIMESTAMP_MICROS. File: gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsns_as_datetime/types.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "tsns_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/tsns_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "tsns",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Cannot return an invalid timestamp value of 1704164645000006007 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field tsns",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Cannot return an invalid timestamp value of 1704164645000006007 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field tsns",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "u32_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/u32_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "u32",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "u32",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "u32_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/u32_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "u32",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "u32",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "u32_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/u32_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "u32",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "u32",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "u64_as_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/u64_as_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "u64",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "u64",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "u64_as_int64": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/u64_as_int64/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "u64",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "u64",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "u64_as_numeric": {
+      "project": "johejo-sandbox",
+      "run": "wwvjukwmmf2k2uozb63t4dgpuu",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/wwvjukwmmf2k2uozb63t4dgpuu/u64_as_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "u64",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "u64",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  },
+  "version": 1
+}

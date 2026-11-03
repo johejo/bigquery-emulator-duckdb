@@ -63,6 +63,14 @@ int16_t TimeUnit(const ThriftValue& element, const ParquetColumn& column) {
   }
 }
 
+// Whether the LogicalType of `element`, a TIME or TIMESTAMP, is adjusted to UTC.
+bool AdjustedToUtc(const ThriftValue& element) {
+  const auto [member, value] = Logical(element);
+  const ThriftValue* adjusted =
+      value == nullptr ? nullptr : value->Field(parquet::kTimeAdjustedToUtc);
+  return adjusted != nullptr && adjusted->type == ThriftValue::Type::kTrue;
+}
+
 // The type BigQuery detects for the Parquet leaf `column`, whose SchemaElement is `element`, as
 // the Parquet conversions of
 // [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
@@ -118,6 +126,12 @@ std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetC
       if (timestamp && (TimeUnit(element, column) == parquet::kTimeUnitMillis ||
                         TimeUnit(element, column) == parquet::kTimeUnitMicros)) {
         return FieldType::kTimestamp;
+      }
+      // As BigQuery's answers in external_table_parquet_types.api.answers.json show, it reads a
+      // TIMESTAMP of nanoseconds, not adjusted to UTC, as its INT64 value.
+      if (timestamp && TimeUnit(element, column) == parquet::kTimeUnitNanos &&
+          !AdjustedToUtc(element)) {
+        return FieldType::kInteger;
       }
       return std::nullopt;
     case parquet::kInt96:
@@ -224,6 +238,156 @@ std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const Parq
   return field;
 }
 
+// The name BigQuery's messages give the physical type of `column`.
+std::string_view PhysicalName(const ParquetColumn& column) {
+  switch (column.type) {
+    case parquet::kBoolean:
+      return "BOOLEAN";
+    case parquet::kInt32:
+      return "INT32";
+    case parquet::kInt64:
+      return "INT64";
+    case parquet::kInt96:
+      return "INT96";
+    case parquet::kFloat:
+      return "FLOAT";
+    case parquet::kDouble:
+      return "DOUBLE";
+    case parquet::kByteArray:
+      return "BYTE_ARRAY";
+    default:
+      return "FIXED_LEN_BYTE_ARRAY";
+  }
+}
+
+// The DuckDB value, with {} for the column, of the top-level Parquet leaf `column`, of `element`,
+// which BigQuery detects as `detected`, as the scalar `field` declares it, or empty where the
+// reader's cast gives it. Throws BigQuery's error for a type it does not read the column as, and
+// ApiError::Unsupported for other combinations. As BigQuery's answers in
+// external_table_parquet_types.api.answers.json show, it reads an integer or a DECIMAL as NUMERIC
+// or BIGNUMERIC, a DECIMAL as STRING and, by its unscaled value, as INT64, a BYTE_ARRAY as STRING
+// or BYTES, a TIMESTAMP of milliseconds or microseconds as DATETIME, and a DATE, and a TIMESTAMP of
+// nanoseconds, by their INT32 or INT64 value, as microseconds of a TIMESTAMP.
+std::string ParquetConversion(const FieldSchema& field, const ThriftValue& element,
+                              const ParquetColumn& column, FieldType detected,
+                              std::string_view uri) {
+  const bool nanos =
+      column.type == parquet::kInt64 && Logical(element).first == parquet::kLogicalTimestamp &&
+      TimeUnit(element, column) == parquet::kTimeUnitNanos && !AdjustedToUtc(element);
+  // The reader reads a DECIMAL that NUMERIC does not hold as a DOUBLE.
+  if (column.IsWideDecimal()) {
+    throw ApiError::Unsupported("reading an external Parquet DECIMAL(" +
+                                std::to_string(column.precision) + ", " +
+                                std::to_string(column.scale) + ") column");
+  }
+  if (field.type == detected) {
+    return nanos ? "epoch_ns({})" : "";
+  }
+  const std::string_view physical = PhysicalName(column);
+  const auto failed = [&](const std::string& detail) {
+    return ApiError::Invalid(
+        std::format("Error while reading data, error message: {} File: {}", detail, uri));
+  };
+  const auto unsupported = [&] {
+    return ApiError::Unsupported(std::format("reading external Parquet column {} as {}", field.name,
+                                             FieldTypeName(field.type)));
+  };
+  const bool bytes =
+      column.type == parquet::kByteArray || column.type == parquet::kFixedLenByteArray;
+  switch (field.type) {
+    case FieldType::kJson:
+      throw ApiError::Invalid("Unsupported field type: JSON");
+    case FieldType::kString:
+      if (column.IsDecimal()) {
+        // As NUMERIC text, without trailing fractional zeros.
+        return R"(regexp_replace(regexp_replace(CAST({} AS VARCHAR), '(\.[0-9]*?)0+$', '\1'), '\.$', ''))";
+      }
+      if (detected == FieldType::kBytes) {
+        return "decode({})";
+      }
+      if (!bytes) {
+        throw failed(
+            std::format("Parquet type for field '{}' needs to be FIXED_LEN_BYTE_ARRAY or "
+                        "BYTE_ARRAY (found {}).",
+                        field.name, physical));
+      }
+      break;
+    case FieldType::kBytes:
+      if (detected == FieldType::kString) {
+        return "encode({})";
+      }
+      break;
+    case FieldType::kFloat:
+    case FieldType::kInteger:
+      if (field.type == FieldType::kInteger && column.IsDecimal() &&
+          (column.type == parquet::kInt32 || column.type == parquet::kInt64)) {
+        return std::format("CAST({{}} * 1{} AS BIGINT)", std::string(column.scale, '0'));
+      }
+      if ((field.type == FieldType::kFloat && column.type != parquet::kFloat &&
+           column.type != parquet::kDouble &&
+           (detected == FieldType::kInteger || detected == FieldType::kNumeric)) ||
+          (field.type == FieldType::kInteger &&
+           (column.type == parquet::kFloat || column.type == parquet::kDouble ||
+            column.type == parquet::kBoolean || column.type == parquet::kByteArray))) {
+        throw ApiError::InvalidQuery(std::format(
+            "Column '{}' has unsupported Parquet type({}) for GoogleSQL type({})", field.name,
+            physical, field.type == FieldType::kFloat ? "FLOAT64" : "INT64"));
+      }
+      break;
+    case FieldType::kNumeric:
+    case FieldType::kBigNumeric:
+      if (detected == FieldType::kInteger && !nanos) {
+        return "";
+      }
+      if (column.IsDecimal()) {
+        return "";
+      }
+      if (column.type == parquet::kFloat || column.type == parquet::kDouble ||
+          detected == FieldType::kString) {
+        throw failed(std::format(
+            "Reading column '{}' of type {} as NUMERIC type but its logical type is {}, expecting "
+            "DECIMAL.",
+            field.name, physical, detected == FieldType::kString ? "UTF8" : "NONE"));
+      }
+      break;
+    case FieldType::kDate:
+      if (column.type == parquet::kInt64 || column.type == parquet::kByteArray) {
+        // The physical type, numbered from 1.
+        throw failed(std::format("Date type ({}) is not int32", column.type + 1));
+      }
+      break;
+    case FieldType::kDatetime:
+      if (detected == FieldType::kTimestamp && column.type == parquet::kInt64) {
+        return "";
+      }
+      if (column.type == parquet::kInt32 || column.type == parquet::kByteArray) {
+        throw failed(std::format("Datetime type ({}) is not INT64", physical));
+      }
+      if (nanos) {
+        throw failed(std::format(
+            "Datetime type column ({}) with type ({}) is not annotated as a TIMESTAMP, please "
+            "annotate it as TIMESTAMP_MILLIS or TIMESTAMP_MICROS.",
+            field.name, column.type + 1));
+      }
+      break;
+    case FieldType::kTimestamp:
+      if (detected == FieldType::kDate || nanos) {
+        const std::string micros =
+            nanos ? "epoch_ns({0})" : "CAST({0} - DATE '1970-01-01' AS BIGINT)";
+        return std::format(
+            "CASE WHEN {0} BETWEEN -62135596800000000 AND 253402300799999999 THEN "
+            "make_timestamp({0}) ELSE error('Cannot return an invalid timestamp value of ' || {0} "
+            "|| ' microseconds relative to the Unix epoch. The range of valid timestamp values is "
+            "[0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field {1}') END",
+            micros, std::string(field.name));
+      }
+      break;
+    default:
+      break;
+  }
+  throw unsupported();
+}
+
 // Whether a source whose column has the `detected` field, or none, can be read as `declared`:
 // the same type, REPEATED in both or neither, and each declared field one of the source's, or
 // NULLABLE and absent. BigQuery, as DuckDB's casts do, matches a RECORD's fields by name in any
@@ -274,6 +438,17 @@ std::optional<int> CsvSkipLeadingRows(const GcsExternalData& definition) {
   return static_cast<int>(*definition.skip_leading_rows);
 }
 
+// The time_zone, date_format, datetime_format, time_format and timestamp_format of `definition`.
+DatetimeFormats Formats(const GcsExternalData& definition) {
+  return {
+      .time_zone = definition.time_zone.value_or(""),
+      .date = definition.date_format.value_or(""),
+      .datetime = definition.datetime_format.value_or(""),
+      .time = definition.time_format.value_or(""),
+      .timestamp = definition.timestamp_format.value_or(""),
+  };
+}
+
 // The reader settings of a CSV table's options other than its delimiter and leading rows.
 CsvReadOptions CsvOptions(const GcsExternalData& definition) {
   return {
@@ -286,7 +461,8 @@ CsvReadOptions CsvOptions(const GcsExternalData& definition) {
       .null_markers = definition.null_markers,
       .preserve_ascii_control_characters =
           definition.preserve_ascii_control_characters.value_or(false),
-      .canonical_datetimes = true,
+      .external_values = true,
+      .formats = Formats(definition),
   };
 }
 
@@ -428,6 +604,10 @@ void ReportBadRecords(BadRecords& bad, bool csv, std::string_view table_name,
         bad.found.size(), bad.limit));
   }
   for (const BadRecord& record : bad.found) {
+    if (record.query) {
+      context.warn(ApiError::InvalidQuery(record.message));
+      continue;
+    }
     const std::string message =
         csv ? record.message
             : std::format("Error while reading table: {}, error message: {}", table_name,
@@ -606,10 +786,12 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       if (json) {
         std::vector<FileSource> staged;
         try {
-          staged = StageExternalJson({source}, file_schema, files,
-                                     definition.autodetect.value_or(false), skips);
+          staged =
+              StageExternalJson({source}, file_schema, files, definition.autodetect.value_or(false),
+                                Formats(definition), skips);
         } catch (const ApiError& error) {
-          if (std::string_view(error.what()).starts_with(kUnsupported)) {
+          if (std::string_view(error.what()).starts_with(kUnsupported) ||
+              error.reason() == "invalidQuery") {
             throw;
           }
           throw error.WithMessage(std::format("Error while reading table: {}, error message: {}",
@@ -621,7 +803,22 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       }
       if (csv) {
         first_records.push_back(bad.records + 1);
-        const auto staged = StageCsvSources({source}, csv_options, read_schema, files, skips);
+        std::vector<FileSource> staged;
+        try {
+          staged = StageCsvSources({source}, csv_options, read_schema, files, skips);
+        } catch (const ApiError& error) {
+          // As BigQuery's answers in external_table_csv_types.api.answers.json show, a query fails
+          // with the message of the record it warns of when it skips it, naming the table and
+          // the source.
+          constexpr std::string_view kRecord = "Error while reading data, error message: ";
+          const std::string_view message = error.what();
+          if (!message.starts_with(kRecord)) {
+            throw;
+          }
+          throw error.WithMessage(
+              std::format("Error while reading table: {}, error message: {} File: {}", table_name,
+                          message.substr(kRecord.size()), source.uri));
+        }
         std::ranges::copy(staged, std::back_inserter(staged_csv));
         std::string read_csv = FileReadQuery(csv_options, staged, converted);
         if (!unread.empty()) {
@@ -633,8 +830,10 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       const ThriftValue metadata = SourceMetadata(source);
       const auto columns =
           ParquetColumns(metadata, definition.enable_list_inference.value_or(false));
-      // Do not inherit load's coercions: a source column must have the type BigQuery would
-      // detect for it, so that no incompatible column is silently cast to the declared type.
+      // Do not inherit load's coercions: a top-level column reads as ParquetConversion gives
+      // it, and a nested one must have the type BigQuery would detect for it, so that no
+      // incompatible column is silently cast to the declared type.
+      std::map<std::string, std::string> conversions;
       for (const auto& field : file_schema) {
         const auto* column = columns.Child(field.name);
         const auto detected = column == nullptr ? std::nullopt : DetectedField(metadata, *column);
@@ -646,6 +845,27 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
               "expected to be optional/required in BigQuery File: {}",
               field.name, source.uri));
         }
+        // BigQuery detects a DECIMAL that NUMERIC does not hold as NUMERIC too.
+        const bool decimal = column != nullptr && !detected && column->IsDecimal();
+        if (column != nullptr && (detected || decimal) &&
+            column->kind == ParquetColumn::Kind::kLeaf &&
+            column->edges == ParquetColumn::Edges::kNone && field.mode != FieldMode::kRepeated &&
+            field.type != FieldType::kRecord &&
+            (decimal ||
+             (detected->mode != FieldMode::kRepeated && detected->type != FieldType::kRecord))) {
+          // Whether BigQuery rounds or rejects its values is not known.
+          if (decimal && field.type == FieldType::kNumeric) {
+            throw ApiError::Unsupported("reading external Parquet column " + field.name +
+                                        ", a DECIMAL that NUMERIC does not hold, as NUMERIC");
+          }
+          std::string conversion =
+              ParquetConversion(field, Element(metadata, *column), *column,
+                                decimal ? FieldType::kNumeric : detected->type, source.uri);
+          if (!conversion.empty()) {
+            conversions.emplace(field.name, std::move(conversion));
+          }
+          continue;
+        }
         if ((column != nullptr && !detected) || !Matches(field, detected ? &*detected : nullptr)) {
           throw ApiError::Unsupported(std::string("external Parquet source schema for column ") +
                                       field.name);
@@ -656,6 +876,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
                                          ParquetReadOptions{
                                              .allow_missing_columns = true,
                                              .allow_null_list_elements = true,
+                                             .conversions = std::move(conversions),
                                          },
                                          {source}, read_schema, columns)));
     }

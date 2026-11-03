@@ -73,36 +73,39 @@ GCS external tables support Parquet, CSV and newline-delimited JSON through `CRE
 or `tables.insert`. Sources
 must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A Parquet or CSV
 table created without a schema takes the one BigQuery detects from the alphabetically last source
-file when it is created, so creation reads the sources. Columns and their fields must be of the Parquet types
-that the [Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
-convert to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a DECIMAL that NUMERIC
-holds, or a group, which is a RECORD; a repeated field is REPEATED. By default a LIST or MAP
-group is a RECORD of its repeated field. DDL `enable_list_inference` and REST
-`parquetOptions.enableListInference` can unwrap LIST groups into REPEATED fields. Unlike loads,
-external reads preserve NULL LIST elements. An explicit schema must give each column and field
-the type detected for it; coercions, ENUM, GeoParquet, column name conversions and the
-options that select other types are unsupported. Every source file must have each REQUIRED and
-REPEATED column and field of the schema.
+file when it is created, so creation reads the sources. Columns and their fields must be of the
+Parquet types that the
+[Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md) convert
+to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a TIMESTAMP of nanoseconds, which
+reads as its INT64 value, a DECIMAL that NUMERIC holds, or a group, which is a RECORD; a repeated
+field is REPEATED. By default a LIST or MAP group is a RECORD of its repeated field. DDL
+`enable_list_inference` and REST `parquetOptions.enableListInference` can unwrap LIST groups into
+REPEATED fields. Unlike loads, external reads preserve NULL LIST elements. An explicit schema
+gives each nested field the type detected for it. A top-level column can also read an integer or
+a DECIMAL as NUMERIC or BIGNUMERIC, a DECIMAL as STRING or, as BigQuery does, by its unscaled
+value as INT64, a BYTE_ARRAY as STRING or BYTES, a TIMESTAMP of milliseconds or microseconds as
+DATETIME, and a DATE or a TIMESTAMP of nanoseconds, whose value BigQuery reads as microseconds, as
+TIMESTAMP; other combinations fail as BigQuery's do or, such as GEOGRAPHY, are unsupported. A
+DECIMAL that NUMERIC does not hold, ENUM, GeoParquet, column name conversions and the options
+that select other types are unsupported. Every source file must have each REQUIRED and REPEATED
+column and field of the schema.
 
 CSV takes a flat schema of the scalar types listed above, given or detected as
 [loads detect it](#loads-extracts-and-copies), and a given schema can also have DATETIME,
-BIGNUMERIC, JSON and GEOGRAPHY columns. A DATETIME value must have the form
-`YYYY-MM-DD HH:MM:SS[.SSSSSS]` of the
-[CSV data types](../third_party/bigquery_docs/loading-data-cloud-storage-csv.md); other forms are
-unsupported. It supports
-`skip_leading_rows` / `csvOptions.skipLeadingRows`, a single ASCII
-`field_delimiter` / `csvOptions.fieldDelimiter`, other than a quote, line break or NUL, and the
-[CSV options](#loads-extracts-and-copies) loads take. Schema detection does not take a quote,
-quoted line breaks or NULL markers. Other CSV options are unsupported.
+BIGNUMERIC, JSON and GEOGRAPHY columns. It supports `skip_leading_rows` /
+`csvOptions.skipLeadingRows`, a single ASCII `field_delimiter` / `csvOptions.fieldDelimiter`,
+other than a quote, line break or NUL, and the [CSV options](#loads-extracts-and-copies) loads
+take. Schema detection does not take a quote, quoted line breaks or NULL markers. Other CSV
+options are unsupported.
 
-JSON takes a schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, DATE, DATETIME, TIME,
-TIMESTAMP or GEOGRAPHY fields, RECORDs of those fields, or repeated fields of those types. Given
-a schema, scalar values must use their native JSON representation, except INT64 also accepts
-decimal strings, BOOL accepts its text spellings, and BYTES requires base64 strings. NUMERIC accepts decimal numbers or strings
-with at most 29 integer digits and nine fractional digits, without exponent notation. DATE and
-TIME accept canonical `YYYY-MM-DD` and `HH:MM:SS[.SSSSSS]` strings, DATETIME
-`YYYY-MM-DD HH:MM:SS[.SSSSSS]`, and TIMESTAMP only `YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z`. GEOGRAPHY
-accepts WKT, hex WKB or GeoJSON strings. A table created without a schema takes the one BigQuery
+JSON takes a schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, BIGNUMERIC, DATE, DATETIME,
+TIME, TIMESTAMP, JSON or GEOGRAPHY fields, RECORDs of those fields, or repeated fields of those
+types. Given a schema, scalar values must use their native JSON representation, except INT64 also
+accepts decimal strings, BOOL accepts its text spellings, and BYTES requires base64 strings.
+NUMERIC accepts decimal numbers or strings with at most 29 integer digits and nine fractional
+digits, without exponent notation. DATE and TIME accept canonical `YYYY-MM-DD` and
+`HH:MM:SS[.SSSSSS]` strings, and TIMESTAMP only `YYYY-MM-DDTHH:MM:SS[.SSSSSS]Z` unless a format
+or time zone applies. A table created without a schema takes the one BigQuery
 [detects](../third_party/bigquery_docs/schema-detect.md) from the alphabetically last source
 file, and its reads also take strings in the forms detection converts, and numbers and BOOL
 values for STRING fields. The order of detected columns can differ from BigQuery's for objects of
@@ -111,12 +114,17 @@ no fields, and `tables.insert` rejects `autodetect` with a schema. Other scalar 
 JSON options other than `jsonOptions.encoding` are unsupported.
 
 CSV and JSON tables support `compression`, `encoding` / `csvOptions.encoding` and
-`jsonOptions.encoding`, and `max_bad_records` / `maxBadRecords`. A gzip source with compression
-`NONE`, which BigQuery reads without decompressing it, or in UTF-16 or UTF-32, and an invalid
-UTF-16 or UTF-32 sequence, are unsupported. A CSV value of a BIGNUMERIC, BYTES, INTERVAL, RANGE
-or GEOGRAPHY column, or a JSON value of a valid record, that fails to convert still fails the
-query rather than counting as bad. The warning for a malformed JSON line does not name the token
-BigQuery expected.
+`jsonOptions.encoding`, `max_bad_records` / `maxBadRecords`, and `time_zone`, `date_format`,
+`datetime_format`, `time_format` and `timestamp_format` / `timeZone`, `dateFormat`,
+`datetimeFormat`, `timeFormat` and `timestampFormat`, which schema detection does not take. A
+TIMESTAMP that `time_zone` applies to without a format takes the forms of the
+[CSV data types](../third_party/bigquery_docs/loading-data-cloud-storage-csv.md) but not a Unix
+epoch time. A gzip source with compression `NONE`, which BigQuery reads without decompressing it,
+or in UTF-16 or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A CSV value of
+a BYTES, INTERVAL or RANGE column, or a JSON value of a valid record other than a BIGNUMERIC,
+DATETIME or GEOGRAPHY one or one a format parses, that fails to convert still fails the query
+rather than counting as bad. GEOGRAPHY WKT of a word other than a geometry type is unsupported. The
+warning for a malformed JSON line does not name the token BigQuery expected.
 
 [Hive partitioning](../third_party/bigquery_docs/hive-partitioned-queries.md), through
 `WITH PARTITION COLUMNS` or `hivePartitioningOptions`, takes its keys and their types from the

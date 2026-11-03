@@ -97,9 +97,12 @@ inline constexpr int16_t kLogicalTime = 7;
 inline constexpr int16_t kLogicalTimestamp = 8;
 inline constexpr int16_t kLogicalInteger = 10;
 // TimeType and TimestampType: unit, a TimeUnit, whose members are MILLIS, MICROS and NANOS.
+// TimeType and TimestampType: isAdjustedToUTC, a bool.
+inline constexpr int16_t kTimeAdjustedToUtc = 1;
 inline constexpr int16_t kTimeUnit = 2;
 inline constexpr int16_t kTimeUnitMillis = 1;
 inline constexpr int16_t kTimeUnitMicros = 2;
+inline constexpr int16_t kTimeUnitNanos = 3;
 inline constexpr int16_t kDecimalScale = 1;
 inline constexpr int16_t kDecimalPrecision = 2;
 inline constexpr int16_t kRowGroupColumns = 1;

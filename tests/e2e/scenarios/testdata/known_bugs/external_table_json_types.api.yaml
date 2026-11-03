@@ -1,0 +1,477 @@
+version: 1
+# Each case expects BigQuery's answer, which the emulator does not give: its comment
+# says what differs.
+# Recorded on BigQuery in project johejo-sandbox, run pt7rubsgsvcxs2qkywarngjwp4, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the
+# observations. BigQuery's answers settle which JSON values of a NEWLINE_DELIMITED_JSON external
+#   table's
+# DATETIME, BIGNUMERIC, JSON and GEOGRAPHY fields it reads, and how, at the top level and
+# nested: third_party/bigquery_docs/loading-data-cloud-storage-json.md describes loads.
+# Records are {"id": N, "v": VALUE}, one value of the type per record:
+# - datetime: 1: "2024-01-02 03:04:05"; 2: "2024-01-02T03:04:05.123456"; 3: "2024-01-02"; 4:
+#   "2024-01-02 03:04"; 5: 1; 6: "2024-01-02 03:04:05 UTC"; 7: "2024-01-02T03:04:05Z"; 8:
+#   "2024-01-02 03:04:05.1234567"; 9: "2024-01-02 3:4:5"; 10: true; 11: {"a":1}; 12: null
+# - bignumeric: 1: 1.5; 2: "1.5"; 3: 1e3; 4: "1e3"; 5: 0.123456789012345678901234567890123456789; 6:
+#   578960446186580977117854925043439539266.34992332820282019728792003956564819967; 7: 1e40; 8:
+#   true; 9: "abc"; 10: " 1"; 11: null; 12: -0.00000000000000000000000000000000000001
+# - json: 1: {"a":1}; 2: [1,2]; 3: "s"; 4: "{\"a\":1}"; 5: 1; 6: 1.5; 7: 12345678901234567890; 8:
+#   true; 9: null; 10: {"a":{"b":[1,null]}}; 11: {}; 12: {"b":2,"a":1}
+# - geography: 1: "POINT(1 2)"; 2: {"type":"Point","coordinates":[1,2]}; 3:
+#   "{\"type\":\"Point\",\"coordinates\":[1,2]}"; 4: "0101000000000000000000F03F0000000000000040";
+#   5: 1; 6: "POINT(200 0)"; 7: "INVALID"; 8: null; 9: "POINT EMPTY"; 10: "SRID=4326;POINT(1 2)"
+# - datetime_invalid: {"id":1,"v":"2024/01/02 03:04:05"}
+# - bignumeric_invalid: {"id":1,"v":"abc"}
+# - json_invalid: {"id":1,"v":[1,}
+# - geography_invalid: {"id":1,"v":"INVALID"}
+# - nested: {"id":1,"r":{"dt":"2024-01-02 03:04:05","j":{"a":1},"g":"POINT(1
+#   2)","bn":"1.5"},"bns":[1.5,"2.5"],"js":[{"a":1},2,null],"dts":["2024-01-02 03:04:05"]}
+description: >-
+  DATETIME, BIGNUMERIC, JSON and GEOGRAPHY fields of JSON external tables with a given
+  schema.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+  geography: "eyJpZCI6MSwidiI6IlBPSU5UKDEgMikifQp7ImlkIjoyLCJ2Ijp7InR5cGUiOiJQb2ludCIsImNvb3JkaW5hdGVzIjpbMSwyXX19CnsiaWQiOjMsInYiOiJ7XCJ0eXBlXCI6XCJQb2ludFwiLFwiY29vcmRpbmF0ZXNcIjpbMSwyXX0ifQp7ImlkIjo0LCJ2IjoiMDEwMTAwMDAwMDAwMDAwMDAwMDAwMEYwM0YwMDAwMDAwMDAwMDAwMDQwIn0KeyJpZCI6NSwidiI6MX0KeyJpZCI6NiwidiI6IlBPSU5UKDIwMCAwKSJ9CnsiaWQiOjcsInYiOiJJTlZBTElEIn0KeyJpZCI6OCwidiI6bnVsbH0KeyJpZCI6OSwidiI6IlBPSU5UIEVNUFRZIn0KeyJpZCI6MTAsInYiOiJTUklEPTQzMjY7UE9JTlQoMSAyKSJ9Cg=="
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and runs `query` on it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the query fails.
+  ddl_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the statement fails.
+  create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  # Known bug: WKT of an unknown word is unsupported, where BigQuery fails with Unexpected 'INVALID'
+  #   at position 0.
+  - name: geography_spellings
+    template: ddl
+    vars:
+      object: "s.json"
+      source: "${geography}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_spellings/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_geography_spellings.t, error message: JSON parsing error in row starting at position 26: JSON object specified for non-record field: v File: gs://${bucket}/${run}/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+                "message": "Error while reading table: ${project}.bqa_${run}_geography_spellings.t, error message: JSON parsing error in row starting at position 192: Could not convert JSON value to geography. Field: v; Value: 1 File: gs://${bucket}/${run}/geography_spellings/s.json",
+                "reason": "invalid"
+              },
+              {
+                "location": "query",
+                "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID",
+                "reason": "invalidQuery"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "query",
+              "reason": "invalidQuery"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "9"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  # Known bug: the message for a malformed line names no expected token.
+  - name: json_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6WzEsfQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v JSON) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/json_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "JSON"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalid",
+          "message": "Error while reading table: ${project}.bqa_${run}_json_invalid.t, error message: JSON parsing error in row starting at position 0: Parser terminated before end of string File: gs://${bucket}/${run}/json_invalid/s.json"
+        }
+      }
+  # Known bug: WKT of an unknown word is unsupported, where BigQuery fails with Unexpected 'INVALID'
+  #   at position 0.
+  - name: geography_invalid
+    template: ddl_failure
+    vars:
+      object: "s.json"
+      source: "eyJpZCI6MSwidiI6IklOVkFMSUQifQo="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'JSON', uris = ['${prefix}/s.json'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_invalid/s.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Could not convert JSON value to geography: Unexpected 'INVALID' at position 0. Field: v; Value: INVALID"
+        }
+      }

@@ -28,6 +28,27 @@ namespace bigquery_emulator_duckdb::information_schema {
 
 namespace {
 
+// The time_zone, date_format, datetime_format, time_format and timestamp_format options `external`
+// sets, in the order BigQuery lists them, as its answers in
+// external_table_datetime_formats.api.answers.json show.
+std::vector<std::pair<std::string_view, std::string>> DatetimeFormatOptions(
+    const GcsExternalData& external) {
+  std::vector<std::pair<std::string_view, std::string>> options;
+  for (const auto& [name, value] : {
+           std::pair<std::string_view, const std::optional<std::string>*>{"time_zone",
+                                                                          &external.time_zone},
+           {"date_format", &external.date_format},
+           {"datetime_format", &external.datetime_format},
+           {"time_format", &external.time_format},
+           {"timestamp_format", &external.timestamp_format},
+       }) {
+    if (value->has_value()) {
+      options.emplace_back(name, StringOptionValue(value->value()));
+    }
+  }
+  return options;
+}
+
 // DDL omits redundant collations: the table's default, and binary when there is no nonempty
 // default. Nested STRING fields and array elements carry their own COLLATE clauses.
 absl::StatusOr<std::string> ColumnTypeDdl(FieldSchema field,
@@ -147,6 +168,9 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     }
     if (external->max_bad_records) {
       ddl += "  max_bad_records=" + std::to_string(*external->max_bad_records) + ",\n";
+    }
+    for (const auto& [name, value] : DatetimeFormatOptions(*external)) {
+      ddl += std::format("  {}={},\n", name, value);
     }
     ddl += "  format=" + StringOptionValue(external->format) + ",\n";
     if (hive) {
@@ -419,6 +443,10 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
               .type = "INT64",
               .value = std::to_string(*external.max_bad_records),
           });
+        }
+        for (auto& [name, value] : DatetimeFormatOptions(external)) {
+          options.push_back(
+              {.name = std::string(name), .type = "STRING", .value = std::move(value)});
         }
         if (external.skip_leading_rows) {
           options.push_back({

@@ -48,6 +48,12 @@ struct GcsExternalData {
   // csvOptions.encoding of a CSV table, or jsonOptions.encoding of a JSON one, as given.
   std::optional<std::string> encoding = std::nullopt;
   std::optional<HivePartitioning> hive_partitioning = std::nullopt;
+  // time_zone, date_format, datetime_format, time_format and timestamp_format, as given.
+  std::optional<std::string> time_zone = std::nullopt;
+  std::optional<std::string> date_format = std::nullopt;
+  std::optional<std::string> datetime_format = std::nullopt;
+  std::optional<std::string> time_format = std::nullopt;
+  std::optional<std::string> timestamp_format = std::nullopt;
   bool operator==(const GcsExternalData&) const = default;
 };
 

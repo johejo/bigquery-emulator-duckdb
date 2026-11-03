@@ -13,10 +13,12 @@ namespace bigquery_emulator_duckdb {
 // fields before the typed reader runs. Keeps source URIs for _FILE_NAME and error attribution.
 // The values of an `autodetected` table convert as BigQuery reads them, such as a string that
 // holds a number of a FLOAT64 field. A record BigQuery rejects throws ApiError::Invalid unless
-// `bad` adds it and may skip it, which leaves it out.
+// `bad` adds it and may skip it, which leaves it out. DATE, DATETIME, TIME and TIMESTAMP values
+// parse with `formats` as ExternalValue parses them.
 std::vector<FileSource> StageExternalJson(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
                                           TemporaryFiles& files, bool autodetected,
+                                          const DatetimeFormats& formats,
                                           BadRecords* bad = nullptr);
 
 }  // namespace bigquery_emulator_duckdb

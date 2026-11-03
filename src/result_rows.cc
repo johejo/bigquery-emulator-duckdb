@@ -132,6 +132,19 @@ struct CellEncoding {
 };
 
 // The cell, {"v": ...}, of `row` of a result vector in BigQuery's wire format.
+// `text`, a DATETIME or TIME, with six digits of any fraction of a second, as BigQuery gives it
+// in its answers in external_table_parquet_types.api.answers.json and
+// external_table_datetime_formats.api.answers.json.
+std::string SixDigitFraction(std::string text) {
+  if (const auto point = text.find('.'); point != std::string::npos) {
+    const size_t digits = text.size() - point - 1;
+    if (digits < 6) {
+      text.append(6 - digits, '0');
+    }
+  }
+  return text;
+}
+
 json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
             const CellEncoding& encoding);
 
@@ -232,9 +245,12 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
       if (text.size() > 10 && text.at(10) == ' ') {
         text.at(10) = 'T';
       }
-      value = std::move(text);
+      value = SixDigitFraction(std::move(text));
       break;
     }
+    case DUCKDB_TYPE_TIME:
+      value = SixDigitFraction(ValueString(VectorValue(vector, type, row).get()));
+      break;
     case DUCKDB_TYPE_INTERVAL: {
       const auto interval = IntervalFromDuckDb(VectorElement<duckdb_interval>(vector, row));
       if (!interval.ok()) {

@@ -1,0 +1,468 @@
+version: 1
+# Each case expects BigQuery's answer, which the emulator does not give: its comment
+# says what differs.
+# Recorded on BigQuery in project johejo-sandbox, run ysncep57lqwczakpjuta2ymnxk, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the
+# observations. BigQuery's answers settle which values of a CSV external table's DATETIME,
+#   BIGNUMERIC,
+# JSON and GEOGRAPHY columns it reads, and how: third_party/bigquery_docs/
+# loading-data-cloud-storage-csv.md describes the forms loads take, not external reads.
+# Records are `id,value`, one spelling of the type per record, base64-encoded:
+# - datetime: 1: "2024-01-02 03:04:05"; 2: "2024-01-02T03:04:05"; 3: "2024-01-02 03:04:05.123456";
+#   4: "2024-01-02 03:04:05.1234567"; 5: "2024-01-02 3:4:5"; 6: "2024-01-02"; 7: "2024-01-02 03:04";
+#   8: "2024-01-02 03:04:05 UTC"; 9: "2024-01-02 03:04:05+00:00"; 10: "2024/01/02 03:04:05"; 11: "
+#   2024-01-02 03:04:05"; 12: "2024-01-02 03:04:05 "; 13: "0001-01-01 00:00:00"; 14: "9999-12-31
+#   23:59:59.999999"; 15: "2024-1-2 03:04:05"; 16: "2024-01-02 24:00:00"; 17: "2024-02-30 00:00:00";
+#   18: "2024-01-02T03:04:05Z"; 19: ""
+# - bignumeric: 1: "1.5"; 2: "-0.00000000000000000000000000000000000001"; 3:
+#   "0.123456789012345678901234567890123456789"; 4: "1e3"; 5: " 1"; 6:
+#   "578960446186580977117854925043439539266.34992332820282019728792003956564819967"; 7:
+#   "578960446186580977117854925043439539267"; 8: "+1"; 9: ".5"; 10: "5."; 11: "NaN"; 12: "0x10";
+#   13: "1,000"; 14: ""; 15:
+#   "-578960446186580977117854925043439539266.34992332820282019728792003956564819968"
+# - json: 1: "{\"a\":1}"; 2: "[1,2]"; 3: "\"s\""; 4: "1"; 5: "null"; 6: "true"; 7: "{\"a\":1"; 8:
+#   "abc"; 9: "{\"a\":1,\"a\":2}"; 10: ""; 11: " {\"a\": 1} "; 12: "{\"b\":2,\"a\":1}"; 13: "1.0e2";
+#   14: "12345678901234567890"; 15: "{\"a\":\"\\u00e9\"}"
+# - geography: 1: "POINT(1 2)"; 2: "point(1 2)"; 3: "SRID=4326;POINT(1 2)"; 4:
+#   "{\"type\":\"Point\",\"coordinates\":[1,2]}"; 5: "0101000000000000000000F03F0000000000000040";
+#   6: "POINT EMPTY"; 7: "POINT(200 0)"; 8: "LINESTRING(0 0, 1 1)"; 9: "INVALID"; 10: "POLYGON((0 0,
+#   1 0, 1 1, 0 0))"; 11: ""; 12: "POINT(1 91)"
+# - datetime_invalid: 1,"2024/01/02 03:04:05"
+# - bignumeric_invalid: 1,"abc"
+# - json_invalid: 1,"{"
+# - geography_invalid: 1,"INVALID"
+# - rest_types: 1,2024-01-02 03:04:05,1.5,"{""a"":1}",POINT(1 2)
+description: >-
+  DATETIME, BIGNUMERIC, JSON and GEOGRAPHY columns of CSV external tables with a given
+  schema.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+  geography: "MSxQT0lOVCgxIDIpCjIscG9pbnQoMSAyKQozLFNSSUQ9NDMyNjtQT0lOVCgxIDIpCjQsInsiInR5cGUiIjoiIlBvaW50IiIsIiJjb29yZGluYXRlcyIiOlsxLDJdfSIKNSwwMTAxMDAwMDAwMDAwMDAwMDAwMDAwRjAzRjAwMDAwMDAwMDAwMDAwNDAKNixQT0lOVCBFTVBUWQo3LFBPSU5UKDIwMCAwKQo4LCJMSU5FU1RSSU5HKDAgMCwgMSAxKSIKOSxJTlZBTElECjEwLCJQT0xZR09OKCgwIDAsIDEgMCwgMSAxLCAwIDApKSIKMTEsCjEyLFBPSU5UKDEgOTEpCg=="
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and runs `query` on it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        bind:
+          job: /body/jobReference/jobId
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: job
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        observe:
+          status: /body/status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the query fails.
+  ddl_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, where the statement fails.
+  create_failure:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  # Known bug: WKT of an unknown word is unsupported, where BigQuery fails with Unexpected 'INVALID'
+  #   at position 0.
+  - name: geography_spellings
+    template: ddl
+    vars:
+      object: "s.csv"
+      source: "${geography}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'CSV', uris = ['${prefix}/s.csv'], max_bad_records = 100)"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "maxBadRecords": 100,
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_spellings/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "job": {
+          "status": {
+            "errors": [
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+                "message": "Error while reading data, error message: Unexpected 'INVALID' at position 0.; line_number: 9 byte_offset_to_start_of_line: 195 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://${bucket}/${run}/geography_spellings/s.csv",
+                "reason": "invalid"
+              },
+              {
+                "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+                "message": "Error while reading data, error message: Latitude must be between -90 and 90 degrees. Actual value was 91; line_number: 12 byte_offset_to_start_of_line: 244 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"POINT(1 91)\" File: gs://${bucket}/${run}/geography_spellings/s.csv",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://${bucket}/${run}/geography_spellings/s.csv",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "POINT(1 2)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "GEOMETRYCOLLECTION EMPTY"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "POINT(-160 0)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": "LINESTRING(0 0, 1 1)"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "10"
+                },
+                {
+                  "v": "POLYGON((0 0, 1 0, 1 1, 0 0))"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "11"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+  # Known bug: WKT of an unknown word is unsupported, where BigQuery fails with Unexpected 'INVALID'
+  #   at position 0.
+  - name: geography_invalid
+    template: ddl_failure
+    vars:
+      object: "s.csv"
+      source: "MSxJTlZBTElECg=="
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v GEOGRAPHY) OPTIONS (format = 'CSV', uris = ['${prefix}/s.csv'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://${bucket}/${run}/geography_invalid/s.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "GEOGRAPHY"
+              }
+            ]
+          }
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalid",
+          "message": "Error while reading table: ${project}.bqa_${run}_geography_invalid.t, error message: Unexpected 'INVALID' at position 0.; line_number: 1 byte_offset_to_start_of_line: 0 column_index: 1 column_name: \"v\" column_type: GEOGRAPHY value: \"INVALID\" File: gs://${bucket}/${run}/geography_invalid/s.csv"
+        }
+      }
