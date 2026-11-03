@@ -161,6 +161,9 @@ struct BasicAggregateRule : AggregateOptions {
   List<std::string_view> arguments = {};
   // The order of the DuckDB call, with $n for argument n, when the BigQuery call has none.
   std::string_view order = {};
+  // Keeps values that `order` finds equal in their input order, which DuckDB's sort does not;
+  // only analytic calls, whose scan numbers its input rows, take it.
+  bool orders_ties_by_input = false;
   // The spellings of the arguments a call leaves out, by position; empty for none.
   List<std::string_view> defaults = {};
   Nulls nulls = Nulls::kRespect;

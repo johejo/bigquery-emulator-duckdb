@@ -362,7 +362,7 @@ Type signatures are enumerated for **361 of 407 functions**. The remaining **46*
 | `PATH_LAST` | 0 | Not enumerated |
 | `PATH_LENGTH` | 0 | Not enumerated |
 | [PERCENTILE_CONT](function-types/navigation.md#percentile_cont) | 9 | Supported |
-| [PERCENTILE_DISC](function-types/navigation.md#percentile_disc) | 45 | Partial |
+| [PERCENTILE_DISC](function-types/navigation.md#percentile_disc) | 45 | Supported |
 | [PERCENT_RANK](function-types/numbering.md#percent_rank) | 1 | Supported |
 | [POW](function-types/mathematical.md#pow) | 16 | Supported |
 | [POWER](function-types/mathematical.md#power) | 16 | Supported |

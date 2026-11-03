@@ -757,9 +757,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
 namespace {
 
 // PERCENTILE_CONT and PERCENTILE_DISC read their result off the partition's values, which
-// list() sorts as GoogleSQL does: NULLs first, then NaNs, then the other values.
+// list() sorts as GoogleSQL does: NULLs first, then NaNs, then the other values. INTERVAL values
+// sort by their keys, and BigQuery returns the first of equal ones.
 constexpr std::string_view kPercentileOrder = "$1 NULLS FIRST";
 constexpr std::string_view kFloatPercentileOrder = "NOT isnan($1) NULLS FIRST, $1 NULLS FIRST";
+constexpr std::string_view kIntervalPercentileOrder = "bq_interval_key($1) NULLS FIRST";
 
 // GoogleSQL's PERCENTILE_CONT over the sorted list `sql` of values of `kType`: FLOAT64, NUMERIC
 // or BIGNUMERIC, whose values and percentile cross as the VARCHAR of their units.
@@ -800,7 +802,10 @@ constexpr StaticAggregateRule PercentileDiscRule(googlesql::TypeKind type) {
       .type = type,
       .conditions = ArgumentType<kPercentile>::kSecond,
       .arguments = kValueArgument,
-      .order = type == googlesql::TYPE_DOUBLE ? kFloatPercentileOrder : kPercentileOrder,
+      .order = type == googlesql::TYPE_DOUBLE     ? kFloatPercentileOrder
+               : type == googlesql::TYPE_INTERVAL ? kIntervalPercentileOrder
+                                                  : kPercentileOrder,
+      .orders_ties_by_input = type == googlesql::TYPE_INTERVAL,
       .nulls = AggregateRule::Nulls::kFilterUnlessRespected,
       .finish = PercentileDisc<kPercentile>,
   };
@@ -968,12 +973,15 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
                  PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_DOUBLE),
                  PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_DOUBLE),
                  PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_DOUBLE),
+                 PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_INTERVAL),
+                 PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_INTERVAL),
+                 PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_INTERVAL),
                  PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_UNKNOWN),
                  PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_UNKNOWN),
                  PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_UNKNOWN),
              },
              {
-                 .uses = {TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
              }),
   };
   static constexpr auto kAnalytics = DefinitionViews(kAnalyticsBacking);
