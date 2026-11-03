@@ -312,3 +312,28 @@ SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, [2] AS y), (2, [1])])
 
 SELECT MAX_BY(x, y) FROM UNNEST([STRUCT(1 AS x, ST_GEOGPOINT(1, 2) AS y)])
 => error contains: must support ordering; Type GEOGRAPHY does not
+
+# Observed BigQuery answer recorded with tools/bqanswers: the average fits a NUMERIC though
+# the sum does not.
+SELECT AVG(x) FROM UNNEST([NUMERIC '99999999999999999999999999999.999999999', NUMERIC '99999999999999999999999999999.999999999']) AS x
+=> "99999999999999999999999999999.999999999"
+
+SELECT AVG(x) FROM UNNEST([NULL, NUMERIC '1.5']) AS x
+=> "1.5"
+
+SELECT AVG(x) FROM UNNEST([CAST(NULL AS NUMERIC)]) AS x
+=> null
+
+SELECT AVG(DISTINCT x) FROM UNNEST([NUMERIC '1', 1, 4]) AS x
+=> "2.5"
+
+# Observed BigQuery answers recorded with tools/bqanswers: a NUMERIC mean rounds half away from
+# zero to nine fractional digits.
+SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0]) AS x
+=> "0.000000001"
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '-0.000000001', 0]) AS x
+=> "-0.000000001"
+
+SELECT AVG(x) FROM UNNEST([NUMERIC '0.000000001', 0, 0]) AS x
+=> "0"

@@ -85,6 +85,22 @@ class Arguments {
     return {values + entry.offset, values + entry.offset + entry.length};
   }
 
+  // A list of DECIMAL(38, s) without NULL elements, as their 128-bit integers of units.
+  [[nodiscard]] std::vector<__int128> Decimals(idx_t column) const {
+    duckdb_vector vector = duckdb_data_chunk_get_vector(input_, column);
+    const auto entry = VectorElement<duckdb_list_entry>(vector, row_);
+    const auto* values =
+        static_cast<duckdb_hugeint*>(duckdb_vector_get_data(duckdb_list_vector_get_child(vector)));
+    std::vector<__int128> decimals;
+    decimals.reserve(entry.length);
+    for (idx_t i = 0; i < entry.length; ++i) {
+      const duckdb_hugeint value = values[entry.offset + i];
+      decimals.push_back(std::bit_cast<__int128>(
+          (static_cast<unsigned __int128>(value.upper) << 64U) | value.lower));
+    }
+    return decimals;
+  }
+
   [[nodiscard]] bool Bool(idx_t column) const {
     return static_cast<bool*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];

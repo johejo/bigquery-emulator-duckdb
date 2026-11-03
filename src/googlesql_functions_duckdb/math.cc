@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -254,6 +255,31 @@ bool RoundWithMode(T in, int64_t digits, T* out, absl::Status* error) {
   return fn::RoundDecimalWithRoundingMode(in, digits, kMode, out, error);
 }
 
+// AVG of the non-NULL NUMERIC values that list() collects, rounded half away from zero, which
+// is in range even where SUM overflows.
+void NumericAverage(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<__int128>> {
+            const std::vector<__int128> units = arguments.Decimals(0);
+            if (units.empty()) {
+              return std::nullopt;
+            }
+            googlesql::NumericValue::SumAggregator sum;
+            for (const __int128 value : units) {
+              const auto numeric = googlesql::NumericValue::FromPackedInt(value);
+              if (!numeric.ok()) {
+                return numeric.status();
+              }
+              sum.Add(*numeric);
+            }
+            const auto average = sum.GetAverage(units.size());
+            if (!average.ok()) {
+              return average.status();
+            }
+            return average->as_packed_int();
+          });
+}
+
 // Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix,
@@ -270,6 +296,7 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
     Register(connection, (name + suffix).c_str(), {type.get()}, type.get(), function);
   }
   LogicalType const list(duckdb_create_list_type(type.get()));
+  Register(connection, "bq_numeric_avg", {list.get()}, type.get(), NumericAverage);
   RegisterWithContext(connection, "bq_generate_array_numeric", {type.get(), type.get(), type.get()},
                       list.get(), ApplyWithContext<GenerateArray<T>>, extended_array_limit);
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
