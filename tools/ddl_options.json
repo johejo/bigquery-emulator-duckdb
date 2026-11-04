@@ -1917,8 +1917,14 @@
       "name": "CREATE EXTERNAL TABLE",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "exclude": ["format", "uris", "hive_partition_uri_prefix", "require_hive_partition_filter", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format"],
-      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})"
+      "exclude": ["field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format"],
+      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})",
+      "templates": {
+        "format": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], {option})",
+        "uris": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', {option})",
+        "hive_partition_uri_prefix": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], {option})",
+        "require_hive_partition_filter": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], hive_partition_uri_prefix = 'gs://bucket', {option})"
+      }
     },
     {
       "name": "CREATE EXTERNAL TABLE CSV",
@@ -1926,34 +1932,6 @@
       "group": "external_table_option_list",
       "only": ["field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], {option})"
-    },
-    {
-      "name": "CREATE EXTERNAL TABLE format",
-      "implementation": "CREATE EXTERNAL TABLE",
-      "group": "external_table_option_list",
-      "only": ["format"],
-      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], {option})"
-    },
-    {
-      "name": "CREATE EXTERNAL TABLE uris",
-      "implementation": "CREATE EXTERNAL TABLE",
-      "group": "external_table_option_list",
-      "only": ["uris"],
-      "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', {option})"
-    },
-    {
-      "name": "CREATE EXTERNAL TABLE hive_partition_uri_prefix",
-      "implementation": "CREATE EXTERNAL TABLE",
-      "group": "external_table_option_list",
-      "only": ["hive_partition_uri_prefix"],
-      "template": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], {option})"
-    },
-    {
-      "name": "CREATE EXTERNAL TABLE require_hive_partition_filter",
-      "implementation": "CREATE EXTERNAL TABLE",
-      "group": "external_table_option_list",
-      "only": ["require_hive_partition_filter"],
-      "template": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], hive_partition_uri_prefix = 'gs://bucket', {option})"
     },
     {
       "name": "CREATE TABLE generated column",
