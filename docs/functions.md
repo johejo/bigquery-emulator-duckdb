@@ -52,7 +52,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 67 | 3 | 1 | 0 |
+| [Geography functions](#geography-functions) | 68 | 2 | 1 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -254,7 +254,7 @@ functions.
 | [`ST_DIFFERENCE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DIMENSION`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DISJOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
-| [`ST_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Partial | S2 function | Unsupported: use_spheroid. |
+| [`ST_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
 | [`ST_DUMP`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DWITHIN`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_ENDPOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |

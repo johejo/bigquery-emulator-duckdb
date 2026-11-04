@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "GeographicLib/Geodesic.hpp"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
@@ -181,15 +182,40 @@ S1ChordAngle MaxDistance(const IndexedGeography& a, const IndexedGeography& b) {
 }
 }  // namespace
 
+// The geodesic distance over the WGS84 spheroid between the points where nonempty geographies
+// are closest over the sphere, as BigQuery measures it, or 0 where one contains part of the other.
+namespace {
+double SpheroidDistance(const IndexedGeography& a, const IndexedGeography& b) {
+  S2ClosestEdgeQuery query(&a.index());
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&b.index());
+  const auto result = query.FindClosestEdge(&target);
+  if (result.is_interior()) {
+    return 0;
+  }
+  const auto edge = query.GetEdge(result);
+  S2ClosestEdgeQuery reverse(&b.index());
+  S2ClosestEdgeQuery::EdgeTarget edge_target(edge.v0, edge.v1);
+  const auto opposite = reverse.FindClosestEdge(&edge_target);
+  if (opposite.is_interior()) {
+    return 0;
+  }
+  const auto other_edge = reverse.GetEdge(opposite);
+  const auto [p, q] = S2::GetEdgePairClosestPoints(edge.v0, edge.v1, other_edge.v0, other_edge.v1);
+  const Point x = ToPoint(p);
+  const Point y = ToPoint(q);
+  double meters = 0;
+  GeographicLib::Geodesic::WGS84().Inverse(x.latitude, x.longitude, y.latitude, y.longitude,
+                                           meters);
+  return meters;
+}
+}  // namespace
+
 // BigQuery's error for use_spheroid TRUE where it is not implemented, which `function`, the
-// last argument, names. ST_DISTANCE implements it, and the emulator does not.
+// last argument, names. Only ST_DISTANCE implements it.
 namespace {
 absl::Status CheckSphere(bool use_spheroid, const std::string& function) {
-  if (!use_spheroid) {
+  if (!use_spheroid || function == "ST_DISTANCE") {
     return absl::OkStatus();
-  }
-  if (function == "ST_DISTANCE") {
-    return absl::UnimplementedError("The emulator does not support use_spheroid");
   }
   return absl::OutOfRangeError(
       (function == "ST_CLOSESTPOINT" ? std::string("ST_ClosestPoint failed: ") : std::string()) +
@@ -205,6 +231,9 @@ absl::StatusOr<std::optional<double>> Distance(const IndexedGeography& a, const 
     return std::nullopt;
   }
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(use_spheroid, function));
+  if (use_spheroid) {
+    return SpheroidDistance(a, b);
+  }
   return Meters(function == "ST_MAXDISTANCE" ? MaxDistance(a, b) : MinDistance(a, b));
 }
 

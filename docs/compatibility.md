@@ -305,7 +305,8 @@ BigQuery loads as NULL.
 
 ### GEOGRAPHY values
 
-- `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
+- `ST_DISTANCE` with `use_spheroid = TRUE` can differ from BigQuery in the last digits where
+  the closest point lies inside an edge.
 - `ST_ASGEOJSON` splits lines and polygons at the antimeridian and closes polygons enclosing
   a pole along the map boundary. Tessellated coordinates can differ from BigQuery in their
   last digits; clipped polygon order, ring starts and boundary vertices can also differ, and
