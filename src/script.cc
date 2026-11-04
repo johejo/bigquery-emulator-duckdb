@@ -991,6 +991,7 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
       .distinct_aggregates_without_arrays =
           host.functions().restrictions().distinct_aggregates_without_arrays,
       .restrict_struct_results = host.functions().restrictions().restrict_struct_results,
+      .cast_without_type_parameters = host.functions().restrictions().cast_without_type_parameters,
   };
   for (const FieldSchema& field : parameters.named_types()) {
     absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);

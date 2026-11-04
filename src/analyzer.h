@@ -49,6 +49,7 @@ struct AnalyzerSettings {
   bool distinct_aggregates_without_arrays = true;
   // BigQuery rejects empty STRUCT results and anonymous fields of STRUCT value tables.
   bool restrict_struct_results = true;
+  bool cast_without_type_parameters = true;
 };
 
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so

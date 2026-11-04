@@ -15,9 +15,11 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/function_catalog/catalog.h"
 #include "src/function_catalog/comparison.h"
 #include "src/timestamp_precision.h"
 #include "src/translator/aggregate.h"
@@ -93,6 +95,82 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
 
 std::optional<std::string> CastValue(const googlesql::Type* from, const googlesql::Type* to,
                                      const std::string& sql, bool safe, Context& context);
+
+// Constraints apply after conversion, recursively, without changing the resolved type. Bind
+// STRUCT values once, preserving a NULL parent; ARRAY lambdas preserve NULL elements.
+std::optional<std::string> ConstrainedCast(const googlesql::Type* type,
+                                           const googlesql::TypeParameters& parameters,
+                                           const std::string& sql, bool safe, Context& context) {
+  const auto scalar = [safe](const std::string& call) { return safe ? "TRY(" + call + ")" : call; };
+  if (parameters.IsEmpty()) {
+    return sql;
+  }
+  if (parameters.IsStringTypeParameters()) {
+    const auto& length = parameters.string_type_parameters();
+    if (length.is_max_length()) {
+      return sql;
+    }
+    return scalar(
+        std::string(type->IsBytes() ? "bq_cast_constrain_bytes(" : "bq_cast_constrain_string(") +
+        sql + ", " + std::to_string(length.max_length()) + ")");
+  }
+  if (parameters.IsNumericTypeParameters()) {
+    const auto& numeric = parameters.numeric_type_parameters();
+    const std::string arguments =
+        ", " + std::to_string(numeric.is_max_precision() ? -1 : numeric.precision()) + ", " +
+        std::to_string(numeric.scale()) + ")";
+    if (type->IsBigNumericType()) {
+      return scalar("CAST(bq_cast_constrain_bignumeric(CAST(" + sql + " AS VARCHAR)" + arguments +
+                    " AS BIGNUM)");
+    }
+    return scalar("bq_cast_constrain_numeric(" + sql + arguments);
+  }
+  if (type->IsArray()) {
+    const std::string element = context.FreshName("_e");
+    const auto constrained = ConstrainedCast(type->AsArray()->element_type(), parameters.child(0),
+                                             element, safe, context);
+    if (!constrained) {
+      return std::nullopt;
+    }
+    if (!safe) {
+      return "list_transform(" + sql + ", lambda " + element + ": " + *constrained + ")";
+    }
+    const std::string array = context.FreshName("_a");
+    const std::string casts = context.FreshName("_c");
+    return "list_transform([" + sql + "], lambda " + array + ": list_transform([list_transform(" +
+           array + ", lambda " + element + ": " + *constrained + ")], lambda " + casts +
+           ": CASE WHEN list_count(" + casts + ") < list_count(" + array + ") THEN NULL ELSE " +
+           casts + " END)[1])[1]";
+  }
+  if (!type->IsStruct()) {
+    return std::nullopt;
+  }
+  const std::string value = context.FreshName("_s");
+  const auto names = DuckDbStructFieldNames(type->AsStruct());
+  const std::string casts = context.FreshName("_c");
+  std::vector<std::string> fields;
+  std::vector<std::string> failures;
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    const auto constrained = ConstrainedCast(
+        type->AsStruct()->field(i).type, parameters.child(i),
+        "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ")", safe, context);
+    if (!constrained) {
+      return std::nullopt;
+    }
+    fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *constrained);
+    std::string failure =
+        "(struct_extract_at(" + casts + ", " + std::to_string(i + 1) + ") IS NULL AND ";
+    failure += "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ") IS NOT NULL)";
+    failures.push_back(std::move(failure));
+  }
+  const std::string packed = "struct_pack(" + Join(fields, ", ") + ")";
+  const std::string result = safe ? "list_transform([" + packed + "], lambda " + casts +
+                                        ": CASE WHEN " + Join(failures, " OR ") +
+                                        " THEN NULL ELSE " + casts + " END)[1]"
+                                  : packed;
+  return "list_transform([" + sql + "], lambda " + value + ": CASE WHEN " + value +
+         " IS NULL THEN NULL ELSE " + result + " END)[1]";
+}
 
 // A cast to or from a RANGE's bound, which holds a microsecond TIMESTAMP at either precision;
 // see MapToDuckDb.
@@ -574,8 +652,8 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     const auto* cast = expr.GetAs<googlesql::ResolvedCast>();
     // A collation, such as an INSERT's to a collated column, annotates the result and leaves the
     // value unchanged.
-    if (cast->extended_cast() != nullptr || !cast->type_modifiers().type_parameters().IsEmpty()) {
-      return Unsupported(scope, "CAST with type parameters");
+    if (cast->extended_cast() != nullptr) {
+      return Unsupported(scope, "extended CAST");
     }
     const auto argument = Expression(*cast->expr(), scope, columns);
     if (!argument) {
@@ -583,6 +661,30 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     }
     const googlesql::Type* from = cast->expr()->type();
     const bool safe = cast->return_null_on_error();
+    const auto& parameters = cast->type_modifiers().type_parameters();
+    if (!parameters.IsEmpty()) {
+      if (scope.context.functions.restrictions().cast_without_type_parameters) {
+        return Unsupported(scope, "CAST with type parameters");
+      }
+      // SAFE_CAST protects conversion and constraint errors, not evaluation of its input.
+      const std::string value = scope.context.FreshName("_v");
+      const std::string& input = safe ? value : *argument;
+      const auto converted = cast->format() != nullptr ? FormatCast(*cast, input, scope, columns)
+                             : from->Equals(cast->type())
+                                 ? std::optional<std::string>(input)
+                                 : CastValue(from, cast->type(), input, safe, scope.context);
+      if (!converted) {
+        return Unsupported(scope, "parameterized CAST conversion");
+      }
+      const auto constrained =
+          ConstrainedCast(cast->type(), parameters, *converted, safe, scope.context);
+      if (!constrained) {
+        return Unsupported(scope, "CAST type parameters for " + cast->type()->DebugString());
+      }
+      return safe ? "list_transform([" + *argument + "], lambda " + value + ": " + *constrained +
+                        ")[1]"
+                  : *constrained;
+    }
     if (cast->format() != nullptr) {
       return FormatCast(*cast, *argument, scope, columns);
     }

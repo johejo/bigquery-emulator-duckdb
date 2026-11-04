@@ -64,8 +64,10 @@ cc_library(
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:coercer",
         "@googlesql//googlesql/public:timestamp_picos_value",
+        "@googlesql//googlesql/public:type_parameters_cc_proto",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/types",
+        "@googlesql//googlesql/reference_impl:type_parameter_constraints",
     ],
     linkstatic = True,
     deps = [

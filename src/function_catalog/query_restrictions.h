@@ -33,6 +33,8 @@ struct QueryRestrictions {
   bool arrays_without_null_elements = false;
   // Query results take no empty STRUCTs or anonymous fields of STRUCT value tables.
   bool restrict_struct_results = false;
+  // CAST takes no parameterized types.
+  bool cast_without_type_parameters = false;
 
   std::strong_ordering operator<=>(const QueryRestrictions&) const = default;
 };
