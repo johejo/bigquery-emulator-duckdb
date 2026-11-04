@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 1 | 4 |
 | [Queries](#queries) | 34 | 2 |
 | [DML](#dml) | 9 | 0 |
-| [DDL](#ddl) | 24 | 9 |
+| [DDL](#ddl) | 25 | 8 |
 | [Collation](#collation) | 15 | 0 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 |
@@ -116,7 +116,7 @@ rejected.
 | `DROP TABLE` | Supported |  |
 | `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ALTER TABLE on external tables. |
+| `ALTER TABLE` | Supported | See [ALTER TABLE](compatibility.md#alter-table). |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1. |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |

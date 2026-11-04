@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -376,6 +377,18 @@ class RestServer::Impl {
         const TableReference table = TableFromPath(request);
         const TableUpdateRequest update = ParseTableUpdate(ParseBody(request), patch);
         TableMetadata metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
+        // Clients that send back the whole resource, as tables.update takes it, repeat the
+        // definition of an external table, which the emulator does not change.
+        if (const auto& config = update.external_data_configuration) {
+          std::optional<GcsExternalData> given =
+              TableMetadataFromJson(json{{"externalDataConfiguration", *config}}).external_data;
+          if (given.has_value() && metadata.external_data.has_value()) {
+            given->given_schema = metadata.external_data->given_schema;
+          }
+          if (given != metadata.external_data) {
+            throw ApiError::Unsupported("changing externalDataConfiguration");
+          }
+        }
         UpdateTableMetadata(metadata, update.resource, patch);
         return TableResource(emulator_.UpdateTable(
             table, update.schema, update.view, metadata,

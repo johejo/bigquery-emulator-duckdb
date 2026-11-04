@@ -1,0 +1,83 @@
+desc: tables.update takes back the whole resource of an external table that tables.get returned, with a new description, and rejects one with another definition
+# Fields follow third_party/bigquery_docs/reference/rest/v2/tables/update.md, which replaces the
+# whole resource. The Go client only patches, so check a replacement through the HTTP runner.
+# The source does not exist; creating and updating the table do not read it.
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_external_table_update}
+    test: current.res.status == 200
+  create:
+    req:
+      /projects/test/datasets/rest_external_table_update/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: t}
+              schema:
+                fields: [{name: id, type: INTEGER}]
+              externalDataConfiguration:
+                sourceFormat: CSV
+                sourceUris: ['gs://rest-external-table-update-missing/a.csv']
+                csvOptions: {skipLeadingRows: '1', fieldDelimiter: '|'}
+    test: current.res.status == 200
+  get:
+    req:
+      /projects/test/datasets/rest_external_table_update/tables/t:
+        get:
+          body: null
+    test: current.res.status == 200
+  replace:
+    req:
+      /projects/test/datasets/rest_external_table_update/tables/t:
+        put:
+          body:
+            application/json:
+              tableReference: '{{ steps.get.res.body.tableReference }}'
+              schema: '{{ steps.get.res.body.schema }}'
+              externalDataConfiguration: '{{ steps.get.res.body.externalDataConfiguration }}'
+              description: replaced
+    test: |
+      current.res.status == 200 &&
+      current.res.body.type == "EXTERNAL" &&
+      current.res.body.description == "replaced" &&
+      current.res.body.externalDataConfiguration == steps.get.res.body.externalDataConfiguration &&
+      current.res.body.schema == steps.get.res.body.schema
+  # The emulator keeps an external table's definition; a replacement that changes it is unsupported.
+  change_uris:
+    req:
+      /projects/test/datasets/rest_external_table_update/tables/t:
+        put:
+          body:
+            application/json:
+              tableReference: '{{ steps.get.res.body.tableReference }}'
+              schema: '{{ steps.get.res.body.schema }}'
+              externalDataConfiguration:
+                sourceFormat: CSV
+                sourceUris: ['gs://rest-external-table-update-missing/b.csv']
+                csvOptions: {skipLeadingRows: '1', fieldDelimiter: '|'}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == "The emulator does not support changing externalDataConfiguration"
+  get_after:
+    req:
+      /projects/test/datasets/rest_external_table_update/tables/t:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.description == "replaced" &&
+      current.res.body.externalDataConfiguration.sourceUris ==
+        ["gs://rest-external-table-update-missing/a.csv"]
+  cleanup:
+    req:
+      /projects/test/datasets/rest_external_table_update?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

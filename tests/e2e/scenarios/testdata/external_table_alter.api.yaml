@@ -1,0 +1,145 @@
+version: 1
+# BigQuery project johejo-sandbox, run bdip4fy7bfxhr65rzg3xfa7slp; original observations are
+# retained in external_table_alter.api.answers.json. As its
+# [DDL reference](third_party/bigquery_docs/reference/standard-sql/data-definition-language.md)
+# says, BigQuery rejects ALTER TABLE SET OPTIONS on external tables, which tables.patch updates.
+description: Metadata updates of an external table through ALTER TABLE SET OPTIONS and tables.patch, verified on BigQuery. Sources deliberately do not exist; no GCS fixture upload is needed.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: gs://bqanswers-missing-${run}/missing.parquet
+  alter_error:
+    status: 400
+    reason: invalid
+    message: ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external
+templates:
+  alter:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference:
+              tableId: t
+            schema:
+              fields:
+                - name: id
+                  type: INTEGER
+            externalDataConfiguration:
+              sourceFormat: PARQUET
+              sourceUris:
+                - ${uri}
+      - name: alter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (${options})
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+        expectFailure: true
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  patch:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference:
+              tableId: t
+            schema:
+              fields:
+                - name: id
+                  type: INTEGER
+            externalDataConfiguration:
+              sourceFormat: PARQUET
+              sourceUris:
+                - ${uri}
+            labels:
+              env: dev
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: ${patch}
+        observe:
+          type: /body/type
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: alter_description
+    template: alter
+    vars:
+      options: description = 'altered'
+    expect:
+      alter: ${alter_error}
+  - name: alter_labels
+    template: alter
+    vars:
+      options: labels = [('env', 'prod')]
+    expect:
+      alter: ${alter_error}
+  - name: alter_expiration_timestamp
+    template: alter
+    vars:
+      options: expiration_timestamp = TIMESTAMP '2100-01-01 00:00:00 UTC'
+    expect:
+      alter: ${alter_error}
+  - name: patch_description_and_labels
+    template: patch
+    vars:
+      patch:
+        description: patched
+        friendlyName: External
+        labels:
+          env: null
+          tier: "1"
+    expect:
+      patch:
+        type: EXTERNAL
+        description: patched
+        friendlyName: External
+        labels:
+          tier: "1"
+        external:
+          sourceFormat: PARQUET
+          sourceUris:
+            - ${uri}
+        schema:
+          fields:
+            - mode: NULLABLE
+              name: id
+              type: INTEGER

@@ -89,6 +89,8 @@ struct TableUpdateRequest {
   nlohmann::json resource;
   std::optional<std::vector<FieldSchema>> schema;
   std::optional<nlohmann::json> view;
+  // The externalDataConfiguration given, without its schema, which `schema` takes.
+  std::optional<nlohmann::json> external_data_configuration;
 };
 
 struct InsertAllRequest {

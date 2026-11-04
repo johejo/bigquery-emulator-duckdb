@@ -141,8 +141,13 @@ most common one.
 paths the sources have when the table is created. Queries read every source file, since the
 emulator does not prune partitions, and fail on a file whose path does not have those keys.
 
-Bigtable, BigLake connections, metadata caching,
-configuration updates, `ALTER TABLE` and time travel are unsupported. Query dry runs reject
+`tables.patch` and `tables.update` change an external table's description, friendly name,
+labels, tags and expiration time. They take back the schema and `externalDataConfiguration` that
+`tables.get` returns, but changing them is unsupported.
+`ALTER TABLE SET OPTIONS` fails on external tables, as
+[BigQuery's does](../tests/e2e/scenarios/testdata/external_table_alter.api.yaml); other
+`ALTER TABLE` actions on them are unsupported. Bigtable, BigLake connections, metadata caching
+and time travel are unsupported. Query dry runs reject
 external reads rather than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
 not read external tables; use a query instead. Writes to external tables are rejected.
 
