@@ -114,8 +114,9 @@ absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
 
 // What a DuckDB type is for: a query value, a stored column, or a query parameter, which is a
 // query value whose type a TableFieldSchema describes. A resolved column definition can still
-// have anonymous STRUCT fields, which take positional names when stored.
-enum class TypeUse : std::uint8_t { kQuery, kColumn, kParameter, kDefinition };
+// have anonymous STRUCT fields, which take positional names when stored. An external column is
+// a stored column that can also be a STRUCT<>.
+enum class TypeUse : std::uint8_t { kQuery, kColumn, kExternalColumn, kParameter, kDefinition };
 
 std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                                        const googlesql::TypeParameters* parameters, TypeUse use,
@@ -200,8 +201,10 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       return "DECIMAL(38,9)";
     case googlesql::TYPE_BIGNUMERIC:
       // The integer number of units of 10^-38; see src/bignumeric.h.
-      return use == TypeUse::kColumn || use == TypeUse::kDefinition ? kBigNumericStorageType
-                                                                    : "BIGNUM";
+      return use == TypeUse::kColumn || use == TypeUse::kExternalColumn ||
+                     use == TypeUse::kDefinition
+                 ? kBigNumericStorageType
+                 : "BIGNUM";
     case googlesql::TYPE_JSON:
       return "JSON";
     case googlesql::TYPE_INTERVAL:
@@ -216,7 +219,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     }
     case googlesql::TYPE_GEOGRAPHY:
       // See src/googlesql_geography_duckdb/codec.h.
-      return use == TypeUse::kColumn || use == TypeUse::kDefinition
+      return use == TypeUse::kColumn || use == TypeUse::kExternalColumn ||
+                     use == TypeUse::kDefinition
                  ? geography_duckdb::kGeographyStorageType
                  : "BLOB";
     case googlesql::TYPE_ARRAY: {
@@ -231,17 +235,19 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
         const auto field_type = MapToDuckDb(field.type, child(i), use, precision);
         // Metadata and parameters already have their final field names. Query values and
         // resolved SQL definitions can still need positional names.
-        if (!field_type || ((use == TypeUse::kColumn || use == TypeUse::kParameter) &&
+        if (!field_type || ((use == TypeUse::kColumn || use == TypeUse::kExternalColumn ||
+                             use == TypeUse::kParameter) &&
                             names.at(i) != field.name)) {
           return std::nullopt;
         }
         fields.push_back(QuoteIdentifier(names.at(i)) + " " + *field_type);
       }
-      // DuckDB has no empty STRUCT, and BigQuery stores none.
+      // DuckDB has no empty STRUCT, and BigQuery stores none but in an external table.
       if (fields.empty()) {
-        return use == TypeUse::kQuery ? std::optional<std::string>(std::format(
-                                            "STRUCT({} BOOLEAN)", QuoteIdentifier(kEmptyStruct)))
-                                      : std::nullopt;
+        return use == TypeUse::kQuery || use == TypeUse::kExternalColumn
+                   ? std::optional<std::string>(
+                         std::format("STRUCT({} BOOLEAN)", QuoteIdentifier(kEmptyStruct)))
+                   : std::nullopt;
       }
       return "STRUCT(" + absl::StrJoin(fields, ", ") + ")";
     }
@@ -615,6 +621,11 @@ std::optional<std::string> DuckDbColumnType(const googlesql::Type* type,
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field,
                                              TimestampPrecision precision) {
   return DuckDbFieldType(field, TypeUse::kColumn, precision);
+}
+
+absl::StatusOr<std::string> DuckDbExternalColumnType(const FieldSchema& field,
+                                                     TimestampPrecision precision) {
+  return DuckDbFieldType(field, TypeUse::kExternalColumn, precision);
 }
 
 absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field,

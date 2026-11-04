@@ -86,9 +86,9 @@ a DECIMAL as NUMERIC or BIGNUMERIC, a DECIMAL as STRING or, as BigQuery does, by
 value as INT64, a BYTE_ARRAY as STRING or BYTES, a TIMESTAMP of milliseconds or microseconds as
 DATETIME, a DATE or a TIMESTAMP of nanoseconds, whose value BigQuery reads as microseconds, as
 TIMESTAMP, and, as BigQuery does, a BYTE_ARRAY as the TIMESTAMP 0 and a BOOLEAN or a signed
-integer by its value as microseconds of a TIMESTAMP, and a STRING of WKT or a BYTE_ARRAY of WKB
-as GEOGRAPHY; other combinations, such as a FLOAT or DOUBLE as TIMESTAMP, fail as BigQuery's do or
-are unsupported. A DECIMAL that NUMERIC does not hold fails on a value NUMERIC does not hold, as
+integer by its value and a DOUBLE by its bits as microseconds of a TIMESTAMP, and a STRING of WKT
+or a BYTE_ARRAY of WKB as GEOGRAPHY; other combinations, such as a FLOAT as TIMESTAMP, fail as
+BigQuery's do or are unsupported. A DECIMAL that NUMERIC does not hold fails on a value NUMERIC does not hold, as
 BigQuery's does for one of bytes, and is unsupported for an INT32 or INT64 one, of both too many
 integer and fractional digits, and of more than 38 integer digits; a nested one, ENUM,
 GeoParquet, column name conversions and the options that select other types are unsupported. Every source file must
@@ -113,10 +113,10 @@ digits, without exponent notation. DATE and TIME accept canonical `YYYY-MM-DD` a
 Unix epoch time. A table created without a schema takes the one BigQuery
 [detects](../third_party/bigquery_docs/schema-detect.md) from the alphabetically last source
 file, and its reads also take strings in the forms detection converts, and numbers and BOOL
-values for STRING fields. The order of detected columns can differ from BigQuery's for objects of
-more than six fields. Detection rejects an empty object, which BigQuery detects as a RECORD with
-no fields, and `tables.insert` rejects `autodetect` with a schema. Other scalar types and
-JSON options other than `jsonOptions.encoding` are unsupported.
+values for STRING fields. With `autodetect` and a schema, `tables.insert` keeps the schema, and
+reads leave out the top-level fields it lacks; they reject a nested field it lacks, and a value
+whose read would depend on converting it as reads of a detected schema do, as unsupported. Other
+scalar types and JSON options other than `jsonOptions.encoding` are unsupported.
 
 CSV and JSON tables support `compression`, `encoding` / `csvOptions.encoding` and
 `jsonOptions.encoding`, `max_bad_records` / `maxBadRecords`, and `time_zone`, `date_format`,

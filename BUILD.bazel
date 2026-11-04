@@ -1889,6 +1889,7 @@ cc_library(
         ":table_metadata",
         ":temporary_files",
         ":text_encoding",
+        ":type_mapping",
         ":unordered_map_order",
         "@abseil-cpp//absl/status",
         "@googlesql//googlesql/public:numeric_value",

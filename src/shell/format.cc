@@ -37,7 +37,8 @@ ordered_json CellValue(const json& field, const json& value, bool element = fals
   const std::string type = field.value("type", "");
   if (type == "RECORD" || type == "STRUCT") {
     ordered_json record = ordered_json::object();
-    const json& fields = field.at("fields");
+    // A STRUCT<> has no fields.
+    const json fields = field.value("fields", json::array());
     const json& cells = value.at("f");
     for (size_t i = 0; i < fields.size(); ++i) {
       record[fields[i].at("name").get<std::string>()] = CellValue(fields[i], cells[i].at("v"));

@@ -5,6 +5,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <format>
 #include <iterator>
 #include <limits>
@@ -28,6 +29,7 @@
 #include "src/file_read_options.h"
 #include "src/schema_detect.h"
 #include "src/temporary_files.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -400,6 +402,10 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool c
       }
     }
   }
+  // A RECORD of no fields reads as DuckDB keeps a STRUCT<>.
+  if (schema.empty()) {
+    canonical[std::string(kEmptyStruct)] = true;
+  }
   object = std::move(canonical);
 }
 
@@ -423,21 +429,89 @@ void Bad(const ApiError& error, std::size_t start, const FileSource& source, Bad
   }
 }
 
+// The field of `fields` that `name` names, in any case, or none.
+const FieldSchema* FindField(const std::vector<FieldSchema>& fields, const std::string& name) {
+  const auto field = std::ranges::find_if(fields, [&name](const FieldSchema& declared) {
+    return Folded(declared.name) == Folded(name);
+  });
+  return field == fields.end() ? nullptr : &*field;
+}
+
+// Rejects as unsupported a field of `value`, a value of the RECORD `fields` or an array of them,
+// that `fields` lacks: how BigQuery reads such a nested field with a given schema is not known.
+void CheckNestedFields(const json& value, const std::vector<FieldSchema>& fields) {
+  if (value.is_array()) {
+    for (const json& item : value) {
+      CheckNestedFields(item, fields);
+    }
+    return;
+  }
+  if (!value.is_object()) {
+    return;
+  }
+  for (const auto& [name, item] : value.items()) {
+    const FieldSchema* field = FindField(fields, name);
+    if (field == nullptr) {
+      throw ApiError::Unsupported(
+          "reading a nested JSON field that the given schema of an autodetected external table "
+          "lacks: " +
+          name);
+    }
+    if (field->type == FieldType::kRecord) {
+      CheckNestedFields(item, field->fields);
+    }
+  }
+}
+
+// Leaves out of `object`, a row of a JSON table with autodetect and a given `schema`, the
+// top-level fields `schema` lacks, as BigQuery's reads do in its answers in
+// external_table_json_autodetect.api.answers.json.
+void LeaveOutUnknownFields(json& object, const std::vector<FieldSchema>& schema) {
+  for (auto it = object.begin(); it != object.end();) {
+    const FieldSchema* field = FindField(schema, it.key());
+    if (field == nullptr) {
+      it = object.erase(it);
+      continue;
+    }
+    if (field->type == FieldType::kRecord) {
+      CheckNestedFields(it.value(), field->fields);
+    }
+    ++it;
+  }
+}
+
 FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>& schema,
-                       TemporaryFiles& files, bool converts, const DatetimeFormats& formats,
-                       BadRecords* bad) {
+                       TemporaryFiles& files, bool converts, bool given_schema,
+                       const DatetimeFormats& formats, BadRecords* bad) {
   const std::string contents = ReadMaybeGzip(source.path);
-  const bool quotes = QuotesJsonNumerics(schema, converts);
   std::string rewritten;
+  // Where the next row starts, as BigQuery's messages give it: a row takes in the empty lines
+  // before it, as BigQuery's answers in external_table_json_autodetect.api.answers.json show.
+  std::size_t row_start = 0;
   for (std::size_t start = 0; start < contents.size();) {
     const auto newline = contents.find('\n', start);
     const auto end = newline == std::string::npos ? contents.size() : newline;
     const std::string_view line(contents.data() + start, end - start);
-    if (line.find_first_not_of(" \t\r") != std::string_view::npos) {
-      if (bad != nullptr) {
-        ++bad->records;
+    start = end + 1;
+    if (line.find_first_not_of(" \t\r") == std::string_view::npos) {
+      // BigQuery reads an empty line, but not one of spaces.
+      if (line.find_first_of(" \t") != std::string_view::npos) {
+        if (bad != nullptr) {
+          ++bad->records;
+        }
+        Bad(ApiError::Invalid("Unexpected token"), row_start, source, bad);
+        row_start = start;
       }
-      try {
+      continue;
+    }
+    if (bad != nullptr) {
+      ++bad->records;
+    }
+    try {
+      const std::optional<std::string> without_comma = WithoutTrailingComma(line);
+      const std::string_view row = without_comma ? std::string_view(*without_comma) : line;
+      // The row as a read that converts its values or not takes it.
+      const auto read = [&](bool converted) {
         std::vector<std::set<std::string>> keys;
         const auto unique_keys = [&keys](int /*depth*/, json::parse_event_t event, json& parsed) {
           using Event = json::parse_event_t;
@@ -451,33 +525,63 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
           }
           return true;
         };
-        // NUMERIC and BIGNUMERIC numbers, and with `converts` those of STRING fields, are read
+        // NUMERIC and BIGNUMERIC numbers, and with `converted` those of STRING fields, are read
         // as their text, which ValidateValue converts.
-        const std::optional<std::string> without_comma = WithoutTrailingComma(line);
-        const std::string_view row = without_comma ? std::string_view(*without_comma) : line;
         const std::string text =
-            quotes ? QuotedJsonNumerics(row, schema, converts, /*bignumeric_text=*/true)
-                   : std::string(row);
+            QuotesJsonNumerics(schema, converted)
+                ? QuotedJsonNumerics(row, schema, converted, /*bignumeric_text=*/true)
+                : std::string(row);
         auto object = json::parse(text, unique_keys, false);
         if (object.is_discarded() || !object.is_object()) {
           throw ApiError::Invalid(std::string(NotObjectMessage(line)));
         }
-        ValidateObject(object, schema, converts, formats);
-        rewritten += object.dump() + '\n';
-      } catch (const ApiError& error) {
-        if (std::string_view(error.what()).starts_with(kUnsupported)) {
-          throw;
+        if (given_schema) {
+          LeaveOutUnknownFields(object, schema);
         }
-        Bad(error, start, source, bad);
+        ValidateObject(object, schema, converted, formats);
+        return object;
+      };
+      if (!given_schema) {
+        rewritten += read(converts).dump() + '\n';
+      } else {
+        // Whether such a read converts values as one of a detected schema does is not known, so
+        // a row must read the same either way.
+        // A read's row, or its error and the error's message.
+        struct Outcome {
+          std::optional<json> row = std::nullopt;
+          std::exception_ptr error = nullptr;
+          std::string message = {};
+        };
+        const auto outcome = [&read](bool converted) {
+          try {
+            return Outcome{.row = read(converted)};
+          } catch (const ApiError& error) {
+            return Outcome{.error = std::current_exception(), .message = error.what()};
+          }
+        };
+        const Outcome with = outcome(true);
+        const Outcome without = outcome(false);
+        for (const Outcome* read_outcome : {&with, &without}) {
+          if (read_outcome->error && read_outcome->message.starts_with(kUnsupported)) {
+            std::rethrow_exception(read_outcome->error);
+          }
+        }
+        if (with.error && without.error && with.message == without.message) {
+          std::rethrow_exception(with.error);
+        }
+        if (!with.row || !without.row || *with.row != *without.row) {
+          throw ApiError::Unsupported(
+              "converting JSON values of an autodetected external table with a given schema");
+        }
+        rewritten += with.row->dump() + '\n';
       }
-    } else if (line.find_first_of(" \t") != std::string_view::npos) {
-      // BigQuery reads an empty line, but not one of spaces.
-      if (bad != nullptr) {
-        ++bad->records;
+    } catch (const ApiError& error) {
+      if (std::string_view(error.what()).starts_with(kUnsupported)) {
+        throw;
       }
-      Bad(ApiError::Invalid("Unexpected token"), start, source, bad);
+      Bad(error, row_start, source, bad);
     }
-    start = end + 1;
+    row_start = start;
   }
   return {.uri = source.uri, .path = files.Write(rewritten)};
 }
@@ -487,10 +591,11 @@ FileSource StageSource(const FileSource& source, const std::vector<FieldSchema>&
 std::vector<FileSource> StageExternalJson(const std::vector<FileSource>& sources,
                                           const std::vector<FieldSchema>& schema,
                                           TemporaryFiles& files, bool autodetected,
-                                          const DatetimeFormats& formats, BadRecords* bad) {
+                                          bool given_schema, const DatetimeFormats& formats,
+                                          BadRecords* bad) {
   std::vector<FileSource> staged;
   std::ranges::transform(sources, std::back_inserter(staged), [&](const FileSource& source) {
-    return StageSource(source, schema, files, autodetected, formats, bad);
+    return StageSource(source, schema, files, autodetected, given_schema, formats, bad);
   });
   return staged;
 }

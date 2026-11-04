@@ -111,6 +111,12 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field,
                                              TimestampPrecision precision);
 
+// As DuckDbColumnType, for a column of an external table or a value read from a source file,
+// which can be a RECORD of no fields, as BigQuery detects for an empty JSON object: it maps as a
+// STRUCT<> does in a query.
+absl::StatusOr<std::string> DuckDbExternalColumnType(const FieldSchema& field,
+                                                     TimestampPrecision precision);
+
 // The same storage mapping for a resolved SQL column definition, narrowed by `parameters`.
 // DuckDB ignores lengths, so STRING(L) and BYTES(L) lose them; NUMERIC(P, S) keeps its rounding
 // as DECIMAL(P, S), and BIGNUMERIC(P, S) as the type BigNumericTypeName names.

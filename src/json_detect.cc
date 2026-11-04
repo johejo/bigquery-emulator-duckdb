@@ -138,10 +138,7 @@ std::vector<FieldSchema> Fields(const std::vector<Node>& appeared, std::string_v
         .mode = node->repeated ? FieldMode::kRepeated : FieldMode::kNullable,
     });
     if (node->record) {
-      // BigQuery detects a RECORD with no fields, which DuckDB has no type for.
-      if (node->fields.empty()) {
-        throw ApiError::Unsupported("detecting the schema of an empty JSON object: " + node->name);
-      }
+      // BigQuery detects a RECORD with no fields for an empty object.
       field.fields = Fields(node->fields, table_id, false);
     }
   }

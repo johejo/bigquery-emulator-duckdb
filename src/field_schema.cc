@@ -204,7 +204,8 @@ json FieldSchema::ToJson() const {
   if (range_element_type.has_value()) {
     field["rangeElementType"] = {{"type", FieldTypeName(*range_element_type)}};
   }
-  if (type == FieldType::kRecord || !fields.empty()) {
+  // BigQuery shows no fields of a RECORD that has none, which it detects for an empty JSON object.
+  if (!fields.empty()) {
     field["fields"] = json::array();
     for (const FieldSchema& child : fields) {
       field["fields"].push_back(child.ToJson());

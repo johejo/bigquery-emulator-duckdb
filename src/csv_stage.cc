@@ -149,6 +149,12 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
         ++bad->records;
         bad->positions.push_back(position);
       }
+      // The records end at such a record, so a read fails at it rather than skip the rest.
+      if (record.error) {
+        const size_t column = record.cells.size() - 1;
+        Reject(*record.error, position, column < columns ? &schema.at(column) : nullptr, column,
+               record.cells.back()->text);
+      }
       try {
         if (too_many) {
           Reject(std::format("Too many values in line. Found {} column(s) when expecting {}.",

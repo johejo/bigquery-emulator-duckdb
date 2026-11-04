@@ -182,8 +182,9 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   std::vector<std::string> columns;
-  std::ranges::transform(schema, std::back_inserter(columns), [this](const FieldSchema& field) {
-    return ColumnDefinition(field, functions_.timestamp_precision());
+  std::ranges::transform(schema, std::back_inserter(columns), [&](const FieldSchema& field) {
+    return ColumnDefinition(field, functions_.timestamp_precision(),
+                            metadata.external_data.has_value());
   });
   DdlWrite write = CreateTableWrite(
       TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);

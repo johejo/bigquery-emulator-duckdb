@@ -1,8 +1,6 @@
 version: 1
 # Recorded on BigQuery in project johejo-sandbox, run cipf6vmsedeqlbl7jl7ggf5ums, with sources in
-# the bucket johejo-sandbox-us; the answers sidecar keeps the observations. Failed queries observe
-# only their status and reason, since their messages give line and byte positions the emulator
-# does not report.
+# the bucket johejo-sandbox-us; the answers sidecar keeps the observations.
 # third_party/bigquery_docs/loading-data-cloud-storage-csv.md describes CSV schema auto-detection
 # for loads, and load_csv_autodetect.api.yaml records its rules. These cases settle what the
 # documentation leaves open for external tables: DDL and tables.insert with autodetect detect a
@@ -166,6 +164,7 @@ templates:
         observe:
           status: /status
           reason: /body/error/errors/0/reason
+          message: /body/error/message
     cleanup:
       - name: delete
         rest:
@@ -211,6 +210,50 @@ templates:
           status: /status
           errors: /body/errors
           rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_a
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+  # As api, for a table a query cannot read.
+  api_unreadable:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: a
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${header}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration: ${configuration}
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT * FROM `${project}.${dataset}.t` ORDER BY 1
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
     cleanup:
       - name: delete
         rest:
@@ -301,7 +344,7 @@ cases:
     template: ddl_unreadable
     vars:
       first: ${quoted_newline}
-    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid"}}
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "string_field_0", "type": "STRING"}, {"mode": "NULLABLE", "name": "string_field_1", "type": "STRING"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: Missing close quote character (\").; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"string_field_1\" column_type: STRING value: \"a\" File: ${prefix}/a.csv"}}
   # The alphabetically last file, b.csv (y), gives the schema whatever the URI order; queries
   # skip a.csv's header too and read its column by position.
   - name: ddl_two_files
@@ -334,3 +377,26 @@ cases:
         sourceFormat: CSV
         sourceUris: ['${prefix}/a.csv']
     expect: {"create": {"status": 400, "reason": "invalid", "message": "When defining a table with an ExternalDataConfiguration, a schema must be present on either the Table or the ExternalDataConfiguration. If the schema is present on both, the schemas must be the same."}}
+  # b.csv, which gives the schema, has the columns of a.csv in another order: queries read a.csv
+  # by position and fail on its values.
+  - name: ddl_reordered
+    template: ddl_unreadable
+    vars:
+      first: ${header}
+      second: ${reordered}
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv', '${prefix}/b.csv'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv", "${prefix}/b.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "id", "type": "INTEGER"}]}, "status": 200}, "information_schema": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"CSV\",\n  uris=[\"${prefix}/a.csv\", \"${prefix}/b.csv\"]\n);"}]}]}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"id\" column_type: INT64 value: \"a\" File: ${prefix}/a.csv"}}
+  # An explicit schema with autodetect is kept; queries skip the detected header and read columns
+  # by position, failing on the values.
+  - name: api_schema_autodetect
+    template: api_unreadable
+    vars:
+      configuration:
+        sourceFormat: CSV
+        sourceUris: ['${prefix}/a.csv']
+        autodetect: true
+        schema:
+          fields:
+            - {name: name, type: STRING}
+            - {name: id, type: INTEGER}
+    expect: {"create": {"external": {"autodetect": true, "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "name", "type": "STRING"}, {"mode": "NULLABLE", "name": "id", "type": "INTEGER"}]}, "status": 200}, "query": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: Unable to parse; line_number: 2 byte_offset_to_start_of_line: 8 column_index: 1 column_name: \"id\" column_type: INT64 value: \"a\" File: ${prefix}/a.csv"}}

@@ -10,10 +10,11 @@
 #include <utility>
 #include <vector>
 
-// Follows libc++ 21's std::hash<std::string> (__murmur2_or_cityhash<size_t, 64>, without
-// _LIBCPP_ABI_FIX_CITYHASH_IMPLEMENTATION) and its __hash_table: prime bucket counts, a load
-// factor of 1, and a single list in which a key goes first in its bucket, and a key of an empty
-// bucket goes first in the list.
+// Follows libc++ 21's std::hash<std::string> (__murmur2_or_cityhash<size_t, 64>, with
+// _LIBCPP_ABI_FIX_CITYHASH_IMPLEMENTATION, which only names of 4 to 8 bytes tell apart, as
+// BigQuery's answers in external_table_json_autodetect.api.answers.json do) and its __hash_table:
+// prime bucket counts, a load factor of 1, and a single list in which a key goes first in its
+// bucket, and a key of an empty bucket goes first in the list.
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -53,10 +54,9 @@ uint64_t HashLen0To16(const char* s, uint64_t len) {
     return HashLen16(a, ((b + len) >> shift) | ((b + len) << (64U - shift))) ^ b;
   }
   if (len >= 4) {
-    const auto a = Load<uint32_t>(s);
+    const uint64_t a = Load<uint32_t>(s);
     const auto b = Load<uint32_t>(s + len - 4);
-    // libc++ shifts the 32-bit word before widening it.
-    return HashLen16(len + static_cast<uint32_t>(a << 3U), b);
+    return HashLen16(len + (a << 3U), b);
   }
   if (len > 0) {
     const auto a = static_cast<unsigned char>(s[0]);

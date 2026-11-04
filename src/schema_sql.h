@@ -19,13 +19,18 @@ namespace bigquery_emulator_duckdb {
 // API's table writes and schema updates that use it serve only BigQuery's semantics.
 std::string ToDuckDbType(const FieldSchema& field);
 
-// A DuckDB column definition for `field`, which enforces REQUIRED as BigQuery does.
-std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision);
+// As ToDuckDbType, for a value read from a source file, which DuckDbExternalColumnType maps.
+std::string ToDuckDbReadType(const FieldSchema& field);
+
+// A DuckDB column definition for `field`, which enforces REQUIRED as BigQuery does, of an
+// `external` table's column as DuckDbExternalColumnType maps it.
+std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision,
+                             bool external = false);
 
 // Column definitions for a table that holds `schema`, or nullopt when a type has no column
 // type of its own in the emulator.
 std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema,
-                                             TimestampPrecision precision);
+                                             TimestampPrecision precision, bool external = false);
 
 // The DuckDB expression for `value`, a value of `field` in a tabledata.insertAll row. An unknown
 // field of a RECORD is an error unless `ignore_unknown_values` is set.

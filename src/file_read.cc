@@ -271,7 +271,7 @@ FieldSchema TextJsons(FieldSchema field) {
 // lambda takes the name _e and its `depth`.
 std::string ParquetValue(const std::string& sql, const FieldSchema& field,
                          const ParquetColumn* column, int depth) {
-  std::string cast = std::format("CAST({} AS {})", sql, ToDuckDbType(field));
+  std::string cast = std::format("CAST({} AS {})", sql, ToDuckDbReadType(field));
   if (column == nullptr ||
       (field.type != FieldType::kGeography && !HasType(field.fields, FieldType::kGeography) &&
        field.type != FieldType::kBigNumeric && !HasType(field.fields, FieldType::kBigNumeric) &&
@@ -337,7 +337,7 @@ std::string ParquetConverted(const std::string& name, const FieldSchema& field,
   }
   return std::format("CAST({} AS {})",
                      std::vformat(conversion->second, std::make_format_args(name)),
-                     ToDuckDbType(field));
+                     ToDuckDbReadType(field));
 }
 
 // The DuckDB value `sql` of `column` in the shape BigQuery loads it, with each unwrapped STRUCT
@@ -489,7 +489,8 @@ FieldSchema JsonTextFields(FieldSchema field) {
 // The value of `field` that the column `name` of a NEWLINE_DELIMITED_JSON file holds.
 std::string JsonValue(const std::string& name, const FieldSchema& field, int depth = 0) {
   if (HasType({field}, FieldType::kBytes)) {
-    const std::string text = "CAST(" + name + " AS " + ToDuckDbType(JsonTextFields(field)) + ")";
+    const std::string text =
+        "CAST(" + name + " AS " + ToDuckDbReadType(JsonTextFields(field)) + ")";
     if (field.mode == FieldMode::kRepeated) {
       return MapElements(text, field, depth, JsonValue);
     }
@@ -501,11 +502,11 @@ std::string JsonValue(const std::string& name, const FieldSchema& field, int dep
     return "from_base64(CAST(" + name + " AS VARCHAR))";
   }
   const FieldSchema read = JsonTextFields(field);
-  const std::string type = ToDuckDbType(field);
+  const std::string type = ToDuckDbReadType(field);
   if (read.type == field.type && !HasType(field.fields, FieldType::kBigNumeric)) {
     return std::format("CAST({} AS {})", name, type);
   }
-  return std::format("CAST(CAST({} AS {}) AS {})", name, ToDuckDbType(read), type);
+  return std::format("CAST(CAST({} AS {}) AS {})", name, ToDuckDbReadType(read), type);
 }
 
 }  // namespace
@@ -745,10 +746,10 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
         columns.push_back(QuoteLiteral(field.name) + ": " +
                           QuoteLiteral(big || range || interval || bytes
                                            ? "VARCHAR"
-                                           : ToDuckDbType(TextGeographies(field))));
+                                           : ToDuckDbReadType(TextGeographies(field))));
         conversions.push_back(
             big     ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}", name,
-                                  ToDuckDbType(field))
+                                  ToDuckDbReadType(field))
             : range ? RangeFromText(name, field) + " AS " + name
             : interval
                 ? std::format("bq_interval_from_csv({0}) AS {0}", name)
@@ -768,7 +769,7 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
       std::vector<std::string> columns;
       std::ranges::transform(schema, std::back_inserter(columns), [](const FieldSchema& field) {
         return QuoteLiteral(field.name) + ": " +
-               QuoteLiteral(ToDuckDbType(JsonTextFields(TextJsons(TextGeographies(field)))));
+               QuoteLiteral(ToDuckDbReadType(JsonTextFields(TextJsons(TextGeographies(field)))));
       });
       sql += ", auto_detect=false, columns={" + Join(columns, ", ") + "}";
     }

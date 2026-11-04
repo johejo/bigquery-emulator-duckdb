@@ -54,6 +54,9 @@ struct GcsExternalData {
   std::optional<std::string> datetime_format = std::nullopt;
   std::optional<std::string> time_format = std::nullopt;
   std::optional<std::string> timestamp_format = std::nullopt;
+  // Whether tables.insert gave a JSON table with autodetect its schema, which reads take
+  // differently from a detected one. The table's comment keeps it; its resource does not show it.
+  bool given_schema = false;
   bool operator==(const GcsExternalData&) const = default;
 };
 
