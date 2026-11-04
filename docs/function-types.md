@@ -243,7 +243,7 @@ Type signatures are enumerated for **361 of 407 functions**. The remaining **46*
 | [GENERATE_RANGE_ARRAY](function-types/range.md#generate_range_array) | 6 | Supported |
 | [GENERATE_TIMESTAMP_ARRAY](function-types/array.md#generate_timestamp_array) | 1 | Supported |
 | [GENERATE_UUID](function-types/utility.md#generate_uuid) | 1 | Supported |
-| [GREATEST](function-types/mathematical.md#greatest) | 30 | Broken |
+| [GREATEST](function-types/mathematical.md#greatest) | 28 | Supported |
 | `GROUPING` | 0 | Not enumerated |
 | [HLL_COUNT.EXTRACT](function-types/hll.md#hll_countextract) | 1 | Supported |
 | [HLL_COUNT.INIT](function-types/hll.md#hll_countinit) | 10 | Supported |
@@ -311,7 +311,7 @@ Type signatures are enumerated for **361 of 407 functions**. The remaining **46*
 | [LAX_INT64](function-types/json.md#lax_int64) | 1 | Supported |
 | [LAX_STRING](function-types/json.md#lax_string) | 1 | Supported |
 | [LEAD](function-types/navigation.md#lead) | 120 | Supported |
-| [LEAST](function-types/mathematical.md#least) | 30 | Broken |
+| [LEAST](function-types/mathematical.md#least) | 28 | Supported |
 | [LEFT](function-types/string.md#left) | 2 | Supported |
 | [LENGTH](function-types/string.md#length) | 2 | Supported |
 | [LN](function-types/mathematical.md#ln) | 4 | Supported |
