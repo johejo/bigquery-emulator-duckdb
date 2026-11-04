@@ -22,6 +22,8 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
+#include "src/function_catalog/catalog.h"
+#include "src/function_catalog/rules.h"
 #include "src/language_options.h"
 #include "src/references.h"
 #include "src/table_path.h"
@@ -428,10 +430,10 @@ std::optional<Relation> FlatGraphPath(
       std::unique_ptr<googlesql::ResolvedGraphElementScan> selected;
       if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
         const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
-        if (!edge.lhs_hint_list().empty() || !edge.rhs_hint_list().empty() ||
-            edge.cost_expr() != nullptr) {
-          return Unsupported(scope, "graph edge hints or costs");
+        if (!edge.lhs_hint_list().empty() || !edge.rhs_hint_list().empty()) {
+          return Unsupported(scope, "graph edge hints");
         }
+        // GraphPath adds the cost after every element filter, from the original edge.
         auto scan = googlesql::MakeResolvedGraphEdgeScan();
         scan->set_orientation(edge.orientation());
         selected = std::move(scan);
@@ -485,9 +487,8 @@ std::optional<Relation> FlatGraphPath(
     const std::string variable = ElementAlias(element);
     if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
       const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
-      if (!edge.lhs_hint_list().empty() || !edge.rhs_hint_list().empty() ||
-          edge.cost_expr() != nullptr) {
-        return Unsupported(scope, "graph edge hints or costs");
+      if (!edge.lhs_hint_list().empty() || !edge.rhs_hint_list().empty()) {
+        return Unsupported(scope, "graph edge hints");
       }
     }
     const auto* element_table = element.target_element_table_list(0);
@@ -696,15 +697,83 @@ std::string AppendWalk(const std::string& left, const std::string& right) {
          ", \"$edges\" := list_concat(" + left + ".\"$edges\", " + right + ".\"$edges\"))";
 }
 
+// Path costs add as + does in the resolver's cost supertype, which raises its overflow errors.
+std::optional<std::string> AddCosts(const std::string& left, const std::string& right,
+                                    const googlesql::Type* type, const Scope& scope) {
+  auto sum = scope.context.functions.Translate("$ADD", {
+                                                           {.sql = left, .type = type->kind()},
+                                                           {.sql = right, .type = type->kind()},
+                                                       });
+  if (!sum) {
+    return Unsupported(scope, "graph cost type");
+  }
+  return sum;
+}
+
+// Adds the path's total cost, `_graph_cost`, to a flat path. Each edge's COST must be a finite
+// positive number, checked as GoogleSQL does after the edge's filter, with its messages.
+std::optional<Relation> WithCost(
+    Relation relation, const std::vector<const googlesql::ResolvedGraphElementScan*>& input,
+    const googlesql::Type* type, const Scope& scope) {
+  if (type == nullptr) {
+    return relation;
+  }
+  const auto duckdb_type = DuckDbType(type, scope.context.timestamp_precision);
+  if (!duckdb_type) {
+    return Unsupported(scope, "graph cost type");
+  }
+  const std::string zero = "CAST(0 AS " + *duckdb_type + ")";
+  std::optional<std::string> total;
+  for (const auto* element : input) {
+    if (!element->Is<googlesql::ResolvedGraphEdgeScan>() ||
+        element->GetAs<googlesql::ResolvedGraphEdgeScan>()->cost_expr() == nullptr) {
+      continue;
+    }
+    const auto cost = Expression(*element->GetAs<googlesql::ResolvedGraphEdgeScan>()->cost_expr(),
+                                 scope, relation.columns);
+    if (!cost) {
+      return std::nullopt;
+    }
+    const auto c = QuoteIdentifier(scope.context.FreshName("cost"));
+    const auto raise = [](std::string_view what) {
+      return function_catalog::Raise("'Graph cost expression must " + std::string(what) + "'",
+                                     false);
+    };
+    std::string checks = std::format(" WHEN {} IS NULL THEN {}", c, raise("not be NULL"));
+    if (type->IsDouble()) {
+      checks += std::format(" WHEN isinf({0}) THEN {1} WHEN isnan({0}) THEN {2}", c,
+                            raise("not be Inf"), raise("not be NaN"));
+    }
+    checks += std::format(" WHEN {} <= {} THEN {}", c, zero, raise("be positive"));
+    // Binds the cost once.
+    const auto checked =
+        std::format("list_transform([CAST({} AS {})], lambda {}: CASE{} ELSE {} END)[1]", *cost,
+                    *duckdb_type, c, checks, c);
+    total = total ? AddCosts(*total, checked, type, scope) : checked;
+    if (!total) {
+      return std::nullopt;
+    }
+  }
+  relation.sql = "SELECT q.*, " + total.value_or(zero) + " AS _graph_cost" + relation.From();
+  return relation;
+}
+
+// `cost_type` is the enclosing pattern's cost supertype, whose total cost each part carries as
+// `_graph_cost` when any edge in the pattern has a COST.
 std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, const Scope& scope,
-                                  const googlesql::GraphPathType* path_type = nullptr) {
-  if (path.path_cost() != nullptr || !path.hint_list().empty() || !path.path_hint_list().empty()) {
-    return Unsupported(scope, "graph costs or hints");
+                                  const googlesql::GraphPathType* path_type = nullptr,
+                                  const googlesql::Type* cost_type = nullptr) {
+  if (!path.hint_list().empty() || !path.path_hint_list().empty()) {
+    return Unsupported(scope, "graph hints");
+  }
+  if (cost_type == nullptr && path.path_cost() != nullptr) {
+    cost_type = path.path_cost()->cost_supertype();
   }
   if (path.search_prefix() != nullptr &&
       (path.search_prefix()->path_count() != nullptr ||
        (path.search_prefix()->type() != googlesql::ResolvedGraphPathSearchPrefix::ANY &&
-        path.search_prefix()->type() != googlesql::ResolvedGraphPathSearchPrefix::SHORTEST))) {
+        path.search_prefix()->type() != googlesql::ResolvedGraphPathSearchPrefix::SHORTEST &&
+        path.search_prefix()->type() != googlesql::ResolvedGraphPathSearchPrefix::CHEAPEST))) {
     return Unsupported(scope, "this graph search prefix");
   }
   const auto mode = path.path_mode() == nullptr ? googlesql::ResolvedGraphPathMode::WALK
@@ -731,6 +800,9 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
   // Adjacent node patterns bind the same node, so they compose by identity like subpaths.
   if (elements.size() == path.input_scan_list().size() && alternating) {
     result = FlatGraphPath(elements, path_type, scope);
+    if (result) {
+      result = WithCost(std::move(*result), elements, cost_type, scope);
+    }
   } else {
     // Compose subpaths and element patterns by identity. An edge gets its own
     // endpoint rows so references to non-key columns still resolve correctly.
@@ -739,18 +811,29 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
       const auto& part = *path.input_scan_list().at(i);
       std::optional<Relation> piece;
       if (part.Is<googlesql::ResolvedGraphPathScan>()) {
-        piece = GraphPath(*part.GetAs<googlesql::ResolvedGraphPathScan>(), scope, path_type);
+        piece =
+            GraphPath(*part.GetAs<googlesql::ResolvedGraphPathScan>(), scope, path_type, cost_type);
       } else if (part.Is<googlesql::ResolvedGraphNodeScan>()) {
-        piece = FlatGraphPath({part.GetAs<googlesql::ResolvedGraphNodeScan>()}, path_type, scope);
+        const auto* node = part.GetAs<googlesql::ResolvedGraphNodeScan>();
+        piece = FlatGraphPath({node}, path_type, scope);
+        if (piece) {
+          piece = WithCost(std::move(*piece), {node}, cost_type, scope);
+        }
       } else if (part.Is<googlesql::ResolvedGraphEdgeScan>() && i > 0 &&
                  i + 1 < path.input_scan_list().size() &&
                  !path.input_scan_list().at(i - 1)->Is<googlesql::ResolvedGraphEdgeScan>() &&
                  !path.input_scan_list().at(i + 1)->Is<googlesql::ResolvedGraphEdgeScan>()) {
         auto left = BoundaryNode(*path.input_scan_list().at(i - 1), false, scope);
         auto right = BoundaryNode(*path.input_scan_list().at(i + 1), true, scope);
-        piece =
-            FlatGraphPath({left.get(), part.GetAs<googlesql::ResolvedGraphEdgeScan>(), right.get()},
-                          path_type, scope);
+        const std::vector<const googlesql::ResolvedGraphElementScan*> edge = {
+            left.get(),
+            part.GetAs<googlesql::ResolvedGraphEdgeScan>(),
+            right.get(),
+        };
+        piece = FlatGraphPath(edge, path_type, scope);
+        if (piece) {
+          piece = WithCost(std::move(*piece), edge, cost_type, scope);
+        }
         if (piece) {
           // Endpoint values belong to the adjacent pieces, not to this edge.
           piece->columns.erase(left->column_list(0).column_id());
@@ -770,6 +853,7 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
     std::string nodes;
     std::string edges;
     std::string walk;
+    std::string cost;
     for (size_t i = 0; i < pieces.size(); ++i) {
       const auto alias = std::format("s{}", i);
       from += std::format("{}{}) AS {}", i == 0 ? " FROM (" : " JOIN (", pieces.at(i).sql, alias);
@@ -788,6 +872,14 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
         const auto next_walk = alias + "._graph_walk";
         walk = i == 0 ? next_walk : AppendWalk(std::format("({})", walk), next_walk);
       }
+      if (cost_type != nullptr) {
+        const auto next_cost = alias + "._graph_cost";
+        const auto sum = i == 0 ? next_cost : AddCosts(cost, next_cost, cost_type, scope);
+        if (!sum) {
+          return std::nullopt;
+        }
+        cost = *sum;
+      }
     }
     projections.emplace_back("s0._graph_head AS _graph_head");
     projections.push_back("s" + std::to_string(pieces.size() - 1) + "._graph_tail AS _graph_tail");
@@ -795,6 +887,9 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
     projections.push_back(edges + " AS _graph_edges");
     if (path_type != nullptr) {
       projections.push_back(walk + " AS _graph_walk");
+    }
+    if (cost_type != nullptr) {
+      projections.push_back(cost + " AS _graph_cost");
     }
     joined.sql = "SELECT " + Join(projections, ", ") + from;
     result = std::move(joined);
@@ -860,6 +955,15 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
       initial.emplace_back("b._graph_walk");
       next.push_back(AppendWalk("r._graph_walk", "b._graph_walk"));
     }
+    if (cost_type != nullptr) {
+      const auto sum = AddCosts("r._graph_cost", "b._graph_cost", cost_type, scope);
+      if (!sum) {
+        return std::nullopt;
+      }
+      names.emplace_back("_graph_cost");
+      initial.emplace_back("b._graph_cost");
+      next.push_back(*sum);
+    }
     names.emplace_back("_graph_repetitions");
     initial.emplace_back("1::BIGINT");
     next.emplace_back("r._graph_repetitions + 1");
@@ -919,6 +1023,13 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
         if (path_type != nullptr) {
           values.emplace_back("q._graph_walk");
         }
+        if (cost_type != nullptr) {
+          const auto type = DuckDbType(cost_type, scope.context.timestamp_precision);
+          if (!type) {
+            return Unsupported(scope, "graph cost type");
+          }
+          values.push_back("CAST(0 AS " + *type + ")");
+        }
         values.emplace_back("0::BIGINT");
         values.push_back("CAST(q._graph_head AS " + *head_type + ")");
         values.push_back("CAST(q._graph_tail AS " + *tail_type + ")");
@@ -931,10 +1042,12 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
     // Select independently for each pair of element identities, after matching
     // the entire path and its subpath modes. Count edges, not repetitions.
     // MATCH's WHERE and joins to other patterns are applied by GraphScan later.
-    const std::string order =
-        path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::SHORTEST
-            ? " ORDER BY length(q._graph_edges)"
-            : "";
+    std::string order;
+    if (path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::SHORTEST) {
+      order = " ORDER BY length(q._graph_edges)";
+    } else if (path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::CHEAPEST) {
+      order = " ORDER BY q._graph_cost";
+    }
     result->sql =
         "SELECT q.*" + result->From() +
         R"( QUALIFY row_number() OVER (PARTITION BY q._graph_head."$id", q._graph_tail."$id")" +

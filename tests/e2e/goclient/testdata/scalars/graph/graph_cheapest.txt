@@ -1,0 +1,48 @@
+# ANY CHEAPEST selects, for each pair of endpoints, a path whose edge COST values sum lowest.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+# TransferGraph edges: 7->16 (300), 7->16 (100), 16->20 (300), 20->7 (500), 20->16 (200).
+# Never assert which path is chosen when several paths cost the same.
+
+# The documented example, with its table as written.
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, total_cost), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[t:Transfers COST t.amount]->{1,3}(b:Account) LET total_cost = sum(t.amount) RETURN a.id AS a_id, b.id AS b_id, total_cost)
+=> "7:7:900,7:16:100,7:20:400,16:7:800,16:16:500,16:20:300,20:7:500,20:16:200,20:20:500"
+
+# The cheapest path can have more edges than the shortest: 20->7->16 costs 600, the direct
+# edge 1000.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account WHERE a.id = 20)-[e:Transfers COST IF(e.amount = 200, 1000, e.amount)]->{1,2}(b:Account WHERE b.id = 16) RETURN ARRAY_LENGTH(e) AS result)
+=> "2"
+
+# Costs of a composed path add across its parts; edges without COST add nothing.
+SELECT STRING_AGG(FORMAT('%d:%d:%d', d, hops, first), ',' ORDER BY d) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account WHERE a.id = 7)-[e1:Transfers COST e1.amount]->{1,2}(b:Account WHERE b.id = 20)-[e2:Transfers]->(-[e3:Transfers COST e3.amount * 10]->){1,2}(c:Account) RETURN c.id AS d, ARRAY_LENGTH(e3) AS hops, e3[OFFSET(0)].amount AS first)
+=> "7:2:300,16:1:100,20:1:300"
+
+# A zero-edge path costs nothing, so it wins for identical endpoints.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH p = ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount]->{0,2}(b:Account) RETURN SUM(PATH_LENGTH(p)) AS result)
+=> "8"
+
+# Without ANY CHEAPEST, COST selects nothing.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (a:Account)-[e:Transfers COST e.amount]->(b:Account) RETURN COUNT(*) AS result)
+=> "5"
+
+# NULL, zero, negative, infinite and NaN costs are runtime errors.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount > 0, NULL, e.amount)]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount - 100]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST -e.amount]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IEEE_DIVIDE(e.amount, 0)]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IEEE_DIVIDE(0, 0) + e.amount]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
+
+# ANY CHEAPEST needs a COST, on every quantified edge pattern, of a numeric type, and only on
+# edge patterns.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers]->{1,2}(b:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e1:Transfers COST e1.amount]->(b:Account)-[e2:Transfers]->{1,2}(c:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST CAST(e.amount AS STRING)]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account COST 1)-[e:Transfers COST e.amount]->(b:Account) RETURN COUNT(*) AS result)
+=> error:
