@@ -32,7 +32,16 @@ cc_library(
     linkstatic = True,
     visibility = ["//:__subpackages__"],
     deps = [
+        ":query_restrictions",
         "//:timestamp_precision",
         "@googlesql//googlesql/public:type_cc_proto",
     ],
+)
+
+# The query restrictions alone, so that functions_duckdb::Options holds them without the catalog.
+cc_library(
+    name = "query_restrictions",
+    hdrs = ["query_restrictions.h"],
+    linkstatic = True,
+    visibility = ["//:__subpackages__"],
 )

@@ -2,6 +2,7 @@
 
 #include <compare>
 
+#include "src/function_catalog/query_restrictions.h"
 #include "src/googlesql_collation/options.h"
 #include "src/timestamp_precision.h"
 
@@ -33,30 +34,10 @@ struct Options {
   // of a negative zero.
   bool json_strict_numbers = false;
   bool json_preserve_negative_zero = false;
-  // JSON_KEYS rejects the SAFE. prefix.
-  bool json_keys_rejects_safe = false;
   // The translator restricts COLLATE specifications to und:ci and the empty specification.
   bool collate_und_ci_only = false;
-  // The translator rejects INTERSECT ALL and EXCEPT ALL.
-  bool intersect_except_distinct_only = false;
-  // Window PARTITION BY rejects STRUCT and ARRAY keys.
-  bool scalar_window_partition_keys_only = false;
-  // DISTINCT set operations reject STRUCT columns.
-  bool distinct_set_operations_without_structs = false;
-  // DISTINCT set operations reject ARRAY columns.
-  bool distinct_set_operations_without_arrays = false;
-  // Aggregate functions with DISTINCT reject STRUCT arguments.
-  bool distinct_aggregates_without_structs = false;
-  // INTERVAL * FLOAT64 and FLOAT64 * INTERVAL are rejected.
-  bool interval_multiply_int64_only = false;
-  // IS DISTINCT FROM and IS NOT DISTINCT FROM reject STRUCT arguments.
-  bool distinct_comparisons_without_structs = false;
-  // APPROX_TOP_COUNT and APPROX_TOP_SUM reject STRUCT and ARRAY values.
-  bool approx_top_scalar_values_only = false;
-  // Query results and written values fail on an ARRAY with a NULL element.
-  bool arrays_without_null_elements = false;
-  // Query results reject empty STRUCTs and anonymous fields of STRUCT value tables.
-  bool restrict_struct_results = false;
+  // The forms the translator rejects.
+  function_catalog::QueryRestrictions query = {};
   googlesql_collation::Options collation = {};
 
   std::strong_ordering operator<=>(const Options&) const = default;

@@ -230,9 +230,9 @@ give each function only its own flags, as context the registration owns
 (`RegisterWithContext` and `ApplyWithContext` in [duckdb_functions](../src/duckdb_functions/)).
 [`BigQueryFunctionOptions()`](../src/function_options.h) selects every difference, and is the
 default of `Backend`, `SqlRuntime`, `Emulator` and `RegisterBackendFunctions`. Its flags for forms
-GoogleSQL accepts and BigQuery does not, such as `intersect_except_distinct_only`, reach the
-translator instead, as the function catalog's
-[`QueryRestrictions`](../src/function_catalog/catalog.h).
+GoogleSQL accepts and BigQuery does not, such as `intersect_except_distinct_only`, are its
+`query` field, a [`QueryRestrictions`](../src/function_catalog/query_restrictions.h) that the
+function catalog passes to the translator.
 
 ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapter receives
 connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
