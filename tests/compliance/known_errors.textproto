@@ -405,13 +405,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "A CALL nested in another CALL, or one that takes a column of an enclosing query, refers to an outer input the generated SQL does not bind, so DuckDB fails to resolve it"
-  label: "graph_table_gql_extended2_test:call_declaring_correlated_name_in_variable_scope_clause"
-  label: "graph_table_gql_extended2_test:nested_call"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "TRAIL counts one edge for a row of an edge table whose endpoints reference non-key node columns, where the reference implementation counts one edge for each pair of endpoint nodes; BigQuery's behavior is unverified"
   label: "graph_table_gql_extended4_test:trail_path_mode_with_duplicate_scalar_nodes"

@@ -126,6 +126,20 @@ CALL (p) {
 RETURN STRING_AGG(FORMAT('%s:%d', p.name, amount), ',' ORDER BY p.name) AS result
 => "Alex:300,Dana:500,Lee:300"
 
+# A nested CALL can declare a variable its caller received from the outer scope.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+CALL (p) {
+  MATCH (p)-[:Owns]->(a:Account)
+  CALL (p, a) {
+    MATCH (a)-[t:Transfers]->()
+    RETURN p.name AS owner, t.amount AS amount ORDER BY amount DESC LIMIT 1
+  }
+  RETURN owner, amount
+}
+RETURN STRING_AGG(FORMAT('%s:%s:%d', p.name, owner, amount), ',' ORDER BY p.name) AS result
+=> "Alex:Alex:300,Dana:Dana:500,Lee:Lee:300"
+
 # CALL can be the first statement; it must not require an existing working table.
 GRAPH scalar_graph.TransferGraph
 CALL () {
