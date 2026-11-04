@@ -1,0 +1,11 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+# LGPL-2.1-or-later; see README.md.
+cc_library(
+    name = "glibc_hypot",
+    srcs = ["hypot.cc"],
+    hdrs = ["hypot.h"],
+    # The kernel's rounding is glibc's only when the compiler fuses nothing but the explicit fma.
+    copts = ["-ffp-contract=off"],
+    visibility = ["//visibility:public"],
+)

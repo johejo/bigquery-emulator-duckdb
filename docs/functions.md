@@ -254,7 +254,7 @@ functions.
 | [`ST_DIFFERENCE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DIMENSION`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DISJOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
-| [`ST_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
+| [`ST_DISTANCE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DUMP`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_DWITHIN`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_ENDPOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |

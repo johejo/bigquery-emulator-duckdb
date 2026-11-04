@@ -52,6 +52,18 @@ SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEO
 SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGFROMTEXT('LINESTRING(5 5, 6 7)'), TRUE)
 => "470253.7059663307"
 
+# BigQuery's last digits match glibc's hypot where it computes with FMA, which GeographicLib
+# calls on every platform (third_party/glibc_hypot); a correctly rounded hypot differs.
+
+SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGPOINT(3, 1), TRUE)
+=> "111302.64804842559"
+
+SELECT ST_DISTANCE(ST_GEOGFROMTEXT('LINESTRING(2 0, 2 2)'), ST_GEOGPOINT(3, 1), TRUE)
+=> "111302.64804842559"
+
+SELECT ST_DISTANCE(ST_GEOGPOINT(2, 1.0001522971042087), ST_GEOGPOINT(3, 1), TRUE)
+=> "111302.64804842563"
+
 # The closest point over the sphere, inside the edge, is meters away from the closest point over
 # the spheroid, which BigQuery does not look for.
 

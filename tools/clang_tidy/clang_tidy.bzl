@@ -1,7 +1,7 @@
 """Runs clang-tidy on every C++ source and header of the repository's targets.
 
 Each checked-in file is its own action, so results are cached and checked in parallel. Generated
-and external files are omitted. Headers are checked as their own translation units too, since
+and external files are omitted, and so is code under third_party/, which keeps its origin's style. Headers are checked as their own translation units too, since
 checks such as misc-include-cleaner look only at the main file.
 """
 
@@ -11,7 +11,7 @@ load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("//tools/cc_checks:compile_flags.bzl", "compile_flags")
 
 def _clang_tidy_impl(target, ctx):
-    if CcInfo not in target or target.label.workspace_name:
+    if CcInfo not in target or target.label.workspace_name or target.label.package.startswith("third_party/"):
         return []
 
     inherited = [

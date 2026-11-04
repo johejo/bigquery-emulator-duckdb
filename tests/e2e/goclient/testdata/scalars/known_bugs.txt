@@ -105,19 +105,6 @@ SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
 SELECT SAFE.ST_BUFFER(ST_GEOGPOINT(1, 2), 100, use_spheroid => TRUE)
 !> error: ST_BUFFER does not yet implement use_spheroid=true.
 
-# ST_DISTANCE over the spheroid differs from BigQuery in the last digits (geography_spheroid.txt).
-# BigQuery's closest points, ST_X and ST_Y are the emulator's, and the answers match GeographicLib
-# with coordinates an ulp or two away from them, the cause unknown. Correctly rounded libm in
-# GeographicLib, its exact solver and the flattening's spelling do not account for it.
-SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGPOINT(3, 1), TRUE)
-!> "111302.64804842559"
-
-SELECT ST_DISTANCE(ST_GEOGFROMTEXT('LINESTRING(2 0, 2 2)'), ST_GEOGPOINT(3, 1), TRUE)
-!> "111302.64804842559"
-
-SELECT ST_DISTANCE(ST_GEOGPOINT(2, 1.0001522971042087), ST_GEOGPOINT(3, 1), TRUE)
-!> "111302.64804842563"
-
 # A RANGE frame with an offset, ordered by FLOAT64, still sorts NaN after +inf, so the frame of
 # -inf leaves out the NaN that precedes it (analytic_sum_test). The documentation orders NaN
 # below -inf.

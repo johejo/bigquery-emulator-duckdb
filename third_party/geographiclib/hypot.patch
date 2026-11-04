@@ -1,0 +1,109 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -41,4 +41,5 @@
+         "include",
+     ],
+     visibility = ["//visibility:public"],
++    deps = ["@@//third_party/glibc_hypot"],
+ )
+diff --git a/include/GeographicLib/AlbersEqualArea.hpp b/include/GeographicLib/AlbersEqualArea.hpp
+--- a/include/GeographicLib/AlbersEqualArea.hpp
++++ b/include/GeographicLib/AlbersEqualArea.hpp
+@@ -67,7 +67,6 @@
+     static const int numit_ = 5;   // Newton iterations in Reverse
+     static const int numit0_ = 20; // Newton iterations in Init
+     static real hyp(real x) {
+-      using std::hypot;
+       return hypot(real(1), x);
+     }
+     // atanh(      e   * x)/      e   if f > 0
+diff --git a/include/GeographicLib/Angle.hpp b/include/GeographicLib/Angle.hpp
+--- a/include/GeographicLib/Angle.hpp
++++ b/include/GeographicLib/Angle.hpp
+@@ -474,7 +474,7 @@
+     , _c(c)
+     , _n(num)
+   {
+-    using std::isfinite, std::isnan, std::isinf, std::hypot,
++    using std::isfinite, std::isnan, std::isinf,
+       std::copysign, std::rint;
+     _n = rint(_n);
+     if (!normp) {
+@@ -653,7 +653,6 @@
+ 
+   template<typename T>
+   inline AngleT<T>& AngleT<T>::renormalize() {
+-    using std::hypot;
+     T h = hypot(_s, _c); _s /= h; _c /= h;
+     return *this;
+   }
+diff --git a/include/GeographicLib/AuxLatitude.hpp b/include/GeographicLib/AuxLatitude.hpp
+--- a/include/GeographicLib/AuxLatitude.hpp
++++ b/include/GeographicLib/AuxLatitude.hpp
+@@ -383,7 +383,7 @@
+     }
+     // the function sqrt(1 + tphi^2), convert tan to sec
+     static real sc(real tphi)
+-    { using std::hypot; return hypot(real(1), tphi); }
++    { return hypot(real(1), tphi); }
+     // the function tphi / sqrt(1 + tphi^2), convert tan to sin
+     static real sn(real tphi) {
+       using std::isinf, std::copysign;
+diff --git a/include/GeographicLib/LambertConformalConic.hpp b/include/GeographicLib/LambertConformalConic.hpp
+--- a/include/GeographicLib/LambertConformalConic.hpp
++++ b/include/GeographicLib/LambertConformalConic.hpp
+@@ -69,7 +69,6 @@
+     real _scbet0, _tchi0, _scchi0, _psi0, _nrho0, _drhomax;
+     static const int numit_ = 5;
+     static real hyp(real x) {
+-      using std::hypot;
+       return hypot(real(1), x);
+     }
+     // Divided differences
+diff --git a/include/GeographicLib/Math.hpp b/include/GeographicLib/Math.hpp
+--- a/include/GeographicLib/Math.hpp
++++ b/include/GeographicLib/Math.hpp
+@@ -38,6 +38,7 @@
+ #include <cmath>
+ #include <algorithm>
+ #include <limits>
++#include "third_party/glibc_hypot/hypot.h"
+ 
+ #if GEOGRAPHICLIB_PRECISION == 4
+ #  include <memory>
+@@ -69,6 +70,13 @@
+ 
+ namespace GeographicLib {
+ 
++  // bigquery-emulator-duckdb: unqualified hypot calls in GeographicLib find
++  // these before std::hypot, so that doubles take glibc's FMA hypot, whose
++  // rounding BigQuery's distances match, on every platform.
++  inline double hypot(double x, double y) { return glibc_hypot::Hypot(x, y); }
++  template<typename T> T hypot(T x, T y) { return std::hypot(x, y); }
++  template<typename T> T hypot(T x, T y, T z) { return std::hypot(x, y, z); }
++
+   /**
+    * \brief Mathematical functions needed by %GeographicLib
+    *
+@@ -232,7 +240,7 @@
+       // Let's hope it's fixed in vc18.
+       using std::sqrt; T h = sqrt(x * x + y * y);
+ #else
+-      using std::hypot; T h = hypot(x, y);
++      T h = hypot(x, y);
+ #endif
+       x /= h; y /= h;
+     }
+diff --git a/include/GeographicLib/Triaxial/GeodesicLine3.hpp b/include/GeographicLib/Triaxial/GeodesicLine3.hpp
+--- a/include/GeographicLib/Triaxial/GeodesicLine3.hpp
++++ b/include/GeographicLib/Triaxial/GeodesicLine3.hpp
+@@ -423,7 +423,7 @@
+       return ang(sinh(u), mult, 0);
+     }
+     static real mcosh(real u, real mult = 1) {
+-      using std::cosh, std::sinh, std::hypot;
++      using std::cosh, std::sinh;
+       return mult == 1 ? cosh(u) : hypot(sinh(u), mult) / mult;
+     }
+ 

@@ -132,7 +132,6 @@ argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
 # BigQuery also measures over the spheroid, between points and between lines or polygons.
 longest ^ST_DISTANCE\(
 extra_query ST_DISTANCE SELECT ST_DISTANCE(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'), ST_GEOGPOINT(1, 0), TRUE)
-note ST_DISTANCE See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 # Linestring accessors take a linestring, and ST_MAKELINE's documented example of lines that
 # overlap makes a MULTILINESTRING.
 argument ^ST_(STARTPOINT|ENDPOINT|POINTN|LINEINTERPOLATEPOINT|LINESUBSTRING)\( | GEOGRAPHY | ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')
