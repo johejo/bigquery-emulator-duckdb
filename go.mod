@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	cloud.google.com/go v0.123.0
 	cloud.google.com/go/bigquery v1.84.0
+	cloud.google.com/go/bigtable v1.47.0
 	github.com/apache/arrow-go/v18 v18.8.0
 	github.com/creack/pty v1.1.24
 	github.com/goccy/go-yaml v1.19.2
@@ -21,6 +22,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.1 // indirect
 	cloud.google.com/go/iam v1.12.0 // indirect
+	cloud.google.com/go/longrunning v1.2.0 // indirect
 	github.com/andybalholm/brotli v1.2.3 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/apache/thrift v0.24.0 // indirect

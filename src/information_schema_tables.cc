@@ -14,6 +14,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/information_schema_options.h"
@@ -110,7 +111,8 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
   std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
                     "." + dataset + "." + table + "`";
   // BigQuery leaves out the columns of an external table whose schema it detects.
-  if (!external || (external->format != "PARQUET" && !external->autodetect.value_or(false))) {
+  if (!external || (external->format != "PARQUET" && external->format != "BIGTABLE" &&
+                    !external->autodetect.value_or(false))) {
     ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
   }
   // A CUSTOM schema created by DDL lists its keys, one in the prefix lists none, and AUTO has no
@@ -172,7 +174,13 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     for (const auto& [name, value] : DatetimeFormatOptions(*external)) {
       ddl += std::format("  {}={},\n", name, value);
     }
-    ddl += "  format=" + StringOptionValue(external->format) + ",\n";
+    if (external->bigtable_options) {
+      ddl += "  bigtable_options=" +
+             StringOptionValue(BigtableOptionsJson(*external->bigtable_options).dump()) + ",\n";
+    }
+    ddl += "  format=" +
+           StringOptionValue(external->format == "BIGTABLE" ? "CLOUD_BIGTABLE" : external->format) +
+           ",\n";
     if (hive) {
       ddl +=
           "  hive_partition_uri_prefix=" + StringOptionValue(HivePrefixOption(*hive).value_or("")) +
@@ -180,7 +188,8 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       flag("require_hive_partition_filter",
            hive->require_partition_filter.value_or(false) ? std::optional(true) : std::nullopt);
     }
-    ddl += "  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
+    ddl += external->format == "BIGTABLE" ? "  uris=" + uris.at(0) + "\n)"
+                                          : "  uris=[" + absl::StrJoin(uris, ", ") + "]\n)";
   }
   return ddl + ";";
 }
@@ -468,12 +477,23 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
             }
           }
         }
-        options.push_back(
-            {.name = "format", .type = "STRING", .value = StringOptionValue(external.format)});
+        if (external.bigtable_options) {
+          options.push_back({
+              .name = "bigtable_options",
+              .type = "STRING",
+              .value = StringOptionValue(BigtableOptionsJson(*external.bigtable_options).dump()),
+          });
+        }
+        const bool bigtable = external.format == "BIGTABLE";
+        options.push_back({
+            .name = "format",
+            .type = "STRING",
+            .value = StringOptionValue(bigtable ? "CLOUD_BIGTABLE" : external.format),
+        });
         options.push_back({
             .name = "uris",
-            .type = "ARRAY<STRING>",
-            .value = "[" + absl::StrJoin(uris, ", ") + "]",
+            .type = bigtable ? "STRING" : "ARRAY<STRING>",
+            .value = bigtable ? uris.at(0) : "[" + absl::StrJoin(uris, ", ") + "]",
         });
       }
       if (metadata->restored_from_snapshot) {

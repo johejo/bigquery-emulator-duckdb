@@ -29,6 +29,7 @@
           testPackages = with pkgs; [
             (callPackage ./duckdb-bin.nix { })
             fake-gcs-server
+            cbtemulator
             go
             google-cloud-sdk
             gotestsum

@@ -11,6 +11,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/bigtable_options.h"
 #include "src/csv_records.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -97,7 +98,13 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
     if (metadata.external_data->uris.empty()) {
       throw ApiError::Invalid("External table source URIs must not be empty");
     }
+    if (metadata.external_data->format == "BIGTABLE") {
+      ValidateBigtableExternal(*metadata.external_data);
+    }
     for (const auto& uri : metadata.external_data->uris) {
+      if (metadata.external_data->format == "BIGTABLE") {
+        continue;
+      }
       if (!uri.starts_with("gs://")) {
         throw ApiError::Unsupported("external table sources other than gs://");
       }

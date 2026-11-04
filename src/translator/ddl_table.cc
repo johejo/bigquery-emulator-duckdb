@@ -974,6 +974,10 @@ std::optional<std::string> CreateExternalTable(
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
   }
   auto& hive = table.metadata.external_data->hive_partitioning;
+  if (table.metadata.external_data->format == "BIGTABLE" &&
+      (!table.schema.empty() || hive || create.with_partition_columns() != nullptr)) {
+    return Unsupported(scope, "explicit schema or Hive partitioning on a Bigtable external table");
+  }
   if (const auto* partition = create.with_partition_columns(); partition == nullptr) {
     if (hive && !hive->source_uri_prefix.empty()) {
       throw ApiError::InvalidQuery(

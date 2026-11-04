@@ -164,6 +164,18 @@ func run(ctx context.Context, args []string) (err error) {
 	if err := os.Setenv("STORAGE_EMULATOR_HOST", host); err != nil {
 		return err
 	}
+	if os.Getenv("BIGTABLE_EMULATOR_HOST") == "" {
+		startup, cancel := context.WithTimeout(ctx, 15*time.Second)
+		bigtable, startErr := serverprocess.StartBigtable(startup)
+		cancel()
+		if startErr != nil {
+			return startErr
+		}
+		defer func() { err = errors.Join(err, bigtable.Stop()) }()
+		if err := os.Setenv("BIGTABLE_EMULATOR_HOST", bigtable.Host); err != nil {
+			return err
+		}
+	}
 	projectData, err := os.ReadFile("tests/e2e/projects.jsonl")
 	if err != nil {
 		return err

@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 1 | 4 |
 | [Queries](#queries) | 34 | 2 |
 | [DML](#dml) | 9 | 0 |
-| [DDL](#ddl) | 25 | 8 |
+| [DDL](#ddl) | 24 | 9 |
 | [Collation](#collation) | 15 | 0 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 |
@@ -112,7 +112,7 @@ rejected.
 | `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE CLONE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE SNAPSHOT TABLE` | Supported | See [Table snapshots](compatibility.md#table-snapshots). |
-| `CREATE EXTERNAL TABLE` | Supported | See [External tables](compatibility.md#external-tables). |
+| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: Bigtable cell type INTEGER. |
 | `DROP TABLE` | Supported |  |
 | `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |

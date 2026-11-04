@@ -729,8 +729,8 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       return {};
     }
     TranslatedStatement detected = translation;
-    // tables.get reports a table that CREATE EXTERNAL TABLE detects the schema of as autodetected.
-    if (table->schema.empty()) {
+    // GCS schema detection is reported as autodetect; Bigtable gets its schema from families.
+    if (table->schema.empty() && table->metadata.external_data->format != "BIGTABLE") {
       detected.table->metadata.external_data->autodetect = true;
     }
     detected.table->schema =

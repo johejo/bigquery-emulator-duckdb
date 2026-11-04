@@ -259,6 +259,18 @@ CSV and newline-delimited JSON loads accept gzip data from GCS, local files, and
 Compression is detected from the file contents, so a `.gz` extension is not required, and
 compressed and uncompressed files can be loaded together.
 
+## Bigtable external tables
+
+`nix develop` provides nixpkgs' `cbtemulator`. Start it with `cbtemulator -host 127.0.0.1 -port 9000`,
+then start the emulator with `BIGTABLE_EMULATOR_HOST=127.0.0.1:9000`. This uses an insecure,
+anonymous connection to the local Bigtable emulator. Without that variable, Bigtable uses the
+public API and Application Default Credentials.
+
+Create external tables with REST `sourceFormat: "BIGTABLE"` or DDL `format = 'CLOUD_BIGTABLE'`.
+DDL takes a single STRING `uris`, such as
+`https://googleapis.com/bigtable/projects/test/instances/test/tables/events`.
+See [external table limits](docs/compatibility.md#external-tables).
+
 ## Compatibility
 
 What the emulator supports is listed in generated pages:

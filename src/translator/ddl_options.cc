@@ -21,6 +21,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/api_error.h"
+#include "src/bigtable_options.h"
 #include "src/datetime_formats.h"
 #include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
@@ -297,7 +298,9 @@ std::optional<DecodedDdlOption> DecodeNamedDdlOption(const googlesql::ResolvedOp
   }
   const auto checked =
       [&](std::optional<googlesql::Value> value) -> std::optional<DecodedDdlOption> {
-    if (!value || !DdlOptionValueMatches(definition->type, *value)) {
+    const bool bigtable_uri =
+        value && definition->name == DdlOptionId::kUris && value->type()->IsString();
+    if (!value || (!bigtable_uri && !DdlOptionValueMatches(definition->type, *value))) {
       return std::nullopt;
     }
     return DecodedDdlOption{.id = definition->name, .value = *std::move(value)};
@@ -380,6 +383,7 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   const bool table = statement == DdlOptionContext::kCreateTable;
   const bool external = statement == DdlOptionContext::kCreateExternalTable;
   bool format = false;
+  bool scalar_uri = false;
   if (external) {
     metadata.external_data.emplace();
   }
@@ -389,13 +393,23 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       format = !decoded->value.is_null() &&
                (decoded->value.string_value() == "PARQUET" ||
                 decoded->value.string_value() == "CSV" || decoded->value.string_value() == "JSON" ||
-                decoded->value.string_value() == "NEWLINE_DELIMITED_JSON");
+                decoded->value.string_value() == "NEWLINE_DELIMITED_JSON" ||
+                decoded->value.string_value() == "CLOUD_BIGTABLE");
       if (!format) {
-        return Unsupported(scope, "external tables other than PARQUET, CSV or JSON");
+        return Unsupported(scope,
+                           "external tables other than PARQUET, CSV, JSON or CLOUD_BIGTABLE");
       }
-      metadata.external_data->format = decoded->value.string_value() == "JSON"
-                                           ? "NEWLINE_DELIMITED_JSON"
-                                           : decoded->value.string_value();
+      metadata.external_data->format =
+          decoded->value.string_value() == "JSON"             ? "NEWLINE_DELIMITED_JSON"
+          : decoded->value.string_value() == "CLOUD_BIGTABLE" ? "BIGTABLE"
+                                                              : decoded->value.string_value();
+      continue;
+    }
+    if (decoded && external && decoded->id == DdlOptionId::kBigtableOptions) {
+      if (!decoded->value.is_null()) {
+        metadata.external_data->bigtable_options =
+            ParseBigtableOptions(decoded->value.string_value());
+      }
       continue;
     }
     if (decoded && external && decoded->id == DdlOptionId::kSkipLeadingRows) {
@@ -536,6 +550,11 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       if (decoded->value.is_null()) {
         return Unsupported(scope, "NULL external table uris");
       }
+      if (decoded->value.type()->IsString()) {
+        scalar_uri = true;
+        metadata.external_data->uris.push_back(decoded->value.string_value());
+        continue;
+      }
       for (int i = 0; i < decoded->value.num_elements(); ++i) {
         const auto& uri = decoded->value.element(i);
         if (uri.is_null()) {
@@ -552,6 +571,14 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   }
   if (external && (!format || metadata.external_data->uris.empty())) {
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
+  }
+  if (external && scalar_uri != (metadata.external_data->format == "BIGTABLE")) {
+    throw ApiError::InvalidQuery(
+        "Bigtable uris must be a STRING; other external table uris must be an ARRAY<STRING>");
+  }
+  if (external && metadata.external_data->bigtable_options &&
+      metadata.external_data->format != "BIGTABLE") {
+    throw ApiError::UnsupportedQuery("bigtable_options on a non-Bigtable external table");
   }
   // As BigQuery's answers in external_table_datetime_formats.api.answers.json show.
   if (external) {

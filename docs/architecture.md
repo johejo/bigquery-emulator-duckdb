@@ -248,13 +248,17 @@ A native `Backend` does not register external connectors by default.
 project aliases, location tracking, time travel, numeric-storage conversion and write
 restrictions. The application supplies an
 [`ExternalTableProvider`](../src/external_table_provider.h) for external operations;
-[`service_table_provider`](../src/service_table_provider.cc) prepares GCS reads and
+[`service_table_provider`](../src/service_table_provider.cc) prepares GCS and Bigtable reads and
 discovers/registers external connections, using the shared connection registry and
 backend outside script transactions. Without a provider, external reads fail rather
 than reading native placeholder tables. GCS read definitions retain metadata, schema
 and the client by value; analysis does not stage files, and `StatementResources` keeps
 staged files alive through result or Storage snapshot consumption. Metadata URI
-validation uses [`gcs_uri`](../src/gcs_uri.cc), which has no service SDK dependency.
+validation uses [`gcs_uri`](../src/gcs_uri.cc) and
+[`bigtable_options`](../src/bigtable_options.cc), which have no service SDK dependency.
+[`bigtable_external`](../src/bigtable_external.cc) discovers column families through the
+Bigtable Admin API and reads current cells through google-cloud-cpp. Its deferred reads
+materialize typed SQL values; the SQL runtime itself does not depend on the Bigtable SDK.
 
 HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
 the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.
