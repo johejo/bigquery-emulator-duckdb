@@ -60,22 +60,8 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
   if (functions != nullptr) {
     return *functions;
   }
-  functions = std::make_unique<function_catalog::Catalog>(
-      options.timestamp_precision,
-      function_catalog::QueryRestrictions{
-          .json_keys_rejects_safe = options.json_keys_rejects_safe,
-          .intersect_except_distinct_only = options.intersect_except_distinct_only,
-          .scalar_window_partition_keys_only = options.scalar_window_partition_keys_only,
-          .distinct_set_operations_without_structs =
-              options.distinct_set_operations_without_structs,
-          .distinct_set_operations_without_arrays = options.distinct_set_operations_without_arrays,
-          .distinct_aggregates_without_structs = options.distinct_aggregates_without_structs,
-          .interval_multiply_int64_only = options.interval_multiply_int64_only,
-          .distinct_comparisons_without_structs = options.distinct_comparisons_without_structs,
-          .approx_top_scalar_values_only = options.approx_top_scalar_values_only,
-          .arrays_without_null_elements = options.arrays_without_null_elements,
-          .restrict_struct_results = options.restrict_struct_results,
-      });
+  functions =
+      std::make_unique<function_catalog::Catalog>(options.timestamp_precision, options.query);
   translator::AddBuiltinFunctions(*functions);
   functions->Add("COLLATE",
                  {

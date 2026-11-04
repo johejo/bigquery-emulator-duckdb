@@ -67,7 +67,7 @@ does not, and it contradicts the one on APPROX_TOP_COUNT and APPROX_TOP_SUM.
 | SAFE.JSON_KEYS | `TypeUse::kRejectsSafe` in [functions.cc](../src/translator/functions.cc) | Accepts | [JSON_KEYS](../third_party/bigquery_docs/reference/standard-sql/json_functions.md) does not exclude SAFE |
 | STRUCT<> or an anonymous field in a query's result | [analyzer.cc](../src/analyzer.cc) `CheckEmptyStructs` and `CheckResultColumns` | Accepts, except empty STRUCT value tables and strict procedure validation | [STRUCT<>](../third_party/bigquery_docs/reference/standard-sql/data-types.md) is a listed type, without the restriction |
 
-A form that `googlesql` accepts has its own flag in `functions_duckdb::Options`, such as
+A form that `googlesql` accepts has its own flag in `functions_duckdb::Options::query`, such as
 `intersect_except_distinct_only`, which BigQuery's options set; end-to-end tests check that
 rejection.
 
