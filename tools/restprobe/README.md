@@ -48,8 +48,9 @@ assigned, are the Collation section of `tools/sql_features.txt`.
 `tools/ddl_options.json` is a snapshot of the option lists in BigQuery's DDL reference. `groups`
 maps each list's section anchor to its options: a name, a GoogleSQL type and SQL sample `values`.
 Each of `contexts` names a statement that takes a group's options, with a `template` holding
-`{option}` once, `setup` statements, and `only` or `exclude` to keep the options a language or
-form takes. `implementation` names the DDL handlers' context in `src/ddl_option_types.cc`.
+`{option}` once, `templates` replacing it for options that need another statement, such as one
+the template already sets, `setup` statements, and `only` or `exclude` to keep the options a
+language or form takes. `implementation` names the DDL handlers' context in `src/ddl_option_types.cc`.
 
 `internal/ddloptions` checks the catalog's structure and builds one statement per sample, which
 `restprobe options` runs. `tests/ddl_options_catalog_test.cc` parses each type and sample with

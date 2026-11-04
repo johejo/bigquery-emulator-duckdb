@@ -89,6 +89,41 @@ func TestRejectsInvalidTemplates(t *testing.T) {
 	rejects(t, c, "template must contain {option} exactly once")
 }
 
+func TestRejectsInvalidOptionTemplates(t *testing.T) {
+	t.Parallel()
+	c := load(t)
+	context(c, "external_table_option_list").Templates["field_delimiter"] = "CREATE EXTERNAL TABLE n OPTIONS ({option})"
+	rejects(t, c, "template for an option the context does not take: field_delimiter")
+	c = load(t)
+	context(c, "external_table_option_list").Templates["uris"] = "CREATE EXTERNAL TABLE n"
+	rejects(t, c, "uris: template must contain {option} exactly once")
+}
+
+func TestOptionTemplatesReplaceTheContextTemplate(t *testing.T) {
+	t.Parallel()
+	c := &Catalog{
+		Source: "https://example.com/ddl",
+		Groups: map[string][]Option{"g": {
+			{Name: "a", Type: "STRING", Values: []string{"'x'"}},
+			{Name: "b", Type: "STRING", Values: []string{"'y'"}},
+		}},
+		Contexts: []Context{{
+			Name: "CREATE T", Group: "g", Template: "CREATE T OPTIONS (b = 'z', {option})",
+			Templates: map[string]string{"b": "CREATE T OPTIONS ({option})"},
+		}},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, k := range c.Cases() {
+		got = append(got, k.Queries...)
+	}
+	if strings.Join(got, "; ") != "CREATE T OPTIONS (b = 'z', a = 'x'); CREATE T OPTIONS (b = 'y')" {
+		t.Errorf("queries = %v", got)
+	}
+}
+
 func TestRejectsUnreferencedGroups(t *testing.T) {
 	t.Parallel()
 	c := load(t)
