@@ -788,6 +788,14 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       {.argument = 1, .types = kInt64Types},
       {.argument = 2, .types = kIntervalTypes},
   };
+  static constexpr StaticCondition kIntervalDouble[] = {
+      {.argument = 1, .types = kIntervalTypes},
+      {.argument = 2, .types = kDoubleTypes},
+  };
+  static constexpr StaticCondition kDoubleInterval[] = {
+      {.argument = 1, .types = kDoubleTypes},
+      {.argument = 2, .types = kIntervalTypes},
+  };
   static constexpr function_catalog::TypeRejection kMultiplyRejections[] = {
       {.types = kIntervalDoubleTypes, .message = "No matching signature for operator *"},
       {.types = kDoubleIntervalTypes, .message = "No matching signature for operator *"},
@@ -948,7 +956,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      .conditions = kBigNumeric,
                  },
                  {.arity = 2, .spelling = "bq_multiply_numeric($1, $2)", .conditions = kNumeric},
-                 // Reject FLOAT64 operands as BigQuery does.
                  {
                      .arity = 2,
                      .spelling = "bq_multiply_interval($1, $2)",
@@ -958,6 +965,17 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                      .arity = 2,
                      .spelling = "bq_multiply_interval($2, $1)",
                      .conditions = kInt64Interval,
+                 },
+                 // QueryRestrictions::interval_multiply_int64_only rejects these, as BigQuery does.
+                 {
+                     .arity = 2,
+                     .spelling = "bq_multiply_interval_double($1, $2)",
+                     .conditions = kIntervalDouble,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_multiply_interval_double($2, $1)",
+                     .conditions = kDoubleInterval,
                  },
                  {
                      .arity = 2,

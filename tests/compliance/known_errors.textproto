@@ -63,13 +63,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects INTERVAL * FLOAT64, which GoogleSQL accepts"
-  label: "interval_test:multiply_double"
-  label: "interval_test:multiply_double_without_nanos_feature"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "BigQuery rejects ARRAYs in aggregate functions with DISTINCT, which GoogleSQL accepts"
   label: "aggregation_distinct_queries_test:aggregation_distinct_count_6"
   label: "elementwise_aggregation_test:aggregate_elementwise_avg_testtable_bignumeric_array_val_distinct"

@@ -389,6 +389,9 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
       // Empty STRUCTs use a fixed placeholder field, preserving null-safe equality.
       selected.uses |= {TypeUse::kReadsEmptyStruct};
     }
+    if (name == "$MULTIPLY" && !functions.restrictions().interval_multiply_int64_only) {
+      selected.type_rejections = {};
+    }
     functions.AddRules(name, selected, Implementation::kSQL);
   }
   for (const auto& [name, definition] : TemplateRules()) {
