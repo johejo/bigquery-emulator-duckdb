@@ -147,9 +147,10 @@ labels, tags and expiration time. They take back the schema and `externalDataCon
 `ALTER TABLE SET OPTIONS` fails on external tables, as
 [BigQuery's does](../tests/e2e/scenarios/testdata/external_table_alter.api.yaml); other
 `ALTER TABLE` actions on them are unsupported. Bigtable, BigLake connections, metadata caching
-and time travel are unsupported. Query dry runs reject
-external reads rather than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
-not read external tables; use a query instead. Writes to external tables are rejected.
+and time travel are unsupported. Query dry runs validate external table references against the
+stored schema without accessing GCS; they do not estimate external data sizes. `tabledata.list`,
+Storage Read, extracts and copy jobs do not read external tables; use a query instead. Writes to
+external tables are rejected.
 
 ### Resource tags
 

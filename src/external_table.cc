@@ -843,6 +843,16 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         !formats.ok()) {
       throw ApiError::InvalidQuery(std::string(formats.message()));
     }
+    if (context.dry_run) {
+      // Even preparing a file reader can access GCS. Bind only the stored schema, including
+      // the pseudocolumn which is not part of that schema, without listing or staging files.
+      std::vector<std::string> columns;
+      std::ranges::transform(schema, std::back_inserter(columns), [](const FieldSchema& field) {
+        return "CAST(NULL AS " + ToDuckDbReadType(field) + ") AS " + QuoteIdentifier(field.name);
+      });
+      columns.emplace_back("CAST(NULL AS VARCHAR) AS _FILE_NAME");
+      return "SELECT " + Join(columns, ", ") + " WHERE FALSE";
+    }
     const auto sources = StageSources(definition, table_name, client, files);
     // BigQuery ignores maxBadRecords for Parquet. A JSON table of one file fails at the record
     // that exceeds the limit. A CSV read finds its bad records even without a limit, since the
