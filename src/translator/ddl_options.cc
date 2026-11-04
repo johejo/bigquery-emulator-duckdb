@@ -112,7 +112,7 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
 }
 
 // Tags have the same pair representation as labels, but cannot repeat a key.
-// NULL clears tags; incremental additions stay unsupported until their ordering is verified.
+// NULL clears tags on replacement; incremental NULL operands are handled by SetOptions.
 bool TagsOption(const googlesql::Value& value, std::map<std::string, std::string>& into,
                 std::vector<std::string>& order) {
   if (!LabelsOption(value, into, order) ||
@@ -305,11 +305,13 @@ std::optional<DecodedDdlOption> DecodeNamedDdlOption(const googlesql::ResolvedOp
     }
     return DecodedDdlOption{.id = definition->name, .value = *std::move(value)};
   };
-  const bool removing_tags = context == DdlOptionContext::kAlterTable &&
-                             definition->name == DdlOptionId::kTags &&
-                             option.assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN;
+  const bool incremental_tags =
+      (context == DdlOptionContext::kAlterTable || context == DdlOptionContext::kAlterSchema) &&
+      definition->name == DdlOptionId::kTags &&
+      (option.assignment_op() == googlesql::ResolvedOption::ADD_ASSIGN ||
+       option.assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN);
   if (!option.qualifier().empty() ||
-      (option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN && !removing_tags)) {
+      (option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN && !incremental_tags)) {
     return std::nullopt;
   }
   const googlesql::ResolvedExpr& expression = *option.value();
@@ -619,7 +621,7 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
 
 // The metadata SET OPTIONS of `statement` sets on `updates`. The
 // other options change how BigQuery stores or reads the table or dataset, which the
-// emulator does not emulate, so they are unsupported. Tag removal also accepts -=.
+// emulator does not emulate, so they are unsupported. Tags also accept += and -=.
 bool SetOptions(const Options& options, DdlOptionContext statement, const Scope& scope,
                 OptionUpdates& updates) {
   using enum DdlOptionId;
@@ -643,11 +645,23 @@ bool SetOptions(const Options& options, DdlOptionContext statement, const Scope&
                   std::string(DdlOptionContextName(statement)) + " option " + option->name());
       return false;
     };
-    if (name == kTags && option->assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN) {
-      std::vector<std::string> order;
-      if (!decoded || decoded->value.is_null() ||
-          !TagsOption(decoded->value, updates.removed_tags, order)) {
+    if (name == kTags && option->assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN) {
+      if (!decoded) {
         return fail();
+      }
+      if (decoded->value.is_null()) {
+        continue;
+      }
+      if (option->assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN) {
+        std::vector<std::string> order;
+        if (!TagsOption(decoded->value, updates.removed_tags, order)) {
+          return fail();
+        }
+      } else {
+        updates.merge_resource_tags = true;
+        if (!TagsOption(decoded->value, updates.resource_tags.emplace(), updates.tag_order)) {
+          return fail();
+        }
       }
       continue;
     }

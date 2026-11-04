@@ -1,0 +1,171 @@
+version: 1
+# Requires Cloud Resource Manager tag keys under the collecting project:
+# emulator_compat_a (values test, Production) and emulator_compat_b (value sales).
+# Reuse the real definitions required by scenarios/testdata/tags_observed.api.yaml;
+# synthetic tag keys accepted by the emulator cannot establish BigQuery behavior.
+# BigQuery observations are retained in tags_incremental.api.answers.json
+# (project johejo-sandbox, run b2oav6j7qqhxcxwsitvpmrunn2).
+description: Observed incremental DDL resource tag additions, removals and NULL operands.
+vars:
+  dataset: bqa_${run}_${case}
+  key_a: '${project}/emulator_compat_a'
+  key_b: '${project}/emulator_compat_b'
+  initial_tags: "[('${key_b}', 'sales'), ('${key_a}', 'test')]"
+templates:
+  tags:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                useLegacySql: false
+                query: |
+                  ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags = ${initial_tags});
+                  CREATE TABLE `${project}.${dataset}.t` (x INT64) OPTIONS (tags = ${initial_tags});
+        bind: {job: /body/jobReference/jobId}
+      - name: created
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors}
+      - name: mutate
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                useLegacySql: false
+                query: ${query}
+        bind: {mutation_job: /body/jobReference/jobId}
+      - name: mutated
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${mutation_job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {error: /body/status/errorResult, errors: /body/status/errors}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {tags: /body/resourceTags}
+      - name: dataset
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe: {tags: /body/resourceTags, legacy_tags: /body/tags}
+      - name: options_query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                useLegacySql: false
+                query: |
+                  SELECT table_name AS object, option_type, option_value
+                  FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS`
+                  WHERE table_name = 't' AND option_name = 'tags'
+                  UNION ALL
+                  SELECT 'dataset', option_type, option_value
+                  FROM `${project}.region-us.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`
+                  WHERE schema_name = '${dataset}' AND option_name = 'tags'
+                  ORDER BY object
+        bind: {options_job: /body/jobReference/jobId}
+      - name: options
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${options_job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors, rows: /body/rows}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: schema_add
+    template: tags
+    vars:
+      initial_tags: "[('${key_b}', 'sales')]"
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags += [('${key_a}', 'test')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_b": "sales"}}}
+  - name: table_add
+    template: tags
+    vars:
+      initial_tags: "[('${key_b}', 'sales')]"
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags += [('${key_a}', 'test')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}], "tags": {"${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_add_replace_value
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags += [('${key_a}', 'Production')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "Production"}], "tags": {"${project}/emulator_compat_a": "Production", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"Production\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: table_add_replace_value
+    template: tags
+    vars:
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags += [('${key_a}', 'Production')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"Production\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "Production", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_add_existing
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags += [('${key_b}', 'sales')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: table_add_existing
+    template: tags
+    vars:
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags += [('${key_b}', 'sales')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_add_null
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags += NULL)
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: table_add_null
+    template: tags
+    vars:
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags += NULL)
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_remove
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags -= [('${key_a}', 'test')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}], "tags": {"${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_remove_mismatched_value
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags -= [('${key_a}', 'Production')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_remove_absent
+    template: tags
+    vars:
+      initial_tags: "[('${key_b}', 'sales')]"
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags -= [('${key_a}', 'test')])
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}], "tags": {"${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_b": "sales"}}}
+  - name: schema_remove_all
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags -= [('${key_a}', 'test'), ('${key_b}', 'sales')])
+    expect: {"created": {"complete": true}, "dataset": {}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: schema_remove_null
+    template: tags
+    vars:
+      query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags -= NULL)
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}
+  - name: table_remove_null
+    template: tags
+    vars:
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags -= NULL)
+    expect: {"created": {"complete": true}, "dataset": {"legacy_tags": [{"tagKey": "${project}/emulator_compat_b", "tagValue": "sales"}, {"tagKey": "${project}/emulator_compat_a", "tagValue": "test"}], "tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}, "mutated": {}, "options": {"complete": true, "rows": [{"f": [{"v": "dataset"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}, {"f": [{"v": "t"}, {"v": "ARRAY<STRUCT<STRING, STRING>>"}, {"v": "[STRUCT(\"${project}/emulator_compat_b\", \"sales\"), STRUCT(\"${project}/emulator_compat_a\", \"test\")]"}]}]}, "table": {"tags": {"${project}/emulator_compat_a": "test", "${project}/emulator_compat_b": "sales"}}}

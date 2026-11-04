@@ -23,9 +23,9 @@ the emulator rejected.
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
 | [CREATE SCHEMA](#create-schema) | 7 | 0 | 5 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 5 | 1 | 5 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 6 | 0 | 5 | 3 |
 | [CREATE TABLE](#create-table) | 7 | 2 | 3 | 3 |
-| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 6 | 1 | 5 | 3 |
+| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 7 | 0 | 5 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ADD COLUMN](#alter-table-add-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ALTER COLUMN SET OPTIONS](#alter-table-alter-column-set-options) | 2 | 0 | 2 | 0 |
@@ -85,7 +85,7 @@ the emulator rejected.
 | [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
 | [`primary_replica`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `ALTER SCHEMA d SET OPTIONS (tags += NULL)`; `ALTER SCHEMA d SET OPTIONS (tags += [('123456789012/env', 'test')])`; `ALTER SCHEMA d SET OPTIONS (tags -= NULL)`; `ALTER SCHEMA d SET OPTIONS (tags -= [('123456789012/env', 'test')])`. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## CREATE TABLE
 
@@ -125,7 +125,7 @@ the emulator rejected.
 | [`storage_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`file_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`table_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `ALTER TABLE t SET OPTIONS (tags += NULL)`; `ALTER TABLE t SET OPTIONS (tags += [('123456789012/env', 'test')])`; `ALTER TABLE t SET OPTIONS (tags -= NULL)`. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## CREATE TABLE column
 
