@@ -768,7 +768,7 @@ GeographyFunctions() {
                      .defaults = kFalse,
                  },
              },
-             {.uses = kUses}),
+             {.uses = {TypeUse::kBuildsOrReadsGeography, TypeUse::kRejectsSafe}}),
       Define("ST_MAXDISTANCE",
              {
                  {
