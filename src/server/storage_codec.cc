@@ -21,6 +21,7 @@
 #include "googlesql/common/utf_util.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
+#include "googlesql/public/json_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -93,6 +94,7 @@ bool ProtoType(const FieldSchema& field, const FieldDescriptor& descriptor) {
     case FieldType::kRecord:
       return type == FieldDescriptor::CPPTYPE_MESSAGE;
     case FieldType::kString:
+    case FieldType::kJson:
     case FieldType::kGeography:
       return string;
     default:
@@ -121,8 +123,8 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
         std::ranges::any_of(options, [](const auto* option) { return option->is_extension(); })) {
       throw ApiError::Invalid("Storage Write does not support protobuf field annotations");
     }
-    if (field.type == FieldType::kJson || field.type == FieldType::kInterval) {
-      throw ApiError::Invalid("Storage Write does not support JSON or INTERVAL input");
+    if (field.type == FieldType::kInterval) {
+      throw ApiError::Invalid("Storage Write does not support INTERVAL input");
     }
     if (!ProtoType(field, input)) {
       throw StorageFieldMismatch(std::string(input.full_name()), std::string(input.type_name()),
@@ -197,6 +199,17 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
           const auto value = googlesql::BigNumericValue::FromStringStrict(text);
           Check(value.status());
           return value->ToString();
+        }
+        case FieldType::kJson: {
+          // Keep JSON text inside a string: a parsed JSON null would become SQL NULL in
+          // WriteStorageRows, and parsing through nlohmann could round large numbers.
+          const auto value = googlesql::JSONValue::ParseJSONString(
+              text, {
+                        .wide_number_mode = googlesql::JSONParsingOptions::WideNumberMode::kRound,
+                        .max_nesting = 500,
+                    });
+          Check(value.status());
+          return value->GetConstRef().ToString();
         }
         case FieldType::kGeography: {
           // Read here only for BigQuery's error, which names no function, since the value is

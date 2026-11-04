@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "cases": {
+    "negative_zero_float": {
+      "project": "johejo-sandbox",
+      "run": "e3ur66zoz7n4f2ukvyixdxqbjs",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_e3ur66zoz7n4f2ukvyixdxqbjs_negative_zero_float/tables/t/streams/_default"
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "-0.0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "negative_zero_integer": {
+      "project": "johejo-sandbox",
+      "run": "e3ur66zoz7n4f2ukvyixdxqbjs",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_e3ur66zoz7n4f2ukvyixdxqbjs_negative_zero_integer/tables/t/streams/_default"
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "overflow": {
+      "project": "johejo-sandbox",
+      "run": "e3ur66zoz7n4f2ukvyixdxqbjs",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "messages": [
+            {
+              "error": {
+                "code": 3,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                    "detail": "INVALID_ARGUMENT: number overflow parsing '1e400' [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+                  }
+                ],
+                "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_e3ur66zoz7n4f2ukvyixdxqbjs_overflow/tables/t/streams/_default"
+              },
+              "rowErrors": [
+                {
+                  "code": "FIELDS_ERROR",
+                  "message": "number overflow parsing '1e400'"
+                }
+              ],
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_e3ur66zoz7n4f2ukvyixdxqbjs_overflow/tables/t/streams/_default"
+            }
+          ]
+        },
+        "query": {}
+      }
+    },
+    "wide_decimal": {
+      "project": "johejo-sandbox",
+      "run": "e3ur66zoz7n4f2ukvyixdxqbjs",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_e3ur66zoz7n4f2ukvyixdxqbjs_wide_decimal/tables/t/streams/_default"
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.2345678901234567"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "wide_integer": {
+      "project": "johejo-sandbox",
+      "run": "e3ur66zoz7n4f2ukvyixdxqbjs",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "messages": [
+            {
+              "appendResult": {},
+              "writeStream": "projects/johejo-sandbox/datasets/bqa_e3ur66zoz7n4f2ukvyixdxqbjs_wide_integer/tables/t/streams/_default"
+            }
+          ]
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "9.223372036854776e+20"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
