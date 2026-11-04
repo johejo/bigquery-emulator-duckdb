@@ -142,9 +142,8 @@ paths the sources have when the table is created. Queries read every source file
 emulator does not prune partitions, and fail on a file whose path does not have those keys.
 
 Bigtable, BigLake connections, metadata caching,
-configuration updates, `ALTER TABLE`, stored views over external tables and time
-travel are unsupported. Query dry runs and stored definitions reject external reads rather
-than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
+configuration updates, `ALTER TABLE` and time travel are unsupported. Query dry runs reject
+external reads rather than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
 not read external tables; use a query instead. Writes to external tables are rejected.
 
 ### Resource tags
