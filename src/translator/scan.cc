@@ -753,10 +753,14 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     Scope nested = scope;
     // The inline query has its own working table; only declared correlated columns
     // can see the caller. Fresh aliases also keep nested CALLs from shadowing it.
+    // A parameter the input does not produce, such as a column of an enclosing CALL
+    // or query, keeps the reference the enclosing scope gives it.
     nested.graph_input.reset();
     for (const auto& parameter : call.parameter_list()) {
       const int id = parameter->column().column_id();
-      nested.outer[id] = left + "." + ColumnName(id);
+      if (input->columns.contains(id)) {
+        nested.outer[id] = left + "." + ColumnName(id);
+      }
     }
     const auto subquery = Scan(*call.subquery(), nested);
     if (!subquery) {
