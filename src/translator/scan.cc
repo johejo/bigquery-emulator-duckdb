@@ -156,9 +156,6 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
     }
     for (const auto& key : *partition_names) {
       if (absl::EqualsIgnoreCase(schema.column(i).name, key.string_value())) {
-        if (HasInterval(column.type()) && !column.type()->IsInterval()) {
-          return Unsupported(scope, "RANGE_SESSIONIZE partitioning column type");
-        }
         // Keep the input value for the output, and partition every window by the
         // same comparison key rather than INTERVAL's stored representation.
         const std::string key_name = "_rs_key" + std::to_string(keys.size());

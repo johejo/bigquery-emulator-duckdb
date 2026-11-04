@@ -324,8 +324,7 @@ the emulator does on x86-64 Linux, while it returns `POINT(1.3 -2.3)` on arm64.
 ### RANGE_SESSIONIZE
 
 The range column, partitioning columns and sessionize option must be non-NULL literals.
-Value tables, annotated input columns and partitioning columns containing nested INTERVAL values
-are unsupported.
+Value tables are unsupported.
 
 ### EXTERNAL_QUERY
 

@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <string>
 #include <utility>
@@ -62,6 +63,12 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SessionizeSchema(
     if (column == nullptr) {
       return absl::InvalidArgumentError(
           "RANGE_SESSIONIZE requires unambiguous partitioning columns");
+    }
+    if (column->type->IsStruct() || column->type->IsArray()) {
+      return absl::InvalidArgumentError(
+          std::format("Invalid table-valued function RANGE_SESSIONIZE\nColumn {} ({}) is not "
+                      "allowed for partitioning",
+                      column->name, column->type->IsStruct() ? "STRUCT" : "ARRAY"));
     }
     if (!column->type->SupportsGrouping(GoogleSqlLanguageOptions())) {
       return absl::InvalidArgumentError(
