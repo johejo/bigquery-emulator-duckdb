@@ -29,6 +29,8 @@ struct TableReadContext {
   const TextQuery& query;
   // Adds a warning to the job, such as of a bad record the read skips.
   std::function<void(const ApiError& warning)> warn;
+  // Return a schema-only query without acquiring sources; binding can otherwise open files.
+  bool dry_run = false;
 };
 
 // A read definition, resolved without acquiring its source. A fixed query needs no staging.

@@ -326,7 +326,7 @@ func externalQuery(ctx context.Context, query *bigquery.Query) error {
 }
 
 // Explicit schemas let analysis and stored definitions resolve columns without
-// downloading data. Even rejected dry runs and views must not touch the source.
+// downloading data. Dry runs and stored views must not touch the source.
 func TestExternalParquetWithoutSourceAccess(t *testing.T) {
 	configure(t)
 	var requests atomic.Int32
@@ -349,15 +349,6 @@ func TestExternalParquetWithoutSourceAccess(t *testing.T) {
 	if err := externalDDL(ctx, client, "SELECT missing_column FROM gcs.external"); err == nil || !strings.Contains(err.Error(), "Unrecognized name") {
 		t.Fatalf("analysis error: %v", err)
 	}
-	q := client.Query("SELECT id FROM gcs.external")
-	q.DryRun = true
-	job, err := q.Run(ctx)
-	if err == nil {
-		err = job.LastStatus().Err()
-	}
-	if err == nil || !strings.Contains(err.Error(), "Dry runs of resource-backed") {
-		t.Fatalf("external dry run: %v", err)
-	}
 	// Views store the GoogleSQL query rather than a prepared reader.
 	if err := externalDDL(ctx, client, "CREATE VIEW gcs.v AS SELECT id FROM gcs.external"); err != nil {
 		t.Fatal(err)
@@ -371,6 +362,40 @@ func TestExternalParquetWithoutSourceAccess(t *testing.T) {
 	// TVFs store the GoogleSQL body rather than a prepared reader.
 	if err := externalDDL(ctx, client, "CREATE TABLE FUNCTION gcs.f() AS SELECT id FROM gcs.external"); err != nil {
 		t.Fatal(err)
+	}
+	// A successful dry run returns the resolved schema (REST Job.statistics.query.schema),
+	// including through views and TVFs. It must never bind a file reader.
+	for _, sql := range []string{
+		"SELECT id FROM gcs.external",
+		"SELECT id FROM gcs.nested",
+		"SELECT id FROM gcs.f()",
+		"SELECT id FROM gcs.external WHERE _FILE_NAME LIKE '%data.parquet'",
+	} {
+		q := client.Query(sql)
+		q.DryRun = true
+		job, err := q.Run(ctx)
+		if err != nil {
+			t.Fatalf("dry run %s: %v", sql, err)
+		}
+		if err := job.LastStatus().Err(); err != nil {
+			t.Fatalf("dry run %s: %v", sql, err)
+		}
+		statistics, ok := job.LastStatus().Statistics.Details.(*bigquery.QueryStatistics)
+		if !ok {
+			t.Fatalf("dry run %s: statistics = %T", sql, job.LastStatus().Statistics.Details)
+		}
+		if len(statistics.Schema) != 1 || statistics.Schema[0].Name != "id" || statistics.Schema[0].Type != bigquery.IntegerFieldType {
+			t.Errorf("dry run %s: schema = %v, want id INT64", sql, statistics.Schema)
+		}
+	}
+	q := client.Query("SELECT missing_column FROM gcs.external")
+	q.DryRun = true
+	job, err := q.Run(ctx)
+	if err == nil {
+		err = job.LastStatus().Err()
+	}
+	if err == nil || !strings.Contains(err.Error(), "Unrecognized name") {
+		t.Fatalf("dry run analysis error: %v", err)
 	}
 	if got := requests.Load(); got != 0 {
 		t.Fatalf("source requests during analysis or definition = %d, want 0", got)

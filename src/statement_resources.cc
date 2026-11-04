@@ -35,11 +35,6 @@ std::optional<std::string> StatementResources::ReadQuery(
         "Resource-backed table reads are unsupported in stored definitions or without an "
         "execution resource owner");
   }
-  if (resources->mode_ == Mode::kDryRun) {
-    // DuckDB can open files while binding a reader, even without executing it. Until external
-    // dry-run semantics are specified, do not prepare sources or send their readers to Prepare.
-    throw std::invalid_argument("Dry runs of resource-backed table reads are not supported");
-  }
   // No column name holds a NUL or is *.
   std::string key = QualifiedName(table);
   for (const std::string& column : columns.value_or(std::set<std::string>{"*"})) {
@@ -64,6 +59,7 @@ std::optional<std::string> StatementResources::ReadQuery(
               resources->warnings_.push_back(warning);
             }
           },
+      .dry_run = resources->mode_ == Mode::kDryRun,
   };
   std::string query = std::get<std::function<std::string(TableReadContext&)>>(*definition)(context);
   resources->reads_.emplace(key, query);
