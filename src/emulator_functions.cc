@@ -70,6 +70,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb:
               options.distinct_set_operations_without_structs,
           .distinct_set_operations_without_arrays = options.distinct_set_operations_without_arrays,
           .distinct_aggregates_without_structs = options.distinct_aggregates_without_structs,
+          .interval_multiply_int64_only = options.interval_multiply_int64_only,
           .distinct_comparisons_without_structs = options.distinct_comparisons_without_structs,
           .approx_top_scalar_values_only = options.approx_top_scalar_values_only,
           .arrays_without_null_elements = options.arrays_without_null_elements,

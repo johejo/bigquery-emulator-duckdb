@@ -47,6 +47,8 @@ struct Options {
   bool distinct_set_operations_without_arrays = false;
   // Aggregate functions with DISTINCT reject STRUCT arguments.
   bool distinct_aggregates_without_structs = false;
+  // INTERVAL * FLOAT64 and FLOAT64 * INTERVAL are rejected.
+  bool interval_multiply_int64_only = false;
   // IS DISTINCT FROM and IS NOT DISTINCT FROM reject STRUCT arguments.
   bool distinct_comparisons_without_structs = false;
   // APPROX_TOP_COUNT and APPROX_TOP_SUM reject STRUCT and ARRAY values.

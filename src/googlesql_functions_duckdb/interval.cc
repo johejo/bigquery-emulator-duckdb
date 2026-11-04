@@ -73,6 +73,12 @@ absl::StatusOr<IntervalValue> MultiplyInterval(const IntervalValue& interval, in
   return interval * factor;
 }
 
+// INTERVAL * FLOAT64, which BigQuery rejects. GoogleSQL truncates the time to microseconds, as
+// the reference implementation does at microsecond precision.
+absl::StatusOr<IntervalValue> MultiplyIntervalDouble(const IntervalValue& interval, double factor) {
+  return interval.Multiply(factor, /*round_to_micros=*/true);
+}
+
 // INTERVAL / INT64. GoogleSQL divides the months, carries the remainder into the days and theirs
 // into the time, and truncates the time to microseconds.
 absl::StatusOr<IntervalValue> DivideInterval(const IntervalValue& interval, int64_t divisor) {
@@ -236,6 +242,8 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            Apply<AddIntervals<true>>);
   Register(connection, "bq_multiply_interval", {kInterval, kBigint}, kInterval,
            Apply<MultiplyInterval>);
+  Register(connection, "bq_multiply_interval_double", {kInterval, kDouble}, kInterval,
+           Apply<MultiplyIntervalDouble>);
   Register(connection, "bq_divide_interval", {kInterval, kBigint}, kInterval,
            Apply<DivideInterval>);
   Register(connection, "bq_add_date_interval", {kDate, kInterval}, kDatetime,
