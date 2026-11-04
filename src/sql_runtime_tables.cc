@@ -256,8 +256,13 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
   if (view.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
   }
+  std::optional<std::vector<FieldSchema>> updated_schema = schema;
+  // An external table keeps the schema it was created with, which a client may send back.
   if (info.metadata.external_data && schema.has_value()) {
-    throw ApiError::Unsupported("changing the schema of an external table");
+    if (!SameSchema(*schema, info.schema)) {
+      throw ApiError::Unsupported("changing the schema of an external table");
+    }
+    updated_schema.reset();
   }
   // A snapshot's schema, clustering and default rounding mode cannot change.
   if (info.metadata.snapshot.has_value() &&
@@ -271,7 +276,6 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
         "a snapshot.");
   }
   std::vector<std::string> statements;
-  std::optional<std::vector<FieldSchema>> updated_schema = schema;
   if (updated_schema.has_value()) {
     const RoundingMode mode = metadata.value_or(info.metadata).default_rounding_mode;
     ApplyDefaultRoundingMode(info.schema, *updated_schema, mode);

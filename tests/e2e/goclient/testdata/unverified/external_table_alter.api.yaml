@@ -1,0 +1,127 @@
+version: 1
+description: >-
+  Record how BigQuery answers metadata updates to an external table. Its DDL reference says
+  ALTER TABLE SET OPTIONS "is not supported for external tables"
+  (third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) without giving
+  the message, which the emulator replaces with its own unsupported error; tables.patch updates the
+  description and labels. Sources deliberately do not exist; no GCS fixture upload is needed.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: gs://bqanswers-missing-${run}/missing.parquet
+templates:
+  alter:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference:
+              tableId: t
+            schema:
+              fields:
+                - name: id
+                  type: INTEGER
+            externalDataConfiguration:
+              sourceFormat: PARQUET
+              sourceUris:
+                - ${uri}
+      - name: alter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (${options})
+        observe:
+          errors: /body/errors
+          error: /body/error
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          type: /body/type
+          description: /body/description
+          labels: /body/labels
+          expirationTime: /body/expirationTime
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  patch:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference:
+              tableId: t
+            schema:
+              fields:
+                - name: id
+                  type: INTEGER
+            externalDataConfiguration:
+              sourceFormat: PARQUET
+              sourceUris:
+                - ${uri}
+            labels:
+              env: dev
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: ${patch}
+        observe:
+          type: /body/type
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: alter_description
+    template: alter
+    vars:
+      options: description = 'altered'
+  - name: alter_labels
+    template: alter
+    vars:
+      options: labels = [('env', 'prod')]
+  - name: alter_expiration_timestamp
+    template: alter
+    vars:
+      options: expiration_timestamp = TIMESTAMP '2100-01-01 00:00:00 UTC'
+  - name: patch_description_and_labels
+    template: patch
+    vars:
+      patch:
+        description: patched
+        friendlyName: External
+        labels:
+          env: null
+          tier: "1"

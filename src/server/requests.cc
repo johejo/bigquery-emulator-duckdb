@@ -907,14 +907,33 @@ TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
   if (table.has_materialized_view()) {
     throw ApiError::Unsupported("updating materializedView");
   }
-  if (body.contains("externalDataConfiguration")) {
-    throw ApiError::Unsupported("updating externalDataConfiguration");
-  }
-  TableUpdateRequest request{.resource = body, .schema = std::nullopt, .view = std::nullopt};
+  TableUpdateRequest request{
+      .resource = body,
+      .schema = std::nullopt,
+      .view = std::nullopt,
+      .external_data_configuration = std::nullopt,
+  };
   // As BigQuery answers, a patch that sets the schema to null keeps it; the emulator keeps a view
   // set to null too.
   if (table.has_schema()) {
     request.schema = SchemaFromJson(body["schema"]);
+  }
+  if (const auto it = body.find("externalDataConfiguration"); it != body.end() && !it->is_null()) {
+    json config = *it;
+    if (const auto schema = config.find("schema"); schema != config.end()) {
+      if (!schema->is_null()) {
+        auto external_schema = SchemaFromJson(*schema);
+        if (request.schema.has_value() && !SameSchema(*request.schema, external_schema)) {
+          throw ApiError::Invalid(
+              "When defining a table with an ExternalDataConfiguration, a schema must be present "
+              "on either the Table or the ExternalDataConfiguration. If the schema is present on "
+              "both, the schemas must be the same.");
+        }
+        request.schema = std::move(external_schema);
+      }
+      config.erase(schema);
+    }
+    request.external_data_configuration = std::move(config);
   }
   if (table.has_view()) {
     request.view = body["view"];
