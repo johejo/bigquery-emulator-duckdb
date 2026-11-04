@@ -26,6 +26,9 @@ class StorageFieldMismatch : public std::invalid_argument {
   FieldType type;
 };
 
+// Rejects column options that cannot be honored when decoding or publishing staged rows.
+void ValidateStorageWriteSchema(const std::vector<FieldSchema>& schema);
+
 // The self-contained proto2 writer descriptor of one AppendRows connection. Decodes to the
 // named JSON values that WriteStorageRows validates against the destination table.
 class StorageProtoDecoder {

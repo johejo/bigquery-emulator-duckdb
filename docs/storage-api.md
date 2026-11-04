@@ -24,11 +24,16 @@ INTERVAL columns, parameterized decimals, and JSON columns in Arrow are unsuppor
 Protobuf scalar fields, STRUCTs and repeated fields are supported. GEOGRAPHY fields take strings
 as `tabledata.insertAll` does; see [GEOGRAPHY values](compatibility.md#geography-values). Column
 defaults, parameterized STRING and BYTES columns, custom protobuf annotations, JSON and INTERVAL
-input and schema evolution are unsupported.
+input are unsupported.
 
-Create a new stream after changing a table schema. Default streams established before a schema
-change require restarting the process. Tables persisted without creation metadata cannot return
-default-stream creation metadata.
+Existing streams support adding nullable or repeated columns and relaxing REQUIRED columns to
+NULLABLE, including within records. Open connections report changes through `updated_schema`,
+and accept a replacement protobuf writer descriptor. Older descriptors can continue writing.
+Unpublished BUFFERED and PENDING rows remain publishable after these changes. Column removal,
+renaming and type changes
+are unsupported on existing streams.
+
+Tables persisted without creation metadata cannot return default-stream creation metadata.
 
 Decimal writer strings must fit NUMERIC's scale of 9 or BIGNUMERIC's scale of 38 exactly.
 

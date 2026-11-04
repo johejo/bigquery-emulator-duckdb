@@ -21,6 +21,7 @@
 #include "google/cloud/bigquery/storage/v1/storage.pb.h"
 #include "google/cloud/bigquery/storage/v1/stream.pb.h"
 #include "google/cloud/bigquery/storage/v1/table.pb.h"
+#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/timestamp.pb.h"
 #include "grpc/impl/channel_arg_names.h"
 #include "grpcpp/security/server_credentials.h"
@@ -153,6 +154,58 @@ std::string NewId() {
     }
   }
   return result;
+}
+
+// Retained rows and older writer descriptors remain valid after additions and relaxation.
+// Other changes need explicit handling rather than silently discarding or converting fields.
+void CheckSchemaChange(const std::vector<FieldSchema>& before,
+                       const std::vector<FieldSchema>& after) {
+  for (const auto& field : before) {
+    const auto found = std::ranges::find(after, field.name, &FieldSchema::name);
+    if (found == after.end() || found->type != field.type ||
+        found->default_value_expression != field.default_value_expression ||
+        found->max_length != field.max_length ||
+        (found->mode != field.mode &&
+         (field.mode != FieldMode::kRequired || found->mode != FieldMode::kNullable))) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support this destination schema change");
+    }
+    CheckSchemaChange(field.fields, found->fields);
+  }
+  for (const auto& field : after) {
+    if (std::ranges::find(before, field.name, &FieldSchema::name) == before.end()) {
+      if (field.mode == FieldMode::kRequired) {
+        Fail(grpc::StatusCode::UNIMPLEMENTED,
+             "Storage Write does not support adding required destination fields");
+      }
+      // Staged rows can be published without another AppendRows call to validate the schema.
+      ValidateStorageWriteSchema({field});
+    }
+  }
+}
+
+// Rows staged before a repeated field was added have no decoder-provided empty array.
+// Fill those omissions before publishing, including arrays inside present records.
+void CompleteRepeatedFields(json& row, const std::vector<FieldSchema>& schema) {
+  for (const auto& field : schema) {
+    const auto value = row.find(field.name);
+    if (value == row.end()) {
+      if (field.mode == FieldMode::kRepeated) {
+        row[field.name] = json::array();
+      }
+      continue;
+    }
+    if (field.type != FieldType::kRecord || value->is_null()) {
+      continue;
+    }
+    if (field.mode == FieldMode::kRepeated) {
+      for (auto& element : *value) {
+        CompleteRepeatedFields(element, field.fields);
+      }
+    } else {
+      CompleteRepeatedFields(*value, field.fields);
+    }
+  }
 }
 
 struct Snapshot {
@@ -625,9 +678,6 @@ class WriteService final : public pb::BigQueryWrite::Service {
       }
       json rows = json::array();
       for (const auto& state : states) {
-        if (SchemaToJson(state->schema) != SchemaToJson(info.schema)) {
-          Fail(grpc::StatusCode::FAILED_PRECONDITION, "The table schema changed before commit");
-        }
         for (const auto& row : state->staged) {
           rows.push_back(row);
         }
@@ -660,7 +710,8 @@ class WriteService final : public pb::BigQueryWrite::Service {
     }
     WriteService& service;
     std::string name;
-    std::string descriptor;
+    google::protobuf::DescriptorProto descriptor;
+    std::string schema;
     int64_t storage_id = 0;
     std::unique_ptr<StorageProtoDecoder> decoder;
     std::shared_ptr<WriteState> lease;
@@ -746,6 +797,13 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (found == streams_.end() || found->second->storage_id != info.storage_id) {
       Fail(grpc::StatusCode::NOT_FOUND, "Write stream not found: " + name);
     }
+    if (SchemaToJson(found->second->schema) != SchemaToJson(info.schema)) {
+      CheckSchemaChange(found->second->schema, info.schema);
+      for (auto& row : found->second->staged) {
+        CompleteRepeatedFields(row, info.schema);
+      }
+      found->second->schema = info.schema;
+    }
     return found->second;
   }
 
@@ -809,9 +867,20 @@ class WriteService final : public pb::BigQueryWrite::Service {
         Fail(grpc::StatusCode::ALREADY_EXISTS,
              "A write stream can have only one active connection");
       }
+    }
+    const std::string schema = SchemaToJson(state->schema).dump();
+    const bool schema_changed = !first && connection.schema != schema;
+    if (first || schema_changed ||
+        (request.proto_rows().has_writer_schema() &&
+         request.proto_rows().writer_schema().proto_descriptor().SerializeAsString() !=
+             connection.descriptor.SerializeAsString())) {
+      const auto& descriptor = request.proto_rows().has_writer_schema()
+                                   ? request.proto_rows().writer_schema().proto_descriptor()
+                                   : connection.descriptor;
       try {
-        connection.decoder = std::make_unique<StorageProtoDecoder>(
-            request.proto_rows().writer_schema().proto_descriptor(), state->schema);
+        auto decoder = std::make_unique<StorageProtoDecoder>(descriptor, state->schema);
+        connection.descriptor = descriptor;
+        connection.decoder = std::move(decoder);
       } catch (const StorageFieldMismatch& error) {
         throw ConnectionError(grpc::StatusCode::INVALID_ARGUMENT,
                               "The proto field mismatched with BigQuery field at " + error.field +
@@ -819,20 +888,21 @@ class WriteService final : public pb::BigQueryWrite::Service {
                                   ", BigQuery field type " +
                                   std::string(FieldTypeName(error.type)) + " Entity: " + name);
       }
+    }
+    if (first) {
       connection.name = name;
       connection.storage_id = state->storage_id;
-      connection.descriptor =
-          request.proto_rows().writer_schema().proto_descriptor().SerializeAsString();
       if (!IsDefault(name)) {
         state->active = true;
         connection.lease = state;
       }
-    } else if (request.proto_rows().has_writer_schema() &&
-               request.proto_rows().writer_schema().proto_descriptor().SerializeAsString() !=
-                   connection.descriptor) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write does not support changing writer_schema on an existing connection");
     }
+    if (schema_changed) {
+      for (const auto& field : state->schema) {
+        StorageField(response.mutable_updated_schema()->add_fields(), field);
+      }
+    }
+    connection.schema = schema;
     if (connection.storage_id != state->storage_id) {
       Fail(grpc::StatusCode::NOT_FOUND, "The destination table was replaced");
     }
