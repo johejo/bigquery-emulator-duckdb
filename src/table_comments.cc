@@ -74,6 +74,9 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
     metadata.label_order = object.value("labelOrder", std::vector<std::string>{});
     metadata.tag_order = object.value("tagOrder", std::vector<std::string>{});
     metadata.restored_from_snapshot = object.value("restoredFromSnapshot", false);
+    if (metadata.external_data) {
+      metadata.external_data->given_schema = object.value("givenExternalSchema", false);
+    }
     metadata.clone = ParseBaseTableDefinition(object.value("cloneDefinition", json()), "cloneTime");
     metadata.snapshot =
         ParseBaseTableDefinition(object.value("snapshotDefinition", json()), "snapshotTime");
@@ -189,6 +192,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
   }
   if (metadata.restored_from_snapshot) {
     comment["restoredFromSnapshot"] = true;
+  }
+  if (metadata.external_data && metadata.external_data->given_schema) {
+    comment["givenExternalSchema"] = true;
   }
   return std::format("COMMENT ON TABLE {} IS {}", QualifiedName(table),
                      metadata.empty() ? "NULL" : QuoteLiteral(comment.dump()));

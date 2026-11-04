@@ -734,8 +734,8 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
         ExternalSchema(*detected.table->metadata.external_data, detected.table->schema,
                        detected.table->partition_columns, table->table.table_id);
     detected.table->sources_read = true;
-    const auto columns =
-        ColumnDefinitions(detected.table->schema, functions_.timestamp_precision());
+    const auto columns = ColumnDefinitions(detected.table->schema, functions_.timestamp_precision(),
+                                           /*external=*/true);
     if (!columns) {
       throw ApiError::Unsupported("the detected schema of external table " +
                                   TableName(table->table));

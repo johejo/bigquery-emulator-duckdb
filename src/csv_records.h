@@ -28,11 +28,14 @@ struct CsvRecord {
   size_t line = 0;
   // The byte it starts at, counting from 0.
   size_t offset = 0;
+  // BigQuery's error detail for a quote it does not close or data after a closing quote. Such a
+  // record is the last, and its last cell is the value the error is in.
+  std::optional<std::string> error = std::nullopt;
 };
 
-// Splits `contents` into at most `limit` records, skipping blank lines. Throws ApiError::Invalid
-// for a quote BigQuery does not close or data after a closing quote, unless `lenient`, as schema
-// detection is, which ends such a value at the end of its line or keeps the data.
+// Splits `contents` into at most `limit` records, skipping blank lines. A quote BigQuery does not
+// close or data after a closing quote ends them with a record of its error, unless `lenient`, as
+// schema detection is, which ends such a value at the end of its line or keeps the data.
 std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDialect& dialect,
                                        size_t limit = std::numeric_limits<size_t>::max(),
                                        bool lenient = false);

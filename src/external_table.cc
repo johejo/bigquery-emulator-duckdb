@@ -470,17 +470,22 @@ std::string ParquetConversion(const FieldSchema& field, const ThriftValue& eleme
     case FieldType::kTimestamp:
       // As BigQuery's answers in external_table_parquet_types.api.answers.json and
       // external_table_types_open.api.answers.json show, it reads a BYTE_ARRAY as the TIMESTAMP
-      // 0, and a BOOLEAN or a signed integer by its value as microseconds.
+      // 0, a BOOLEAN or a signed integer by its value as microseconds, and a DOUBLE by its bits.
       if (column.type == parquet::kByteArray &&
           (detected == FieldType::kString || detected == FieldType::kBytes)) {
         return "CASE WHEN {0} IS NULL THEN NULL ELSE make_timestamp(0) END";
       }
       if (detected == FieldType::kDate || nanos || column.type == parquet::kBoolean ||
+          column.type == parquet::kDouble ||
           (detected == FieldType::kInteger && SignedInteger(column))) {
-        const std::string micros = nanos ? "epoch_ns({0})"
-                                   : detected == FieldType::kDate
-                                       ? "CAST({0} - DATE '1970-01-01' AS BIGINT)"
-                                       : "CAST({0} AS BIGINT)";
+        std::string micros = "CAST({0} AS BIGINT)";
+        if (nanos) {
+          micros = "epoch_ns({0})";
+        } else if (detected == FieldType::kDate) {
+          micros = "CAST({0} - DATE '1970-01-01' AS BIGINT)";
+        } else if (column.type == parquet::kDouble) {
+          micros = "CAST(CAST({0} AS BIT) AS BIGINT)";
+        }
         return std::format(
             "CASE WHEN {0} BETWEEN -62135596800000000 AND 253402300799999999 THEN "
             "make_timestamp({0}) ELSE error('Cannot return an invalid timestamp value of ' || {0} "
@@ -682,6 +687,20 @@ void AddUnparsable(const std::vector<FileSource>& sources, const std::vector<int
   }
 }
 
+// `error`, of a CSV record of the external table `table_name` in the source `uri`, as a query
+// fails with it: naming the table and the source, as BigQuery's answers in
+// external_table_csv_types.api.answers.json and external_table_csv_autodetect.api.answers.json
+// show.
+ApiError RecordError(const ApiError& error, std::string_view table_name, std::string_view uri) {
+  constexpr std::string_view kRecord = "Error while reading data, error message: ";
+  const std::string_view message = error.what();
+  if (!message.starts_with(kRecord)) {
+    return error;
+  }
+  return error.WithMessage(std::format("Error while reading table: {}, error message: {} File: {}",
+                                       table_name, message.substr(kRecord.size()), uri));
+}
+
 // Fails as BigQuery does when more records of the external table `table_name` than its limit are
 // bad, and otherwise warns of each one in order. As BigQuery's answers in
 // external_table_bad_records.api.answers.json show, it reads every source before it fails, and
@@ -690,6 +709,11 @@ void AddUnparsable(const std::vector<FileSource>& sources, const std::vector<int
 void ReportBadRecords(BadRecords& bad, bool csv, std::string_view table_name,
                       const TableReadContext& context) {
   std::ranges::sort(bad.found, {}, &BadRecord::number);
+  // A CSV read without a limit fails with the error of its first bad record.
+  if (csv && bad.limit == 0 && !bad.found.empty()) {
+    throw RecordError(ApiError::Invalid(bad.found.front().message), table_name,
+                      bad.found.front().uri);
+  }
   if (std::cmp_greater(bad.found.size(), bad.limit)) {
     throw ApiError::Invalid(std::format(
         "Error while reading table: {}, error message: {} processing encountered too many errors, "
@@ -821,12 +845,13 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     }
     const auto sources = StageSources(definition, table_name, client, files);
     // BigQuery ignores maxBadRecords for Parquet. A JSON table of one file fails at the record
-    // that exceeds the limit.
+    // that exceeds the limit. A CSV read finds its bad records even without a limit, since the
+    // reader cannot report a value it fails to convert as BigQuery does.
     BadRecords bad{
         .limit = definition.max_bad_records.value_or(0),
         .stops = json && sources.size() == 1,
     };
-    BadRecords* const skips = bad.limit > 0 && (csv || json) ? &bad : nullptr;
+    BadRecords* const skips = csv || (bad.limit > 0 && json) ? &bad : nullptr;
     // A partitioned table reads its keys from each source's path rather than its contents.
     const HivePartitioning* hive =
         definition.hive_partitioning && !definition.hive_partitioning->mode.empty()
@@ -856,7 +881,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         const auto values = HiveValues(*hive, keys, source.uri, table_id);
         for (size_t i = 0; i < keys.size(); ++i) {
           columns += ", CAST(" + (values.at(i) ? QuoteLiteral(*values.at(i)) : "NULL") + " AS " +
-                     ToDuckDbType(keys.at(i)) + ") AS " + QuoteIdentifier(keys.at(i).name);
+                     ToDuckDbReadType(keys.at(i)) + ") AS " + QuoteIdentifier(keys.at(i).name);
         }
       }
       return "SELECT " + columns + ", " + QuoteLiteral(source.uri) + " AS _FILE_NAME FROM (" +
@@ -864,17 +889,18 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     };
     std::vector<FieldSchema> read_schema;
     std::ranges::transform(file_schema, std::back_inserter(read_schema), Unenforced);
-    // A CSV table that skips bad records converts only the columns the statement reads, as
-    // BigQuery does, and reads the others as NULL.
+    // A CSV table converts only the columns the statement reads, as BigQuery does, and reads the
+    // others as NULL.
     std::vector<bool> read(read_schema.size(), true);
     std::vector<FieldSchema> converted = read_schema;
     std::vector<std::string> unread;
-    if (csv && skips != nullptr && context.columns) {
+    if (csv && context.columns) {
       for (size_t i = 0; i < read_schema.size(); ++i) {
         if (!context.columns->contains(read_schema.at(i).name)) {
           read.at(i) = false;
           converted.at(i).type = FieldType::kString;
-          unread.push_back(std::format("CAST(NULL AS {}) AS {}", ToDuckDbType(read_schema.at(i)),
+          unread.push_back(std::format("CAST(NULL AS {}) AS {}",
+                                       ToDuckDbReadType(read_schema.at(i)),
                                        QuoteIdentifier(read_schema.at(i).name)));
         }
       }
@@ -904,7 +930,7 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         try {
           staged =
               StageExternalJson({source}, file_schema, files, definition.autodetect.value_or(false),
-                                ExternalFormats(definition), skips);
+                                definition.given_schema, ExternalFormats(definition), skips);
         } catch (const ApiError& error) {
           if (std::string_view(error.what()).starts_with(kUnsupported) ||
               error.reason() == "invalidQuery") {
@@ -923,17 +949,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         try {
           staged = StageCsvSources({source}, csv_options, read_schema, files, skips);
         } catch (const ApiError& error) {
-          // As BigQuery's answers in external_table_csv_types.api.answers.json show, a query fails
-          // with the message of the record it warns of when it skips it, naming the table and
-          // the source.
-          constexpr std::string_view kRecord = "Error while reading data, error message: ";
-          const std::string_view message = error.what();
-          if (!message.starts_with(kRecord)) {
-            throw;
-          }
-          throw error.WithMessage(
-              std::format("Error while reading table: {}, error message: {} File: {}", table_name,
-                          message.substr(kRecord.size()), source.uri));
+          // A record the parser cannot split fails the read whatever its limit.
+          throw RecordError(error, table_name, source.uri);
         }
         std::ranges::copy(staged, std::back_inserter(staged_csv));
         std::string read_csv = FileReadQuery(csv_options, staged, converted);

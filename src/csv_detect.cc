@@ -42,6 +42,11 @@ std::vector<Record> ParseRecords(std::string_view contents, char delimiter,
                                  bool lenient = false) {
   std::vector<Record> records;
   for (CsvRecord& parsed : ParseCsvRecords(contents, {.delimiter = delimiter}, limit, lenient)) {
+    if (parsed.error) {
+      throw ApiError::Invalid(
+          std::format("Error while reading data, error message: {}; line_number: {}", *parsed.error,
+                      parsed.line));
+    }
     std::ranges::transform(parsed.cells, std::back_inserter(records.emplace_back()),
                            [](std::optional<CsvCell>& cell) {
                              return cell ? Cell(std::move(cell->text)) : std::nullopt;

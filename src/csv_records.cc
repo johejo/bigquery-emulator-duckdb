@@ -21,7 +21,6 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
   const auto line_end = [&] { return i >= contents.size() || line_break(); };
   while (i < contents.size() && records.size() < limit) {
     CsvRecord record{.cells = {}, .line = line, .offset = i};
-    const size_t record_line = line;
     while (true) {
       CsvCell cell;
       if (dialect.quote && i < contents.size() && contents.at(i) == *dialect.quote) {
@@ -31,10 +30,8 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
             if (lenient) {
               break;
             }
-            throw ApiError::Invalid(
-                std::format("Error while reading data, error message: Missing close quote "
-                            "character ({}).; line_number: {}",
-                            *dialect.quote, record_line));
+            record.error = std::format("Missing close quote character ({}).", *dialect.quote);
+            break;
           }
           if (contents.at(i) == *dialect.quote) {
             if (i + 1 >= contents.size() || contents.at(i + 1) != *dialect.quote) {
@@ -51,11 +48,14 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
           }
           cell.text += contents.at(i);
         }
-        if (!lenient && !line_end() && contents.at(i) != dialect.delimiter) {
-          throw ApiError::Invalid(std::format(
-              "Error while reading data, error message: Data between close quote character ({}) "
-              "and field separator.; line_number: {}",
-              *dialect.quote, record_line));
+        if (!lenient && !record.error && !line_end() && contents.at(i) != dialect.delimiter) {
+          record.error = std::format("Data between close quote character ({}) and field separator.",
+                                     *dialect.quote);
+        }
+        if (record.error) {
+          record.cells.emplace_back(std::move(cell));
+          records.push_back(std::move(record));
+          return records;
         }
       }
       for (; !line_end() && contents.at(i) != dialect.delimiter; ++i) {

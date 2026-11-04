@@ -3812,3 +3812,77 @@ cases:
           }
         }
       }
+  # A DOUBLE read as TIMESTAMP: its bits as microseconds, which 1.5 gives out of range.
+  - name: f64_as_timestamp
+    template: ddl_failure
+    vars:
+      object: "types.parquet"
+      source: "${types}"
+      ddl: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (f64 TIMESTAMP) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'])"
+    expect: {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://${bucket}/${run}/f64_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `${project}.bqa_${run}_f64_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://${bucket}/${run}/f64_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://${bucket}/${run}/f64_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "status": 400,
+          "reason": "invalidQuery",
+          "message": "Cannot return an invalid timestamp value of 4609434218613702656 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field f64"
+        }
+      }

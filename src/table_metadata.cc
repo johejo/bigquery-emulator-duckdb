@@ -863,15 +863,16 @@ TableMetadata TableMetadataFromJson(const json& table) {
       }
       // Without a schema, a Parquet table takes the one its sources have either way. A CSV
       // table keeps a given schema, and autodetection still finds the header its reads skip. A
-      // JSON table keeps one too, but its reads skip fields the schema lacks, which the stored
-      // definition cannot tell from a detected schema's.
+      // JSON table keeps one too, but its reads skip fields the schema lacks.
       const auto given = [](const json& resource) {
         return resource.contains("schema") && !resource["schema"].is_null();
       };
-      if (config["autodetect"] == true && format != "CSV" && (given(table) || given(config))) {
+      const bool given_schema = config["autodetect"] == true && (given(table) || given(config));
+      if (given_schema && format != "CSV" && format != "NEWLINE_DELIMITED_JSON") {
         throw ApiError::Unsupported("external table schema autodetection with a schema");
       }
       metadata.external_data->autodetect = config["autodetect"].get<bool>();
+      metadata.external_data->given_schema = given_schema && format == "NEWLINE_DELIMITED_JSON";
     }
     for (const auto& uri : uris) {
       if (!uri.is_string() || !uri.get_ref<const std::string&>().starts_with("gs://")) {

@@ -218,6 +218,15 @@ std::string ToDuckDbType(const FieldSchema& field) {
   return *std::move(type);
 }
 
+std::string ToDuckDbReadType(const FieldSchema& field) {
+  absl::StatusOr<std::string> type =
+      DuckDbExternalColumnType(field, TimestampPrecision::kMicroseconds);
+  if (!type.ok()) {
+    throw ApiError::Invalid(std::string(type.status().message()));
+  }
+  return *std::move(type);
+}
+
 std::string RangeFromText(const std::string& text, const FieldSchema& field) {
   const std::string element = ToDuckDbType(RangeBoundField(field, field.name));
   return std::format(
@@ -343,8 +352,10 @@ std::string ReadColumns(const std::vector<FieldSchema>& schema, bool selected) {
   return Join(columns, ", ");
 }
 
-std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision) {
-  const auto type = DuckDbColumnType(field, precision);
+std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precision,
+                             bool external) {
+  const auto type =
+      external ? DuckDbExternalColumnType(field, precision) : DuckDbColumnType(field, precision);
   if (!type.ok()) {
     throw ApiError::Invalid(std::string(type.status().message()));
   }
@@ -353,11 +364,11 @@ std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precis
 }
 
 std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema,
-                                             TimestampPrecision precision) {
+                                             TimestampPrecision precision, bool external) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
     try {
-      columns.push_back(ColumnDefinition(field, precision));
+      columns.push_back(ColumnDefinition(field, precision, external));
     } catch (const ApiError&) {
       return std::nullopt;
     }

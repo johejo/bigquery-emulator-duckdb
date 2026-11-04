@@ -2458,6 +2458,93 @@
         }
       }
     },
+    "f64_as_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "7d66b5tzdcdehezgqc5taknfnh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "ddl": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_7d66b5tzdcdehezgqc5taknfnh_f64_as_timestamp.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/f64_as_timestamp/types.parquet\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "get": {
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/f64_as_timestamp/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "f64",
+                "type": "TIMESTAMP"
+              }
+            ]
+          }
+        },
+        "options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "format"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "\"PARQUET\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/7d66b5tzdcdehezgqc5taknfnh/f64_as_timestamp/types.parquet\"]"
+                }
+              ]
+            }
+          ]
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Cannot return an invalid timestamp value of 4609434218613702656 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field f64",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Cannot return an invalid timestamp value of 4609434218613702656 microseconds relative to the Unix epoch. The range of valid timestamp values is [0001-01-01 00:00:00, 9999-12-31 23:59:59.999999]; error in writing field f64",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
     "i32_as_timestamp": {
       "project": "johejo-sandbox",
       "run": "7d66b5tzdcdehezgqc5taknfnh",
