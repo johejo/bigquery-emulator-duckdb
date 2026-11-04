@@ -1580,7 +1580,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
               .uses =
                   {
                       TypeUse::kCompares,
-                      TypeUse::kSelectsCollationValues,
+                      TypeUse::kSelectsComparedValues,
                       TypeUse::kBigNumeric,
                   },
               .struct_handler = StructComparison,

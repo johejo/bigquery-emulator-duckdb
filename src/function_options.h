@@ -33,6 +33,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
               .interval_multiply_int64_only = true,
               .distinct_comparisons_without_structs = true,
               .approx_top_scalar_values_only = true,
+              .selections_without_intervals = true,
               .arrays_without_null_elements = true,
               .restrict_struct_results = true,
           },
