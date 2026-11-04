@@ -64,7 +64,7 @@ functions.
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
 | [ObjectRef functions](#objectref-functions) | 1 | 1 | 3 | 0 |
-| [Range functions](#range-functions) | 7 | 1 | 0 | 0 |
+| [Range functions](#range-functions) | 8 | 0 | 0 | 0 |
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
@@ -510,7 +510,7 @@ functions.
 | [`RANGE_END`](../third_party/bigquery_docs/reference/standard-sql/range-functions.md) | Supported | DuckDB SQL |  |
 | [`RANGE_INTERSECT`](../third_party/bigquery_docs/reference/standard-sql/range-functions.md) | Supported | DuckDB SQL |  |
 | [`RANGE_OVERLAPS`](../third_party/bigquery_docs/reference/standard-sql/range-functions.md) | Supported | DuckDB SQL |  |
-| [`RANGE_SESSIONIZE`](../third_party/bigquery_docs/reference/standard-sql/range-functions.md) | Partial | Table function | See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits. Unsupported: RANGE_SESSIONIZE partitioning column type. |
+| [`RANGE_SESSIONIZE`](../third_party/bigquery_docs/reference/standard-sql/range-functions.md) | Supported | Table function | See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits. |
 | [`RANGE_START`](../third_party/bigquery_docs/reference/standard-sql/range-functions.md) | Supported | DuckDB SQL |  |
 
 ## Search functions
