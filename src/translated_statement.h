@@ -74,8 +74,8 @@ struct DatasetDefinition {
   bool if_not_exists = false;
 };
 
-// What SET OPTIONS sets on a table or dataset: each option it names replaces the value there,
-// and NULL clears it.
+// What SET OPTIONS sets on a table or dataset. Tags also support incremental updates;
+// NULL incremental operands leave tags unchanged.
 struct OptionUpdates {
   std::optional<bool> require_partition_filter = {};
   std::optional<std::string> description = {};
@@ -84,6 +84,7 @@ struct OptionUpdates {
   std::vector<std::string> label_order;
   std::optional<std::map<std::string, std::string>> resource_tags = {};
   std::vector<std::string> tag_order;
+  bool merge_resource_tags = false;
   std::map<std::string, std::string> removed_tags;
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};

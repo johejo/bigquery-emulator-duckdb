@@ -59,8 +59,24 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
     metadata.label_order = updates.label_order;
   }
   if (updates.resource_tags.has_value()) {
-    metadata.resource_tags = *updates.resource_tags;
-    metadata.tag_order = updates.tag_order;
+    if (updates.merge_resource_tags) {
+      // REST-created metadata can use map order without an explicit tag order.
+      if (metadata.tag_order.empty()) {
+        for (const auto& [key, value] : metadata.resource_tags) {
+          metadata.tag_order.push_back(key);
+        }
+      }
+      // Existing bindings keep their positions; newly added keys follow operand order.
+      for (const auto& key : updates.tag_order) {
+        if (!metadata.resource_tags.contains(key)) {
+          metadata.tag_order.push_back(key);
+        }
+        metadata.resource_tags[key] = updates.resource_tags->at(key);
+      }
+    } else {
+      metadata.resource_tags = *updates.resource_tags;
+      metadata.tag_order = updates.tag_order;
+    }
   }
   for (const auto& [key, value] : updates.removed_tags) {
     const auto tag = metadata.resource_tags.find(key);

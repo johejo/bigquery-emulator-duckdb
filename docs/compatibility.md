@@ -158,9 +158,9 @@ DDL `tags` and REST `resourceTags` share stored metadata for datasets, tables an
 including materialized views and table snapshots. Tags do not enforce access controls or
 require Cloud Resource Manager tag definitions; see the [IAM exception](../README.md#compatibility).
 
-Incremental additions (`+=`), schema tag removals (`-=`), empty tag patches on tagged
-datasets, NULL dataset tags, NULL `resourceTags` in full REST updates, and copying tagged
-tables through copy jobs are unsupported until their metadata behavior is verified. Use DDL `SET OPTIONS (tags = ...)` or a full REST update to replace tags.
+Empty tag patches on tagged datasets, NULL dataset tags, NULL `resourceTags` in full REST
+updates, and copying tagged tables through copy jobs are unsupported until their metadata
+behavior is verified. Use DDL `SET OPTIONS (tags = ...)` or a full REST update to replace tags.
 
 BigQuery returns no tag option row after clearing tags, although its
 [tag documentation](../third_party/bigquery_docs/tags.md) says that untagged resources

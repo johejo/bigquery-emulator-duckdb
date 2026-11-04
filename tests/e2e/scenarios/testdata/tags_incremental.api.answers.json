@@ -1,0 +1,842 @@
+{
+  "version": 1,
+  "cases": {
+    "schema_add": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_add_existing": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_add_null": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_add_replace_value": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "Production"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "Production",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"Production\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_remove": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_remove_absent": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_remove_all": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {},
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_remove_mismatched_value": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "schema_remove_null": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "table_add": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "table_add_existing": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "table_add_null": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "table_add_replace_value": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"Production\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "Production",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    },
+    "table_remove_null": {
+      "project": "johejo-sandbox",
+      "run": "b2oav6j7qqhxcxwsitvpmrunn2",
+      "steps": {
+        "created": {
+          "complete": true
+        },
+        "dataset": {
+          "legacy_tags": [
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_b",
+              "tagValue": "sales"
+            },
+            {
+              "tagKey": "johejo-sandbox/emulator_compat_a",
+              "tagValue": "test"
+            }
+          ],
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        },
+        "mutated": {},
+        "options": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "dataset"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "t"
+                },
+                {
+                  "v": "ARRAY\u003cSTRUCT\u003cSTRING, STRING\u003e\u003e"
+                },
+                {
+                  "v": "[STRUCT(\"johejo-sandbox/emulator_compat_b\", \"sales\"), STRUCT(\"johejo-sandbox/emulator_compat_a\", \"test\")]"
+                }
+              ]
+            }
+          ]
+        },
+        "table": {
+          "tags": {
+            "johejo-sandbox/emulator_compat_a": "test",
+            "johejo-sandbox/emulator_compat_b": "sales"
+          }
+        }
+      }
+    }
+  }
+}
