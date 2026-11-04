@@ -209,6 +209,8 @@ AggregateRule Own(const StaticAggregateRule& rule);
 enum class TypeUse : std::uint8_t {
   // Handle graph values without exposing their private STRUCT metadata.
   kGraphValues,
+  // Compare graph elements by identity, never properties or labels; excludes paths and containers.
+  kComparesGraphElementKeys,
   // Handle BIGNUMERIC arguments and results without loss of precision. Other DuckDB functions
   // could compute BIGNUM values as DOUBLE or truncate them.
   kBigNumeric,

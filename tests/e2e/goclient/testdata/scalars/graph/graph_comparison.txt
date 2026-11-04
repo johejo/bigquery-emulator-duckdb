@@ -1,0 +1,48 @@
+# Element equality compares identity, not properties or labels.
+# Sources: GoogleSQL compliance graph_table.test graph_equal_nodes and
+# graph_equal_nodes_different_types; identity semantics and the fixture counts are
+# covered by graph_identity.txt. NULL comparison semantics:
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE a = b RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE a != b RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1) RETURN a <> a AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[f:Knows]->(d:Person) WHERE e = f RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (a)-[f:Knows]->(b) WHERE e != f RETURN COUNT(*) AS result)
+=> "2"
+
+# Hidden keys, composite keys, and distinct element tables with overlapping keys.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person), (b:Person) WHERE a = b RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound), (b:Compound) WHERE a = b RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound WHERE a.tenant = 'a' AND a.id = 1), (b:Compound WHERE b.tenant = 'b' AND b.id = 1) RETURN a != b AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author), (b:Reader) WHERE a.id = b.id RETURN COUNTIF(a = b) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Account) RETURN a = b AS result)
+=> "false"
+
+# Expressions and path endpoints retain their element identity.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN PATH_FIRST(p) = PATH_LAST(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 2) RETURN IF(TRUE, a, b) = a AS result)
+=> "true"
+
+# Unlike SAME and ALL_DIFFERENT, comparisons propagate NULL in either position.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN a = b AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN b = a AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN a != b AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN b != a AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN b = b AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN b <> b AS result)
+=> null

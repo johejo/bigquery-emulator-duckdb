@@ -421,12 +421,17 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!functions.HasTypeUse(function, TypeUse::kBigNumeric) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
+  const bool compares_graph_elements =
+      functions.HasTypeUse(function, TypeUse::kComparesGraphElementKeys) &&
+      !HasGraph(call.type()) && std::ranges::all_of(call.argument_list(), [](const auto& argument) {
+        return argument->type()->IsGraphElement();
+      });
   // Private graph metadata is not a SQL STRUCT's value. Opt functions in explicitly rather
   // than accidentally comparing properties, formatting metadata or serializing private IDs.
   if ((HasGraph(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGraph(argument->type()); })) &&
-      !functions.HasTypeUse(function, TypeUse::kGraphValues)) {
+      !functions.HasTypeUse(function, TypeUse::kGraphValues) && !compares_graph_elements) {
     return Unsupported(scope, "function " + name + " with graph values");
   }
   const bool interval = HasInterval(call.type()) ||
@@ -547,7 +552,9 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
         function == "$CASE_WITH_VALUE"
             ? i == 0 || (i % 2 == 1 && i + 1 < call.argument_list().size())
             : functions.HasTypeUse(function, TypeUse::kComparesCollationKeys);
-    if (compared_operand && !collation->empty()) {
+    if (compares_graph_elements) {
+      args.push_back("struct_extract(" + *sql + ", '$id')");
+    } else if (compared_operand && !collation->empty()) {
       args.push_back(CollationKey(*sql, *collation, argument->type()));
     } else if ((compares_intervals ||
                 (function == "$CASE_WITH_VALUE" && compared_operand && selects_intervals)) &&
