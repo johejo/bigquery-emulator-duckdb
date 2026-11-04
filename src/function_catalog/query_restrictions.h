@@ -19,6 +19,8 @@ struct QueryRestrictions {
   bool distinct_set_operations_without_arrays = false;
   // Aggregate functions with DISTINCT take no STRUCT arguments.
   bool distinct_aggregates_without_structs = false;
+  // Aggregate functions with DISTINCT take no ARRAY arguments.
+  bool distinct_aggregates_without_arrays = false;
   // INTERVAL multiplies only by INT64, not FLOAT64.
   bool interval_multiply_int64_only = false;
   // IS DISTINCT FROM and IS NOT DISTINCT FROM take no STRUCT arguments.

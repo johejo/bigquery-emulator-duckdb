@@ -438,6 +438,8 @@ TranslatedStatement SqlRuntime::Translate(
       .system_variables = system_variables,
       .distinct_aggregates_without_structs =
           functions_.restrictions().distinct_aggregates_without_structs,
+      .distinct_aggregates_without_arrays =
+          functions_.restrictions().distinct_aggregates_without_arrays,
       .restrict_struct_results = functions_.restrictions().restrict_struct_results,
   };
   googlesql::TypeFactory type_factory;
