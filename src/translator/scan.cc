@@ -140,6 +140,7 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   const auto partitions = tvf.signature()->input_arguments().at(2).GetScalarArgType();
   const auto partition_names = partitions->literal_value()->elements_view();
   std::vector<std::string> keys;
+  std::vector<std::string> key_projections;
   std::string range;
   for (int i = 0; i < schema.num_columns(); ++i) {
     const auto& column = argument.argument_column_list(i);
@@ -155,10 +156,15 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
     }
     for (const auto& key : *partition_names) {
       if (absl::EqualsIgnoreCase(schema.column(i).name, key.string_value())) {
-        if (HasInterval(column.type())) {
+        if (HasInterval(column.type()) && !column.type()->IsInterval()) {
           return Unsupported(scope, "RANGE_SESSIONIZE partitioning column type");
         }
-        keys.push_back(name);
+        // Keep the input value for the output, and partition every window by the
+        // same comparison key rather than INTERVAL's stored representation.
+        const std::string key_name = "_rs_key" + std::to_string(keys.size());
+        key_projections.push_back(
+            std::format("{} AS {}", IntervalKey(column.type(), "q." + name), key_name));
+        keys.push_back(key_name);
       }
     }
   }
@@ -174,8 +180,9 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   // than LAG) keeps nested ranges and chains in the same connected component.
   const std::string bounds = std::format(
       "SELECT q.*, row_number() OVER () AS _rs_id, {0}.{1} AS _rs_start, "
-      "{0}.{2} AS _rs_end{3}",
-      range, QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd), input->From());
+      "{0}.{2} AS _rs_end{3}{4}",
+      range, QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd),
+      key_projections.empty() ? "" : ", " + Join(key_projections, ", "), input->From());
   const std::string previous =
       std::format("SELECT *, max(_rs_end) OVER ({}{}1 PRECEDING) AS _rs_previous FROM ({})",
                   partition, order, bounds);

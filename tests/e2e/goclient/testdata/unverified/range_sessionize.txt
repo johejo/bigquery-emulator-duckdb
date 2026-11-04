@@ -1,0 +1,15 @@
+# Confirm whether RANGE_SESSIONIZE accepts collated partition columns and, if so,
+# whether it uses their collation. The collation operation catalog does not name it.
+WITH ranges AS (SELECT 1 AS id, COLLATE('a', 'und:ci') AS k, RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r UNION ALL SELECT 2, COLLATE('A', 'und:ci'), RANGE<DATE> '[2024-01-03, 2024-01-05)') SELECT ARRAY_AGG(STRUCT(id, k, CAST(session_range AS STRING) AS session_range) ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', ['k'])
+?>
+
+# A collated column that is only passed through, not used for partitioning.
+WITH ranges AS (SELECT COLLATE('a', 'und:ci') AS label, RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r) SELECT (SELECT AS STRUCT * FROM RANGE_SESSIONIZE(TABLE ranges, 'r', []))
+?>
+
+# Record session results for equivalent INTERVAL representations in nested keys.
+WITH ranges AS (SELECT 1 AS id, STRUCT(INTERVAL 1 MONTH AS i) AS k, RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r UNION ALL SELECT 2, STRUCT(INTERVAL 30 DAY), RANGE<DATE> '[2024-01-03, 2024-01-05)') SELECT ARRAY_AGG(STRUCT(id, CAST(session_range AS STRING) AS session_range) ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', ['k'])
+?>
+
+WITH ranges AS (SELECT 1 AS id, [INTERVAL 1 MONTH, NULL] AS k, RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r UNION ALL SELECT 2, [INTERVAL 30 DAY, NULL], RANGE<DATE> '[2024-01-03, 2024-01-05)') SELECT ARRAY_AGG(STRUCT(id, CAST(session_range AS STRING) AS session_range) ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', ['k'])
+?>
