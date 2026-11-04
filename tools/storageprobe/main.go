@@ -334,6 +334,24 @@ var sections = []section{
 				}
 				return e.send(ctx, request("value"), request("other"))
 			}},
+			{"destination column additions", func(ctx context.Context, e *env) error {
+				stream, err := e.stream(ctx, storagepb.WriteStream_COMMITTED)
+				if err != nil {
+					return err
+				}
+				if err := e.append(ctx, stream.Name, nil); err != nil {
+					return err
+				}
+				id := strings.Split(stream.Name, "/")[5]
+				_, err = e.rest.Dataset("probe").Table(id).Update(ctx, bigquery.TableMetadataToUpdate{
+					Schema: bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType},
+						{Name: "added", Type: bigquery.StringFieldType}},
+				}, "")
+				if err != nil {
+					return err
+				}
+				return e.append(ctx, stream.Name, nil)
+			}},
 			{"column defaults", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType,
 				DefaultValueExpression: "'x'"}}, "probe")},
 			{"parameterized STRING columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType,

@@ -29,6 +29,20 @@
 #include "src/googlesql_geography/input.h"
 
 namespace bigquery_emulator_duckdb {
+
+void ValidateStorageWriteSchema(const std::vector<FieldSchema>& schema) {
+  for (const auto& field : schema) {
+    if (!field.default_value_expression.empty()) {
+      throw ApiError::Invalid("Storage Write does not support column defaults");
+    }
+    if (field.max_length) {
+      throw ApiError::Invalid(
+          "Storage Write does not support parameterized STRING or BYTES columns");
+    }
+    ValidateStorageWriteSchema(field.fields);
+  }
+}
+
 namespace {
 
 using google::protobuf::Descriptor;
@@ -86,27 +100,12 @@ bool ProtoType(const FieldSchema& field, const FieldDescriptor& descriptor) {
   }
 }
 
-void ValidateDefaults(const std::vector<FieldSchema>& schema) {
-  for (const auto& field : schema) {
-    if (!field.default_value_expression.empty()) {
-      throw ApiError::Invalid("Storage Write does not support column defaults");
-    }
-    if (field.max_length) {
-      throw ApiError::Invalid(
-          "Storage Write does not support parameterized STRING or BYTES columns");
-    }
-    if (field.type == FieldType::kRecord) {
-      ValidateDefaults(field.fields);
-    }
-  }
-}
-
 void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>& schema,
                    int depth) {
   if (depth > 15) {
     throw ApiError::Invalid("Writer schema exceeds maximum nesting depth");
   }
-  ValidateDefaults(schema);
+  ValidateStorageWriteSchema(schema);
   for (int i = 0; i < descriptor.field_count(); ++i) {
     const auto& input = *descriptor.field(i);
     const auto& field = Destination(schema, input.name());
