@@ -78,6 +78,9 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person), (b:Person), (c:Person) WHERE SAME(a, b, c) RETURN ALL_DIFFERENT(a, b, c) AS different)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) WHERE ALL_DIFFERENT(e, f) RETURN SAME(e, f) AS same_edge)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->(b:Person) WHERE a != b RETURN a.id)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[f:Knows]->(d:Person) RETURN a = c AS same_node, e = f AS same_edge, e <> f AS different_edge)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN a = b AS same_node, b != a AS different_node)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = (a:Person)-[:Knows]->(b:Person) RETURN p = p AS same_path)
 query GQL queries | GRAPH d.g_nodes MATCH (n:Person|Account) RETURN n.id, n.name
 query GQL queries | GRAPH d.g_nodes MATCH (a)-[e]->(b)-[f]->(c) RETURN a.id AS src, c.id AS dst, LABELS(e) AS labels
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.name ORDER BY p.name

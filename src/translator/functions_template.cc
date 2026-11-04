@@ -1600,6 +1600,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
               .uses =
                   {
                       TypeUse::kCompares,
+                      TypeUse::kComparesGraphElementKeys,
                       TypeUse::kComparesIntervalKeys,
                       TypeUse::kComparesCollationKeys,
                       TypeUse::kComparesStructsWithInterval,
@@ -1615,6 +1616,7 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
               .uses =
                   {
                       TypeUse::kCompares,
+                      TypeUse::kComparesGraphElementKeys,
                       TypeUse::kComparesIntervalKeys,
                       TypeUse::kComparesCollationKeys,
                       TypeUse::kComparesStructsWithInterval,

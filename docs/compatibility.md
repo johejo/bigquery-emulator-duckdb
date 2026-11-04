@@ -507,8 +507,9 @@ because they have rows or properties of their own.
 - GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
   `COLUMNS` clause.
 - Graph elements or paths in query results.
-- Graph values in comparisons such as `a = b`, grouping sets, `PARTITION BY`, and aggregate or
-  analytic functions other than `COUNT`; paths in `GROUP BY`, `DISTINCT` and `COUNT(DISTINCT)`.
+- Graph element comparisons other than `=` and `!=` (`<>`); graph path comparisons.
+- Graph values in grouping sets, `PARTITION BY`, and aggregate or analytic functions other than
+  `COUNT`; paths in `GROUP BY`, `DISTINCT` and `COUNT(DISTINCT)`.
 - Horizontal aggregates other than `SUM`, `AVG`, `MIN`, `MAX`, `COUNT` and `ARRAY_AGG`;
   horizontal aggregates with `LIMIT`, `HAVING` or collation; `DISTINCT` or `ORDER BY` on
   horizontal aggregates other than `ARRAY_AGG`; and horizontal `MIN` and `MAX` over INTERVAL.

@@ -60,12 +60,6 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound), (a
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1)-[e:Knows]->(b:Person), (b WHERE b.id = 2)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
 => "2"
 
-# Implicit equality for repeated variables does not enable user-written graph comparisons.
-SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE a = b RETURN COUNT(*) AS result)
-=> error contains: The emulator does not support
-SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) RETURN a = a AS result)
-=> error contains: The emulator does not support
-
 # Adjacent node patterns bind the same node, so the labels and filters of both apply.
 # third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)(b:Person) RETURN COUNT(*) AS result)

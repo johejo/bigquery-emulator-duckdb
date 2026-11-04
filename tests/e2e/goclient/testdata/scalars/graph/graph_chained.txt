@@ -32,6 +32,6 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:
 SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author) MATCH (a:Reader) RETURN COUNT(*) AS result)
 => "0"
 
-# The resolver's implicit equality does not enable explicit graph comparisons.
+# Explicit equality uses the same element identity across MATCH stages.
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) MATCH (b:Person) WHERE a = b RETURN COUNT(*) AS result)
-=> error contains: The emulator does not support
+=> "3"
