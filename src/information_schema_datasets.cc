@@ -93,6 +93,13 @@ absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context)
                                       kMillisPerDay),
       });
     }
+    if (metadata->max_time_travel_hours.has_value()) {
+      options.push_back({
+          .name = "max_time_travel_hours",
+          .type = "INT64",
+          .value = std::to_string(*metadata->max_time_travel_hours),
+      });
+    }
     AppendOptions(Identity(dataset), std::move(options), rows);
   }
   return rows;

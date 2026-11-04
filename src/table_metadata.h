@@ -187,8 +187,9 @@ struct ViewDescription {
 
 // What a dataset carries besides its reference: Dataset.description, friendlyName, labels and
 // resourceTags, defaultTableExpirationMs, which sets the expiration of tables and views created in
-// it later, and defaultRoundingMode, which tables created in it later take as their own. The
-// emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
+// it later, defaultRoundingMode, which tables created in it later take as their own, and
+// maxTimeTravelHours, which limits historical reads. The emulator keeps them in a table of its
+// own, since DuckDB cannot comment on a schema.
 struct DatasetMetadata {
   std::string description;
   std::string friendly_name;
@@ -197,6 +198,7 @@ struct DatasetMetadata {
   std::map<std::string, std::string> resource_tags;
   std::vector<std::string> tag_order;
   std::optional<int64_t> default_table_expiration_ms;
+  std::optional<int64_t> max_time_travel_hours;
   RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
   std::optional<std::string> default_collation;
   // Output only and recorded with the dataset.
@@ -208,6 +210,7 @@ struct DatasetMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !default_table_expiration_ms.has_value() &&
+           !max_time_travel_hours.has_value() &&
            default_rounding_mode == RoundingMode::kUnspecified && creation_time == 0 &&
            location.empty() && !default_collation.has_value();
   }
@@ -243,6 +246,9 @@ void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bo
 // Throws ApiError::Invalid for a field of the wrong type, for a location BigQuery does not have
 // and for a label BigQuery rejects.
 DatasetMetadata DatasetMetadataFromJson(const nlohmann::json& dataset);
+
+// Dataset time travel windows are whole days from two through seven days.
+void ValidateMaxTimeTravelHours(const std::optional<int64_t>& hours);
 
 // datasets.patch (`patch`) or datasets.update applied to `metadata`, as UpdateTableMetadata does
 // for tables, except that datasets.update keeps the friendly name when `body` leaves it out; a

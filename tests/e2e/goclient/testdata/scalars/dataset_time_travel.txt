@@ -1,0 +1,27 @@
+# SCHEMATA_OPTIONS lists each dataset option's value as a STRING.
+# third_party/bigquery_docs/information-schema-datasets-schemata-options.md
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+CREATE SCHEMA IF NOT EXISTS scalars_time_travel_window OPTIONS (max_time_travel_hours = 48);
+SELECT CONCAT(option_type, ' ', option_value) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_time_travel_window' AND option_name = 'max_time_travel_hours'
+=> "INT64 48"
+
+CREATE SCHEMA IF NOT EXISTS scalars_time_travel_window_alter OPTIONS (max_time_travel_hours = 48);
+ALTER SCHEMA scalars_time_travel_window_alter SET OPTIONS (max_time_travel_hours = 168);
+SELECT option_value FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_time_travel_window_alter' AND option_name = 'max_time_travel_hours'
+=> "168"
+
+# BigQuery answers: NULL leaves no explicit option on CREATE and clears it on ALTER.
+DECLARE result STRING;
+CREATE SCHEMA time_travel_null_create OPTIONS (max_time_travel_hours = NULL);
+SET result = (SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'time_travel_null_create' AND option_name = 'max_time_travel_hours');
+DROP SCHEMA time_travel_null_create;
+SELECT result;
+=> null
+
+DECLARE result STRING;
+CREATE SCHEMA time_travel_null_alter OPTIONS (max_time_travel_hours = 48);
+ALTER SCHEMA time_travel_null_alter SET OPTIONS (max_time_travel_hours = NULL);
+SET result = (SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'time_travel_null_alter' AND option_name = 'max_time_travel_hours');
+DROP SCHEMA time_travel_null_alter;
+SELECT result;
+=> null

@@ -238,8 +238,9 @@ snapshot rather than rejected with BigQuery's message.
 
 ### Time travel
 
-`FOR SYSTEM_TIME AS OF` reads the rows a table had within BigQuery's default seven-day time travel
-window, which datasets cannot change. It is unsupported:
+`FOR SYSTEM_TIME AS OF` uses the dataset's `max_time_travel_hours` setting (REST
+`maxTimeTravelHours`), defaulting to seven days. Setting the REST field to `null` is unsupported;
+DDL can clear the option with `NULL`. Time travel is unsupported:
 
 - before the table was created, including a table it replaced by `CREATE OR REPLACE TABLE` or a
   job's `WRITE_TRUNCATE`, before `ALTER TABLE ADD COLUMN` or `DROP COLUMN`, and before
