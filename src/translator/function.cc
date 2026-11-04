@@ -55,7 +55,11 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
   if (entry == nullptr) {
     return std::nullopt;
   }
-  if (name == "NULLIF" && !collation.empty()) {
+  // These compare INTERVAL values, like collated strings, by keys that function_catalog::Equal
+  // and IntervalKey build.
+  const bool selects_interval =
+      !resolved.argument_list().empty() && resolved.argument_list(0)->type()->IsInterval();
+  if (name == "NULLIF" && (!collation.empty() || selects_interval)) {
     // Compare keys, but return the original first argument, evaluated only once.
     const std::string first = function_catalog::BoundComparison(0);
     const std::string second = function_catalog::BoundComparison(1);
@@ -68,12 +72,13 @@ std::optional<std::string> LegacyCall(const Catalog& functions,
                 CollationKey(second, collation, resolved.argument_list(1)->type())) +
             " THEN NULL ELSE " + first + " END");
   }
-  if ((name == "GREATEST" || name == "LEAST") && !collation.empty()) {
+  if ((name == "GREATEST" || name == "LEAST") && (!collation.empty() || selects_interval)) {
     // NULL when any argument is, and otherwise the first argument whose key is the extremum.
     return "list_transform([[" + Join(args, ", ") +
            "]], lambda _ext: CASE WHEN list_count(_ext) < len(_ext) THEN NULL ELSE "
            "list_transform([list_transform(_ext, lambda _e: " +
-           CollationKey("_e", collation, resolved.argument_list(0)->type()) +
+           (selects_interval ? IntervalKey("_e")
+                             : CollationKey("_e", collation, resolved.argument_list(0)->type())) +
            ")], lambda _keys: _ext[list_position(_keys, " +
            (name == "GREATEST" ? "list_max" : "list_min") + "(_keys))])[1] END)[1]";
   }
@@ -369,7 +374,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     return Unsupported(scope, "function " + name + " with nested collation");
   }
   if (!collation->empty() && !functions.HasTypeUse(name, TypeUse::kComparesCollationKeys) &&
-      !functions.HasTypeUse(name, TypeUse::kSelectsCollationValues) &&
+      !functions.HasTypeUse(name, TypeUse::kSelectsComparedValues) &&
       !functions.SupportsCollation(name)) {
     return Unsupported(scope, "function " + name + " with collation");
   }
@@ -447,6 +452,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   // CASE with a value carries its results when it compares no INTERVAL values.
   const bool carries_results = functions.HasTypeUse(function, TypeUse::kCarriesResults) &&
                                !HasInterval(call.argument_list(0)->type());
+  // GREATEST, LEAST, NULLIF and CASE with a value compare INTERVAL values by their keys and
+  // return or carry the values themselves.
+  const bool selects_intervals = functions.HasTypeUse(function, TypeUse::kSelectsComparedValues) &&
+                                 !call.argument_list().empty() &&
+                                 call.argument_list(0)->type()->IsInterval();
   // A declared conversion permits INTERVAL only in the argument it converts, not in the
   // result or nested inside another argument's ARRAY or STRUCT.
   bool converts_intervals = !HasInterval(call.type());
@@ -459,7 +469,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   }
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   if (interval && !compares_intervals && !compares_structs && !carries_results &&
-      !converts_intervals && !functions.HasTypeUse(function, TypeUse::kCarries) &&
+      !selects_intervals && !converts_intervals &&
+      !functions.HasTypeUse(function, TypeUse::kCarries) &&
       !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
@@ -532,13 +543,15 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
     // CASE compares only its input and WHEN operands; its results retain their values. NULLIF,
     // GREATEST and LEAST return values they compare, so Call binds their values before keying.
-    const bool collation_operand =
+    const bool compared_operand =
         function == "$CASE_WITH_VALUE"
             ? i == 0 || (i % 2 == 1 && i + 1 < call.argument_list().size())
             : functions.HasTypeUse(function, TypeUse::kComparesCollationKeys);
-    if (collation_operand && !collation->empty()) {
+    if (compared_operand && !collation->empty()) {
       args.push_back(CollationKey(*sql, *collation, argument->type()));
-    } else if (compares_intervals && argument->type()->IsInterval()) {
+    } else if ((compares_intervals ||
+                (function == "$CASE_WITH_VALUE" && compared_operand && selects_intervals)) &&
+               argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
     } else if (compares_intervals && keyed(argument->type(), i)) {
       args.push_back("list_transform(" + *sql + ", lambda _ik: " + IntervalKey("_ik") + ")");

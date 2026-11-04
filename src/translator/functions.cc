@@ -5,6 +5,7 @@
 #include <span>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "src/function_catalog/catalog.h"
 #include "src/function_catalog/rules.h"
@@ -145,7 +146,7 @@ constexpr auto kHandlers =
                         {
                             TypeUse::kCompares,
                             TypeUse::kCarriesResults,
-                            TypeUse::kSelectsCollationValues,
+                            TypeUse::kSelectsComparedValues,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },
@@ -300,7 +301,7 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kSelectsCollationValues,
+                            TypeUse::kSelectsComparedValues,
                             TypeUse::kBigNumeric,
                         },
                     .type_rejections = kGreatestTypeRejections,
@@ -313,7 +314,7 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kSelectsCollationValues,
+                            TypeUse::kSelectsComparedValues,
                             TypeUse::kBigNumeric,
                         },
                     .type_rejections = kLeastTypeRejections,
@@ -394,8 +395,14 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
     }
     functions.AddRules(name, selected, Implementation::kSQL);
   }
+  // Without BigQuery's restriction, these compare INTERVAL values by their keys.
+  const bool selects_intervals = !functions.restrictions().selections_without_intervals;
   for (const auto& [name, definition] : TemplateRules()) {
-    functions.AddRules(name, definition, Implementation::kSQL);
+    auto selected = definition;
+    if (name == "NULLIF" && selects_intervals) {
+      selected.type_rejections = {};
+    }
+    functions.AddRules(name, selected, Implementation::kSQL);
   }
   for (const auto& [name, definition] : StaticBackendRules()) {
     auto selected = definition;
@@ -420,23 +427,25 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                                  });
   }
   for (const auto& [name, function] : kHandlers) {
-    functions.Add(name, {
-                            .translation = Translation::kHandler,
-                            .uses = function.uses,
-                            .implementations = {function.implementation},
-                            .handler = function.handler,
-                            .argument_modes =
-                                {
-                                    function.argument_modes.begin(),
-                                    function.argument_modes.end(),
-                                },
-                            .struct_handler = function.struct_handler,
-                            .type_rejections =
-                                {
-                                    function.type_rejections.begin(),
-                                    function.type_rejections.end(),
-                                },
-                        });
+    const bool rejects =
+        !selects_intervals || (name != "$CASE_WITH_VALUE" && name != "GREATEST" && name != "LEAST");
+    functions.Add(name,
+                  {
+                      .translation = Translation::kHandler,
+                      .uses = function.uses,
+                      .implementations = {function.implementation},
+                      .handler = function.handler,
+                      .argument_modes =
+                          {
+                              function.argument_modes.begin(),
+                              function.argument_modes.end(),
+                          },
+                      .struct_handler = function.struct_handler,
+                      .type_rejections =
+                          rejects ? std::vector<TypeRejection>{function.type_rejections.begin(),
+                                                               function.type_rejections.end()}
+                                  : std::vector<TypeRejection>{},
+                  });
   }
   for (const auto& [name, target] : kSafeFunctions) {
     functions.Add(name, {

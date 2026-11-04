@@ -199,6 +199,25 @@ steps:
         "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=bigquery
       stdin: *struct_sets
     test: current.exit_code == 1 && current.stdout == "" && current.stderr contains "Type STRUCT is not supported"
+  # GoogleSQL compares INTERVAL values by length, as the compliance cases cited in
+  # scalars/interval.txt show. GREATEST and LEAST keep the first of equal values, as
+  # GreatestFunction and LeastFunction in GoogleSQL's reference_impl/function.cc do; NULLIF
+  # returns its first argument. BigQuery's rejections are in errors/interval.txt and
+  # scalars/interval.txt.
+  semantics_interval_selections_googlesql:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --semantics=googlesql
+      stdin: |
+        SELECT CAST(GREATEST(INTERVAL 1 MONTH, INTERVAL 30 DAY) AS STRING) AS g1,
+               CAST(GREATEST(INTERVAL 30 DAY, INTERVAL 1 MONTH) AS STRING) AS g2,
+               CAST(LEAST(INTERVAL 1 MONTH, INTERVAL 30 DAY, INTERVAL 719 HOUR) AS STRING) AS l,
+               CAST(GREATEST(INTERVAL 1 DAY, NULL) AS STRING) AS n,
+               CAST(NULLIF(INTERVAL 1 MONTH, INTERVAL 30 DAY) AS STRING) AS e,
+               CAST(NULLIF(INTERVAL 1 MONTH, INTERVAL 31 DAY) AS STRING) AS d,
+               CASE INTERVAL 1 MONTH WHEN INTERVAL 31 DAY THEN 'a' WHEN INTERVAL 30 DAY THEN 'b' END AS c,
+               CAST(CASE INTERVAL 1 DAY WHEN INTERVAL 24 HOUR THEN INTERVAL 2 MONTH END AS STRING) AS r;
+    test: current.exit_code == 0 && current.stdout == '{"g1":"0-1 0 0:0:0","g2":"0-0 30 0:0:0","l":"0-0 0 719:0:0","n":null,"e":null,"d":"0-1 0 0:0:0","c":"b","r":"0-2 0 0:0:0"}' + "\n"
   # ARRAY grouping follows data-types.md's "Grouping with arrays": NULL arrays, empty
   # arrays and NULL elements differ; element order, length and multiplicity matter.
   # BigQuery's DISTINCT set-operation rejection is also covered by scalars/interval_set_operations.txt.
