@@ -107,6 +107,15 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 	err := serveStorage()
+	var bigtable *serverprocess.Bigtable
+	if err == nil && len(args) > 0 && (args[0] == "sql" || args[0] == "options" || args[0] == "api") {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		bigtable, err = serverprocess.StartBigtable(ctx)
+		cancel()
+		if err == nil {
+			err = os.Setenv("BIGTABLE_EMULATOR_HOST", bigtable.Host)
+		}
+	}
 	switch {
 	case err != nil:
 	case *check && (len(args) == 0 || args[0] != "function-types"):
@@ -124,6 +133,11 @@ func main() {
 	default:
 		flag.Usage()
 		os.Exit(2)
+	}
+	if bigtable != nil {
+		if stopErr := bigtable.Stop(); err == nil {
+			err = stopErr
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

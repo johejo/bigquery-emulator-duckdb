@@ -1,0 +1,77 @@
+version: 1
+# Maintainer prerequisite: in the answer project's Bigtable instance bqanswers, create table
+# bigtable-external with families family_a and family_b. Write row a with family_a:q = hello
+# and row b with family_b:q = world, leaving the other family absent in each row.
+# No expected values below are taken from cbtemulator or the emulator.
+description: Bigtable sparse-family results and generated metadata; requires the Bigtable source described above.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-external
+cases:
+  - name: sparse_family
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference:
+              datasetId: ${dataset}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference:
+              tableId: t
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ["${uri}"]
+              bigtableOptions:
+                readRowkeyAsString: true
+                ignoreUnspecifiedColumnFamilies: true
+                columnFamilies:
+                  - familyId: family_a
+                    type: STRING
+                    onlyReadLatest: true
+        observe:
+          status: /status
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: rows
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: SELECT rowkey, TO_JSON_STRING(family_a) AS family FROM `${project}.${dataset}.t` ORDER BY rowkey
+        observe:
+          status: /status
+          errors: /body/errors
+          rows: /body/rows
+      - name: metadata
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

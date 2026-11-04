@@ -141,16 +141,24 @@ most common one.
 paths the sources have when the table is created. Queries read every source file, since the
 emulator does not prune partitions, and fail on a file whose path does not have those keys.
 
+Bigtable external tables support BYTES and STRING cell values, `readRowkeyAsString`,
+`ignoreUnspecifiedColumnFamilies` and family-level `onlyReadLatest`. Promoting individual
+qualifiers through `columns`, numeric and boolean conversions, JSON/PROTO values and
+`outputColumnFamiliesAsJson` are unsupported. Explicit schemas and GCS-specific read options
+are rejected. Bigtable schemas are fixed when the external table is created; queries read
+current source rows. Reading a row missing a selected column family is unsupported.
+Endpoint setup is in [README](../README.md#bigtable-external-tables).
+
 `tables.patch` and `tables.update` change an external table's description, friendly name,
 labels, tags and expiration time. They take back the schema and `externalDataConfiguration` that
 `tables.get` returns, but changing them is unsupported.
 `ALTER TABLE SET OPTIONS` fails on external tables, as
 [BigQuery's does](../tests/e2e/scenarios/testdata/external_table_alter.api.yaml); other
-`ALTER TABLE` actions on them are unsupported. Bigtable, BigLake connections, metadata caching
+`ALTER TABLE` actions on them are unsupported. BigLake connections, metadata caching
 and time travel are unsupported. Query dry runs validate external table references against the
-stored schema without accessing GCS; they do not estimate external data sizes. `tabledata.list`,
-Storage Read, extracts and copy jobs do not read external tables; use a query instead. Writes to
-external tables are rejected.
+stored schema without accessing their sources; they do not estimate external data sizes.
+`tabledata.list`, Storage Read, extracts and copy jobs do not read external tables; use a query
+instead. Writes to external tables are rejected.
 
 ### Resource tags
 

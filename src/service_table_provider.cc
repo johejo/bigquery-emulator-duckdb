@@ -12,6 +12,7 @@
 #include "absl/status/statusor.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/bigtable_external.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/external_table.h"
@@ -47,11 +48,17 @@ class ServiceTableProvider : public ExternalTableProvider {
 
   TableRead Read(GcsExternalData definition, std::vector<FieldSchema> schema,
                  std::string table_name) override {
+    if (definition.format == "BIGTABLE") {
+      return BigtableExternalRead(std::move(definition), std::move(schema));
+    }
     return GcsExternalRead(std::move(definition), std::move(schema), std::move(table_name), gcs_);
   }
 
   std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition,
                                         const std::string& table_id) override {
+    if (definition.format == "BIGTABLE") {
+      return DetectBigtableSchema(definition);
+    }
     return DetectGcsExternalSchema(definition, table_id, gcs_);
   }
 

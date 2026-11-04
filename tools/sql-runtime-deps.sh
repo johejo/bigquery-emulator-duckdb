@@ -12,13 +12,13 @@ if [[ $# -eq 0 ]]; then set -- //:compliance_test; fi
 
 # These existing targets represent application composition, acquisition and extraction.
 # Include the SDK itself so a new path bypassing :gcs is also caught.
-forbidden='set(//:emulator //:service_backend //:service_table_provider //:gcs //:file_read //:extract @google_cloud_cpp//:storage)'
+forbidden='set(//:emulator //:service_backend //:service_table_provider //:gcs //:file_read //:extract //:bigtable_external @google_cloud_cpp//:storage @google_cloud_cpp//:bigtable)'
 failed=0
 for root in "$@"; do
   # Resolve separately: a misspelled or missing root must never count as an empty path.
   bazelisk query "$root" --output=label >/dev/null
   if [[ "$mode" == report ]]; then
-    for sink in //:gcs @google_cloud_cpp//:storage @google_cloud_cpp//:spanner; do
+    for sink in //:gcs @google_cloud_cpp//:storage @google_cloud_cpp//:spanner @google_cloud_cpp//:bigtable; do
       printf '\n# All dependency paths: %s -> %s\n' "$root" "$sink"
       bazelisk query "allpaths($root, $sink)" --output=graph --nograph:factored
     done

@@ -116,7 +116,8 @@
       {
         "name": "uris",
         "type": "STRING",
-        "source": "external_table_option_list"
+        "source": "external_table_option_list",
+        "values": ["'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe'"]
       }
     ],
     "capacity_commitment_option_list": [
@@ -292,7 +293,8 @@
       },
       {
         "name": "bigtable_options",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'{}'", "'{\"readRowkeyAsString\":true}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"STRING\",\"onlyReadLatest\":true}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\"}]}'", "'{\"outputColumnFamiliesAsJson\":true}'"]
       },
       {
         "name": "compression",
@@ -1939,7 +1941,15 @@
     },
     {
       "name": "CREATE EXTERNAL TABLE Bigtable URI",
-      "group": "bigtable_uri_option"
+      "group": "bigtable_uri_option",
+      "template": "CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', {option})"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE Bigtable",
+      "implementation": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list",
+      "only": ["bigtable_options"],
+      "template": "CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', {option})"
     }
   ]
 }

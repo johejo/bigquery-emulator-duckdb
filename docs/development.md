@@ -12,6 +12,10 @@ and share a fixed build-tool PATH for Bazel actions with the development shell.
 Test dependencies are available through `TEST_TOOLS_PATH`, which the test and probe recipes add to PATH only for their execution;
 `SPANNER_EMULATOR_GATEWAY` selects the standalone Spanner gateway on Linux.
 
+`just e2e` starts nixpkgs' `cbtemulator` on a free loopback port unless
+`BIGTABLE_EMULATOR_HOST` already names an externally started emulator. SQL, DDL option and REST
+probes start an isolated `cbtemulator` with an empty source table.
+
 `just e2e` starts the standalone Spanner emulator on Linux x86_64 and arm64. On other platforms,
 Spanner cases are skipped unless `SPANNER_EMULATOR_HOST` and `E2E_SPANNER_DATABASE` name an externally
 started emulator and an empty GoogleSQL database.

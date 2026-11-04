@@ -414,6 +414,30 @@ void ValidateClustering(const std::vector<std::string>& clustering,
 
 }  // namespace
 
+json BigtableOptionsJson(const BigtableOptions& options) {
+  json result = json::object();
+  if (options.ignore_unspecified_column_families) {
+    result["ignoreUnspecifiedColumnFamilies"] = *options.ignore_unspecified_column_families;
+  }
+  if (options.read_rowkey_as_string) {
+    result["readRowkeyAsString"] = *options.read_rowkey_as_string;
+  }
+  for (const auto& family : options.column_families) {
+    json value = {{"familyId", family.family_id}};
+    if (!family.type.empty()) {
+      value["type"] = family.type;
+    }
+    if (family.encoding) {
+      value["encoding"] = *family.encoding;
+    }
+    if (family.only_read_latest) {
+      value["onlyReadLatest"] = *family.only_read_latest;
+    }
+    result["columnFamilies"].push_back(std::move(value));
+  }
+  return result;
+}
+
 json TableMetadata::ToJson() const {
   json fields = json::object();
   if (external_data) {
@@ -421,6 +445,10 @@ json TableMetadata::ToJson() const {
         {"sourceFormat", external_data->format},
         {"sourceUris", external_data->uris},
     };
+    if (external_data->bigtable_options) {
+      fields["externalDataConfiguration"]["bigtableOptions"] =
+          BigtableOptionsJson(*external_data->bigtable_options);
+    }
     if (external_data->skip_leading_rows) {
       fields["externalDataConfiguration"]["csvOptions"]["skipLeadingRows"] =
           std::to_string(*external_data->skip_leading_rows);
@@ -689,13 +717,14 @@ TableMetadata TableMetadataFromJson(const json& table) {
           name != "ignoreUnknownValues" && name != "hivePartitioningOptions" &&
           name != "compression" && name != "maxBadRecords" && name != "jsonOptions" &&
           name != "timeZone" && name != "dateFormat" && name != "datetimeFormat" &&
-          name != "timeFormat" && name != "timestampFormat") {
+          name != "timeFormat" && name != "timestampFormat" && name != "bigtableOptions") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
     const std::string format = config.value("sourceFormat", "");
-    if (format != "PARQUET" && format != "CSV" && format != "NEWLINE_DELIMITED_JSON") {
-      throw ApiError::Unsupported("external tables other than PARQUET, CSV or JSON");
+    if (format != "PARQUET" && format != "CSV" && format != "NEWLINE_DELIMITED_JSON" &&
+        format != "BIGTABLE") {
+      throw ApiError::Unsupported("external tables other than PARQUET, CSV, JSON or BIGTABLE");
     }
     const auto uris = config.value("sourceUris", json::array());
     if (!uris.is_array() || uris.empty()) {
@@ -703,6 +732,79 @@ TableMetadata TableMetadataFromJson(const json& table) {
     }
     metadata.external_data.emplace();
     metadata.external_data->format = format;
+    if (format == "BIGTABLE") {
+      for (const auto& [name, value] : config.items()) {
+        if (name != "sourceFormat" && name != "sourceUris" && name != "bigtableOptions") {
+          throw ApiError::Unsupported("Bigtable external table option " + name);
+        }
+      }
+    }
+    if (config.contains("bigtableOptions")) {
+      if (format != "BIGTABLE") {
+        throw ApiError::Unsupported("bigtableOptions on a non-Bigtable external table");
+      }
+      const auto& options = config["bigtableOptions"];
+      if (!options.is_object()) {
+        throw ApiError::Invalid("bigtableOptions must be an object");
+      }
+      auto& parsed = metadata.external_data->bigtable_options.emplace();
+      for (const auto& [name, value] : options.items()) {
+        if (name == "ignoreUnspecifiedColumnFamilies" || name == "readRowkeyAsString") {
+          if (!value.is_boolean()) {
+            throw ApiError::Invalid("bigtableOptions." + name + " must be a boolean");
+          }
+          (name == "readRowkeyAsString" ? parsed.read_rowkey_as_string
+                                        : parsed.ignore_unspecified_column_families) =
+              value.get<bool>();
+        } else if (name == "columnFamilies") {
+          if (!value.is_array()) {
+            throw ApiError::Invalid("bigtableOptions.columnFamilies must be an array");
+          }
+          for (const auto& family : value) {
+            if (!family.is_object()) {
+              throw ApiError::Invalid("Bigtable column family must be an object");
+            }
+            BigtableFamily entry;
+            for (const auto& [key, setting] : family.items()) {
+              if (key == "familyId" || key == "type" || key == "encoding") {
+                if (!setting.is_string()) {
+                  throw ApiError::Invalid("Bigtable " + key + " must be a string");
+                }
+                if (key == "familyId") {
+                  entry.family_id = setting.get<std::string>();
+                } else if (key == "type") {
+                  entry.type = setting.get<std::string>();
+                  if (entry.type.empty()) {
+                    throw ApiError::Unsupported("Empty Bigtable cell type");
+                  }
+                } else {
+                  entry.encoding = setting.get<std::string>();
+                }
+              } else if (key == "onlyReadLatest") {
+                if (!setting.is_boolean()) {
+                  throw ApiError::Invalid("Bigtable onlyReadLatest must be a boolean");
+                }
+                entry.only_read_latest = setting.get<bool>();
+              } else {
+                throw ApiError::Unsupported("Bigtable column family option " + key);
+              }
+            }
+            if (entry.family_id.empty()) {
+              throw ApiError::Invalid("Bigtable familyId must not be empty");
+            }
+            if (!entry.type.empty() && entry.type != "BYTES" && entry.type != "STRING") {
+              throw ApiError::Unsupported("Bigtable cell type " + entry.type);
+            }
+            if (entry.encoding && *entry.encoding != "BINARY" && *entry.encoding != "TEXT") {
+              throw ApiError::Unsupported("Bigtable cell encoding " + *entry.encoding);
+            }
+            parsed.column_families.push_back(std::move(entry));
+          }
+        } else {
+          throw ApiError::Unsupported("bigtableOptions." + name);
+        }
+      }
+    }
     if (config.contains("csvOptions")) {
       if (format != "CSV") {
         throw ApiError::Unsupported("csvOptions on a non-CSV external table");
@@ -875,7 +977,10 @@ TableMetadata TableMetadataFromJson(const json& table) {
       metadata.external_data->given_schema = given_schema && format == "NEWLINE_DELIMITED_JSON";
     }
     for (const auto& uri : uris) {
-      if (!uri.is_string() || !uri.get_ref<const std::string&>().starts_with("gs://")) {
+      if (!uri.is_string()) {
+        throw ApiError::Invalid("external table source URI must be a string");
+      }
+      if (format != "BIGTABLE" && !uri.get_ref<const std::string&>().starts_with("gs://")) {
         throw ApiError::Unsupported("external table sources other than gs://");
       }
       metadata.external_data->uris.push_back(uri.get<std::string>());

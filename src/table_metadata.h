@@ -27,12 +27,30 @@ struct HivePartitioning {
   bool operator==(const HivePartitioning&) const = default;
 };
 
-// GCS external sources and their format-specific read settings.
+struct BigtableFamily {
+  std::string family_id;
+  std::string type = {};
+  std::optional<std::string> encoding = std::nullopt;
+  std::optional<bool> only_read_latest = std::nullopt;
+  bool operator==(const BigtableFamily&) const = default;
+};
+
+struct BigtableOptions {
+  std::vector<BigtableFamily> column_families;
+  std::optional<bool> ignore_unspecified_column_families;
+  std::optional<bool> read_rowkey_as_string;
+  bool operator==(const BigtableOptions&) const = default;
+};
+
+nlohmann::json BigtableOptionsJson(const BigtableOptions& options);
+
+// External sources and their format-specific read settings.
 struct GcsExternalData {
   std::vector<std::string> uris;
   std::optional<bool> autodetect;
   std::optional<bool> enable_list_inference = std::nullopt;
   std::string format = "PARQUET";
+  std::optional<BigtableOptions> bigtable_options = std::nullopt;
   std::optional<int64_t> skip_leading_rows = std::nullopt;
   std::optional<std::string> field_delimiter = std::nullopt;
   std::optional<std::string> quote = std::nullopt;

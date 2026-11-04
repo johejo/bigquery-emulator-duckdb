@@ -86,6 +86,7 @@ const ResourceMask& TableFields() {
                    "externalDataConfiguration.sourceFormat",
                    "externalDataConfiguration.sourceUris",
                    "externalDataConfiguration.autodetect",
+                   "externalDataConfiguration.bigtableOptions",
                    "externalDataConfiguration.parquetOptions.enableListInference",
                    "externalDataConfiguration.csvOptions.skipLeadingRows",
                    "externalDataConfiguration.csvOptions.fieldDelimiter",
@@ -796,6 +797,9 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
             "both, the schemas must be the same.");
       }
       request.schema = std::move(external_schema);
+    }
+    if (request.metadata.external_data->format == "BIGTABLE" && !request.schema.empty()) {
+      throw ApiError::Unsupported("explicit schema on a Bigtable external table");
     }
     SetModesGiven(request.schema);
   }

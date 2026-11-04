@@ -43,6 +43,7 @@ enum class DdlOptionId : uint8_t {
   kEntryPoint,
   kStrictMode,
   kFormat,
+  kBigtableOptions,
   kUris,
   kEnableListInference,
   kSkipLeadingRows,

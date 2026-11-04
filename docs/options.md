@@ -43,8 +43,10 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
 | [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 8 | 1 | 2 | 11 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 8 | 1 | 3 | 10 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 14 | 1 | 0 | 0 |
+| [CREATE EXTERNAL TABLE Bigtable URI](#create-external-table-bigtable-uri) | 1 | 0 | 0 | 0 |
+| [CREATE EXTERNAL TABLE Bigtable](#create-external-table-bigtable) | 0 | 1 | 0 | 0 |
 
 ## CREATE SCHEMA
 
@@ -279,7 +281,7 @@ the emulator rejected.
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
-| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
 | [`compression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`decimal_target_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
@@ -322,6 +324,18 @@ the emulator rejected.
 | [`time_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`timestamp_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
+## CREATE EXTERNAL TABLE Bigtable URI
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+
+## CREATE EXTERNAL TABLE Bigtable
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}')`; `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"outputColumnFamiliesAsJson":true}')`. |
+
 ## Unprobed contexts
 
 These contexts have no statement template yet, so none of their options is probed.
@@ -349,4 +363,3 @@ These contexts have no statement template yet, so none of their options is probe
 - [ALTER DATA_POLICY SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `data_policy_type`, `masking_expression`
 - [ALTER CONNECTION SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `friendly_name`, `description`
 - [CREATE TABLE generated column](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `asynchronous`
-- [CREATE EXTERNAL TABLE Bigtable URI](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `uris`

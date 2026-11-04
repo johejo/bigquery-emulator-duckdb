@@ -163,6 +163,7 @@ cc_library(
         ":context",
         ":query",
         "//:api_error",
+        "//:bigtable_options",
         "//:datetime_formats",
         "//:duckdb_sql",
         "//:field_schema",
