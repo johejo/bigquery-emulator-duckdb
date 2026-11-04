@@ -344,6 +344,11 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision pr
   options.set_prune_unused_columns(true);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
+  // The null-masking rewrite rejects HAVING and aggregates that retain NULLs.
+  // GoogleSQL mode translates PIVOT directly, filtering rows before aggregation.
+  if (!settings.restrict_pivot_aggregates) {
+    options.disable_rewrite(googlesql::REWRITE_PIVOT);
+  }
   // SELECT WITH DIFFERENTIAL_PRIVACY aggregates each privacy unit's contributions first, and
   // BigQuery's max_groups_contributed defaults to 1.
   options.enable_rewrite(googlesql::REWRITE_ANONYMIZATION);

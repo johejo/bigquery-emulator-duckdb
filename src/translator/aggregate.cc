@@ -5,6 +5,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -14,8 +15,10 @@
 #include <vector>
 
 #include "googlesql/public/function.h"
+#include "googlesql/public/id_string.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/catalog.h"
 #include "src/function_catalog/resolved_access.h"
@@ -778,8 +781,11 @@ std::optional<std::string> ArrayAggregate(const googlesql::ResolvedArrayAggregat
                        "", *array, element);
 }
 
-std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
-                                      const Scope& scope) {
+namespace {
+
+std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan& aggregate,
+                                          const Scope& scope, std::optional<Relation> input,
+                                          std::vector<Collation> collations = {}) {
   // Keys with INTERVAL values group by their lengths, and collated strings by their collation keys,
   // and return the first of equal values in input order, as BigQuery does. Graph elements group by
   // identity, as SAME compares them.
@@ -792,8 +798,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     return Unsupported(scope, "GROUP BY with graph values");
   }
   // The collation of each key, which SELECT DISTINCT records as GROUP BY does.
-  std::vector<Collation> collations;
-  for (int i = 0; i < aggregate.group_by_list_size(); ++i) {
+  for (int i = static_cast<int>(collations.size()); i < aggregate.group_by_list_size(); ++i) {
     const auto collation = aggregate.collation_list().empty()
                                ? std::optional<Collation>(Collation{})
                                : OperationCollation(aggregate.collation_list(i), scope);
@@ -802,7 +807,6 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     }
     collations.push_back(*collation);
   }
-  auto input = Scan(*aggregate.input_scan(), scope);
   if (!input) {
     return std::nullopt;
   }
@@ -1096,6 +1100,195 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     result.sql = Join(branches, " UNION ALL ");
   }
   ApplyFinishes(result, finishes);
+  return result;
+}
+
+}  // namespace
+
+std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
+                                      const Scope& scope) {
+  return AggregateRelation(aggregate, scope, Scan(*aggregate.input_scan(), scope));
+}
+
+std::optional<Relation> PivotScan(const googlesql::ResolvedPivotScan& pivot, const Scope& scope) {
+  // PIVOT records no comparison collation for its FOR expression.
+  if (HasCollation(pivot.for_expr()->type_annotation_map())) {
+    return Unsupported(scope, "PIVOT with collation on the FOR expression");
+  }
+  const auto input = Scan(*pivot.input_scan(), scope);
+  if (!input) {
+    return std::nullopt;
+  }
+  // Bind the pivot key, grouping keys and aggregate inputs once, before dividing the rows
+  // among pivot values. In particular, RAND() must not be evaluated anew for each value.
+  const std::string source = scope.context.FreshName("_pivot_input");
+  const std::string groups = scope.context.FreshName("_pivot_groups");
+  std::vector<std::string> bound;
+  Columns columns;
+  for (const auto& [id, sql] : input->columns) {
+    bound.push_back(sql + " AS " + ColumnName(id));
+    columns.emplace(id, "q." + ColumnName(id));
+  }
+  // Allocate above every input, output and correlated column in this subtree. The local
+  // bindings do not escape the PIVOT relation, but must not shadow its subqueries' columns.
+  const auto max_id = [](int id, const googlesql::ResolvedColumn& column) {
+    return std::max(id, column.column_id());
+  };
+  int next_column_id =
+      std::accumulate(pivot.column_list().begin(), pivot.column_list().end(), 0, max_id);
+  // Grouping keys still affect row counts when their output columns have been pruned.
+  next_column_id =
+      std::accumulate(pivot.group_by_list().begin(), pivot.group_by_list().end(), next_column_id,
+                      [&](int id, const auto& key) { return max_id(id, key->column()); });
+  std::vector<const googlesql::ResolvedNode*> nodes;
+  pivot.GetDescendantsSatisfying(&googlesql::ResolvedNode::Is<googlesql::ResolvedScan>, &nodes);
+  for (const auto* node : nodes) {
+    const auto& scan_columns = node->GetAs<googlesql::ResolvedScan>()->column_list();
+    next_column_id =
+        std::accumulate(scan_columns.begin(), scan_columns.end(), next_column_id, max_id);
+  }
+  nodes.clear();
+  pivot.GetDescendantsWithKinds({googlesql::RESOLVED_COLUMN_REF}, &nodes);
+  next_column_id =
+      std::accumulate(nodes.begin(), nodes.end(), next_column_id, [&](int id, const auto* node) {
+        return max_id(id, node->template GetAs<googlesql::ResolvedColumnRef>()->column());
+      });
+  googlesql::IdStringPool names;
+  const auto name = names.Make("_pivot");
+  const auto bind =
+      [&](const googlesql::ResolvedExpr& expr) -> std::unique_ptr<googlesql::ResolvedColumnRef> {
+    const auto sql = Expression(expr, scope, input->columns);
+    if (!sql) {
+      return nullptr;
+    }
+    const googlesql::ResolvedColumn column(++next_column_id, name, name, expr.annotated_type());
+    const std::string alias = ColumnName(column.column_id());
+    bound.push_back(*sql + " AS " + alias);
+    columns.emplace(column.column_id(), "q." + alias);
+    return googlesql::MakeResolvedColumnRef(expr.type(), column, false);
+  };
+  auto pivot_key = bind(*pivot.for_expr());
+  if (!pivot_key) {
+    return std::nullopt;
+  }
+  const std::string pivot_sql = columns.at(pivot_key->column().column_id());
+  auto grouping = googlesql::MakeResolvedAggregateScan();
+  std::vector<std::string> group_conditions;
+  std::vector<Collation> group_collations;
+  for (const auto& key : pivot.group_by_list()) {
+    auto ref = bind(*key->expr());
+    if (!ref) {
+      return std::nullopt;
+    }
+    const std::string sql = columns.at(ref->column().column_id());
+    // PIVOT records no grouping collation list, so each implicit key uses its column's
+    // annotation, as a DISTINCT set operation does.
+    const auto collation = ColumnCollation(key->column().type_annotation_map());
+    group_collations.push_back(collation);
+    group_conditions.push_back(
+        GroupKey(key->expr()->type(), sql, collation) + " IS NOT DISTINCT FROM " +
+        GroupKey(key->expr()->type(), "g." + ColumnName(key->column().column_id()), collation));
+    grouping->add_group_by_list(
+        googlesql::MakeResolvedComputedColumn(key->column(), std::move(ref)));
+  }
+  std::vector<std::unique_ptr<googlesql::ResolvedAggregateFunctionCall>> calls;
+  for (const auto& expr : pivot.pivot_expr_list()) {
+    if (!expr->Is<googlesql::ResolvedAggregateFunctionCall>()) {
+      return Unsupported(scope, "PIVOT expression other than an aggregate call");
+    }
+    auto copy = googlesql::ResolvedASTDeepCopyVisitor::Copy(
+        expr->GetAs<googlesql::ResolvedAggregateFunctionCall>());
+    if (!copy.ok()) {
+      throw std::invalid_argument(std::string(copy.status().message()));
+    }
+    auto call = std::move(*copy);
+    auto arguments = call->release_argument_list();
+    for (auto& argument : arguments) {
+      const auto constant = IsConstantExpression(*argument);
+      if (!constant) {
+        return Unsupported(scope, "PIVOT aggregate argument");
+      }
+      // Keep constants (such as STRING_AGG delimiters) and already-bound column references.
+      // The latter also preserve DISTINCT aggregates' ORDER BY argument identity.
+      if (*constant || argument->Is<googlesql::ResolvedColumnRef>()) {
+        continue;
+      }
+      auto ref = bind(*argument);
+      if (!ref) {
+        return std::nullopt;
+      }
+      argument = std::move(ref);
+    }
+    call->set_argument_list(std::move(arguments));
+    if (call->having_modifier() != nullptr) {
+      auto modifier = googlesql::ResolvedASTDeepCopyVisitor::Copy(call->having_modifier());
+      if (!modifier.ok()) {
+        throw std::invalid_argument(std::string(modifier.status().message()));
+      }
+      auto ref = bind(*(*modifier)->having_expr());
+      if (!ref) {
+        return std::nullopt;
+      }
+      (*modifier)->set_having_expr(std::move(ref));
+      call->set_having_modifier(std::move(*modifier));
+    }
+    calls.push_back(std::move(call));
+  }
+  const Relation source_rows{.sql = "SELECT * FROM " + source, .columns = columns};
+  std::optional<Relation> grouped;
+  if (pivot.group_by_list().empty()) {
+    // A global PIVOT has one row even for empty input, just like a global aggregate.
+    grouped = Relation{.sql = "SELECT 1 AS _unit", .columns = {}};
+  } else {
+    grouped = AggregateRelation(*grouping, scope, source_rows, std::move(group_collations));
+  }
+  if (!grouped) {
+    return std::nullopt;
+  }
+  std::string from = " FROM " + groups + " AS g";
+  std::vector<std::string> projections;
+  Relation result;
+  for (const auto& key : pivot.group_by_list()) {
+    const int id = key->column().column_id();
+    projections.push_back("g." + ColumnName(id) + " AS " + ColumnName(id));
+    result.columns.emplace(id, "q." + ColumnName(id));
+  }
+  // A lateral global aggregate also handles missing pivot values: COUNT returns zero,
+  // while ARRAY_AGG and the other aggregates return their normal empty-input results.
+  for (const auto& output : pivot.pivot_column_list()) {
+    const int id = output->column().column_id();
+    const auto value =
+        Expression(*pivot.pivot_value_list(output->pivot_value_index()), scope, input->columns);
+    if (!value) {
+      return std::nullopt;
+    }
+    std::vector<std::string> conditions = group_conditions;
+    conditions.push_back(GroupKey(pivot.for_expr()->type(), pivot_sql, {}) +
+                         " IS NOT DISTINCT FROM " + GroupKey(pivot.for_expr()->type(), *value, {}));
+    Relation rows{
+        .sql = "SELECT q.*" + source_rows.From() + " WHERE " + Join(conditions, " AND "),
+        .columns = columns,
+    };
+    auto aggregate = googlesql::MakeResolvedAggregateScan();
+    auto call =
+        googlesql::ResolvedASTDeepCopyVisitor::Copy(calls.at(output->pivot_expr_index()).get());
+    if (!call.ok()) {
+      throw std::invalid_argument(std::string(call.status().message()));
+    }
+    aggregate->add_aggregate_list(
+        googlesql::MakeResolvedComputedColumn(output->column(), std::move(*call)));
+    const auto relation = AggregateRelation(*aggregate, scope, std::move(rows));
+    if (!relation) {
+      return std::nullopt;
+    }
+    const std::string alias = scope.context.FreshName("_pivot_value");
+    from += " CROSS JOIN LATERAL (" + relation->sql + ") AS " + alias;
+    projections.push_back(alias + "." + ColumnName(id) + " AS " + ColumnName(id));
+    result.columns.emplace(id, "q." + ColumnName(id));
+  }
+  result.sql = "WITH " + source + " AS MATERIALIZED (SELECT " + Join(bound, ", ") + input->From() +
+               "), " + groups + " AS MATERIALIZED (" + grouped->sql + ") SELECT " +
+               (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) + from;
   return result;
 }
 

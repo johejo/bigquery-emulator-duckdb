@@ -854,6 +854,9 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   if (scan.Is<googlesql::ResolvedJoinScan>()) {
     return JoinScan(*scan.GetAs<googlesql::ResolvedJoinScan>(), scope);
   }
+  if (scan.Is<googlesql::ResolvedPivotScan>()) {
+    return PivotScan(*scan.GetAs<googlesql::ResolvedPivotScan>(), scope);
+  }
   if (scan.Is<googlesql::ResolvedAggregateScan>()) {
     return AggregateScan(*scan.GetAs<googlesql::ResolvedAggregateScan>(), scope);
   }
