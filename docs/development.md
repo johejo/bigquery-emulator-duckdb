@@ -53,7 +53,7 @@ does not, and it contradicts the one on APPROX_TOP_COUNT and APPROX_TOP_SUM.
 | Form | Rejected in | `googlesql` | BigQuery's documentation |
 |---|---|---|---|
 | INTERSECT ALL and EXCEPT ALL | [scan.cc](../src/translator/scan.cc) `SetOperationScan` | Accepts, except over INTERVAL or collated columns | [Syntax](../third_party/bigquery_docs/reference/standard-sql/query-syntax.md) has DISTINCT only |
-| ARRAY arguments of aggregate functions with DISTINCT | [analyzer.cc](../src/analyzer.cc) `CheckDistinctArguments` | Rejects | [Groupable types](../third_party/bigquery_docs/reference/standard-sql/data-types.md): ARRAY only in GROUP BY and SELECT DISTINCT |
+| ARRAY arguments of aggregate functions with DISTINCT | [analyzer.cc](../src/analyzer.cc) `CheckDistinctArguments` | Accepts, except ARRAYs with INTERVAL elements | [Groupable types](../third_party/bigquery_docs/reference/standard-sql/data-types.md): ARRAY only in GROUP BY and SELECT DISTINCT |
 | STRUCT arguments of aggregate functions with DISTINCT | [analyzer.cc](../src/analyzer.cc) `CheckDistinctArguments` | Accepts, except STRUCTs with INTERVAL fields | Groupable types, as above |
 | STRUCT columns in DISTINCT set operations | [scan.cc](../src/translator/scan.cc) `SetOperationScan` | Accepts | Groupable types, as above |
 | ARRAY columns in DISTINCT set operations | [scan.cc](../src/translator/scan.cc) `SetOperationScan` | Accepts | Groupable types, as above |

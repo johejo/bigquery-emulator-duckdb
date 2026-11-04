@@ -45,6 +45,8 @@ struct AnalyzerSettings {
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
   // BigQuery rejects STRUCT arguments of aggregate functions with DISTINCT.
   bool distinct_aggregates_without_structs = true;
+  // BigQuery rejects ARRAY arguments of aggregate functions with DISTINCT.
+  bool distinct_aggregates_without_arrays = true;
   // BigQuery rejects empty STRUCT results and anonymous fields of STRUCT value tables.
   bool restrict_struct_results = true;
 };
