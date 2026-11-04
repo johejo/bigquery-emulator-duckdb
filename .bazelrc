@@ -34,6 +34,10 @@ build --host_copt=--system-header-prefix=s2/
 # starts in about half the CPU time, which speeds up probes and end-to-end tests.
 build --per_file_copt=external/.*@-O2
 
+# Keep GeographicLib's rounding the same on every architecture: clang fuses multiplies and adds
+# where FMA is always available, as on aarch64, which changes ST_DISTANCE's spheroid answers.
+build --per_file_copt=external/geographiclib[^/]*/.*@-ffp-contract=off
+
 # Share Python's OpenSSL across the TLS clients.
 common --@postgres//:with_ssl=openssl
 common --@grpc//third_party:grpc_use_openssl=true
