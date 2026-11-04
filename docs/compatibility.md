@@ -504,7 +504,7 @@ because they have rows or properties of their own.
 
 `GRAPH_TABLE` and GQL queries reject:
 
-- Unbounded repetition, repetition bounds that are not literals, and `ANY CHEAPEST`.
+- Unbounded repetition and repetition bounds that are not literals.
 - GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
   `COLUMNS` clause.
 - Graph elements or paths in query results.

@@ -1,0 +1,71 @@
+version: 1
+description: >-
+  Record how BigQuery checks graph COST expressions where the documentation does not say. The
+  documentation calls a NULL, zero, negative, infinite or NaN cost a runtime error under ANY
+  CHEAPEST; GoogleSQL's reference implementation checks every COST even without ANY CHEAPEST,
+  reports "Graph cost expression must not be NULL" and similar messages, and fails when a path's
+  total cost overflows its type. Requires an Enterprise or Enterprise Plus reservation.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  cost:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.Account` (id INT64 PRIMARY KEY NOT ENFORCED)
+              AS SELECT id FROM UNNEST([7, 16, 20]) AS id;
+              CREATE TABLE `${project}.${dataset}.Transfer` (id INT64, to_id INT64, amount INT64)
+              AS SELECT * FROM UNNEST([STRUCT(7 AS id, 16 AS to_id, 300 AS amount), (7, 16, 100),
+                (16, 20, 300), (20, 7, 500), (20, 16, 200)]);
+              CREATE PROPERTY GRAPH `${project}.${dataset}.g`
+              NODE TABLES (`${project}.${dataset}.Account`)
+              EDGE TABLES (`${project}.${dataset}.Transfer` KEY (id, to_id, amount)
+                SOURCE KEY (id) REFERENCES Account (id)
+                DESTINATION KEY (to_id) REFERENCES Account (id) LABEL Transfers);
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              GRAPH `${project}.${dataset}.g`
+              ${match}
+              RETURN COUNT(*) AS result
+            useLegacySql: false
+        observe:
+          error: /body/error
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: zero_cost_without_cheapest
+    template: cost
+    vars:
+      match: MATCH (a)-[e:Transfers COST e.amount - 100]->(b)
+  - name: null_cost_message
+    template: cost
+    vars:
+      match: MATCH ANY CHEAPEST (a)-[e:Transfers COST IF(e.amount > 0, NULL, e.amount)]->(b)
+  - name: int64_total_overflow
+    template: cost
+    vars:
+      match: >-
+        MATCH ANY CHEAPEST (a)-[e1:Transfers COST 9223372036854775807]->(b)-[e2:Transfers COST
+        9223372036854775807]->(c)
