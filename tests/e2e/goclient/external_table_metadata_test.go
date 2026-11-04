@@ -108,33 +108,3 @@ func TestExternalTableMetadataPatch(t *testing.T) {
 		t.Fatalf("metadata after rejected updates = %+v", got)
 	}
 }
-
-// BigQuery's DDL reference says ALTER TABLE SET OPTIONS "is not supported for external tables"
-// (third_party/bigquery_docs/reference/standard-sql/data-definition-language.md); its message is
-// not known, so the emulator rejects the statement as unsupported. external_table_alter.api.yaml
-// in testdata/unverified/ records the case for BigQuery's answer.
-func TestExternalTableAlterSetOptions(t *testing.T) {
-	t.Parallel()
-	client := newClient(t)
-	dataset := newDataset(t, client, "go_external_table_alter")
-	queries := datasetQueries{t, client, dataset}
-	queries.mustRun(`CREATE EXTERNAL TABLE ext (id INT64)
-		OPTIONS (format = 'PARQUET', uris = ['gs://go-external-table-alter-missing/data.parquet'])`)
-	for _, sql := range []string{
-		"ALTER TABLE ext SET OPTIONS (description = 'altered')",
-		"ALTER TABLE ext SET OPTIONS (labels = [('env', 'dev')])",
-		"ALTER TABLE ext SET OPTIONS (expiration_timestamp = TIMESTAMP '2100-01-01 00:00:00 UTC')",
-	} {
-		if err := queries.run(sql); err == nil ||
-			!strings.Contains(err.Error(), "The emulator does not support ALTER TABLE on external tables") {
-			t.Errorf("%s: err = %v, want unsupported", sql, err)
-		}
-	}
-	got, err := dataset.Table("ext").Metadata(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Description != "" || len(got.Labels) != 0 || !got.ExpirationTime.IsZero() {
-		t.Fatalf("metadata after rejected ALTER = %+v", got)
-	}
-}

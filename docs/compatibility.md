@@ -144,9 +144,10 @@ emulator does not prune partitions, and fail on a file whose path does not have 
 `tables.patch` and `tables.update` change an external table's description, friendly name,
 labels, tags and expiration time. They take back the schema and `externalDataConfiguration` that
 `tables.get` returns, but changing them is unsupported.
-[BigQuery does not support](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md)
-`ALTER TABLE` on external tables; the emulator rejects it with its own message. Bigtable,
-BigLake connections, metadata caching and time travel are unsupported. Query dry runs reject
+`ALTER TABLE SET OPTIONS` fails on external tables, as
+[BigQuery's does](../tests/e2e/scenarios/testdata/external_table_alter.api.yaml); other
+`ALTER TABLE` actions on them are unsupported. Bigtable, BigLake connections, metadata caching
+and time travel are unsupported. Query dry runs reject
 external reads rather than accessing GCS during analysis. `tabledata.list`, Storage Read, extracts and copy jobs do
 not read external tables; use a query instead. Writes to external tables are rejected.
 

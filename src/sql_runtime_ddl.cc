@@ -81,7 +81,16 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
                             ". An external table was expected.");
   }
   if (external && translation.altered_table) {
-    throw ApiError::Unsupported("ALTER TABLE on external tables");
+    // BigQuery's message for SET OPTIONS, in external_table_alter.api.answers.json; what it
+    // reports for the other actions is not known.
+    if (std::ranges::all_of(translation.altered_table->actions, [](const TableAlterAction& action) {
+          return std::holds_alternative<OptionUpdates>(action);
+        })) {
+      throw ApiError::Invalid(
+          "ALTER TABLE SET OPTIONS only supports setting options for tables, while " +
+          target->table_id + " is a(n) external");
+    }
+    throw ApiError::Unsupported("this ALTER TABLE action on an external table");
   }
   const bool creates_external = translation.table && translation.table->metadata.external_data;
   if (translation.replaces && external && !creates_external) {

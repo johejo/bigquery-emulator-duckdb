@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "cases": {
+    "alter_description": {
+      "project": "johejo-sandbox",
+      "run": "bdip4fy7bfxhr65rzg3xfa7slp",
+      "steps": {
+        "alter": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "alter_expiration_timestamp": {
+      "project": "johejo-sandbox",
+      "run": "bdip4fy7bfxhr65rzg3xfa7slp",
+      "steps": {
+        "alter": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "alter_labels": {
+      "project": "johejo-sandbox",
+      "run": "bdip4fy7bfxhr65rzg3xfa7slp",
+      "steps": {
+        "alter": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "ALTER TABLE SET OPTIONS only supports setting options for tables, while t is a(n) external",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_description_and_labels": {
+      "project": "johejo-sandbox",
+      "run": "bdip4fy7bfxhr65rzg3xfa7slp",
+      "steps": {
+        "patch": {
+          "description": "patched",
+          "external": {
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://bqanswers-missing-bdip4fy7bfxhr65rzg3xfa7slp/missing.parquet"
+            ]
+          },
+          "friendlyName": "External",
+          "labels": {
+            "tier": "1"
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "id",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        }
+      }
+    }
+  }
+}
