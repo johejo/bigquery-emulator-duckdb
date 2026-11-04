@@ -651,14 +651,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects HAVING modifiers and null-respecting ARRAY_AGG in PIVOT, which GoogleSQL's reference implementation accepts"
-  label: "pivot_test:having_in_aggregate_fn_call"
-  label: "pivot_test:having_min_with_reference"
-  label: "pivot_test:pivot_array_agg"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "RANGE window frames over NUMERIC overflow near the type's limits"
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_asc_with_special_values_1"
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_asc_with_special_values_10"
@@ -915,7 +907,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "GoogleSQL's analyzer does not implement collation in PIVOT"
-  label: "pivot_test:pivot_with_collation_on_aggregate_argument"
+  reason: "PIVOT comparisons with collated FOR expressions are not implemented"
   label: "pivot_test:pivot_with_collation_on_for_expression"
 }

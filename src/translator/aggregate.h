@@ -10,6 +10,8 @@ class ResolvedAggregateScan;
 class ResolvedAnalyticScan;
 // Keep resolved AST parsing out of callers that only dispatch array aggregates.
 class ResolvedArrayAggregate;
+// Keep resolved AST parsing out of callers that only dispatch PIVOT scans.
+class ResolvedPivotScan;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb::translator {
@@ -21,6 +23,7 @@ std::optional<std::string> ArrayAggregate(const googlesql::ResolvedArrayAggregat
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope);
+std::optional<Relation> PivotScan(const googlesql::ResolvedPivotScan& pivot, const Scope& scope);
 std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& analytic,
                                      const Scope& scope);
 
