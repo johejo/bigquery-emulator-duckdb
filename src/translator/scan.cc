@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -818,11 +819,23 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     // A view such as INFORMATION_SCHEMA.TABLES is read from the query that computes it.
     const auto* sql_table = dynamic_cast<const SqlTable*>(table->table());
     const auto* stored_table = dynamic_cast<const BigQueryTable*>(table->table());
-    const auto read_query =
-        history || stored_table == nullptr
-            ? std::nullopt
-            : StatementResources::ReadQuery(stored_table->reference(), stored_table->ReadQuery(),
-                                            scope.context.resources, names);
+    const auto read_query = [&]() -> std::optional<std::string> {
+      if (history || stored_table == nullptr) {
+        return std::nullopt;
+      }
+      std::optional<TableRead> definition = stored_table->ReadQuery();
+      // A view's DuckDB definition cannot hold a read that one statement prepares, such as of
+      // an external table's files: queries of the view read the table through its GoogleSQL
+      // query.
+      if (scope.context.defines_view && definition &&
+          !std::holds_alternative<std::string>(*definition)) {
+        return "SELECT * FROM " + QuoteIdentifierPath(table->table()->FullName()) +
+               " WHERE error('The emulator reads an external table in a view only through its "
+               "GoogleSQL query')";
+      }
+      return StatementResources::ReadQuery(stored_table->reference(), definition,
+                                           scope.context.resources, names);
+    }();
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +
                  (history                ? "(" + *history + ") AS v"

@@ -118,8 +118,23 @@ func TestExternalParquet(t *testing.T) {
 		t.Fatalf("external table metadata = %+v", metadata)
 	}
 	externalRows(t, client, "SELECT id FROM gcs.external ORDER BY id", []int64{1, 2})
+	for _, sql := range []string{
+		"CREATE VIEW gcs.external_view AS SELECT id * 10 AS id FROM gcs.external",
+		"CREATE VIEW gcs.nested_view AS SELECT id + 1 AS id FROM gcs.external_view",
+	} {
+		if err := externalDDL(ctx, client, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	externalRows(t, client, "SELECT id FROM gcs.nested_view ORDER BY id", []int64{11, 21})
 	contents.Store(externalParquet(t, 3))
+	// Views read the source when they are queried, once for each statement.
 	before := downloads.Load()
+	externalRows(t, client, "SELECT a.id + b.id FROM gcs.external_view a CROSS JOIN gcs.nested_view b", []int64{61})
+	if got := downloads.Load() - before; got != 1 {
+		t.Fatalf("view downloads = %d, want 1", got)
+	}
+	before = downloads.Load()
 	externalRows(t, client, "SELECT a.id + b.id FROM gcs.external a CROSS JOIN gcs.external b", []int64{6})
 	if got := downloads.Load() - before; got != 1 {
 		t.Fatalf("self-join downloads = %d, want 1", got)
@@ -343,8 +358,15 @@ func TestExternalParquetWithoutSourceAccess(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "Dry runs of resource-backed") {
 		t.Fatalf("external dry run: %v", err)
 	}
-	if err := externalDDL(ctx, client, "CREATE VIEW gcs.v AS SELECT id FROM gcs.external"); err == nil || !strings.Contains(err.Error(), "Resource-backed") {
-		t.Fatalf("stored resource-backed definition: %v", err)
+	// Views store the GoogleSQL query rather than a prepared reader.
+	if err := externalDDL(ctx, client, "CREATE VIEW gcs.v AS SELECT id FROM gcs.external"); err != nil {
+		t.Fatal(err)
+	}
+	if err := externalDDL(ctx, client, "CREATE VIEW gcs.nested AS SELECT id FROM gcs.v"); err != nil {
+		t.Fatal(err)
+	}
+	if err := externalDDL(ctx, client, "CREATE MATERIALIZED VIEW gcs.mv AS SELECT id FROM gcs.external"); err == nil {
+		t.Fatal("materialized view over an external table succeeded")
 	}
 	// TVFs store the GoogleSQL body rather than a prepared reader.
 	if err := externalDDL(ctx, client, "CREATE TABLE FUNCTION gcs.f() AS SELECT id FROM gcs.external"); err != nil {

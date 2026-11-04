@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "cases": {
+    "materialized_view_over_external_table": {
+      "project": "johejo-sandbox",
+      "run": "zovgnpae2exlwtwxrstu3kbuo4",
+      "steps": {
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Materialized views can only reference native tables or BigLake external tables with cached metadata enabled or Iceberg external tables.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Materialized views can only reference native tables or BigLake external tables with cached metadata enabled or Iceberg external tables.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

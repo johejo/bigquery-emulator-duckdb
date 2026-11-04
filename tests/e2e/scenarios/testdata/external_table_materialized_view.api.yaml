@@ -1,0 +1,53 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run zovgnpae2exlwtwxrstu3kbuo4; the answers sidecar
+# keeps the observation.
+description: >-
+  CREATE MATERIALIZED VIEW over a Cloud Storage external table without BigLake metadata caching,
+  which [the documentation](third_party/bigquery_docs/materialized-views-intro.md) says
+  materialized views cannot query, but whose message it does not give.
+# The fixture is external_table_schema.api.yaml's x.parquet: one row of an OPTIONAL INT64 column x = 1.
+vars:
+  dataset: bqa_${run}_${case}
+  x_parquet: UEFSMRUAFRwVHCwVAhUAFQYVBhwAAAACAAAAAgEBAAAAAAAAABUEGSxIBnNjaGVtYRUCABUEJQIYAXgAFgIZHBkcJggcFQQZJQAGGRgBeBUAFgIWQhZCJghJHBUAFQAVAgAAABZCFgImCBZCFAAAKBBhcnJvdy1nbyB2MTguOC4wGRwcAAAAYgAAAFBBUjE=
+cases:
+  - name: materialized_view_over_external_table
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: x
+        gcs: {method: PUT, object: '${run}/${case}/x.parquet', base64: '${x_parquet}'}
+      - name: setup
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['gs://${bucket}/${run}/${case}/x.parquet'])
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: CREATE MATERIALIZED VIEW `${project}.${dataset}.mv` AS SELECT x FROM `${project}.${dataset}.t`
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    expect: {"statement": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Materialized views can only reference native tables or BigLake external tables with cached metadata enabled or Iceberg external tables.", "reason": "invalid"}], "message": "Materialized views can only reference native tables or BigLake external tables with cached metadata enabled or Iceberg external tables.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_x
+        gcs: {method: DELETE, object: '${run}/${case}/x.parquet'}

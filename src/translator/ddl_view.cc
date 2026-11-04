@@ -7,6 +7,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/api_error.h"
 #include "src/catalog_table.h"
 #include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
@@ -100,6 +101,12 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
     const auto* table = dynamic_cast<const BigQueryTable*>(
         tables.front()->GetAs<googlesql::ResolvedTableScan>()->table());
     const auto description = table != nullptr ? table->Describe() : std::nullopt;
+    // The emulator has no BigLake or Iceberg external tables.
+    if (description && description->metadata.external_data) {
+      throw ApiError::Invalid(
+          "Materialized views can only reference native tables or BigLake external tables with "
+          "cached metadata enabled or Iceberg external tables.");
+    }
     if (!description || description->metadata.creation_time == 0 ||
         description->metadata.snapshot) {
       return Unsupported(scope, "materialized views over unmanaged tables or snapshots");
