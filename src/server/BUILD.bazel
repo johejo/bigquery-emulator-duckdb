@@ -15,6 +15,7 @@ cc_library(
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/common:utf_util",
         "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:date_time_util",
     ],

@@ -23,7 +23,7 @@ INTERVAL columns, parameterized decimals, and JSON columns in Arrow are unsuppor
 
 Protobuf scalar fields, STRUCTs and repeated fields are supported. GEOGRAPHY fields take strings
 as `tabledata.insertAll` does; see [GEOGRAPHY values](compatibility.md#geography-values). Column
-defaults, parameterized STRING and BYTES columns, custom protobuf annotations, JSON and INTERVAL
+defaults, parameterized STRING and BYTES columns, custom protobuf annotations and INTERVAL
 input are unsupported.
 
 Existing streams support adding nullable or repeated columns and relaxing REQUIRED columns to
