@@ -22,6 +22,14 @@ void RegisterCastFunctions(duckdb_connection connection) {
            Apply<CastFloat64ToInt64, kSafe>);
   Register(connection, "bq_string_to_bool", {kVarchar, kBoolean}, kBoolean,
            Apply<CastStringToBool, kSafe>);
+  Register(connection, "bq_cast_constrain_string", {kVarchar, kBigint}, kVarchar,
+           Apply<ConstrainString>);
+  Register(connection, "bq_cast_constrain_bytes", {kBlob, kBigint}, kBlob, Apply<ConstrainBytes>);
+  LogicalType const bigint(duckdb_create_logical_type(kBigint));
+  Register(connection, "bq_cast_constrain_numeric", {numeric.get(), bigint.get(), bigint.get()},
+           numeric.get(), Apply<ConstrainNumeric>);
+  Register(connection, "bq_cast_constrain_bignumeric", {kVarchar, kBigint, kBigint}, kVarchar,
+           Apply<ConstrainBigNumeric>);
   // Each cast with FORMAT takes the value, the format, the time zone for a cast from or to
   // TIMESTAMP, the current timestamp for a cast to DATE, DATETIME or TIMESTAMP and whether it is
   // SAFE_CAST.

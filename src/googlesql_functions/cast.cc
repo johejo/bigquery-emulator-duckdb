@@ -5,13 +5,17 @@
 #include <string>
 #include <string_view>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/cast.h"
 #include "googlesql/public/timestamp_picos_value.h"
+#include "googlesql/public/type_parameters.pb.h"
 #include "googlesql/public/types/type_factory.h"
+#include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
+#include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "src/googlesql_functions/datetime.h"
 #include "src/language_options.h"
 
@@ -46,7 +50,55 @@ absl::StatusOr<std::string> FormatString(const Value& value, std::string_view fo
   return out.string_value();
 }
 
+absl::Status ConstrainLength(Value& value, int64_t maximum) {
+  googlesql::StringTypeParametersProto proto;
+  proto.set_max_length(maximum);
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto parameters,
+                             googlesql::TypeParameters::MakeStringTypeParameters(proto));
+  return googlesql::ApplyConstraints(parameters, googlesql::PRODUCT_EXTERNAL, value);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the declared precision and scale.
+absl::Status ConstrainDecimal(Value& value, int64_t precision, int64_t scale) {
+  googlesql::NumericTypeParametersProto proto;
+  if (precision < 0) {
+    proto.set_is_max_precision(true);
+  } else {
+    proto.set_precision(precision);
+  }
+  proto.set_scale(scale);
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto parameters,
+                             googlesql::TypeParameters::MakeNumericTypeParameters(proto));
+  return googlesql::ApplyConstraints(parameters, googlesql::PRODUCT_EXTERNAL, value);
+}
+
 }  // namespace
+
+absl::StatusOr<std::string> ConstrainString(std::string_view text, int64_t maximum) {
+  Value value = Value::String(text);
+  GOOGLESQL_RETURN_IF_ERROR(ConstrainLength(value, maximum));
+  return value.string_value();
+}
+
+absl::StatusOr<std::string> ConstrainBytes(std::string_view text, int64_t maximum) {
+  Value value = Value::Bytes(text);
+  GOOGLESQL_RETURN_IF_ERROR(ConstrainLength(value, maximum));
+  return value.bytes_value();
+}
+
+absl::StatusOr<NumericValue> ConstrainNumeric(NumericValue numeric, int64_t precision,
+                                              int64_t scale) {
+  Value value = Value::Numeric(numeric);
+  GOOGLESQL_RETURN_IF_ERROR(ConstrainDecimal(value, precision, scale));
+  return value.numeric_value();
+}
+
+absl::StatusOr<BigNumericValue> ConstrainBigNumeric(BigNumericValue numeric, int64_t precision,
+                                                    int64_t scale) {
+  Value value = Value::BigNumeric(numeric);
+  GOOGLESQL_RETURN_IF_ERROR(ConstrainDecimal(value, precision, scale));
+  return value.bignumeric_value();
+}
 
 // CAST(bytes AS STRING), which fails for bytes that are not UTF-8.
 absl::StatusOr<std::string> CastBytesToUtf8(std::string_view bytes) {

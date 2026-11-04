@@ -63,14 +63,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "BigQuery rejects type parameters in CAST, which GoogleSQL accepts"
-  label: "cast_function_test:cast_array_with_large_floating_point_with_type_parameters"
+  reason: "TIMESTAMP precision type parameters are not supported"
   label: "cast_function_test:cast_range_with_truncation"
-  label: "cast_function_test:cast_struct_type_parameters_valid_input"
-  label: "cast_function_test:cast_struct_with_large_floating_point_with_type_parameters"
-  label: "numeric_test:numeric_self_cast"
-  label: "numeric_test:truncation_in_array_does_not_change_orderedness"
-  label: "typeof_test:typeof_parameterized_type_expression"
 }
 
 known_errors {

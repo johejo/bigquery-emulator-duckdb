@@ -692,8 +692,10 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     }
     throw std::runtime_error(formatted.ToString());
   }
-  if (const auto casts = CheckCastTypeParameters(sql, false); !casts.ok()) {
-    throw std::runtime_error(std::string(casts.message()));
+  if (settings.cast_without_type_parameters) {
+    if (const auto casts = CheckCastTypeParameters(sql, false); !casts.ok()) {
+      throw std::runtime_error(std::string(casts.message()));
+    }
   }
   if (const absl::Status temporary =
           CheckTemporaryTable(*analyzer_output->resolved_statement(), settings.script != nullptr);
@@ -747,7 +749,9 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
                                                         &type_factory, &analyzer_output))
       .With(googlesql::ConvertLocalErrorToScriptError(segment));
-  GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
+  if (settings.cast_without_type_parameters) {
+    GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
+  }
   GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
   GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArguments(*analyzer_output->resolved_statement(),
                                                    settings.distinct_aggregates_without_structs,
@@ -780,7 +784,9 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
     GOOGLESQL_RETURN_IF_ERROR(status).With(googlesql::ConvertLocalErrorToScriptError(*segment));
   }
   GOOGLESQL_RETURN_IF_ERROR(status);
-  GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(sql, true));
+  if (settings.cast_without_type_parameters) {
+    GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(sql, true));
+  }
   GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArguments(*analyzer_output->resolved_expr(),
                                                    settings.distinct_aggregates_without_structs,
                                                    settings.distinct_aggregates_without_arrays));

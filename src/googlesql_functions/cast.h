@@ -9,6 +9,14 @@
 
 namespace googlesql_functions {
 
+// Enforce CAST's type parameters using GoogleSQL's reference constraints.
+absl::StatusOr<std::string> ConstrainString(std::string_view text, int64_t maximum);
+absl::StatusOr<std::string> ConstrainBytes(std::string_view text, int64_t maximum);
+absl::StatusOr<googlesql::NumericValue> ConstrainNumeric(googlesql::NumericValue numeric,
+                                                         int64_t precision, int64_t scale);
+absl::StatusOr<googlesql::BigNumericValue> ConstrainBigNumeric(googlesql::BigNumericValue numeric,
+                                                               int64_t precision, int64_t scale);
+
 absl::StatusOr<std::string> CastBytesToUtf8(std::string_view bytes);
 
 absl::StatusOr<int64_t> CastFloat64ToInt64(double value);
