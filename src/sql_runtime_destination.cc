@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -96,12 +97,11 @@ std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
   return std::nullopt;
 }
 
-QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableReference destination,
-                                         CreateDisposition create, WriteDisposition write,
-                                         const std::string& sql,
-                                         const std::vector<FieldSchema>& schema,
-                                         const std::vector<std::string>& setup, bool count_only,
-                                         const TableMetadata& metadata, bool copy, bool restore) {
+QueryResult SqlRuntime::WriteDestination(
+    const std::string& project_id, TableReference destination, CreateDisposition create,
+    WriteDisposition write, const std::string& sql, const std::vector<FieldSchema>& schema,
+    const std::vector<std::string>& setup, bool count_only, const TableMetadata& metadata,
+    bool copy, bool restore, const std::optional<DestinationTableProperties>& load_properties) {
   std::set<std::string> names;
   std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
@@ -129,6 +129,16 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
   } catch (const ApiError& error) {
     if (error.http_status() != 404) {
       throw;
+    }
+  }
+  if (existing.has_value() && load_properties.has_value()) {
+    const auto& properties = *load_properties;
+    const auto& current = existing->metadata;
+    if ((properties.description && *properties.description != current.description) ||
+        (properties.friendly_name && *properties.friendly_name != current.friendly_name) ||
+        (properties.labels && *properties.labels != current.labels)) {
+      throw ApiError::Invalid("Destination table properties do not match the existing table " +
+                              TableName(destination));
     }
   }
   if (existing.has_value() && existing->view_query) {
@@ -227,6 +237,21 @@ QueryResult SqlRuntime::WriteDestination(const std::string& project_id, TableRef
         .copies_table = true,
         .keeps_rounding_modes = existing.has_value() || copy,
     };
+    if (load_properties.has_value()) {
+      // The REST specification only applies these properties to a newly created table.
+      // Replacement must not erase the existing properties after checking they match.
+      const auto& properties = *load_properties;
+      definition.metadata.description =
+          existing ? existing->metadata.description : properties.description.value_or("");
+      definition.metadata.friendly_name =
+          existing ? existing->metadata.friendly_name : properties.friendly_name.value_or("");
+      definition.metadata.labels =
+          existing ? existing->metadata.labels
+                   : properties.labels.value_or(std::map<std::string, std::string>{});
+      if (existing) {
+        definition.metadata.label_order = existing->metadata.label_order;
+      }
+    }
     DatasetMetadata defaults = existing.has_value() ? DatasetMetadata{} : dataset;
     if (existing.has_value() && restore) {
       definition.metadata = existing->metadata;

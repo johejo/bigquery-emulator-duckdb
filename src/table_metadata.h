@@ -158,6 +158,13 @@ struct TableMetadata {
   [[nodiscard]] nlohmann::json ToJson() const;
 };
 
+// Load-job properties are checked against an existing destination, not applied as updates.
+struct DestinationTableProperties {
+  std::optional<std::string> description;
+  std::optional<std::string> friendly_name;
+  std::optional<std::map<std::string, std::string>> labels;
+};
+
 // Why ordinary row writes are forbidden. Independent of how rows are read: a snapshot
 // reads native storage, while a converted read query need not imply a write restriction.
 // Metadata changes and explicit table replacement have their own validation.
