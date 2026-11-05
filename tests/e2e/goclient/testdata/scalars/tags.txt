@@ -29,6 +29,12 @@ CREATE SNAPSHOT TABLE scalars.tags_snapshot CLONE scalars.tags_snapshot_source O
 SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_snapshot' AND option_name = 'tags'
 => "[STRUCT(\"123456789012/env\", \"test\")]"
 
+# External table tags use the same documented TABLE_OPTIONS representation.
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+CREATE OR REPLACE EXTERNAL TABLE scalars.tags_external (x INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], tags = [('123456789012/env', 'test')]);
+SELECT CONCAT(option_type, ' ', option_value) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_external' AND option_name = 'tags'
+=> "ARRAY<STRUCT<STRING, STRING>> [STRUCT(\"123456789012/env\", \"test\")]"
+
 # Documented tag detachment removes the matching key/value pair and keeps other tags.
 # third_party/bigquery_docs/tags.md
 CREATE OR REPLACE TABLE scalars.tags_removed (x INT64) OPTIONS (tags = [('123456789012/env', 'test'), ('123456789012/team', 'sales')]);
