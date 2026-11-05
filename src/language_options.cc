@@ -35,6 +35,17 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
          }) {
       options->DisableLanguageFeature(feature);
     }
+    // These released GoogleSQL features are not implemented by the emulator. Keep an upgrade
+    // from enabling new forms through maximum language features or analyzer rewrites alone.
+    for (const googlesql::LanguageFeature feature : {
+             googlesql::FEATURE_FPE_NEW_KEYSET,
+             googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT,
+             googlesql::FEATURE_MAP_LITERAL,
+             googlesql::FEATURE_SECURE_CONTEXT,
+             googlesql::FEATURE_LOOKUP_TABLE_TVF,
+         }) {
+      options->DisableLanguageFeature(feature);
+    }
     // GoogleSQL released JSON_EXISTS functions before BigQuery documented them. BigQuery casts
     // no other type to JSON, leaving that to TO_JSON and PARSE_JSON.
     options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);

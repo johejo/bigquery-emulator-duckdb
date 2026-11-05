@@ -9,7 +9,7 @@ bazel_dep(name = "curl", version = "8.22.0")
 bazel_dep(name = "google_cloud_cpp", version = "3.12.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
 bazel_dep(name = "grpc", version = "1.84.0")
-bazel_dep(name = "googlesql", version = "2026.10.1")
+bazel_dep(name = "googlesql", version = "2026.11.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "cli11", version = "2.7.2")
@@ -88,18 +88,16 @@ archive_override(
 
 archive_override(
     module_name = "googlesql",
-    integrity = "sha256-YwDmVmu+e4X2te2GqOV2nGvgu6nbq0acJVX4ekIxtro=",
+    integrity = "sha256-6FHgy+ax6tNVNJqE7n25XQY3DPcV9kJYpqt91A8PJuk=",
     patch_strip = 1,
-    # Abseil 20260526 (required by google_cloud_cpp 3.9+) removes an internal API GoogleSQL uses.
     patches = [
-        "//third_party/googlesql:throw_delegate.patch",
         # Lets //:compliance_test use GoogleSQL's compliance test cases.
         "//third_party/googlesql:compliance.patch",
         "//third_party/googlesql:compliance_expected_results.patch",
         "//third_party/googlesql:openssl.patch",
     ],
-    strip_prefix = "googlesql-2026.10.1",
-    urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.10.1.tar.gz"],
+    strip_prefix = "googlesql-2026.11.1",
+    urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.11.1.tar.gz"],
 )
 
 # The embedded CPython's SSL and hash modules are compiled against OpenSSL 3.5 headers but link

@@ -20,7 +20,6 @@
     "https://bcr.bazel.build/modules/abseil-cpp/20250512.1/MODULE.bazel": "d209fdb6f36ffaf61c509fcc81b19e81b411a999a934a032e10cd009a0226215",
     "https://bcr.bazel.build/modules/abseil-cpp/20250814.0/MODULE.bazel": "c43c16ca2c432566cdb78913964497259903ebe8fb7d9b57b38e9f1425b427b8",
     "https://bcr.bazel.build/modules/abseil-cpp/20250814.1/MODULE.bazel": "51f2312901470cdab0dbdf3b88c40cd21c62a7ed58a3de45b365ddc5b11bcab2",
-    "https://bcr.bazel.build/modules/abseil-cpp/20260107.0/MODULE.bazel": "94bdc259eccc59d880d3ae55e35ff1f27a289618a023cb1ed87182e17887b7c3",
     "https://bcr.bazel.build/modules/abseil-cpp/20260107.1/MODULE.bazel": "e33b3801443f5fd64465262084534115db76363df13d2168a42bbfacc747be81",
     "https://bcr.bazel.build/modules/abseil-cpp/20260526.0/MODULE.bazel": "b4a76a8d70ba08aa0253fd5e374ca5a5fa6b15aba985a7bbe4467c138954830f",
     "https://bcr.bazel.build/modules/abseil-cpp/20260526.0/source.json": "a39a26fec1b7037bdd7ea6c25cc098b99ae80af10ff0b6ec8c4bfe0df694f451",
@@ -964,7 +963,7 @@
     "@@googlesql+//bazel:http_archive_deps.bzl%googlesql_http_archive_deps": {
       "general": {
         "bzlTransitiveDigest": "4VeLZifzoL9ZldTSrDXSJmYrF+BGFs3Z7uBWELTLFho=",
-        "usagesDigest": "0FmsO7RvQDwk5YTk/c0KLxvswX2DhwA90GCNmjnq5pY=",
+        "usagesDigest": "pbcXQNFOZ5vsqsrdj32Hud0fk6cqRLEcuOvtYyRQmpU=",
         "recordedInputs": [
           "REPO_MAPPING:googlesql+,bazel_tools bazel_tools"
         ],
