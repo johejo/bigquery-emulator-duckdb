@@ -81,6 +81,23 @@ bool TimeTravelOption(const googlesql::Value& value, std::optional<int64_t>& int
   return true;
 }
 
+bool StorageBillingModelOption(const googlesql::Value& value, std::string& into) {
+  if (value.is_null()) {
+    return true;
+  }
+  if (!value.type()->IsString()) {
+    return false;
+  }
+  const std::string model = ToUpperAscii(value.string_value());
+  if (model != "LOGICAL" && model != "PHYSICAL") {
+    throw ApiError::InvalidQuery(std::format(
+        "'{}' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS",
+        value.string_value()));
+  }
+  into = model;
+  return true;
+}
+
 bool BoolOption(const googlesql::Value& value, bool& into) {
   if (!value.is_null() && !value.type()->IsBool()) {
     return false;
@@ -258,6 +275,8 @@ bool ApplySchemaOption(DdlOptionId name, const googlesql::Value& value, DatasetM
       return DaysOption(value, metadata.default_table_expiration_ms);
     case kMaxTimeTravelHours:
       return TimeTravelOption(value, metadata.max_time_travel_hours);
+    case kStorageBillingModel:
+      return StorageBillingModelOption(value, metadata.storage_billing_model);
     case kDefaultRoundingMode:
       return RoundingModeOption(value, metadata.default_rounding_mode);
     case kLocation:
@@ -289,6 +308,9 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
       return schema && DaysOption(value, updates.default_table_expiration_ms.emplace());
     case kMaxTimeTravelHours:
       return schema && TimeTravelOption(value, updates.max_time_travel_hours.emplace());
+    case kStorageBillingModel:
+      return schema && (value.is_null() ||
+                        StorageBillingModelOption(value, updates.storage_billing_model.emplace()));
     case kDefaultRoundingMode:
       return (table || schema) &&
              RoundingModeOption(value, updates.default_rounding_mode.emplace());

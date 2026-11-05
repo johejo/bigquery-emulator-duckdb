@@ -1,0 +1,32 @@
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# third_party/bigquery_docs/information-schema-datasets-schemata-options.md
+# BigQuery answers in johejo-sandbox confirm enum option values have no SQL quotes.
+CREATE SCHEMA IF NOT EXISTS scalars_billing_physical OPTIONS (storage_billing_model = 'PHYSICAL');
+SELECT CONCAT(option_type, ' ', option_value) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_billing_physical' AND option_name = 'storage_billing_model'
+=> "STRING PHYSICAL"
+
+CREATE SCHEMA IF NOT EXISTS scalars_billing_logical OPTIONS (storage_billing_model = 'LOGICAL');
+SELECT option_value FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_billing_logical' AND option_name = 'storage_billing_model'
+=> "LOGICAL"
+
+CREATE SCHEMA IF NOT EXISTS scalars_billing_alter;
+ALTER SCHEMA scalars_billing_alter SET OPTIONS (storage_billing_model = 'PHYSICAL');
+SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_billing_alter' AND option_name = 'storage_billing_model'
+=> "PHYSICAL"
+
+# BigQuery answers: the default model has no explicit SCHEMATA_OPTIONS row.
+DECLARE result STRING;
+CREATE SCHEMA billing_default;
+SET result = (SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'billing_default' AND option_name = 'storage_billing_model');
+DROP SCHEMA billing_default;
+SELECT result;
+=> null
+
+# BigQuery answers: NULL on ALTER preserves an explicit billing model.
+DECLARE result STRING;
+CREATE SCHEMA billing_alter_null OPTIONS (storage_billing_model = 'PHYSICAL');
+ALTER SCHEMA billing_alter_null SET OPTIONS (storage_billing_model = NULL);
+SET result = (SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'billing_alter_null' AND option_name = 'storage_billing_model');
+DROP SCHEMA billing_alter_null;
+SELECT result;
+=> "PHYSICAL"

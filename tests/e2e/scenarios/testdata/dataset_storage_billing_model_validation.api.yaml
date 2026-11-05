@@ -1,0 +1,141 @@
+version: 1
+# BigQuery project johejo-sandbox, run vkd7qjatqzggrni2b5u5o5nvuj;
+# observations are retained in the answers sidecar.
+description: Storage billing model defaults, NULL, unspecified enum and validation behavior.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  rejected:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE SCHEMA `${project}.${dataset}` OPTIONS (storage_billing_model = ${value})
+            useLegacySql: false
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+  ddl:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE SCHEMA `${project}.${dataset}` OPTIONS (storage_billing_model = ${value})
+            useLegacySql: false
+        observe:
+          status: /status
+          error: /body/error
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          status: /status
+          model: /body/storageBillingModel
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rest:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+            storageBillingModel: ${value}
+        observe:
+          status: /status
+          model: /body/storageBillingModel
+          error: /body/error
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: rest_default_and_omitted_update
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+        observe:
+          model: /body/storageBillingModel
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body: {storageBillingModel: PHYSICAL}
+        observe:
+          status: /status
+          model: /body/storageBillingModel
+      - name: update
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+        observe:
+          status: /status
+          model: /body/storageBillingModel
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create: {}
+      patch: {status: 200, model: PHYSICAL}
+      update: {status: 200, model: PHYSICAL}
+  - name: ddl_null
+    template: ddl
+    vars: {value: 'NULL'}
+    expect:
+      create: {status: 200}
+      get: {status: 200}
+  - name: ddl_lowercase
+    template: ddl
+    vars: {value: "'physical'"}
+    expect:
+      create: {status: 200}
+      get: {status: 200, model: PHYSICAL}
+  - name: ddl_invalid
+    template: rejected
+    vars: {value: "'CHEAP'"}
+    expect:
+      create:
+        status: 400
+        reason: invalidQuery
+        message: "'CHEAP' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS"
+  - name: ddl_unspecified
+    template: rejected
+    vars: {value: "'STORAGE_BILLING_MODEL_UNSPECIFIED'"}
+    expect:
+      create:
+        status: 400
+        reason: invalidQuery
+        message: "'STORAGE_BILLING_MODEL_UNSPECIFIED' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS"
+  - name: rest_null
+    template: rest
+    vars: {value: null}
+    expect:
+      create: {status: 200}
+  - name: rest_unspecified
+    template: rest
+    vars: {value: STORAGE_BILLING_MODEL_UNSPECIFIED}
+    expect:
+      create: {status: 200}

@@ -421,6 +421,9 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
   if (alteration.options.max_time_travel_hours.has_value()) {
     metadata.max_time_travel_hours = *alteration.options.max_time_travel_hours;
   }
+  if (alteration.options.storage_billing_model.has_value()) {
+    metadata.storage_billing_model = *alteration.options.storage_billing_model;
+  }
   return DatasetMetadataStatements(alteration.dataset, metadata);
 }
 

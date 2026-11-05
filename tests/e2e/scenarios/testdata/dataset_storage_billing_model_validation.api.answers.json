@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "cases": {
+    "ddl_invalid": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'CHEAP' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'CHEAP' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl_lowercase": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "model": "PHYSICAL",
+          "status": 200
+        }
+      }
+    },
+    "ddl_null": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "status": 200
+        }
+      }
+    },
+    "ddl_unspecified": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'STORAGE_BILLING_MODEL_UNSPECIFIED' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'STORAGE_BILLING_MODEL_UNSPECIFIED' is not a valid value; failed to set 'storage_billing_model' in schema OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "rest_default_and_omitted_update": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {},
+        "patch": {
+          "model": "PHYSICAL",
+          "status": 200
+        },
+        "update": {
+          "model": "PHYSICAL",
+          "status": 200
+        }
+      }
+    },
+    "rest_null": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {
+          "status": 200
+        }
+      }
+    },
+    "rest_unspecified": {
+      "project": "johejo-sandbox",
+      "run": "vkd7qjatqzggrni2b5u5o5nvuj",
+      "steps": {
+        "create": {
+          "status": 200
+        }
+      }
+    }
+  }
+}

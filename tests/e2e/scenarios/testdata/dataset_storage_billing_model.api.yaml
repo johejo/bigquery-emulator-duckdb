@@ -1,0 +1,82 @@
+version: 1
+# Expected values: third_party/bigquery_docs/reference/rest/v2/datasets.md and
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md.
+description: Dataset storage billing metadata agrees between REST and DDL.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  model:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+            storageBillingModel: ${model}
+        observe:
+          model: /body/storageBillingModel
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          model: /body/storageBillingModel
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (storage_billing_model = '${model}')
+            useLegacySql: false
+      - name: after_ddl
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          model: /body/storageBillingModel
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body:
+            storageBillingModel: ${model}
+        observe:
+          model: /body/storageBillingModel
+      - name: update
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+            storageBillingModel: ${model}
+        observe:
+          model: /body/storageBillingModel
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: physical
+    template: model
+    vars:
+      model: PHYSICAL
+    expect:
+      create: {model: PHYSICAL}
+      get: {model: PHYSICAL}
+      after_ddl: {model: PHYSICAL}
+      patch: {model: PHYSICAL}
+      update: {model: PHYSICAL}
+  - name: logical
+    template: model
+    vars:
+      model: LOGICAL
+    expect:
+      create: {model: LOGICAL}
+      get: {model: LOGICAL}
+      after_ddl: {model: LOGICAL}
+      patch: {model: LOGICAL}
+      update: {model: LOGICAL}

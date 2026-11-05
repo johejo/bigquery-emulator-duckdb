@@ -37,6 +37,7 @@ enum class DdlOptionId : uint8_t {
   kPartitionExpirationDays,
   kKmsKeyName,
   kDefaultTableExpirationDays,
+  kStorageBillingModel,
   kMaxTimeTravelHours,
   kLocation,
   kRoundingMode,
