@@ -572,17 +572,6 @@ known_errors {
   label: "analytic_bignumeric_range_window_frames_test:range_window_asc_with_special_values_7"
 }
 
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "HAVING MIN and HAVING MAX do not order NaN as BigQuery does"
-  label: "aggregation_having_modifier_queries_test:aggregate_count_distinct_id_having_double_ignore_nan"
-  label: "aggregation_having_modifier_queries_test:aggregate_count_distinct_id_having_double_include_nan_inf"
-  label: "aggregation_having_modifier_queries_test:aggregate_max_id_having_double_ignore_nan"
-  label: "aggregation_having_modifier_queries_test:aggregate_max_id_having_double_include_nan_inf"
-  label: "any_value_aggregation_test:aggregate_any_value_having_nan_having_modifier"
-  label: "any_value_aggregation_test:aggregate_any_value_having_with_group_by"
-}
-
 # BigQuery TO_JSON encoding rejects lossy decimals. GoogleSQL without
 known_errors {
   mode: ALLOW_ERROR
