@@ -1,0 +1,45 @@
+# MIN/MAX returns NaN if any input is NaN; SQL equality does not match NaN,
+# so HAVING MIN/MAX selects no rows in that group (not even the NaN rows).
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+
+SELECT TO_JSON_STRING([COUNT(* HAVING MIN x), COUNT(* HAVING MAX x)])
+FROM UNNEST([CAST('NaN' AS FLOAT64), -1, 1, CAST('-inf' AS FLOAT64), CAST('inf' AS FLOAT64), NULL]) AS x
+=> "[0,0]"
+
+SELECT TO_JSON_STRING([ANY_VALUE(i HAVING MIN x), ANY_VALUE(i HAVING MAX x)])
+FROM UNNEST([CAST('NaN' AS FLOAT64), 1, NULL]) AS x WITH OFFSET AS i
+=> "[null,null]"
+
+SELECT TO_JSON_STRING([COUNT(DISTINCT i HAVING MIN x), COUNT(DISTINCT i HAVING MAX x)])
+FROM UNNEST([CAST('NaN' AS FLOAT64), CAST('NaN' AS FLOAT64)]) AS x WITH OFFSET AS i
+=> "[0,0]"
+
+# No NaN: NULL is ignored, infinities are extrema, and all ties survive.
+SELECT TO_JSON_STRING([COUNT(* HAVING MIN x), COUNT(* HAVING MAX x)])
+FROM UNNEST([CAST('-inf' AS FLOAT64), CAST('-inf' AS FLOAT64), 0, CAST('inf' AS FLOAT64), NULL]) AS x
+=> "[2,1]"
+
+SELECT TO_JSON_STRING([COUNT(* HAVING MIN x), COUNT(* HAVING MAX x)])
+FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> "[0,0]"
+
+SELECT TO_JSON_STRING([COUNT(* HAVING MIN x), COUNT(* HAVING MAX x)])
+FROM UNNEST(ARRAY<FLOAT64>[]) AS x
+=> "[0,0]"
+
+# A NaN affects its group only.
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT g, COUNT(* HAVING MIN x) AS lo, COUNT(* HAVING MAX x) AS hi
+  FROM UNNEST([STRUCT(1 AS g, CAST('NaN' AS FLOAT64) AS x), (1, 2), (2, 3), (2, 3)])
+  GROUP BY g ORDER BY g
+))
+=> "[{\"g\":1,\"lo\":0,\"hi\":0},{\"g\":2,\"lo\":2,\"hi\":2}]"
+
+# Grouping sets compute the NaN guard for each grouping, including the grand total.
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT g, COUNT(* HAVING MIN x) AS lo, COUNT(* HAVING MAX x) AS hi
+  FROM UNNEST([STRUCT(1 AS g, CAST('NaN' AS FLOAT64) AS x), (1, 2), (2, 3), (2, 3)])
+  GROUP BY GROUPING SETS ((g), ()) ORDER BY g
+))
+=> "[{\"g\":null,\"lo\":0,\"hi\":0},{\"g\":1,\"lo\":0,\"hi\":0},{\"g\":2,\"lo\":2,\"hi\":2}]"

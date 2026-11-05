@@ -956,12 +956,31 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
         return std::nullopt;
       }
       const std::string name = "_h" + std::to_string(havings.size());
-      inner.push_back(
-          std::string(modifier.kind() == googlesql::ResolvedAggregateHavingModifier::MAX ? "max("
-                                                                                         : "min(") +
-          IntervalKey(type, *window) + ") OVER (" +
-          (partition.empty() ? "" : "PARTITION BY " + Join(partition, ", ")) + ") AS " + name);
-      havings.emplace(call, IntervalKey(type, *row) + " = q." + name);
+      const std::string over =
+          " OVER (" + (partition.empty() ? "" : "PARTITION BY " + Join(partition, ", ")) + ")";
+      inner.push_back(std::string(modifier.kind() == googlesql::ResolvedAggregateHavingModifier::MAX
+                                      ? "max("
+                                      : "min(")
+                          .append(IntervalKey(type, *window))
+                          .append(")")
+                          .append(over)
+                          .append(" AS ")
+                          .append(name));
+      std::string having = IntervalKey(type, *row) + " = q." + name;
+      if (type->IsFloatingPoint()) {
+        // BigQuery's MIN/MAX propagates NaN, and SQL equality never matches NaN, so a
+        // group containing any NaN keeps no rows. DuckDB's MIN ignores NaN beside finite
+        // values, and its equality matches NaN, so guard both modifiers explicitly.
+        inner.push_back(std::string("bool_or(isnan(")
+                            .append(*window)
+                            .append("))")
+                            .append(over)
+                            .append(" AS ")
+                            .append(name)
+                            .append("_nan"));
+        having += " AND NOT q." + name + "_nan";
+      }
+      havings.emplace(call, std::move(having));
     }
     if (!havings.empty()) {
       // A guarded expression can contain error(), which DuckDB v2 considers volatile and
@@ -1013,7 +1032,13 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
                                                                                          : "min(") +
               *sql + ")",
           name);
-      havings.emplace(call, *sql + " = q." + name);
+      std::string having = *sql + " = q." + name;
+      if (modifier.having_expr()->type()->IsFloatingPoint()) {
+        // As without grouping sets, a NaN anywhere in this group prevents every match.
+        windows.emplace_back("bool_or(isnan(" + *sql + "))", name + "_nan");
+        having += " AND NOT q." + name + "_nan";
+      }
+      havings.emplace(call, std::move(having));
     }
   }
   for (const auto& computed : aggregate.aggregate_list()) {
