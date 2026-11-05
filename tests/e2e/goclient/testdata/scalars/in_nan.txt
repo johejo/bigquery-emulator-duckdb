@@ -1,0 +1,38 @@
+# NaN never equals a value, including itself. IN uses equality with three-valued logic.
+# third_party/bigquery_docs/reference/standard-sql/operators.md
+# Read x from a scan so the analyzer cannot fold the comparison.
+SELECT x IN (x, 2.0) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x NOT IN (x) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT x IN (x, NULL) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> null
+
+SELECT x IN UNNEST([x, 2.0]) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x NOT IN UNNEST([x]) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT x IN UNNEST([x, NULL]) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> null
+
+SELECT x IN UNNEST(ARRAY<FLOAT64>[]) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x IN UNNEST(CAST(NULL AS ARRAY<FLOAT64>)) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x IN UNNEST([CAST('NaN' AS FLOAT64)]) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT x IN UNNEST([CAST('NaN' AS FLOAT64), NULL, 2.0]) FROM UNNEST([2.0]) AS x
+=> "true"
+
+SELECT x IN (SELECT y FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS y) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x IN (SELECT y FROM UNNEST([CAST('NaN' AS FLOAT64), NULL]) AS y) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> null

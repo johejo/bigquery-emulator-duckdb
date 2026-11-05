@@ -68,17 +68,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "NaN does not compare as BigQuery orders it, such as in IN"
-  label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_2_FLOAT64_nan_FLOAT64_3@14"
-  label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_nan"
-  label: "code:InArray_WithoutNulls_FLOAT64_nan_FLOAT64_nan_FLOAT64_3@14"
-  label: "code:InList_FLOAT64_nan_FLOAT64_2_FLOAT64_nan_FLOAT64_3@14"
-  label: "code:InList_FLOAT64_nan_FLOAT64_nan"
-  label: "code:InList_FLOAT64_nan_FLOAT64_nan_FLOAT64_3@14"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "The test's prepare_database creates what the emulator does not, such as a value table, a SQL function, a table-valued function or a measure, so the statement fails to resolve"
   label: "aggregate_filter_test:filter_inside_templated_tvf"

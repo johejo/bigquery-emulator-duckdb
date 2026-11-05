@@ -25,10 +25,10 @@ using function_catalog::BoundComparison;
 using function_catalog::BucketWidthOf;
 using function_catalog::Equal;
 using function_catalog::FunctionArgument;
+using function_catalog::InArray;
 using function_catalog::IsConstant;
 using function_catalog::ScalarCall;
 using function_catalog::StringLiteral;
-using function_catalog::StructInArray;
 
 namespace {
 
@@ -57,6 +57,9 @@ std::optional<std::string> InList(const ScalarCall& call) {
   const std::vector<std::string> args = Sqls(call);
   if (args.size() < 2) {
     return std::nullopt;
+  }
+  if (call.arguments.front().type == googlesql::TYPE_DOUBLE) {
+    return StructComparison(call);
   }
   const std::vector<std::string> values(args.begin() + 1, args.end());
   return "(" + args.at(0) + " IN (" + Join(values, ", ") + "))";
@@ -132,7 +135,7 @@ std::optional<std::string> StructComparison(const ScalarCall& call) {
     return BindComparison(args, indexes, "(" + Join(equals, " OR ") + ")");
   }
   if (call.name == "$IN_ARRAY") {
-    return StructInArray(type, args.at(0), args.at(1));
+    return InArray(type, args.at(0), args.at(1));
   }
   if (call.name == "$CASE_WITH_VALUE" && n >= 4 && n % 2 == 0) {
     // The value and the WHEN values are bound to find the matching WHEN, while the results stay
