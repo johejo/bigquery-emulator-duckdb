@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -33,9 +34,6 @@ namespace bigquery_emulator_duckdb {
 
 void ValidateStorageWriteSchema(const std::vector<FieldSchema>& schema) {
   for (const auto& field : schema) {
-    if (!field.default_value_expression.empty()) {
-      throw ApiError::Invalid("Storage Write does not support column defaults");
-    }
     if (field.max_length) {
       throw ApiError::Invalid(
           "Storage Write does not support parameterized STRING or BYTES columns");
@@ -139,7 +137,9 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
   }
 }
 
-json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema);
+json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema,
+                  bool default_missing = false,
+                  const std::unordered_map<std::string, bool>* missing = nullptr);
 
 json ProtoValue(const Message& message, const FieldDescriptor& input, const FieldSchema& field,
                 int index) {
@@ -316,7 +316,8 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
   }
 }
 
-json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema) {
+json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema,
+                  bool default_missing, const std::unordered_map<std::string, bool>* missing) {
   const auto* descriptor = message.GetDescriptor();
   const auto* reflection = message.GetReflection();
   if (!reflection->GetUnknownFields(message).empty()) {
@@ -325,7 +326,13 @@ json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema
   json result = json::object();
   for (const auto& field : schema) {
     const auto* found = descriptor->FindFieldByName(field.name);
+    const bool use_default = missing != nullptr && (missing->contains(field.name)
+                                                        ? missing->at(field.name)
+                                                        : (found == nullptr || default_missing));
     if (found == nullptr) {
+      if (use_default && !field.default_value_expression.empty()) {
+        continue;
+      }
       if (field.mode == FieldMode::kRequired) {
         throw ApiError::Invalid("Missing required field: " + field.name);
       }
@@ -342,6 +349,9 @@ json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema
     } else if (reflection->HasField(message, &input) || input.has_default_value()) {
       result[field.name] = ProtoValue(message, input, field, -1);
     } else {
+      if (use_default && !field.default_value_expression.empty()) {
+        continue;
+      }
       if (field.mode == FieldMode::kRequired) {
         throw ApiError::Invalid("Missing required field: " + field.name);
       }
@@ -381,12 +391,13 @@ StorageProtoDecoder::StorageProtoDecoder(const google::protobuf::DescriptorProto
 
 StorageProtoDecoder::~StorageProtoDecoder() = default;
 
-json StorageProtoDecoder::Decode(const std::string& bytes) const {
+json StorageProtoDecoder::Decode(const std::string& bytes, bool default_missing,
+                                 const std::unordered_map<std::string, bool>& missing) const {
   const std::unique_ptr<Message> message(impl_->prototype->New());
   if (!message->ParseFromString(bytes)) {
     throw ApiError::Invalid("Invalid serialized protobuf row");
   }
-  return ProtoMessage(*message, impl_->schema);
+  return ProtoMessage(*message, impl_->schema, default_missing, &missing);
 }
 
 }  // namespace bigquery_emulator_duckdb

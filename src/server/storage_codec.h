@@ -3,6 +3,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -38,7 +39,11 @@ class StorageProtoDecoder {
   ~StorageProtoDecoder();
   StorageProtoDecoder(const StorageProtoDecoder&) = delete;
   StorageProtoDecoder& operator=(const StorageProtoDecoder&) = delete;
-  [[nodiscard]] nlohmann::json Decode(const std::string& bytes) const;
+  // Only top-level columns have missing-value interpretations. An omitted JSON key asks
+  // WriteStorageRows to evaluate the column default; explicit nulls remain nulls.
+  [[nodiscard]] nlohmann::json Decode(
+      const std::string& bytes, bool default_missing = false,
+      const std::unordered_map<std::string, bool>& missing = {}) const;
 
  private:
   class Impl;

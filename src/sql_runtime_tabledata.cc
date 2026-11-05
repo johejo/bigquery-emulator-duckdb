@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/time/time.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -43,6 +44,47 @@ std::string RoundedInsertValue(const function_catalog::Catalog& functions, const
   return *rounded;
 }
 
+// Convert a returned default from REST cells to the named input values used for staged
+// writes. Keep decimal strings and bytes intact and format timestamps without a float roundtrip.
+json StorageDefaultValue(const json& value, const FieldSchema& field) {
+  if (value.is_null()) {
+    return nullptr;
+  }
+  if (field.mode == FieldMode::kRepeated) {
+    json result = json::array();
+    for (const auto& cell : value) {
+      result.push_back(StorageDefaultValue(cell.at("v"), AsNullable(field)));
+    }
+    return result;
+  }
+  if (field.type == FieldType::kRecord) {
+    json result = json::object();
+    for (size_t i = 0; i < field.fields.size(); ++i) {
+      result[field.fields.at(i).name] =
+          StorageDefaultValue(value.at("f").at(i).at("v"), field.fields.at(i));
+    }
+    return result;
+  }
+  if (field.type == FieldType::kRange) {
+    const std::string text = value.get<std::string>();
+    const size_t separator = text.find(", ");
+    const auto bound = [&](const std::string& part) -> json {
+      return part == "UNBOUNDED" ? json(nullptr)
+                                 : StorageDefaultValue(part, RangeBoundField(field, field.name));
+    };
+    return json{
+        {"start", bound(text.substr(1, separator - 1))},
+        {"end", bound(text.substr(separator + 2, text.size() - separator - 3))},
+    };
+  }
+  if (field.type == FieldType::kTimestamp) {
+    return absl::FormatTime("%Y-%m-%d %H:%M:%E6S%Ez",
+                            absl::FromUnixMicros(std::stoll(value.get<std::string>())),
+                            absl::UTCTimeZone());
+  }
+  return value;
+}
+
 }  // namespace
 
 QueryResult SqlRuntime::ListTableData(TableReference table, int64_t start_index,
@@ -64,7 +106,7 @@ QueryResult SqlRuntime::ListTableData(TableReference table, int64_t start_index,
 
 std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
                                                       const std::vector<FieldSchema>& schema,
-                                                      const json& rows, int64_t storage_id,
+                                                      json& rows, int64_t storage_id,
                                                       bool validate_only) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
@@ -102,18 +144,30 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
         columns.push_back(QuoteIdentifier(field.name));
         const auto value = row.find(field.name);
         try {
-          values.push_back(RoundedInsertValue(
-              functions_, value == row.end() ? json(nullptr) : *value, field, false));
+          values.push_back(value == row.end()
+                               ? "DEFAULT"
+                               : RoundedInsertValue(functions_, *value, field, false));
         } catch (const ApiError& error) {
           return {{.index = index, .message = error.what()}};
         }
       }
-      statements.push_back(std::format("INSERT INTO {} ({}) VALUES ({})", QualifiedName(table),
-                                       Join(columns, ", "), Join(values, ", ")));
+      statements.push_back(std::format("INSERT INTO {} ({}) VALUES ({}){}", QualifiedName(table),
+                                       Join(columns, ", "), Join(values, ", "),
+                                       validate_only ? " RETURNING " + ReadColumns(schema) : ""));
     }
     for (size_t index = 0; index < statements.size(); ++index) {
       try {
-        session->Execute(statements.at(index));
+        const QueryResult inserted = session->Execute(statements.at(index));
+        if (validate_only) {
+          auto& row = rows.at(index);
+          const json returned = inserted.rows.at(0);
+          for (size_t column = 0; column < schema.size(); ++column) {
+            const auto& field = schema.at(column);
+            if (!row.contains(field.name)) {
+              row[field.name] = StorageDefaultValue(returned.at("f").at(column).at("v"), field);
+            }
+          }
+        }
       } catch (const BackendError& error) {
         return {{.index = index, .message = error.what()}};
       }

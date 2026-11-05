@@ -213,10 +213,11 @@ class SqlRuntime {
       TableReference table, const std::vector<std::string>& selected_fields,
       const std::string& restriction);
   // Validates and inserts the whole Storage Write batch in one transaction. With validate_only,
-  // rolls it back, for pending/buffered appends. Checks the schema in that same transaction.
+  // rolls it back, for pending/buffered appends, and materializes omitted column defaults in
+  // rows so publication never re-evaluates them. Checks the schema in that same transaction.
   std::vector<InsertError> WriteStorageRows(TableReference table,
                                             const std::vector<FieldSchema>& schema,
-                                            const nlohmann::json& rows, int64_t storage_id,
+                                            nlohmann::json& rows, int64_t storage_id,
                                             bool validate_only = false);
   std::vector<InsertError> InsertTableData(TableReference table, const nlohmann::json& rows,
                                            bool skip_invalid_rows, bool ignore_unknown_values);

@@ -106,7 +106,10 @@ void Query(duckdb_connection connection, const std::string& sql) {
 QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const void> owner) {
   const auto statement_type = duckdb_result_statement_type(result.result);
   QueryResult query_result;
-  if (!ProducesResultSet(statement_type)) {
+  // DML with RETURNING exposes rows too, used to freeze Storage Write defaults at append.
+  const bool returning = IsDml(statement_type) && duckdb_result_return_type(result.result) ==
+                                                      DUCKDB_RESULT_TYPE_QUERY_RESULT;
+  if (!ProducesResultSet(statement_type) && !returning) {
     if (IsDml(statement_type)) {
       query_result.affected_rows = static_cast<int64_t>(duckdb_rows_changed(&result.result));
     }
