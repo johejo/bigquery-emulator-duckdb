@@ -1,5 +1,5 @@
 # CORR ignores pairs containing NULL and returns NULL with fewer than two remaining pairs.
-# third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md#corr
+# third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md
 SELECT CORR(x, y) FROM UNNEST(ARRAY<STRUCT<x FLOAT64, y FLOAT64>>[])
 => null
 
