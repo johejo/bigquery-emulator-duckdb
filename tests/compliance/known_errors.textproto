@@ -699,9 +699,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Variance, standard deviation, covariance and correlation lose precision on high-precision NUMERIC values, return NaN instead of NULL for one row, and overflow to infinities"
-  label: "stat_aggregation_test:corr_numeric_one_pair"
-  label: "stat_aggregation_test:corr_one_pair"
+  reason: "Variance and standard deviation lose precision on high-precision NUMERIC values"
   label: "stat_aggregation_test:stddev_pop_numeric_high_prec_values"
   label: "stat_aggregation_test:stddev_samp_numeric_high_prec_values"
   label: "stat_aggregation_test:var_pop_numeric_high_prec_values"
@@ -710,17 +708,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Window statistics return NaN instead of NULL for a single pair, or zero instead of NaN for a nonfinite singleton"
-  label: "analytic_stat_aggregation_test:analytic_stats_double_column_cumulative"
-  label: "analytic_stat_aggregation_test:analytic_stats_double_column_moving_window"
+  reason: "Window statistics return zero instead of NaN for a nonfinite singleton"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_range_offset_preceding"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Variance, standard deviation, covariance and correlation over windows fail as out of range or lose precision where BigQuery returns a result"
-  label: "analytic_stat_aggregation_test:analytic_stats_double_column_cumulative_numeric"
-  label: "analytic_stat_aggregation_test:analytic_stats_double_column_moving_window_numeric"
 }
 
 known_errors {

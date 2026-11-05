@@ -1,0 +1,37 @@
+# CORR ignores pairs containing NULL and returns NULL with fewer than two remaining pairs.
+# third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md#corr
+SELECT CORR(x, y) FROM UNNEST(ARRAY<STRUCT<x FLOAT64, y FLOAT64>>[])
+=> null
+
+SELECT CORR(x, y)
+FROM UNNEST([STRUCT(1.0 AS x, 2.0 AS y), (NULL, 3.0), (4.0, NULL)])
+=> null
+
+SELECT CORR(x, y)
+FROM UNNEST([STRUCT(NUMERIC '1' AS x, NUMERIC '2' AS y), (NULL, NUMERIC '3')])
+=> null
+
+SELECT CORR(x, y)
+FROM UNNEST([STRUCT(BIGNUMERIC '1' AS x, BIGNUMERIC '2' AS y)])
+=> null
+
+SELECT CORR(x, y) FROM UNNEST([STRUCT(1 AS x, 2 AS y), (NULL, NULL)])
+=> null
+
+SELECT CORR(x, y) OVER ()
+FROM UNNEST([STRUCT(1.0 AS x, 2.0 AS y), (NULL, 3.0), (4.0, NULL)]) LIMIT 1
+=> null
+
+SELECT LOGICAL_AND(IF(x = 1.0, r IS NULL, r = 1.0)) FROM (
+  SELECT x, CORR(x, x) OVER (ORDER BY x ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS r
+  FROM UNNEST([1.0, 2.0, 3.0]) AS x
+)
+=> "true"
+
+SELECT CORR(x, x) OVER (ORDER BY x ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING)
+FROM UNNEST([1.0]) AS x
+=> null
+
+# A zero variance still produces NaN, rather than being mistaken for insufficient input.
+SELECT CORR(x, x) FROM UNNEST([1.0, 1.0]) AS x
+=> "NaN"

@@ -144,6 +144,14 @@ std::string NumericAvg(const std::string& sql, const std::vector<std::string>& /
   return "bq_numeric_avg(" + sql + ")";
 }
 
+// DuckDB returns NaN for one pair, but CORR needs at least two non-NULL pairs. Use the
+// same filter and window frame for the pair count as for the correlation.
+std::string Correlation(const std::string& sql, const std::vector<std::string>& arguments,
+                        const std::string& tail) {
+  return "CASE WHEN regr_count(" + arguments.at(0) + ", " + arguments.at(1) + ")" + tail +
+         " < 2 THEN NULL ELSE " + sql + " END";
+}
+
 // A BIGNUMERIC aggregate that `kFunction`, of src/googlesql_functions_duckdb/bignumeric.cc,
 // computes as GoogleSQL does from the units of the non-NULL values that list() collects. A pair of
 // arguments is collected as the units of both joined by a comma, which is NULL where either is
@@ -743,7 +751,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       Define("CORR",
              {
                  BigNumericAggregate<kBigNumericCorr>(2),
-                 {.function = "corr"},
+                 {.function = "corr", .finish = Correlation},
              },
              {
                  .uses = {TypeUse::kBigNumeric},
