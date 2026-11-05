@@ -6,6 +6,7 @@
 #include <exception>
 #include <format>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -434,9 +435,22 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     if (!existing.has_value()) {
       SetModesGiven(written);
     }
-    const QueryResult result =
-        WriteDestination(job.project_id, load.destination_table, load.create_disposition,
-                         load.write_disposition, sql, written, {}, true);
+    std::optional<DestinationTableProperties> properties;
+    if (const auto it = config.find("destinationTableProperties"); it != config.end()) {
+      properties.emplace();
+      if (it->contains("description")) {
+        properties->description = it->at("description").get<std::string>();
+      }
+      if (it->contains("friendlyName")) {
+        properties->friendly_name = it->at("friendlyName").get<std::string>();
+      }
+      if (it->contains("labels")) {
+        properties->labels = it->at("labels").get<std::map<std::string, std::string>>();
+      }
+    }
+    const QueryResult result = WriteDestination(
+        job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
+        sql, written, {}, true, TableMetadata(), false, false, properties);
     job.output_rows = result.rows.Int64(0, 0);
     job.result = QueryResult{};
   });

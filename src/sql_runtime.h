@@ -319,13 +319,14 @@ class SqlRuntime {
   // with the given dispositions. A table the write creates takes `metadata`; a write to an
   // existing table rejects metadata. A `copy` job's new table keeps the rounding modes of
   // `schema` and takes no default rounding mode, and a `restore` keeps the metadata of the table
-  // it replaces. Returns the query's result.
-  QueryResult WriteDestination(const std::string& project_id, TableReference destination,
-                               CreateDisposition create, WriteDisposition write,
-                               const std::string& sql, const std::vector<FieldSchema>& schema,
-                               const std::vector<std::string>& setup, bool count_only = false,
-                               const TableMetadata& metadata = TableMetadata(), bool copy = false,
-                               bool restore = false);
+  // it replaces. Load properties initialize a new table and must match an existing table.
+  // Returns the query's result.
+  QueryResult WriteDestination(
+      const std::string& project_id, TableReference destination, CreateDisposition create,
+      WriteDisposition write, const std::string& sql, const std::vector<FieldSchema>& schema,
+      const std::vector<std::string>& setup, bool count_only = false,
+      const TableMetadata& metadata = TableMetadata(), bool copy = false, bool restore = false,
+      const std::optional<DestinationTableProperties>& load_properties = std::nullopt);
 
   // Mutations also hold this while reading their response. Recursive because their catalog
   // lookups may expire other relations on the same thread.

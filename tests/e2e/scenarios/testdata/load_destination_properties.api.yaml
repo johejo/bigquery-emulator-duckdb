@@ -1,0 +1,116 @@
+version: 1
+# Expectations follow DestinationTableProperties in third_party/bigquery_docs/reference/rest/v2/Job.md.
+description: Load destination properties are set on creation and must match an existing table.
+vars:
+  dataset: e2e_${run}_${case}
+  properties: {friendlyName: People, description: Loaded people, labels: {team: test}}
+  next_properties: '${properties}'
+  disposition: WRITE_APPEND
+  expected_rows: '3'
+  completion: {state: DONE}
+  initial: {friendlyName: People, description: Loaded people, labels: {team: test}, numRows: '2'}
+  final: {friendlyName: People, description: Loaded people, labels: {team: test}, numRows: '${expected_rows}'}
+templates:
+  load:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            configuration:
+              load:
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+                sourceFormat: CSV
+                schema: {fields: [{name: value, type: STRING}]}
+                destinationTableProperties: '${properties}'
+          upload: "old\nold\n"
+        bind: {job: /body/jobReference/jobId}
+      - name: created
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {outputRows: /body/statistics/load/outputRows}
+      - name: initial_metadata
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe:
+          friendlyName: /body/friendlyName
+          description: /body/description
+          labels: /body/labels
+          numRows: /body/numRows
+      - name: next_load
+        rest:
+          method: POST
+          path: /upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart
+          body:
+            configuration:
+              load:
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}', tableId: destination}
+                sourceFormat: CSV
+                schema: {fields: [{name: value, type: STRING}]}
+                writeDisposition: '${disposition}'
+                destinationTableProperties: '${next_properties}'
+          upload: "new\n"
+        bind: {job: /body/jobReference/jobId}
+      - name: completed
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe: {state: /body/status/state}
+      - name: final_metadata
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/destination
+        observe:
+          friendlyName: /body/friendlyName
+          description: /body/description
+          labels: /body/labels
+          numRows: /body/numRows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: matching_append
+    template: load
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: matching_truncate
+    template: load
+    vars: {disposition: WRITE_TRUNCATE, expected_rows: '1'}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: omitted_properties
+    template: load
+    vars: {next_properties: {}}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: description_mismatch
+    template: load
+    vars: {next_properties: {description: Different}, expected_rows: '2'}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: friendly_name_mismatch
+    template: load
+    vars: {next_properties: {friendlyName: Different}, expected_rows: '2'}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: labels_mismatch_truncate
+    template: load
+    vars: {disposition: WRITE_TRUNCATE, next_properties: {labels: {team: other}}, expected_rows: '2'}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: empty_description_mismatch
+    template: load
+    vars: {next_properties: {description: ''}, expected_rows: '2'}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
+  - name: empty_labels_mismatch
+    template: load
+    vars: {next_properties: {labels: {}}, expected_rows: '2'}
+    expect: {created: {outputRows: '2'}, initial_metadata: '${initial}', completed: '${completion}', final_metadata: '${final}'}
