@@ -871,9 +871,3 @@ known_errors {
   label: "measure_annotations_test:measure_evaluation_distinct_count"
   label: "measure_annotations_test:measure_join_inner_before_agg"
 }
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "PIVOT comparisons with collated FOR expressions are not implemented"
-  label: "pivot_test:pivot_with_collation_on_for_expression"
-}
