@@ -52,7 +52,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 68 | 2 | 1 | 0 |
+| [Geography functions](#geography-functions) | 69 | 1 | 1 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -232,7 +232,7 @@ functions.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`S2_CELLIDFROMPOINT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
-| [`S2_COVERINGCELLIDS`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: S2_COVERINGCELLIDS max_cells above INT32_MAX. |
+| [`S2_COVERINGCELLIDS`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
 | [`ST_ANGLE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_AREA`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_ASBINARY`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |

@@ -324,7 +324,6 @@ BigQuery loads as NULL.
   last digits; clipped polygon order, ring starts and boundary vertices can also differ, and
   lines through a pole can have different intermediate vertices. Some polygon cuts touching a
   pole and degenerate antimeridian cuts are unsupported.
-- `S2_COVERINGCELLIDS` does not support `max_cells` above 2,147,483,647.
 - `SAFE.ST_BUFFER` and `SAFE.ST_BUFFERWITHTOLERANCE` return NULL for `use_spheroid = TRUE`,
   where BigQuery fails.
 - Planar polygons with an edge along a pole, including GeoJSON polygons such as
