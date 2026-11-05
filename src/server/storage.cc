@@ -163,7 +163,6 @@ void CheckSchemaChange(const std::vector<FieldSchema>& before,
   for (const auto& field : before) {
     const auto found = std::ranges::find(after, field.name, &FieldSchema::name);
     if (found == after.end() || found->type != field.type ||
-        found->default_value_expression != field.default_value_expression ||
         found->max_length != field.max_length ||
         (found->mode != field.mode &&
          (field.mode != FieldMode::kRequired || found->mode != FieldMode::kNullable))) {
@@ -184,15 +183,13 @@ void CheckSchemaChange(const std::vector<FieldSchema>& before,
   }
 }
 
-// Rows staged before a repeated field was added have no decoder-provided empty array.
-// Fill those omissions before publishing, including arrays inside present records.
+// Rows staged before a field was added have no decoder-provided value. Freeze their
+// NULL/empty-array values before publication, even if the new column later gains a default.
 void CompleteRepeatedFields(json& row, const std::vector<FieldSchema>& schema) {
   for (const auto& field : schema) {
     const auto value = row.find(field.name);
     if (value == row.end()) {
-      if (field.mode == FieldMode::kRepeated) {
-        row[field.name] = json::array();
-      }
+      row[field.name] = field.mode == FieldMode::kRepeated ? json::array() : json(nullptr);
       continue;
     }
     if (field.type != FieldType::kRecord || value->is_null()) {
@@ -612,9 +609,8 @@ class WriteService final : public pb::BigQueryWrite::Service {
       }
       if (offset >= state->published) {
         const auto size = static_cast<size_t>(offset + 1 - state->published);
-        const json rows =
-            json::array_t(state->staged.begin(),
-                          state->staged.begin() + static_cast<json::difference_type>(size));
+        json rows = json::array_t(state->staged.begin(),
+                                  state->staged.begin() + static_cast<json::difference_type>(size));
         const auto errors =
             emulator_.WriteStorageRows(state->table, state->schema, rows, state->storage_id);
         if (!errors.empty()) {
@@ -713,6 +709,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
     google::protobuf::DescriptorProto descriptor;
     std::string schema;
     int64_t storage_id = 0;
+    bool default_missing = false;
     std::unique_ptr<StorageProtoDecoder> decoder;
     std::shared_ptr<WriteState> lease;
   };
@@ -906,10 +903,20 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (connection.storage_id != state->storage_id) {
       Fail(grpc::StatusCode::NOT_FOUND, "The destination table was replaced");
     }
+    if (request.default_missing_value_interpretation() !=
+        pb::AppendRowsRequest::MISSING_VALUE_INTERPRETATION_UNSPECIFIED) {
+      connection.default_missing =
+          request.default_missing_value_interpretation() == pb::AppendRowsRequest::DEFAULT_VALUE;
+    }
+    std::unordered_map<std::string, bool> missing;
+    for (const auto& [field, interpretation] : request.missing_value_interpretations()) {
+      missing.emplace(field, interpretation == pb::AppendRowsRequest::DEFAULT_VALUE);
+    }
     json rows = json::array();
     for (int i = 0; i < request.proto_rows().rows().serialized_rows_size(); ++i) {
       try {
-        rows.push_back(connection.decoder->Decode(request.proto_rows().rows().serialized_rows(i)));
+        rows.push_back(connection.decoder->Decode(request.proto_rows().rows().serialized_rows(i),
+                                                  connection.default_missing, missing));
       } catch (const ApiError& error) {
         auto* row = response.add_row_errors();
         row->set_index(i);

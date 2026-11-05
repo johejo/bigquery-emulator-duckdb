@@ -200,6 +200,30 @@ func appendTo(schema bigquery.Schema, value string) func(context.Context, *env) 
 	}
 }
 
+// columnDefaults exercises an omitted schema column and a missing value in the descriptor.
+func columnDefaults(connection bool, perColumn bool) func(context.Context, *env) error {
+	return func(ctx context.Context, e *env) error {
+		path, err := e.table(ctx, bigquery.Schema{
+			{Name: "value", Type: bigquery.StringFieldType, DefaultValueExpression: "'x'"},
+			{Name: "omitted", Type: bigquery.StringFieldType, DefaultValueExpression: "'y'"},
+		})
+		if err != nil {
+			return err
+		}
+		request := &storagepb.AppendRowsRequest{WriteStream: path + "/streams/_default",
+			Rows: &storagepb.AppendRowsRequest_ProtoRows{ProtoRows: &storagepb.AppendRowsRequest_ProtoData{
+				WriterSchema: &storagepb.ProtoSchema{ProtoDescriptor: descriptor},
+				Rows:         &storagepb.ProtoRows{SerializedRows: [][]byte{{}}}}}}
+		if connection {
+			request.DefaultMissingValueInterpretation = storagepb.AppendRowsRequest_DEFAULT_VALUE
+		}
+		if perColumn {
+			request.MissingValueInterpretations = map[string]storagepb.AppendRowsRequest_MissingValueInterpretation{"value": storagepb.AppendRowsRequest_DEFAULT_VALUE}
+		}
+		return e.send(ctx, request)
+	}
+}
+
 func stringField(name string) *descriptorpb.FieldDescriptorProto {
 	return &descriptorpb.FieldDescriptorProto{Name: proto.String(name), Number: proto.Int32(1),
 		Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()}
@@ -352,8 +376,9 @@ var sections = []section{
 				}
 				return e.append(ctx, stream.Name, nil)
 			}},
-			{"column defaults", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType,
-				DefaultValueExpression: "'x'"}}, "probe")},
+			{"column defaults", columnDefaults(false, false)},
+			{"connection missing-value defaults", columnDefaults(true, false)},
+			{"per-column missing-value defaults", columnDefaults(false, true)},
 			{"parameterized STRING columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType,
 				MaxLength: 10}}, "probe")},
 			{"JSON columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.JSONFieldType}}, `{"a": 1}`)},
