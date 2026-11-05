@@ -2,5 +2,4 @@ exports_files([
     "compliance.patch",
     "compliance_expected_results.patch",
     "openssl.patch",
-    "throw_delegate.patch",
 ])

@@ -580,6 +580,16 @@ known_errors {
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_desc_with_special_values_4"
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_desc_with_special_values_6"
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_desc_without_special_values_1"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_closest_to_zero"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_following_asc"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_following_desc"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_min_value"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_preceding_asc"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_preceding_desc"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_subtraction_expr"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_negative_offset_unary_minus_expr"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_non_negative_offset_unary_minus_expr"
+  label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_null_offset"
   label: "analytic_bignumeric_range_window_frames_test:range_window_asc_with_special_values_7"
 }
 
@@ -685,6 +695,12 @@ known_errors {
   label: "analytic_window_frames_test:range_window_null_offset_2"
   label: "analytic_window_frames_test:range_window_null_offset_3"
   label: "analytic_window_frames_test:range_window_null_offset_4"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "RANGE window frames treat a NULL NUMERIC offset as CURRENT ROW instead of rejecting it"
+  label: "analytic_numeric_range_window_frames_test:numeric_range_window_null_offset"
 }
 
 known_errors {
