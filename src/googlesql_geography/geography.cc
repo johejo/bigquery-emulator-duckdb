@@ -1685,9 +1685,9 @@ absl::StatusOr<std::vector<int64_t>> CoveringCellIds(const IndexedGeography& geo
   if (max_cells <= 0) {
     return invalid("max_cells should at least be specified to be at least one cell");
   }
-  if (max_cells > std::numeric_limits<int>::max()) {
-    return absl::UnimplementedError(
-        "The emulator does not support S2_COVERINGCELLIDS max_cells above INT32_MAX");
+  // BigQuery accepts 1000000 itself despite the wording of its error.
+  if (max_cells > 1000000) {
+    return invalid("max_cells should be less than 1000000");
   }
   if (!(buffer >= 0)) {
     return absl::OutOfRangeError(
