@@ -43,7 +43,7 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
 | [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 8 | 1 | 3 | 10 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 9 | 1 | 2 | 10 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 14 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE Bigtable URI](#create-external-table-bigtable-uri) | 1 | 0 | 0 | 0 |
 | [CREATE EXTERNAL TABLE Bigtable](#create-external-table-bigtable) | 0 | 1 | 0 | 0 |
@@ -301,7 +301,7 @@ the emulator rejected.
 | [`require_hive_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`sheet_range`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`source_column_match`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Supported |  |
 
 ## CREATE EXTERNAL TABLE CSV

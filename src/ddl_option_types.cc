@@ -96,6 +96,7 @@ constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kCreateExternalTable, .name = I::kHivePartitionUriPrefix, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kRequireHivePartitionFilter, .type = kBool},
     {.context = C::kCreateExternalTable, .name = I::kDescription, .type = kString},
+    {.context = C::kCreateExternalTable, .name = I::kTags, .type = kLabels},
     {.context = C::kCreateExternalTable, .name = I::kExpirationTimestamp, .type = kTimestamp},
     {.context = C::kCreateTable, .name = I::kDescription, .type = kString},
     {.context = C::kCreateTable, .name = I::kFriendlyName, .type = kString},

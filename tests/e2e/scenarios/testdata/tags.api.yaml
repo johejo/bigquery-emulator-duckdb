@@ -40,6 +40,7 @@ cases:
                   ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags = [('123456789012/team', 'sales')]);
                   ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags = [('123456789012/env', 'Production')]);
                   CREATE VIEW `${project}.${dataset}.v` OPTIONS (tags = [('123456789012/env', 'test')]) AS SELECT x FROM `${project}.${dataset}.t`;
+                  CREATE EXTERNAL TABLE `${project}.${dataset}.ext` (x INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], tags = [('123456789012/env', 'test')]);
         bind: {job: /body/jobReference/jobId}
       - name: completed
         rest:
@@ -62,6 +63,11 @@ cases:
         rest:
           method: GET
           path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/v
+        observe: {tags: /body/resourceTags}
+      - name: external_table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/ext
         observe: {tags: /body/resourceTags}
       - name: replace_dataset
         rest:
@@ -102,6 +108,7 @@ cases:
       dataset: {tags: {'123456789012/team': sales}}
       table: {tags: {'123456789012/env': Production}}
       view: {tags: {'123456789012/env': test}}
+      external_table: {tags: {'123456789012/env': test}}
       replace_dataset: {tags: {'123456789012/env': Production}}
       replace_table: {tags: {'123456789012/team': sales}}
       patch_dataset_description: {tags: {'123456789012/env': Production}}
