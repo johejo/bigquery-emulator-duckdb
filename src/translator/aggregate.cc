@@ -1136,10 +1136,9 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
 }
 
 std::optional<Relation> PivotScan(const googlesql::ResolvedPivotScan& pivot, const Scope& scope) {
-  // PIVOT records no comparison collation for its FOR expression.
-  if (HasCollation(pivot.for_expr()->type_annotation_map())) {
-    return Unsupported(scope, "PIVOT with collation on the FOR expression");
-  }
+  // PIVOT records no comparison collation list; its FOR expression's annotation
+  // supplies the collation for comparisons with every IN value.
+  const auto pivot_collation = ColumnCollation(pivot.for_expr()->type_annotation_map());
   const auto input = Scan(*pivot.input_scan(), scope);
   if (!input) {
     return std::nullopt;
@@ -1288,8 +1287,9 @@ std::optional<Relation> PivotScan(const googlesql::ResolvedPivotScan& pivot, con
       return std::nullopt;
     }
     std::vector<std::string> conditions = group_conditions;
-    conditions.push_back(GroupKey(pivot.for_expr()->type(), pivot_sql, {}) +
-                         " IS NOT DISTINCT FROM " + GroupKey(pivot.for_expr()->type(), *value, {}));
+    conditions.push_back(GroupKey(pivot.for_expr()->type(), pivot_sql, pivot_collation) +
+                         " IS NOT DISTINCT FROM " +
+                         GroupKey(pivot.for_expr()->type(), *value, pivot_collation));
     Relation rows{
         .sql = "SELECT q.*" + source_rows.From() + " WHERE " + Join(conditions, " AND "),
         .columns = columns,
