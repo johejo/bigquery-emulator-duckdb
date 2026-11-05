@@ -70,6 +70,7 @@ const ResourceMask& DatasetFields() {
                                              "labels",
                                              "resourceTags",
                                              "defaultTableExpirationMs",
+                                             "maxTimeTravelHours",
                                              "defaultRoundingMode",
                                              "defaultCollation",
                                              "location",

@@ -13,8 +13,10 @@
 #include "absl/time/time.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
+#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -168,7 +170,13 @@ absl::StatusOr<std::string> TimeTravelQuery(Backend& backend, const TableReferen
   }
   // BigQuery reads back to the table's creation within its time travel window.
   const int64_t millis = time < 0 ? (time - 999) / 1000 : time / 1000;
-  if (const int64_t earliest = (now / 1000) - kTimeTravelWindowMillis; millis < earliest) {
+  const QueryResult dataset =
+      backend.Execute(DatasetEntriesQuery(table.project_id, table.dataset_id));
+  const auto metadata = dataset.rows.empty()
+                            ? DatasetMetadata{}
+                            : ParseDatasetMetadata(dataset.rows.OptionalString(0, 1));
+  const int64_t window_millis = metadata.max_time_travel_hours.value_or(168) * 60 * 60 * 1000;
+  if (const int64_t earliest = (now / 1000) - window_millis; millis < earliest) {
     return absl::InvalidArgumentError(
         std::format("Invalid value: Invalid time travel timestamp {0} for table {1}@{0}. Cannot "
                     "read before {2}",

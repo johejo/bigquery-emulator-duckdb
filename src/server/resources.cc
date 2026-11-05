@@ -499,6 +499,7 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
     item.update(entry.metadata.ToJson());
     item.erase("description");
     item.erase("defaultTableExpirationMs");
+    item.erase("maxTimeTravelHours");
     datasets.push_back(std::move(item));
   }
   // BigQuery omits the datasets of a project that has none.

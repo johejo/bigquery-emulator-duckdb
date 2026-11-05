@@ -641,6 +641,9 @@ json DatasetMetadata::ToJson() const {
   if (default_table_expiration_ms.has_value()) {
     fields["defaultTableExpirationMs"] = std::to_string(*default_table_expiration_ms);
   }
+  if (max_time_travel_hours.has_value()) {
+    fields["maxTimeTravelHours"] = std::to_string(*max_time_travel_hours);
+  }
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
@@ -1065,6 +1068,21 @@ void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool pat
         unset ? std::nullopt : std::optional(Int64Member(body, "defaultTableExpirationMs"));
   }
   ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
+  if (body.contains("maxTimeTravelHours") && body["maxTimeTravelHours"].is_null()) {
+    throw ApiError::Unsupported("null maxTimeTravelHours");
+  }
+  if (body.contains("maxTimeTravelHours") || !patch) {
+    metadata.max_time_travel_hours = Member(body, "maxTimeTravelHours").is_null()
+                                         ? std::nullopt
+                                         : std::optional(Int64Member(body, "maxTimeTravelHours"));
+  }
+  ValidateMaxTimeTravelHours(metadata.max_time_travel_hours);
+}
+
+void ValidateMaxTimeTravelHours(const std::optional<int64_t>& hours) {
+  if (hours && (*hours < 48 || *hours > 168 || *hours % 24 != 0)) {
+    throw ApiError::Invalid("max_time_travel_hours must be a multiple of 24 between 48 and 168");
+  }
 }
 
 void ValidateDefaultTableExpiration(const std::optional<int64_t>& milliseconds) {

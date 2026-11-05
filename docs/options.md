@@ -22,8 +22,8 @@ the emulator rejected.
 
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [CREATE SCHEMA](#create-schema) | 7 | 0 | 5 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 6 | 0 | 5 | 3 |
+| [CREATE SCHEMA](#create-schema) | 8 | 0 | 4 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 7 | 0 | 4 | 3 |
 | [CREATE TABLE](#create-table) | 7 | 2 | 3 | 3 |
 | [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 7 | 0 | 5 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
@@ -63,7 +63,7 @@ the emulator rejected.
 | [`is_primary`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
 | [`primary_replica`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
 | [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
@@ -82,7 +82,7 @@ the emulator rejected.
 | [`is_case_insensitive`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
 | [`is_primary`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
-| [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
 | [`primary_replica`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
 | [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |

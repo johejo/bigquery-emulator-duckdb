@@ -129,6 +129,7 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
   ValidateLabels(metadata.labels);
   ValidateResourceTags(metadata.resource_tags);
   ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
+  ValidateMaxTimeTravelHours(metadata.max_time_travel_hours);
   if (metadata.default_collation.has_value()) {
     ValidateCollation(*metadata.default_collation);
   }
@@ -416,6 +417,9 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
   ApplyOptionUpdates(alteration.options, metadata);
   if (alteration.options.default_table_expiration_ms.has_value()) {
     metadata.default_table_expiration_ms = *alteration.options.default_table_expiration_ms;
+  }
+  if (alteration.options.max_time_travel_hours.has_value()) {
+    metadata.max_time_travel_hours = *alteration.options.max_time_travel_hours;
   }
   return DatasetMetadataStatements(alteration.dataset, metadata);
 }

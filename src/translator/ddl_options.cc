@@ -72,6 +72,15 @@ bool DaysOption(const googlesql::Value& value, std::optional<int64_t>& into) {
   return true;
 }
 
+bool TimeTravelOption(const googlesql::Value& value, std::optional<int64_t>& into) {
+  if (!value.is_null() && !value.type()->IsInt64()) {
+    return false;
+  }
+  into = value.is_null() ? std::nullopt : std::optional(value.int64_value());
+  ValidateMaxTimeTravelHours(into);
+  return true;
+}
+
 bool BoolOption(const googlesql::Value& value, bool& into) {
   if (!value.is_null() && !value.type()->IsBool()) {
     return false;
@@ -247,6 +256,8 @@ bool ApplySchemaOption(DdlOptionId name, const googlesql::Value& value, DatasetM
       return TagsOption(value, metadata.resource_tags, metadata.tag_order);
     case kDefaultTableExpirationDays:
       return DaysOption(value, metadata.default_table_expiration_ms);
+    case kMaxTimeTravelHours:
+      return TimeTravelOption(value, metadata.max_time_travel_hours);
     case kDefaultRoundingMode:
       return RoundingModeOption(value, metadata.default_rounding_mode);
     case kLocation:
@@ -276,6 +287,8 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
       return table && ExpirationOption(value, updates.expiration_time.emplace());
     case kDefaultTableExpirationDays:
       return schema && DaysOption(value, updates.default_table_expiration_ms.emplace());
+    case kMaxTimeTravelHours:
+      return schema && TimeTravelOption(value, updates.max_time_travel_hours.emplace());
     case kDefaultRoundingMode:
       return (table || schema) &&
              RoundingModeOption(value, updates.default_rounding_mode.emplace());

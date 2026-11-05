@@ -971,7 +971,9 @@ cc_library(
     implementation_deps = [
         ":backend",
         ":backend_error",
+        ":duckdb_catalog",
         ":duckdb_sql",
+        ":table_metadata",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/time",
     ],
