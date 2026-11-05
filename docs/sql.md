@@ -26,7 +26,7 @@ rejected.
 | [DDL](#ddl) | 24 | 9 |
 | [Collation](#collation) | 15 | 0 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
-| [INFORMATION_SCHEMA](#information_schema) | 11 | 0 |
+| [INFORMATION_SCHEMA](#information_schema) | 13 | 0 |
 
 ## Graphs
 
@@ -178,6 +178,8 @@ rejected.
 | `TABLES` | Supported |  |
 | `TABLE_SNAPSHOTS` | Supported |  |
 | `TABLE_OPTIONS` | Supported |  |
+| `TABLE_CONSTRAINTS` | Supported | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). |
+| `KEY_COLUMN_USAGE` | Supported | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). |
 | `PARTITIONS` | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
 | `COLUMNS` | Supported |  |
 | `COLUMN_FIELD_PATHS` | Supported |  |

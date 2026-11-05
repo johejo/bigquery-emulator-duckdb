@@ -58,6 +58,33 @@ inline constexpr auto kTableOptionsColumns = std::to_array<ViewColumn>({
 });
 absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context);
 
+inline constexpr auto kTableConstraintsColumns = std::to_array<ViewColumn>({
+    {.name = "constraint_catalog", .type = FieldType::kString},
+    {.name = "constraint_schema", .type = FieldType::kString},
+    {.name = "constraint_name", .type = FieldType::kString},
+    {.name = "table_catalog", .type = FieldType::kString},
+    {.name = "table_schema", .type = FieldType::kString},
+    {.name = "table_name", .type = FieldType::kString},
+    {.name = "constraint_type", .type = FieldType::kString},
+    {.name = "is_deferrable", .type = FieldType::kString},
+    {.name = "initially_deferred", .type = FieldType::kString},
+    {.name = "enforced", .type = FieldType::kString},
+});
+absl::StatusOr<std::vector<Row>> TableConstraintsRows(const ViewContext& context);
+
+inline constexpr auto kKeyColumnUsageColumns = std::to_array<ViewColumn>({
+    {.name = "constraint_catalog", .type = FieldType::kString},
+    {.name = "constraint_schema", .type = FieldType::kString},
+    {.name = "constraint_name", .type = FieldType::kString},
+    {.name = "table_catalog", .type = FieldType::kString},
+    {.name = "table_schema", .type = FieldType::kString},
+    {.name = "table_name", .type = FieldType::kString},
+    {.name = "column_name", .type = FieldType::kString},
+    {.name = "ordinal_position", .type = FieldType::kInteger},
+    {.name = "position_in_unique_constraint", .type = FieldType::kInteger},
+});
+absl::StatusOr<std::vector<Row>> KeyColumnUsageRows(const ViewContext& context);
+
 inline constexpr auto kPartitionsColumns = std::to_array<ViewColumn>({
     {.name = "table_catalog", .type = FieldType::kString},
     {.name = "table_schema", .type = FieldType::kString},

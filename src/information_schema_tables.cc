@@ -379,6 +379,45 @@ absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context) 
   return rows;
 }
 
+absl::StatusOr<std::vector<Row>> TableConstraintsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const std::string& table :
+         context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
+      const std::optional<TableDescription> description =
+          context.source.DescribeTable(dataset.project_id, dataset.dataset_id, table);
+      if (!description.has_value() || description->metadata.primary_key.empty()) {
+        continue;
+      }
+      rows.push_back(Concat(Concat(Identity(dataset, table + ".pk$"), Identity(dataset, table)),
+                            {String("PRIMARY KEY"), String("NO"), String("NO"), String("NO")}));
+    }
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> KeyColumnUsageRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const std::string& table :
+         context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
+      const std::optional<TableDescription> description =
+          context.source.DescribeTable(dataset.project_id, dataset.dataset_id, table);
+      if (!description.has_value()) {
+        continue;
+      }
+      int64_t ordinal = 0;
+      std::ranges::transform(
+          description->metadata.primary_key, std::back_inserter(rows),
+          [&](const std::string& column) {
+            return Concat(Concat(Identity(dataset, table + ".pk$"), Identity(dataset, table)),
+                          {String(column), Int(++ordinal), kNull});
+          });
+    }
+  }
+  return rows;
+}
+
 absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
   std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {

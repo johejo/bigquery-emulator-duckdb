@@ -11,6 +11,8 @@ import (
 // Primary keys as BigQuery's DDL reference and the Table resource's tableConstraints describe them:
 // third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 // third_party/bigquery_docs/reference/rest/v2/tables.md
+// third_party/bigquery_docs/information-schema-table-constraints.md
+// third_party/bigquery_docs/information-schema-key-column-usage.md
 func TestPrimaryKeys(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -50,6 +52,52 @@ func TestPrimaryKeys(t *testing.T) {
 		t.Fatalf("fk_table primary key = %v, want none", got)
 	}
 
+	checkKeyViews := func(table string, columns []string) {
+		t.Helper()
+		queries := []struct {
+			sql  string
+			want [][]bigquery.Value
+		}{
+			{
+				"SELECT constraint_catalog, constraint_schema, constraint_name, table_catalog, table_schema, table_name, " +
+					"constraint_type, is_deferrable, initially_deferred, enforced FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS " +
+					"WHERE table_name = '" + table + "'",
+				nil,
+			},
+			{
+				"SELECT constraint_catalog, constraint_schema, constraint_name, table_catalog, table_schema, table_name, " +
+					"column_name, ordinal_position, position_in_unique_constraint FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
+					"WHERE table_name = '" + table + "' ORDER BY ordinal_position",
+				nil,
+			},
+		}
+		identity := []bigquery.Value{client.Project(), dataset.DatasetID, table + ".pk$", client.Project(), dataset.DatasetID, table}
+		if len(columns) > 0 {
+			queries[0].want = [][]bigquery.Value{append(append([]bigquery.Value{}, identity...), "PRIMARY KEY", "NO", "NO", "NO")}
+		}
+		for i, column := range columns {
+			queries[1].want = append(queries[1].want, append(append([]bigquery.Value{}, identity...), column, int64(i+1), nil))
+		}
+		for _, query := range queries {
+			q := client.Query(query.sql)
+			q.DefaultDatasetID = dataset.DatasetID
+			rows, err := q.Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := collectRows(rows)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != len(query.want) || len(got) > 0 && !reflect.DeepEqual(got, query.want) {
+				t.Errorf("%s = %v, want %v", query.sql, got, query.want)
+			}
+		}
+	}
+	checkKeyViews("pk_table", []string{"x", "y"})
+	checkKeyViews("column_key", []string{"id"})
+	checkKeyViews("fk_table", nil)
+
 	// The documentation's ALTER TABLE examples; DROP PRIMARY KEY IF EXISTS has no effect on a table
 	// without one.
 	for _, sql := range []string{
@@ -63,12 +111,15 @@ func TestPrimaryKeys(t *testing.T) {
 	if got := primaryKey("pk_table"); got != nil {
 		t.Fatalf("primary key after DROP PRIMARY KEY = %v, want none", got)
 	}
+	checkKeyViews("pk_table", nil)
 	if err := run("ALTER TABLE pk_table ADD PRIMARY KEY (x,y) NOT ENFORCED"); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := primaryKey("pk_table"), []string{"x", "y"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("primary key after ADD PRIMARY KEY = %v, want %v", got, want)
 	}
+
+	checkKeyViews("pk_table", []string{"x", "y"})
 
 	// Primary key columns can be neither dropped nor given a default value.
 	for _, sql := range []string{
@@ -94,5 +145,11 @@ func TestPrimaryKeys(t *testing.T) {
 	}
 	if got, want := primaryKey("rest_key"), []string{"b", "a"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("rest_key primary key = %v, want %v", got, want)
+	}
+	checkKeyViews("rest_key", []string{"b", "a"})
+	for _, view := range []string{"TABLE_CONSTRAINTS", "KEY_COLUMN_USAGE"} {
+		if err := run("SELECT * FROM `region-us`.INFORMATION_SCHEMA." + view); err == nil {
+			t.Errorf("region-qualified %s succeeded, want an error", view)
+		}
 	}
 }

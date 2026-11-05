@@ -212,8 +212,8 @@ add or change defaults, and the Storage Write API cannot write to a table with d
 
 ### Primary and foreign keys
 
-Tables keep their primary keys, which `tables.get` reports, but
-`INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `KEY_COLUMN_USAGE` are unsupported. Foreign keys in
+Tables keep their primary keys, which `tables.get`, `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and
+`INFORMATION_SCHEMA.KEY_COLUMN_USAGE` report. Foreign keys in
 `CREATE TABLE` and `tableConstraints` are accepted and dropped, and `ALTER TABLE ADD FOREIGN KEY`
 and `DROP CONSTRAINT` are unsupported.
 
