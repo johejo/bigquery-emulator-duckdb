@@ -1,5 +1,5 @@
 version: 1
-# Expectations follow third_party/bigquery_docs/reference/rest/v2/Job.md#destinationtableproperties.
+# Expectations follow DestinationTableProperties in third_party/bigquery_docs/reference/rest/v2/Job.md.
 description: Load destination properties are set on creation and must match an existing table.
 vars:
   dataset: e2e_${run}_${case}
