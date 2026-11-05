@@ -644,6 +644,9 @@ json DatasetMetadata::ToJson() const {
   if (max_time_travel_hours.has_value()) {
     fields["maxTimeTravelHours"] = std::to_string(*max_time_travel_hours);
   }
+  if (!storage_billing_model.empty()) {
+    fields["storageBillingModel"] = storage_billing_model;
+  }
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
   }
@@ -1077,6 +1080,17 @@ void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool pat
                                          : std::optional(Int64Member(body, "maxTimeTravelHours"));
   }
   ValidateMaxTimeTravelHours(metadata.max_time_travel_hours);
+  // Omission on update must not silently change a dataset's billing model.
+  if (body.contains("storageBillingModel")) {
+    const json& model = body["storageBillingModel"];
+    if (model.is_null() || model == "STORAGE_BILLING_MODEL_UNSPECIFIED") {
+      return;
+    }
+    if (!model.is_string() || (model != "LOGICAL" && model != "PHYSICAL")) {
+      throw ApiError::Unsupported("storageBillingModel other than LOGICAL or PHYSICAL");
+    }
+    metadata.storage_billing_model = model.get<std::string>();
+  }
 }
 
 void ValidateMaxTimeTravelHours(const std::optional<int64_t>& hours) {

@@ -22,8 +22,8 @@ the emulator rejected.
 
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [CREATE SCHEMA](#create-schema) | 8 | 0 | 4 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 7 | 0 | 4 | 3 |
+| [CREATE SCHEMA](#create-schema) | 9 | 0 | 3 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 8 | 0 | 3 | 3 |
 | [CREATE TABLE](#create-table) | 7 | 2 | 3 | 3 |
 | [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 7 | 0 | 5 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
@@ -65,7 +65,7 @@ the emulator rejected.
 | [`location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
 | [`primary_replica`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## ALTER SCHEMA SET OPTIONS
@@ -84,7 +84,7 @@ the emulator rejected.
 | [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
 | [`primary_replica`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`storage_billing_model`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## CREATE TABLE

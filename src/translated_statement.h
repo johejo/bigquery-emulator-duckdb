@@ -89,6 +89,7 @@ struct OptionUpdates {
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
   std::optional<std::optional<int64_t>> max_time_travel_hours = {};
+  std::optional<std::string> storage_billing_model = {};
   std::optional<RoundingMode> default_rounding_mode = {};
   std::optional<std::string> default_collation = {};
 };

@@ -291,6 +291,9 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 - Materialized views compute current results on every read. Background refresh state is not
   simulated, and their stored row and byte counts are always zero. See
   [Materialized views](docs/compatibility.md#materialized-views) for the supported forms.
+- Dataset `storage_billing_model` (`storageBillingModel` in REST) is stored as metadata only;
+  no storage charges are calculated. Changes are immediate, without BigQuery's 24-hour delay
+  or 14-day restriction on changing the model again.
 - `TABLESAMPLE SYSTEM` samples DuckDB vectors of 2048 rows rather than BigQuery storage blocks.
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.

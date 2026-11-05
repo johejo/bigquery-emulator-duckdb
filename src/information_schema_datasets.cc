@@ -93,6 +93,13 @@ absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context)
                                       kMillisPerDay),
       });
     }
+    if (!metadata->storage_billing_model.empty()) {
+      options.push_back({
+          .name = "storage_billing_model",
+          .type = "STRING",
+          .value = metadata->storage_billing_model,
+      });
+    }
     if (metadata->max_time_travel_hours.has_value()) {
       options.push_back({
           .name = "max_time_travel_hours",

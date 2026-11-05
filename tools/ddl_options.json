@@ -1086,7 +1086,9 @@
         "type": "STRING",
         "values": [
           "'LOGICAL'",
-          "'PHYSICAL'"
+          "'PHYSICAL'",
+          "'physical'",
+          "NULL"
         ]
       },
       {
@@ -1186,7 +1188,9 @@
         "type": "STRING",
         "values": [
           "'LOGICAL'",
-          "'PHYSICAL'"
+          "'PHYSICAL'",
+          "'physical'",
+          "NULL"
         ]
       },
       {
