@@ -65,6 +65,14 @@
       "updateTime": "2026-10-02T03:43:09Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-key-column-usage",
+      "file": "third_party/bigquery_docs/information-schema-key-column-usage.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-key-column-usage",
+      "title": "KEY_COLUMN_USAGE view",
+      "sha256": "06e78c048c4f83797acf6fc9d14f731c1aabfef58b6201c9ae455e6cc0c0ac76",
+      "updateTime": "2026-10-02T03:42:47Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-parameters",
       "file": "third_party/bigquery_docs/information-schema-parameters.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-parameters",
@@ -94,6 +102,14 @@
       "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-snapshots",
       "title": "TABLE_SNAPSHOTS view",
       "sha256": "268a3c7f88019963ab346e5a2d8933af90d88308d749855e6201bcf03a68aa2e",
+      "updateTime": "2026-10-02T03:42:47Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/information-schema-table-constraints",
+      "file": "third_party/bigquery_docs/information-schema-table-constraints.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/information-schema-table-constraints",
+      "title": "TABLE_CONSTRAINTS view",
+      "sha256": "f1fb0ce1c3b9f02db887ea8ef4e3da9d4b8efd1908534a5f8422a920827fed9c",
       "updateTime": "2026-10-02T03:42:47Z"
     },
     {

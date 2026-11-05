@@ -563,6 +563,10 @@ query `TABLE_SNAPSHOTS` | CREATE SNAPSHOT TABLE d.n CLONE d.t; SELECT table_name
 query `TABLE_SNAPSHOTS` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLE_SNAPSHOTS
 query `TABLE_OPTIONS` | ALTER TABLE d.t SET OPTIONS (description = 'x'); SELECT table_name, option_name, option_type, option_value FROM d.INFORMATION_SCHEMA.TABLE_OPTIONS
 query `TABLE_OPTIONS` | SELECT table_schema, table_name, option_name FROM `region-us`.INFORMATION_SCHEMA.TABLE_OPTIONS
+query `TABLE_CONSTRAINTS` | ALTER TABLE d.t ADD PRIMARY KEY (id) NOT ENFORCED; SELECT constraint_name, table_name, constraint_type, enforced FROM d.INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+query `KEY_COLUMN_USAGE` | ALTER TABLE d.t ADD PRIMARY KEY (id) NOT ENFORCED; SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint FROM d.INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+note `TABLE_CONSTRAINTS` | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
+note `KEY_COLUMN_USAGE` | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
 query `PARTITIONS` | CREATE TABLE d.p (day DATE) PARTITION BY day; INSERT d.p VALUES (DATE '2021-07-12'); SELECT table_name, partition_id, total_rows FROM d.INFORMATION_SCHEMA.PARTITIONS
 note `PARTITIONS` | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering).
 query `COLUMNS` | SELECT column_name, ordinal_position, data_type FROM d.INFORMATION_SCHEMA.COLUMNS

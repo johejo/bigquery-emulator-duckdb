@@ -193,6 +193,18 @@ constexpr std::array kViews = {
         .rows = info::TableOptionsRows,
     },
     ViewDefinition{
+        .name = "TABLE_CONSTRAINTS",
+        .scope = ViewScope::kDataset,
+        .columns = info::kTableConstraintsColumns,
+        .rows = info::TableConstraintsRows,
+    },
+    ViewDefinition{
+        .name = "KEY_COLUMN_USAGE",
+        .scope = ViewScope::kDataset,
+        .columns = info::kKeyColumnUsageColumns,
+        .rows = info::KeyColumnUsageRows,
+    },
+    ViewDefinition{
         .name = "PARTITIONS",
         .scope = ViewScope::kDataset,
         .columns = info::kPartitionsColumns,
