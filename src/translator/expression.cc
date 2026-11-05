@@ -32,7 +32,7 @@
 
 namespace bigquery_emulator_duckdb::translator {
 
-using function_catalog::StructInArray;
+using function_catalog::InArray;
 
 namespace {
 
@@ -445,10 +445,10 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
         return "(" + IntervalKey(*value) + " IN (SELECT " + IntervalKey(column->second) +
                relation->From() + "))";
       }
-      if (subquery.in_expr()->type()->IsStruct()) {
-        return StructInArray(in_type, CollationKey(*value, *collation, in_type),
-                             "ARRAY(SELECT " + CollationKey(column->second, *collation, in_type) +
-                                 relation->From() + ")");
+      if (in_type->IsStruct() || in_type->IsDouble()) {
+        return InArray(in_type, CollationKey(*value, *collation, in_type),
+                       "ARRAY(SELECT " + CollationKey(column->second, *collation, in_type) +
+                           relation->From() + ")");
       }
       return "(" + CollationKey(*value, *collation, in_type) + " IN (SELECT " +
              CollationKey(column->second, *collation, in_type) + relation->From() + "))";

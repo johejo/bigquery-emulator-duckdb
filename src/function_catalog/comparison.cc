@@ -48,8 +48,8 @@ std::string BindComparison(const std::vector<std::string>& args, const std::vect
 
 std::string BoundComparison(size_t i) { return "_sc.a" + std::to_string(i + 1); }
 
-std::string StructInArray(const googlesql::Type* type, const std::string& value,
-                          const std::string& array) {
+std::string InArray(const googlesql::Type* type, const std::string& value,
+                    const std::string& array) {
   // TRUE when an element is equal, otherwise NULL when a comparison is NULL; FALSE for an empty
   // or NULL array.
   return BindComparison(

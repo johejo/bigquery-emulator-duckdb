@@ -1149,6 +1149,15 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       // array.
       Define("$IN_ARRAY",
              {
+                 {
+                     .arity = 2,
+                     .spelling = "list_transform([list_transform($2, lambda _e: "
+                                 "CASE WHEN $1 IS NULL OR _e IS NULL THEN NULL "
+                                 "WHEN isnan($1) OR isnan(_e) THEN false ELSE $1 = _e END)], "
+                                 "lambda _b: CASE WHEN list_contains(_b, true) THEN true "
+                                 "WHEN len(_b) > list_count(_b) THEN NULL ELSE false END)[1]",
+                     .conditions = kDouble,
+                 },
                  {.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"},
              },
              {

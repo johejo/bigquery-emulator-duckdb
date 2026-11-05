@@ -20,8 +20,8 @@ std::string BindComparison(const std::vector<std::string>& args,
                            const std::vector<std::size_t>& indexes, const std::string& body);
 std::string BoundComparison(std::size_t i);
 
-// `value` IN UNNEST(`array`) for a STRUCT `type`.
-std::string StructInArray(const googlesql::Type* type, const std::string& value,
-                          const std::string& array);
+// `value` IN UNNEST(`array`), preserving the element type's equality semantics.
+std::string InArray(const googlesql::Type* type, const std::string& value,
+                    const std::string& array);
 
 }  // namespace bigquery_emulator_duckdb::function_catalog
