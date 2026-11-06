@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -16,6 +17,8 @@
 #include "absl/time/time.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
+#include "lz4.h"
+#include "lz4frame.h"
 #include "nanoarrow/nanoarrow.h"
 #include "nanoarrow/nanoarrow.hpp"
 #include "nanoarrow/nanoarrow_ipc.h"
@@ -23,6 +26,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/field_schema.h"
+#include "zstd.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -406,7 +410,62 @@ std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
   return out;
 }
 
-std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& array) {
+namespace {
+
+// IPC prefixes each compressed buffer with its uncompressed int64 length, little-endian.
+// A -1 prefix leaves incompressible buffers verbatim, as the Arrow IPC format permits.
+template <StorageReadCompression Codec>
+int CompressArrowBuffer(ArrowBufferView input, ArrowBuffer* output, ArrowError* /*error*/) {
+  const auto size = static_cast<size_t>(input.size_bytes);
+  // nanoarrow exposes buffer pointers through a C union.
+  const void* data = input.data.data;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+  std::string compressed;
+  if constexpr (Codec == StorageReadCompression::kLz4Frame) {
+    compressed.resize(LZ4F_compressFrameBound(size, nullptr));
+    const size_t result =
+        LZ4F_compressFrame(compressed.data(), compressed.size(), data, size, nullptr);
+    if (LZ4F_isError(result) != 0) {
+      return EIO;
+    }
+    compressed.resize(result);
+  } else {
+    compressed.resize(ZSTD_compressBound(size));
+    const size_t result = ZSTD_compress(compressed.data(), compressed.size(), data, size, 1);
+    if (ZSTD_isError(result) != 0) {
+      return EIO;
+    }
+    compressed.resize(result);
+  }
+  const bool smaller = compressed.size() < size;
+  uint64_t length = smaller ? static_cast<uint64_t>(size) : UINT64_MAX;
+  for (int i = 0; i < 8; ++i) {
+    NANOARROW_RETURN_NOT_OK(ArrowBufferAppendUInt8(output, static_cast<uint8_t>(length & 255U)));
+    length >>= 8U;
+  }
+  return smaller
+             ? ArrowBufferAppend(output, compressed.data(), static_cast<int64_t>(compressed.size()))
+             : ArrowBufferAppend(output, data, input.size_bytes);
+}
+
+}  // namespace
+
+std::string CompressStorageReadResponse(const std::string& bytes) {
+  if (bytes.empty() || bytes.size() > LZ4_MAX_INPUT_SIZE) {
+    return {};
+  }
+  const auto size = static_cast<int>(bytes.size());
+  std::string compressed(static_cast<size_t>(LZ4_compressBound(size)), '\0');
+  const int result = LZ4_compress_default(bytes.data(), compressed.data(), size,
+                                          static_cast<int>(compressed.size()));
+  if (result <= 0 || result >= size) {
+    return {};
+  }
+  compressed.resize(static_cast<size_t>(result));
+  return compressed;
+}
+
+std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& array,
+                                   StorageReadCompression compression) {
   nanoarrow::UniqueArrayView view;
   ArrowError error{};
   ArrowCheck(ArrowArrayViewInitFromSchema(view.get(), &root, &error));
@@ -415,7 +474,22 @@ std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& ar
   nanoarrow::UniqueBuffer header;
   nanoarrow::UniqueBuffer body;
   ArrowCheck(ArrowIpcEncoderInit(encoder.get()));
-  ArrowCheck(ArrowIpcEncoderEncodeSimpleRecordBatch(encoder.get(), view.get(), body.get(), &error));
+  switch (compression) {
+    case StorageReadCompression::kNone:
+      ArrowCheck(
+          ArrowIpcEncoderEncodeSimpleRecordBatch(encoder.get(), view.get(), body.get(), &error));
+      break;
+    case StorageReadCompression::kLz4Frame:
+      ArrowCheck(ArrowIpcEncoderEncodeCompressedRecordBatch(
+          encoder.get(), view.get(), body.get(), NANOARROW_IPC_COMPRESSION_TYPE_LZ4_FRAME,
+          CompressArrowBuffer<StorageReadCompression::kLz4Frame>, &error));
+      break;
+    case StorageReadCompression::kZstd:
+      ArrowCheck(ArrowIpcEncoderEncodeCompressedRecordBatch(
+          encoder.get(), view.get(), body.get(), NANOARROW_IPC_COMPRESSION_TYPE_ZSTD,
+          CompressArrowBuffer<StorageReadCompression::kZstd>, &error));
+      break;
+  }
   ArrowCheck(ArrowIpcEncoderFinalizeBuffer(encoder.get(), 1, header.get()));
   std::string output(reinterpret_cast<const char*>(header->data),
                      static_cast<size_t>(header->size_bytes));

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -24,7 +25,14 @@ void StorageReadArraySchema(ArrowSchema* out, const std::vector<FieldSchema>& sc
 std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
                            const std::vector<FieldSchema>& schema);
 
+enum class StorageReadCompression : uint8_t { kNone, kLz4Frame, kZstd };
+
 // One encapsulated IPC record batch message of `array`, a struct array of the type `root`.
-std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& array);
+std::string EncodeArrowRecordBatch(
+    const ArrowSchema& root, const ArrowArray& array,
+    StorageReadCompression compression = StorageReadCompression::kNone);
+
+// Raw LZ4 block for response_compression_codec; returns empty if compression is not smaller.
+std::string CompressStorageReadResponse(const std::string& bytes);
 
 }  // namespace bigquery_emulator_duckdb

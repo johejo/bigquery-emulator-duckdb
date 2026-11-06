@@ -279,9 +279,14 @@ var sections = []section{
 				&storagepb.ReadSession_TableModifiers{SnapshotTime: timestamppb.New(time.Now().Add(-time.Minute))})},
 			{"sampling", readSession(stringSchema, storagepb.DataFormat_ARROW,
 				&storagepb.ReadSession_TableReadOptions{SamplePercentage: proto.Float64(50)}, nil)},
-			{"response compression", readSession(stringSchema, storagepb.DataFormat_ARROW,
+			{"Arrow response compression (LZ4)", readSession(stringSchema, storagepb.DataFormat_ARROW,
 				&storagepb.ReadSession_TableReadOptions{ResponseCompressionCodec: storagepb.ReadSession_TableReadOptions_RESPONSE_COMPRESSION_CODEC_LZ4.Enum()}, nil)},
-			{"Arrow buffer compression", readSession(stringSchema, storagepb.DataFormat_ARROW,
+			{"Avro response compression (LZ4)", readSession(stringSchema, storagepb.DataFormat_AVRO,
+				&storagepb.ReadSession_TableReadOptions{ResponseCompressionCodec: storagepb.ReadSession_TableReadOptions_RESPONSE_COMPRESSION_CODEC_LZ4.Enum()}, nil)},
+			{"Arrow buffer compression (ZSTD)", readSession(stringSchema, storagepb.DataFormat_ARROW,
+				&storagepb.ReadSession_TableReadOptions{OutputFormatSerializationOptions: &storagepb.ReadSession_TableReadOptions_ArrowSerializationOptions{
+					ArrowSerializationOptions: &storagepb.ArrowSerializationOptions{BufferCompression: storagepb.ArrowSerializationOptions_ZSTD}}}, nil)},
+			{"Arrow buffer compression (LZ4_FRAME)", readSession(stringSchema, storagepb.DataFormat_ARROW,
 				&storagepb.ReadSession_TableReadOptions{OutputFormatSerializationOptions: &storagepb.ReadSession_TableReadOptions_ArrowSerializationOptions{
 					ArrowSerializationOptions: &storagepb.ArrowSerializationOptions{BufferCompression: storagepb.ArrowSerializationOptions_LZ4_FRAME}}}, nil)},
 			{"RANGE columns", readSession(bigquery.Schema{{Name: "r", Type: bigquery.RangeFieldType,

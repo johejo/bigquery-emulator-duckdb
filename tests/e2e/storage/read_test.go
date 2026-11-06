@@ -120,7 +120,7 @@ func arrowIDs(t *testing.T, read storagepb.BigQueryReadClient, s *storagepb.Read
 		if i == 0 && !bytes.Equal(block.GetArrowSchema().GetSerializedSchema(), s.GetArrowSchema().GetSerializedSchema()) {
 			t.Fatal("first response must contain the session schema")
 		}
-		data := append(bytes.Clone(s.GetArrowSchema().GetSerializedSchema()), block.GetArrowRecordBatch().GetSerializedRecordBatch()...)
+		data := append(bytes.Clone(s.GetArrowSchema().GetSerializedSchema()), readBlockData(t, block)...)
 		reader, err := ipc.NewReader(bytes.NewReader(data))
 		if err != nil {
 			t.Fatal(err)
@@ -156,7 +156,7 @@ func readIDs(t *testing.T, read storagepb.BigQueryReadClient, s *storagepb.ReadS
 	}
 	var ids []int64
 	for _, block := range responses(t, read, name, offset) {
-		data := block.GetAvroRows().SerializedBinaryRows
+		data := readBlockData(t, block)
 		for range block.RowCount {
 			value, remaining, err := codec.NativeFromBinary(data)
 			if err != nil {
@@ -790,7 +790,9 @@ func TestReadRejectsInvalidAndUnsupportedOptions(t *testing.T) {
 		{"unknown", &storagepb.ReadSession_TableReadOptions{SelectedFields: []string{"absent"}}, codes.InvalidArgument},
 		{"injection", &storagepb.ReadSession_TableReadOptions{RowRestriction: "TRUE); DELETE FROM storage_read_errors.rows; --"}, codes.InvalidArgument},
 		{"subquery", &storagepb.ReadSession_TableReadOptions{RowRestriction: "id IN (SELECT 1)"}, codes.Unimplemented},
-		{"compression", &storagepb.ReadSession_TableReadOptions{OutputFormatSerializationOptions: &storagepb.ReadSession_TableReadOptions_ArrowSerializationOptions{ArrowSerializationOptions: &storagepb.ArrowSerializationOptions{BufferCompression: storagepb.ArrowSerializationOptions_LZ4_FRAME}}}, codes.Unimplemented},
+		{"compression", &storagepb.ReadSession_TableReadOptions{ResponseCompressionCodec: storagepb.ReadSession_TableReadOptions_RESPONSE_COMPRESSION_CODEC_LZ4.Enum(), OutputFormatSerializationOptions: &storagepb.ReadSession_TableReadOptions_ArrowSerializationOptions{ArrowSerializationOptions: &storagepb.ArrowSerializationOptions{BufferCompression: storagepb.ArrowSerializationOptions_LZ4_FRAME}}}, codes.InvalidArgument},
+		{"unknown_response_codec", &storagepb.ReadSession_TableReadOptions{ResponseCompressionCodec: storagepb.ReadSession_TableReadOptions_ResponseCompressionCodec(99).Enum()}, codes.InvalidArgument},
+		{"unknown_buffer_codec", &storagepb.ReadSession_TableReadOptions{OutputFormatSerializationOptions: &storagepb.ReadSession_TableReadOptions_ArrowSerializationOptions{ArrowSerializationOptions: &storagepb.ArrowSerializationOptions{BufferCompression: storagepb.ArrowSerializationOptions_CompressionCodec(99)}}}, codes.InvalidArgument},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := read.CreateReadSession(t.Context(), &storagepb.CreateReadSessionRequest{Parent: "projects/test", ReadSession: &storagepb.ReadSession{Table: path, DataFormat: storagepb.DataFormat_ARROW, ReadOptions: tc.options}})

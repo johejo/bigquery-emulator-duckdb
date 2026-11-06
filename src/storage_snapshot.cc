@@ -488,7 +488,8 @@ const std::vector<FieldSchema>& StorageSnapshot::schema() const { return impl_->
 
 size_t StorageSnapshot::row_count() const { return impl_->chunks->row_count(); }
 
-std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) const {
+std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
+                                      StorageReadCompression compression) const {
   auto& state = *impl_;
   if (offset > row_count() || count > row_count() - offset || count > duckdb_vector_size()) {
     throw std::out_of_range("Storage Read row range is outside the snapshot or vector capacity");
@@ -554,7 +555,7 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
   }
   root->length = static_cast<int64_t>(count);
   root->null_count = 0;
-  return arrow ? EncodeArrowRecordBatch(*state.wire.get(), *root.get())
+  return arrow ? EncodeArrowRecordBatch(*state.wire.get(), *root.get(), compression)
                : EncodeAvroRows(*state.wire.get(), *root.get(), state.fields);
 }
 
