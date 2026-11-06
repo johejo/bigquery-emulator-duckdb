@@ -26,6 +26,7 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // comparing or ordering arrays, including arrays inside structs.
     for (const googlesql::LanguageFeature feature : {
              googlesql::FEATURE_MAP_TYPE,
+             googlesql::FEATURE_MAP_LITERAL,
              googlesql::FEATURE_UUID_TYPE,
              googlesql::FEATURE_TIMESTAMP_NANOS,
              googlesql::FEATURE_TIMESTAMP_PICOS,
@@ -35,12 +36,12 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
          }) {
       options->DisableLanguageFeature(feature);
     }
-    // These released GoogleSQL features are not implemented by the emulator. Keep an upgrade
-    // from enabling new forms through maximum language features or analyzer rewrites alone.
+    // These released GoogleSQL features still need confirmation of BigQuery's supported forms
+    // and semantics, as well as emulator implementations. Keep them disabled until both are
+    // established; a GoogleSQL release alone does not establish BigQuery compatibility.
     for (const googlesql::LanguageFeature feature : {
              googlesql::FEATURE_FPE_NEW_KEYSET,
              googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT,
-             googlesql::FEATURE_MAP_LITERAL,
              googlesql::FEATURE_SECURE_CONTEXT,
              googlesql::FEATURE_LOOKUP_TABLE_TVF,
          }) {
