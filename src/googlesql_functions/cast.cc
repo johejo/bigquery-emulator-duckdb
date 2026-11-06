@@ -118,6 +118,12 @@ absl::StatusOr<int64_t> CastFloat64ToInt64(double value) {
   return out.int64_value();
 }
 
+// Convert the binary floating point value directly, without decimal scaling in double
+// precision, which can lose significant digits or overflow near NUMERIC's limits in DuckDB.
+absl::StatusOr<NumericValue> CastFloat64ToNumeric(double value) {
+  return NumericValue::FromDouble(value);
+}
+
 // BigQuery accepts only case-insensitive "true" and "false", unlike DuckDB's BOOL cast.
 absl::StatusOr<bool> CastStringToBool(std::string_view text) {
   GOOGLESQL_ASSIGN_OR_RETURN(

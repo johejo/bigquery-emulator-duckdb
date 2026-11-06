@@ -76,3 +76,40 @@ SELECT CAST(x AS BOOL) FROM UNNEST(['true\x00']) AS x
 
 SELECT SAFE_CAST(x AS BOOL) FROM UNNEST(['ＴＲＵＥ']) AS x
 => null
+
+# FLOAT64 -> NUMERIC: exact binary halfway values round away from zero at scale 9.
+# Source: conversion_functions.md, CAST AS NUMERIC.
+SELECT ARRAY_AGG(CAST(x AS NUMERIC) ORDER BY i) FROM UNNEST([0.0009765625, -0.0009765625, 0.0]) AS x WITH OFFSET i
+=> [{"v":"0.000976563"},{"v":"-0.000976563"},{"v":"0"}]
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> error:
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> error:
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST([CAST('-inf' AS FLOAT64)]) AS x
+=> error:
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST([1e30]) AS x
+=> error:
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST([-1e30]) AS x
+=> error:
+
+SELECT TO_JSON_STRING(ARRAY(SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST([CAST('nan' AS FLOAT64), CAST('inf' AS FLOAT64), CAST('-inf' AS FLOAT64), 1e30, -1e30]) AS x WITH OFFSET i ORDER BY i))
+=> "[null,null,null,null,null]"
+
+# Source: GoogleSQL compliance/functions_testlib_cast.cc, GetFunctionTestsCastDouble.
+# Large doubles must retain their binary integer value, not a scaled double approximation.
+SELECT CAST(x AS NUMERIC) FROM UNNEST([1e29]) AS x
+=> "99999999999999991433150857216"
+
+SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST([1.844674407370955e19]) AS x
+=> "18446744073709549568"
