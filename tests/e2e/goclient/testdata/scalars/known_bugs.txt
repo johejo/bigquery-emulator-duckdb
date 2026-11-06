@@ -6,11 +6,6 @@
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
 
-# Observed BigQuery answer collected with tools/bqanswers: JSON_VALUE adds its
-# expression context to an unsupported JSONPath error; the emulator omits it.
-SELECT JSON_VALUE(JSON '[{"a": 1}, {"a": 2}]', '$[*].a')
-!> error: Unsupported operator in JSONPath: *; error in JSON_VALUE expression
-
 # Observed BigQuery answers collected with tools/bqanswers. FPE key generation is
 # available with metadata; the emulator disables FEATURE_FPE_NEW_KEYSET until
 # the key format and its semantics are implemented, rather than approximating it.

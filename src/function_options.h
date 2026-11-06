@@ -20,6 +20,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .double_sum = true,
       .json_strict_numbers = true,
       .json_preserve_negative_zero = true,
+      .json_value_error_context = true,
       .collate_und_ci_only = true,
       .query =
           {

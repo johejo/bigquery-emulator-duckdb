@@ -35,7 +35,10 @@ SELECT JSON_QUERY('{"a": 1, "nested": {"a": 2}}', '$..a')
 SELECT JSON_QUERY_ARRAY('[{"a": 1}, {"a": null}, {}]', '$[*].a')
 => error: Unsupported operator in JSONPath: *
 
-# Scalar and legacy extraction.
+# Scalar and legacy extraction. JSON_VALUE adds its expression context to the error.
+SELECT JSON_VALUE(JSON '[{"a": 1}, {"a": 2}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *; error in JSON_VALUE expression
+
 SELECT JSON_VALUE_ARRAY(JSON '[{"a": 1}, {"a": 2}]', '$[*].a')
 => error: Unsupported operator in JSONPath: *
 
