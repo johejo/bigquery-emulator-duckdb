@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <format>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -127,7 +128,8 @@ std::string CsvRecordError(std::string_view detail, const RecordPosition& positi
 std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                                         const CsvReadOptions& options,
                                         const std::vector<FieldSchema>& schema,
-                                        TemporaryFiles& files, BadRecords* bad) {
+                                        TemporaryFiles& files, BadRecords* bad,
+                                        const std::optional<std::set<std::string>>& read_columns) {
   const CsvDialect dialect{
       .delimiter = options.field_delimiter.front(),
       .quote = options.quote,
@@ -145,6 +147,7 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
       const size_t found = record.cells.size();
       const bool too_many = found > columns && !options.ignore_unknown_values;
       std::string line;
+      bool external_conversion = false;
       if (bad != nullptr) {
         ++bad->records;
         bad->positions.push_back(position);
@@ -174,9 +177,11 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
           }
           auto value = Value(column < found ? record.cells.at(column) : std::nullopt, field, column,
                              options, position);
-          if (value && options.external_values) {
+          if (value && options.external_values &&
+              (!read_columns || read_columns->contains(field.name))) {
             auto converted = ExternalValue(field.type, *value, options.formats);
             if (!converted.ok()) {
+              external_conversion = true;
               const std::string detail(converted.status().message());
               if (absl::IsUnimplemented(converted.status())) {
                 throw ApiError::Invalid(detail);
@@ -198,6 +203,7 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                 .uri = source.uri,
                 .message = error.what(),
                 .row = !too_many,
+                .external_conversion = external_conversion,
             })) {
           throw;
         }

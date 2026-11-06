@@ -683,6 +683,10 @@ void AddUnparsable(const std::vector<FileSource>& sources, const std::vector<int
         .uri = sources.at(source).uri,
         .message = CsvRecordError("Unable to parse", bad.positions.at(record - 1),
                                   &schema.at(column), column, row.at(1)),
+        .external_conversion = schema.at(column).type == FieldType::kBytes ||
+                               schema.at(column).type == FieldType::kBigNumeric ||
+                               schema.at(column).type == FieldType::kInterval ||
+                               schema.at(column).type == FieldType::kRange,
     });
   }
 }
@@ -709,8 +713,10 @@ ApiError RecordError(const ApiError& error, std::string_view table_name, std::st
 void ReportBadRecords(BadRecords& bad, bool csv, std::string_view table_name,
                       const TableReadContext& context) {
   std::ranges::sort(bad.found, {}, &BadRecord::number);
-  // A CSV read without a limit fails with the error of its first bad record.
-  if (csv && bad.limit == 0 && !bad.found.empty()) {
+  // Native CSV reader errors name the first bad record without a limit. Several failures
+  // of external conversions use the summary, as external_table_conversion_projection shows.
+  if (csv && bad.limit == 0 && !bad.found.empty() &&
+      (bad.found.size() == 1 || !bad.found.front().external_conversion)) {
     throw RecordError(ApiError::Invalid(bad.found.front().message), table_name,
                       bad.found.front().uri);
   }
@@ -957,7 +963,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         first_records.push_back(bad.records + 1);
         std::vector<FileSource> staged;
         try {
-          staged = StageCsvSources({source}, csv_options, read_schema, files, skips);
+          staged =
+              StageCsvSources({source}, csv_options, read_schema, files, skips, context.columns);
         } catch (const ApiError& error) {
           // A record the parser cannot split fails the read whatever its limit.
           throw RecordError(error, table_name, source.uri);

@@ -68,6 +68,9 @@ struct BadRecord {
   // Whether BigQuery warns of it as a query error, of reason invalidQuery and location query,
   // with `message` alone, as it does of a JSON value that does not convert.
   bool query = false;
+  // Whether a CSV conversion outside its typed reader failed. Several such errors use the
+  // summary even with max_bad_records=0; native reader errors still name the first record.
+  bool external_conversion = false;
 };
 
 // Where a CSV record of a read starts.

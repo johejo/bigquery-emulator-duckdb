@@ -1,0 +1,589 @@
+{
+  "version": 1,
+  "cases": {
+    "bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_bignumeric.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_bignumeric.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "bytes": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_bytes.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_bytes.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "datetime": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_datetime.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_datetime.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "datetime_within_limit": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/wk4wucamzlk2mabbsyznozpp35/datetime_within_limit/source.csv",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/wk4wucamzlk2mabbsyznozpp35/datetime_within_limit/source.csv",
+              "reason": "invalid"
+            }
+          ],
+          "status": 200
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "datetime_zero_limit": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_datetime_zero_limit.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 0; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_datetime_zero_limit.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 0; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "formatted_date": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_formatted_date.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_formatted_date.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "formatted_time": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_formatted_time.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_formatted_time.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "geography": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_geography.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_geography.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "json": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_json.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_json.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "timestamp": {
+      "project": "johejo-sandbox",
+      "run": "wk4wucamzlk2mabbsyznozpp35",
+      "steps": {
+        "converted_column": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_timestamp.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_wk4wucamzlk2mabbsyznozpp35_timestamp.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        },
+        "count": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "create": {
+          "status": 200
+        },
+        "other_column": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,10 +25,11 @@ std::string CsvRecordError(std::string_view detail, const RecordPosition& positi
 // FileReadQuery reads: comma-delimited records of every column, each value quoted and each NULL
 // an unquoted empty value. Throws ApiError::Invalid for a record BigQuery rejects, unless `bad`
 // adds it and may skip it, which leaves it out. With `bad`, each kept record's number comes first
-// when options.numbered_records is set, and its position is recorded.
-std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
-                                        const CsvReadOptions& options,
-                                        const std::vector<FieldSchema>& schema,
-                                        TemporaryFiles& files, BadRecords* bad = nullptr);
+// when options.numbered_records is set, and its position is recorded. With `columns`, external
+// values are converted only for those columns, as for the typed reader's column projection.
+std::vector<FileSource> StageCsvSources(
+    const std::vector<FileSource>& sources, const CsvReadOptions& options,
+    const std::vector<FieldSchema>& schema, TemporaryFiles& files, BadRecords* bad = nullptr,
+    const std::optional<std::set<std::string>>& columns = std::nullopt);
 
 }  // namespace bigquery_emulator_duckdb

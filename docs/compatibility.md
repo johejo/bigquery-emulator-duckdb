@@ -126,10 +126,9 @@ or TIMESTAMP of the default form given a format of its type or, for a TIMESTAMP,
 format, a detected DATETIME CSV column without a header, and a JSON DATE of the default form given
 a date format are unsupported. A
 gzip source with compression `NONE`, which BigQuery reads without decompressing it, or in UTF-16
-or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A CSV value of a BYTES,
-INTERVAL or RANGE column, or a JSON value of a valid record other than a BIGNUMERIC, DATETIME,
-TIMESTAMP or GEOGRAPHY one or one a format parses, that fails to convert still fails the query
-rather than counting as bad. A JSON row that is a number, a
+or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A JSON value of a valid
+record other than a BIGNUMERIC, DATETIME, TIMESTAMP or GEOGRAPHY one or one a format parses,
+that fails to convert still fails the query rather than counting as bad. A JSON row that is a number, a
 BOOL or null is unsupported, and the messages for malformed JSON lines other than those of
 [BigQuery's answers](../tests/e2e/scenarios/testdata/external_table_types_open.api.yaml) take its
 most common one.
