@@ -25,17 +25,20 @@ struct RoutineReference {
 
 // The DuckDB name of a dataset, which is a schema in the project's catalog.
 inline std::string QualifiedName(const DatasetReference& dataset) {
-  return QuoteIdentifier(dataset.project_id) + "." + QuoteIdentifier(dataset.dataset_id);
+  return QuoteIdentifier(dataset.project_id) + "." +
+         QuoteIdentifier(DatasetCatalogName(dataset.dataset_id));
 }
 
 inline std::string QualifiedName(const TableReference& table) {
-  return QuoteIdentifier(table.project_id) + "." + QuoteIdentifier(table.dataset_id) + "." +
-         QuoteIdentifier(table.table_id);
+  return QuoteIdentifier(table.project_id) + "." +
+         QuoteIdentifier(DatasetCatalogName(table.dataset_id)) + "." +
+         QuoteIdentifier(TableCatalogName(table.dataset_id, table.table_id));
 }
 
 // The DuckDB macro that records a routine in its dataset's schema; see Routine.
 inline std::string QualifiedName(const RoutineReference& routine) {
-  return QuoteIdentifier(routine.project_id) + "." + QuoteIdentifier(routine.dataset_id) + "." +
+  return QuoteIdentifier(routine.project_id) + "." +
+         QuoteIdentifier(DatasetCatalogName(routine.dataset_id)) + "." +
          QuoteIdentifier(routine.routine_id);
 }
 

@@ -71,10 +71,6 @@ Dataset `is_case_insensitive` supports `TRUE` through CREATE/ALTER SCHEMA and RE
 false. REST NULL is supported only by `datasets.patch`. Non-ASCII table names in a case-insensitive
 dataset are unsupported, including enabling the setting on a dataset containing such names.
 
-Distinct dataset or table names differing only in case cannot coexist in the emulator, even
-in case-sensitive datasets. Creating or replacing a distinct spelling is rejected as unsupported
-rather than operating on the existing object.
-
 ## Tables
 
 ### External tables

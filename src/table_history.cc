@@ -25,19 +25,17 @@ std::string HistoryTable(const std::string& project) {
   return QuoteIdentifier(project) + ".main.emulator_table_history";
 }
 
-// The versions of `table`. DuckDB names relations without regard to ASCII case, as the history
-// does.
+// The versions of the resolved, case-sensitive identity of `table`.
 std::string VersionsOf(const TableReference& table, int64_t creation_time) {
   return std::format("dataset_id = {} AND table_id = {} AND creation_time = {}",
-                     QuoteLiteral(ToLowerAscii(table.dataset_id)),
-                     QuoteLiteral(ToLowerAscii(table.table_id)), creation_time);
+                     QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id), creation_time);
 }
 
 // The name of the table in the project's main schema that holds the rows of each version of
 // `table`.
 std::string VersionRowsName(const TableReference& table, int64_t creation_time) {
-  return QuoteIdentifier(std::format("emulator_history.{}.{}.{}", ToLowerAscii(table.dataset_id),
-                                     ToLowerAscii(table.table_id), creation_time));
+  return QuoteIdentifier(std::format("emulator_history.{}.{}.{}", ToHex(table.dataset_id),
+                                     ToHex(table.table_id), creation_time));
 }
 
 std::string VersionRows(const TableReference& table, int64_t creation_time) {
@@ -85,9 +83,8 @@ std::vector<std::string> KeepVersionStatements(const TableReference& table, int6
                   QualifiedName(table), NextVersion(table, creation_time)),
       std::format("INSERT INTO {} SELECT {}, {}, {}, version, epoch_us(get_current_timestamp()), "
                   "true, txid_current() FROM ({})",
-                  history, QuoteLiteral(ToLowerAscii(table.dataset_id)),
-                  QuoteLiteral(ToLowerAscii(table.table_id)), creation_time,
-                  NextVersion(table, creation_time)),
+                  history, QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id),
+                  creation_time, NextVersion(table, creation_time)),
       std::format("DELETE FROM {} WHERE _TABLE_VERSION IN (SELECT version FROM {} WHERE {} AND {})",
                   rows, history, versions, expired),
       std::format("DELETE FROM {} WHERE {} AND {}", history, versions, expired),
@@ -106,9 +103,9 @@ std::vector<std::string> DiscardHistoryStatements(const TableReference& table,
   return {
       std::format("INSERT INTO {} SELECT {}, {}, {}, coalesce(max(version), 0) + 1, "
                   "epoch_us(get_current_timestamp()), false, txid_current() FROM {} WHERE {}",
-                  HistoryTable(table.project_id), QuoteLiteral(ToLowerAscii(table.dataset_id)),
-                  QuoteLiteral(ToLowerAscii(table.table_id)), creation_time,
-                  HistoryTable(table.project_id), VersionsOf(table, creation_time)),
+                  HistoryTable(table.project_id), QuoteLiteral(table.dataset_id),
+                  QuoteLiteral(table.table_id), creation_time, HistoryTable(table.project_id),
+                  VersionsOf(table, creation_time)),
       "DROP TABLE IF EXISTS " + VersionRows(table, creation_time),
   };
 }
@@ -119,7 +116,7 @@ std::vector<std::string> RenameHistoryStatements(const TableReference& table, in
   renamed.table_id = table_id;
   return {
       std::format("UPDATE {} SET table_id = {} WHERE {}", HistoryTable(table.project_id),
-                  QuoteLiteral(ToLowerAscii(table_id)), VersionsOf(table, creation_time)),
+                  QuoteLiteral(table_id), VersionsOf(table, creation_time)),
       std::format("ALTER TABLE IF EXISTS {} RENAME TO {}", VersionRows(table, creation_time),
                   VersionRowsName(renamed, creation_time)),
   };
@@ -128,16 +125,17 @@ std::vector<std::string> RenameHistoryStatements(const TableReference& table, in
 void SweepHistory(Backend& backend, const std::string& project) {
   // The history of each table the project has now, as VersionRowsName and VersionsOf name it.
   const std::string tables = std::format(
-      "SELECT lower(schema_name) AS dataset_id, lower(table_name) AS table_id, "
+      "SELECT schema_name AS dataset_id, table_name AS table_id, "
       "TRY_CAST(CASE WHEN json_valid(comment) THEN json_extract_string(comment, '$.creationTime') "
-      "END AS BIGINT) AS creation_time FROM duckdb_tables() WHERE database_name = {} AND "
+      "END AS BIGINT) AS creation_time FROM {} WHERE database_name = {} AND "
       "schema_name <> 'main'",
-      QuoteLiteral(project));
+      LogicalCatalog("duckdb_tables()"), QuoteLiteral(project));
   try {
     const QueryResult forgotten = backend.Execute(std::format(
         "SELECT table_name FROM duckdb_tables() WHERE database_name = {} AND schema_name = 'main' "
         "AND starts_with(table_name, 'emulator_history.') AND table_name NOT IN (SELECT "
-        "'emulator_history.' || dataset_id || '.' || table_id || '.' || creation_time FROM ({}) "
+        "'emulator_history.' || lower(hex(dataset_id)) || '.' || lower(hex(table_id)) || '.' || "
+        "creation_time FROM ({}) "
         "WHERE creation_time IS NOT NULL)",
         QuoteLiteral(project), tables));
     for (size_t row = 0; row < forgotten.rows.size(); ++row) {

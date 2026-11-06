@@ -1,0 +1,148 @@
+version: 1
+# Dataset and table names are case-sensitive unless is_case_insensitive is TRUE.
+# third_party/bigquery_docs/reference/standard-sql/lexical.md, Case sensitivity.
+# Historical reads: third_party/bigquery_docs/reference/standard-sql/query-syntax.md,
+# FOR SYSTEM_TIME AS OF.
+description: Distinct case-sensitive names retain independent data and resource identities.
+vars:
+  dataset: e2e_${run}_${case}
+cases:
+  - name: tables
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.Mixed` AS SELECT 1 AS id;
+              CREATE TABLE `${project}.${dataset}.mixed` AS SELECT 2 AS id;
+              CREATE TABLE `${project}.${dataset}._bq_4d69786564` AS SELECT 4 AS id;
+              SELECT a.id AS upper_id, b.id AS lower_id, c.id AS literal_id FROM `${project}.${dataset}.Mixed` a
+              CROSS JOIN `${project}.${dataset}.mixed` b CROSS JOIN `${project}.${dataset}._bq_4d69786564` c
+            useLegacySql: false
+        observe:
+          upper: /body/rows/0/f/0/v
+          lower: /body/rows/0/f/1/v
+          literal_prefix: /body/rows/0/f/2/v
+      - name: catalog
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'SELECT table_name FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` ORDER BY table_name'
+            useLegacySql: false
+        observe:
+          names: /body/rows
+      - name: clock
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S+00', CURRENT_TIMESTAMP())"
+            useLegacySql: false
+        bind: {timestamp: /body/rows/0/f/0/v}
+      - name: history
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE snapshot TIMESTAMP DEFAULT TIMESTAMP('${timestamp}');
+              UPDATE `${project}.${dataset}.Mixed` SET id = 10 WHERE TRUE;
+              UPDATE `${project}.${dataset}.mixed` SET id = 20 WHERE TRUE;
+              SELECT a.id, b.id
+              FROM `${project}.${dataset}.Mixed` a FOR SYSTEM_TIME AS OF snapshot
+              CROSS JOIN `${project}.${dataset}.mixed` b FOR SYSTEM_TIME AS OF snapshot
+            useLegacySql: false
+        observe:
+          upper: /body/rows/0/f/0/v
+          lower: /body/rows/0/f/1/v
+      - name: replace
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE OR REPLACE TABLE `${project}.${dataset}.Mixed` AS SELECT 3 AS id;
+              SELECT a.id, b.id FROM `${project}.${dataset}.Mixed` a CROSS JOIN `${project}.${dataset}.mixed` b
+            useLegacySql: false
+        observe:
+          upper: /body/rows/0/f/0/v
+          lower: /body/rows/0/f/1/v
+      - name: rename
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              ALTER TABLE `${project}.${dataset}.Mixed` RENAME TO MIXED;
+              DROP TABLE `${project}.${dataset}.mixed`;
+              SELECT id FROM `${project}.${dataset}.MIXED`
+            useLegacySql: false
+        observe:
+          value: /body/rows/0/f/0/v
+      - name: metadata
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/MIXED
+        observe:
+          name: /body/tableReference/tableId
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create: {upper: '1', lower: '2', literal_prefix: '4'}
+      catalog:
+        names: [{f: [{v: Mixed}]}, {f: [{v: _bq_4d69786564}]}, {f: [{v: mixed}]}]
+      history: {upper: '1', lower: '2'}
+      replace: {upper: '3', lower: '20'}
+      rename: {value: '3'}
+      metadata: {name: MIXED}
+  - name: datasets
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE SCHEMA `${project}.${dataset}_Mixed`;
+              CREATE SCHEMA `${project}.${dataset}_mixed`;
+              CREATE TABLE `${project}.${dataset}_Mixed.T` AS SELECT 1 AS id;
+              CREATE TABLE `${project}.${dataset}_mixed.T` AS SELECT 2 AS id;
+              SELECT a.id, b.id FROM `${project}.${dataset}_Mixed.T` a CROSS JOIN `${project}.${dataset}_mixed.T` b
+            useLegacySql: false
+        observe:
+          upper: /body/rows/0/f/0/v
+          lower: /body/rows/0/f/1/v
+      - name: drop
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DROP SCHEMA `${project}.${dataset}_mixed` CASCADE;
+              SELECT id FROM `${project}.${dataset}_Mixed.T`
+            useLegacySql: false
+        observe:
+          value: /body/rows/0/f/0/v
+    cleanup:
+      - name: delete
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'DROP SCHEMA IF EXISTS `${project}.${dataset}_Mixed` CASCADE; DROP SCHEMA IF EXISTS `${project}.${dataset}_mixed` CASCADE'
+            useLegacySql: false
+    expect:
+      create: {upper: '1', lower: '2'}
+      drop: {value: '1'}

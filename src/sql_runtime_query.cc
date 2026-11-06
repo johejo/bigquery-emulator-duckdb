@@ -622,12 +622,13 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     const std::string dataset_project = ResolveProject(request.default_dataset->project_id.empty()
                                                            ? request.project_id
                                                            : request.default_dataset->project_id);
-    setup.push_back("USE " + QualifiedName(DatasetReference{
-                                 .project_id = dataset_project,
-                                 .dataset_id = request.default_dataset->dataset_id,
-                             }));
-    settings.default_project = dataset_project;
-    settings.default_dataset = request.default_dataset->dataset_id;
+    const DatasetReference dataset = ResolveDatasetReference({
+        .project_id = dataset_project,
+        .dataset_id = request.default_dataset->dataset_id,
+    });
+    setup.push_back("USE " + QualifiedName(dataset));
+    settings.default_project = dataset.project_id;
+    settings.default_dataset = dataset.dataset_id;
   } else {
     setup.push_back("USE " + QuoteIdentifier(request.project_id));
   }
@@ -730,7 +731,9 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
     if (found && found->dataset_id != target->dataset_id) {
       throw ApiError::Unsupported("dataset name resolution changed while preparing DDL");
     }
-    CheckDatasetNameCollision(backend, *target);
+    if (translation.dataset && !found) {
+      CheckCaseInsensitiveDataset(backend, *target, translation.dataset->metadata);
+    }
   }
   if (const auto& target = translation.ddl_target_table) {
     const auto found = FindTableReference(backend, *target);
@@ -754,7 +757,6 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       throw ApiError::Unsupported("table name resolution changed while preparing DDL");
     }
     CheckCaseInsensitiveTableName(backend, *target);
-    CheckTableNameCollision(backend, *target);
   }
   CheckRelationTarget(backend, translation);
   if (const auto& table = translation.table;
@@ -834,9 +836,9 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       }
       throw;
     }
-    const std::string predicate =
-        " WHERE lower(dataset_id) = lower(" + QuoteLiteral(graph.dataset_id) +
-        ") AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) + ")";
+    const std::string predicate = " WHERE dataset_id = " + QuoteLiteral(graph.dataset_id) +
+                                  " AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) +
+                                  ")";
     backend.Execute("DELETE FROM " + PropertyGraphsTable(graph.project_id) + predicate);
     if (creating) {
       backend.Execute("INSERT INTO " + PropertyGraphsTable(graph.project_id) + " VALUES (" +

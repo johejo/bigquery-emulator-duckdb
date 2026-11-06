@@ -26,8 +26,8 @@ std::string DatasetsQuery(const std::string& project);
 std::string DatasetEntriesQuery(const std::string& project,
                                 const std::optional<std::string>& dataset = std::nullopt);
 DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded);
-// Resolve resource names before using DuckDB identifiers, whose matching is always
-// case-insensitive. Returned references retain the catalog's spelling.
+// Resolve resource names according to the dataset's case-sensitivity setting before
+// encoding their DuckDB identifiers. Returned references retain the stored spelling.
 std::optional<DatasetReference> FindDatasetReference(Backend& backend,
                                                      const DatasetReference& dataset);
 std::optional<TableReference> FindTableReference(Backend& backend, const TableReference& table);
@@ -35,10 +35,6 @@ std::optional<TableReference> FindTableReference(Backend& backend, const TableRe
 void CheckCaseInsensitiveTableName(Backend& backend, const TableReference& table);
 void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset,
                                  const DatasetMetadata& metadata);
-// DuckDB cannot hold distinct identifiers differing only in case. Reject that form instead
-// of replacing, skipping or deleting an object that BigQuery treats as different.
-void CheckDatasetNameCollision(Backend& backend, const DatasetReference& dataset);
-void CheckTableNameCollision(Backend& backend, const TableReference& table);
 std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment

@@ -50,11 +50,11 @@ std::vector<TableListEntry> SqlRuntime::ListTableEntries(DatasetReference datase
       std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
                   QuoteLiteral(dataset.dataset_id));
   std::vector<TableListEntry> entries;
-  const QueryResult result =
-      Execute(std::format("SELECT table_name, 'TABLE', comment FROM duckdb_tables() {}"
-                          " UNION ALL SELECT view_name, 'VIEW', comment FROM duckdb_views() {}"
-                          " ORDER BY 1",
-                          where, where));
+  const QueryResult result = Execute(std::format(
+      "SELECT table_name, 'TABLE', comment FROM {} {}"
+      " UNION ALL SELECT view_name, 'VIEW', comment FROM {} {}"
+      " ORDER BY 1",
+      LogicalCatalog("duckdb_tables()"), where, LogicalCatalog("duckdb_views()"), where));
   for (size_t row = 0; row < result.rows.size(); ++row) {
     TableMetadata metadata = CommentMetadata(result.rows.OptionalString(row, 2));
     const auto view = ParseViewMetadata(result.rows.OptionalString(row, 2));
@@ -98,11 +98,11 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
     info.schema = TableSchema(backend_, table);
     info.metadata = CommentMetadata(
         RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(std::nullopt));
-    const QueryResult identity =
-        backend_.Execute(std::format("SELECT table_oid FROM duckdb_tables() WHERE database_name = "
-                                     "{} AND schema_name = {} AND table_name = {}",
-                                     QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
-                                     QuoteLiteral(table.table_id)));
+    const QueryResult identity = backend_.Execute(
+        std::format("SELECT table_oid FROM {} WHERE database_name = "
+                    "{} AND schema_name = {} AND table_name = {}",
+                    LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
+                    QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id)));
     if (identity.rows.empty()) {
       throw ApiError::NotFound("Table not found: " + table.table_id);
     }

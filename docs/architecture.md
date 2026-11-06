@@ -37,6 +37,16 @@ conversion, but installs no external-service providers or callbacks. `just check
 that both `//:sql_runtime` and `//:compliance_test` have no transitive dependency on the
 facade, load acquisition, extraction or the Cloud Storage SDK.
 
+Dataset schemas and their tables and views encode names containing ASCII uppercase letters or
+starting with `_bq_` as reversible `_bq_`-prefixed UTF-8 hex names in DuckDB. Other names stay as
+written. This keeps names differing only in case distinct despite DuckDB's identifier matching,
+without collisions between literal names and encoded ones. The runtime resolves logical names
+using the dataset's `is_case_insensitive` setting before encoding SQL identifiers. Catalog reads
+decode physical names before filtering or returning them;
+REST metadata, GoogleSQL analysis and INFORMATION_SCHEMA use the logical names. DuckDB's native
+schemas and the emulator's internal tables in `main` keep their native names. Table history keys
+use the resolved, case-sensitive identity, not a case-folded spelling.
+
 A query result keeps its rows as the DuckDB chunks of the statement's result, which a job keeps
 for `jobs.getQueryResults`. A row is encoded as BigQuery's JSON cells only when a response reads
 it, so a page encodes only its rows; the emulator's own reads, such as script variables and

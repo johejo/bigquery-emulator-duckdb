@@ -56,7 +56,6 @@ TableReference SqlRuntime::ResolveTableReference(TableReference table, bool crea
     throw ApiError::NotFound("Not found: Table " + TableName(table));
   }
   CheckCaseInsensitiveTableName(backend_, table);
-  CheckTableNameCollision(backend_, table);
   return table;
 }
 
@@ -76,7 +75,7 @@ void SqlRuntime::CreateDataset(DatasetReference dataset, const DatasetMetadata& 
     throw ApiError::Duplicate("Already Exists: Dataset " + dataset.project_id + ":" +
                               dataset.dataset_id);
   }
-  CheckDatasetNameCollision(backend_, dataset);
+  CheckCaseInsensitiveDataset(backend_, dataset, metadata);
   const std::vector<std::string> statements =
       CreateDatasetWrite({.dataset = dataset, .metadata = metadata}).metadata_statements;
   try {

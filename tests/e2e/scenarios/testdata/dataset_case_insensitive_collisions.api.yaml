@@ -1,6 +1,5 @@
 version: 1
 # Observed on BigQuery in project johejo-sandbox, run 4fun2x7ua3e2k2iridfjv4ann3.
-# DuckDB cannot yet store distinct dataset or table names differing only in case.
 description: Enabling case-insensitive names rejects preexisting name collisions.
 vars:
   dataset: bqa_${run}_${case}

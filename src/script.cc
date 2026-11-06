@@ -226,7 +226,8 @@ class TemporaryDatabase {
   TemporaryDatabase(Backend& backend, const TemporaryTables& tables)
       : backend_(backend), name_(QuoteIdentifier(tables.project)) {
     backend_.Execute("ATTACH ':memory:' AS " + name_);
-    backend_.Execute("CREATE SCHEMA " + name_ + "." + QuoteIdentifier(tables.dataset));
+    backend_.Execute("CREATE SCHEMA " + name_ + "." +
+                     QuoteIdentifier(DatasetCatalogName(tables.dataset)));
   }
   TemporaryDatabase(const TemporaryDatabase&) = delete;
   TemporaryDatabase& operator=(const TemporaryDatabase&) = delete;
