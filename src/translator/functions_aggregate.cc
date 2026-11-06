@@ -152,6 +152,14 @@ std::string Correlation(const std::string& sql, const std::vector<std::string>& 
          " < 2 THEN NULL ELSE " + sql + " END";
 }
 
+// DuckDB returns zero for a nonfinite singleton in VAR_POP and STDDEV_POP. Check the
+// same filtered rows and window frame, leaving finite and empty inputs to DuckDB.
+std::string PopulationStatistic(const std::string& sql, const std::vector<std::string>& arguments,
+                                const std::string& tail) {
+  return "CASE WHEN bool_or(NOT isfinite(" + arguments.at(0) + "))" + tail +
+         " THEN CAST('NaN' AS DOUBLE) ELSE " + sql + " END";
+}
+
 // A BIGNUMERIC aggregate that `kFunction`, of src/googlesql_functions_duckdb/bignumeric.cc,
 // computes as GoogleSQL does from the units of the non-NULL values that list() collects. A pair of
 // arguments is collected as the units of both joined by a comma, which is NULL where either is
@@ -722,6 +730,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       Define("STDDEV_POP",
              {
                  BigNumericAggregate<kBigNumericStdDevPop>(1),
+                 {
+                     .function = "stddev_pop",
+                     .type = googlesql::TYPE_DOUBLE,
+                     .finish = PopulationStatistic,
+                 },
                  {.function = "stddev_pop"},
              },
              {
@@ -742,6 +755,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       Define("VAR_POP",
              {
                  BigNumericAggregate<kBigNumericVarPop>(1),
+                 {
+                     .function = "var_pop",
+                     .type = googlesql::TYPE_DOUBLE,
+                     .finish = PopulationStatistic,
+                 },
                  {.function = "var_pop"},
              },
              {

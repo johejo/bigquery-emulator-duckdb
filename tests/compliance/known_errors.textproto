@@ -713,12 +713,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Window statistics return zero instead of NaN for a nonfinite singleton"
-  label: "analytic_stat_aggregation_test:analytic_stats_single_column_range_offset_preceding"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "GoogleSQL's reference implementation computes extreme FLOAT64 averages and statistics in long double, and the emulator's results differ from it"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params_2"
