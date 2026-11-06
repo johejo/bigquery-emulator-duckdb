@@ -1,0 +1,48 @@
+# Snapshot ALTER behavior and error messages observed on BigQuery.
+# SET OPTIONS and ADD/DROP COLUMN are covered in table_snapshots.txt.
+
+# Renaming a snapshot is allowed and preserves its type.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_rename;
+DROP SNAPSHOT TABLE IF EXISTS scalars_snapshot_rename.renamed;
+CREATE OR REPLACE TABLE scalars_snapshot_rename.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_rename.snap CLONE scalars_snapshot_rename.base;
+ALTER TABLE scalars_snapshot_rename.snap RENAME TO renamed;
+SELECT table_type FROM scalars_snapshot_rename.INFORMATION_SCHEMA.TABLES WHERE table_name = 'renamed'
+=> "SNAPSHOT"
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_column_options;
+CREATE OR REPLACE TABLE scalars_snapshot_column_options.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_column_options.snap CLONE scalars_snapshot_column_options.base;
+ALTER TABLE scalars_snapshot_column_options.snap ALTER COLUMN id SET OPTIONS (description = 'changed')
+=> error contains: Invalid value: ALTER TABLE ALTER COLUMN only supports modifying columns for tables, while snap is a(n) snapshot
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_set_default;
+CREATE OR REPLACE TABLE scalars_snapshot_set_default.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_set_default.snap CLONE scalars_snapshot_set_default.base;
+ALTER TABLE scalars_snapshot_set_default.snap ALTER COLUMN id SET DEFAULT 1
+=> error contains: Invalid value: ALTER TABLE ALTER COLUMN only supports modifying columns for tables, while snap is a(n) snapshot
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_drop_default;
+CREATE OR REPLACE TABLE scalars_snapshot_drop_default.base (id INT64 DEFAULT 1);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_drop_default.snap CLONE scalars_snapshot_drop_default.base;
+ALTER TABLE scalars_snapshot_drop_default.snap ALTER COLUMN id DROP DEFAULT
+=> error contains: Invalid value: ALTER TABLE ALTER COLUMN only supports modifying columns for tables, while snap is a(n) snapshot
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_add_primary_key;
+CREATE OR REPLACE TABLE scalars_snapshot_add_primary_key.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_add_primary_key.snap CLONE scalars_snapshot_add_primary_key.base;
+ALTER TABLE scalars_snapshot_add_primary_key.snap ADD PRIMARY KEY (id) NOT ENFORCED
+=> error contains: Invalid value: ALTER TABLE only supports altering constraints for tables while snap is a SNAPSHOT
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_drop_primary_key;
+CREATE OR REPLACE TABLE scalars_snapshot_drop_primary_key.base (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_drop_primary_key.snap CLONE scalars_snapshot_drop_primary_key.base;
+ALTER TABLE scalars_snapshot_drop_primary_key.snap DROP PRIMARY KEY
+=> error contains: Invalid value: ALTER TABLE only supports altering constraints for tables while snap is a SNAPSHOT
+
+# SET DEFAULT COLLATE has a different error from SET OPTIONS.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_default_collate;
+CREATE OR REPLACE TABLE scalars_snapshot_default_collate.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_default_collate.snap CLONE scalars_snapshot_default_collate.base;
+ALTER TABLE scalars_snapshot_default_collate.snap SET DEFAULT COLLATE 'und:ci'
+=> error contains: Invalid value: ALTER TABLE only supports altering default collation for tables while snap is a SNAPSHOT

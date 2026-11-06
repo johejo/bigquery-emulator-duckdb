@@ -118,9 +118,22 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
                                  " which has type SNAPSHOT. A table was expected.");
   }
   if (const auto& alteration = translation.altered_table) {
-    // BigQuery's messages for SET OPTIONS and for ADD and DROP COLUMN; what it reports for the
-    // other actions is not known.
+    // BigQuery permits renaming a snapshot, but rejects the other translated actions with
+    // action-specific messages (scalars/snapshot_alter.txt).
     const std::vector<TableAlterAction>& actions = alteration->actions;
+    if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
+          return std::holds_alternative<RenameTableAction>(action);
+        })) {
+      return;
+    }
+    if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
+          const auto* options = std::get_if<OptionUpdates>(&action);
+          return options && options->default_collation.has_value();
+        })) {
+      throw ApiError::InvalidQuery(
+          "Invalid value: ALTER TABLE only supports altering default collation for tables while " +
+          target->table_id + " is a SNAPSHOT");
+    }
     if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
           return std::holds_alternative<OptionUpdates>(action);
         })) {
@@ -136,6 +149,22 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
       throw ApiError::InvalidQuery(
           "Invalid value: ALTER TABLE does not support modifying the schema of a(n) SNAPSHOT: " +
           target->table_id);
+    }
+    if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
+          return std::holds_alternative<ColumnOptionsAction>(action) ||
+                 std::holds_alternative<ColumnDefaultAction>(action);
+        })) {
+      throw ApiError::InvalidQuery(
+          "Invalid value: ALTER TABLE ALTER COLUMN only supports modifying columns for tables, "
+          "while " +
+          target->table_id + " is a(n) snapshot");
+    }
+    if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
+          return std::holds_alternative<PrimaryKeyAction>(action);
+        })) {
+      throw ApiError::InvalidQuery(
+          "Invalid value: ALTER TABLE only supports altering constraints for tables while " +
+          target->table_id + " is a SNAPSHOT");
     }
     throw ApiError::Unsupported("this ALTER TABLE action on a table snapshot");
   }
