@@ -1,0 +1,50 @@
+version: 1
+# Dataset and table names are case-sensitive by default.
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# third_party/bigquery_docs/reference/standard-sql/lexical.md
+description: Default table name matching does not inherit DuckDB identifier matching.
+vars:
+  dataset: e2e_${run}_${case}
+cases:
+  - name: query_table_spelling
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+      - name: table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: MixedTable}
+            schema: {fields: [{name: id, type: INTEGER}]}
+      - name: exact
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'SELECT COUNT(*) FROM `${project}.${dataset}.MixedTable`'
+            useLegacySql: false
+        observe:
+          count: /body/rows/0/f/0/v
+      - name: different_case
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'SELECT COUNT(*) FROM `${project}.${dataset}.mixedtable`'
+            useLegacySql: false
+        expectFailure: true
+        observe:
+          status: /status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      exact: {count: '0'}
+      different_case: {status: 400}

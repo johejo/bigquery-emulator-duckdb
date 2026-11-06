@@ -26,6 +26,11 @@ std::string DatasetsQuery(const std::string& project);
 std::string DatasetEntriesQuery(const std::string& project,
                                 const std::optional<std::string>& dataset = std::nullopt);
 DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded);
+// Resolve resource names before using DuckDB identifiers, whose matching is always
+// case-insensitive. Returned references retain the catalog's spelling.
+std::optional<DatasetReference> FindDatasetReference(Backend& backend,
+                                                     const DatasetReference& dataset);
+std::optional<TableReference> FindTableReference(Backend& backend, const TableReference& table);
 std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment

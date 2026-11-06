@@ -90,6 +90,39 @@ DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded)
   return metadata;
 }
 
+std::optional<DatasetReference> FindDatasetReference(Backend& backend,
+                                                     const DatasetReference& dataset) {
+  const QueryResult result = backend.Execute(
+      std::format("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = {}"
+                  " AND schema_name = {}",
+                  QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id)));
+  if (result.rows.empty()) {
+    return std::nullopt;
+  }
+  return DatasetReference{.project_id = dataset.project_id, .dataset_id = result.rows.String(0, 0)};
+}
+
+std::optional<TableReference> FindTableReference(Backend& backend, const TableReference& table) {
+  const auto dataset = FindDatasetReference(
+      backend, {.project_id = table.project_id, .dataset_id = table.dataset_id});
+  if (!dataset) {
+    return std::nullopt;
+  }
+  const QueryResult result = backend.Execute(
+      std::format("SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
+                  " AND table_schema = {} AND table_name = {}",
+                  QuoteLiteral(dataset->project_id), QuoteLiteral(dataset->dataset_id),
+                  QuoteLiteral(table.table_id)));
+  if (result.rows.empty()) {
+    return std::nullopt;
+  }
+  return TableReference{
+      .project_id = dataset->project_id,
+      .dataset_id = dataset->dataset_id,
+      .table_id = result.rows.String(0, 0),
+  };
+}
+
 // The tables and views of `dataset` by name.
 std::string TablesQuery(const DatasetReference& dataset) {
   return std::format(
@@ -172,6 +205,9 @@ std::optional<std::optional<std::string>> ViewComment(Backend& backend,
 // table does not exist, and ApiError when a column's DuckDB type is one the emulator does not
 // support.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
+  if (!FindTableReference(backend, table)) {
+    throw BackendError("Table not found: " + TableName(table));
+  }
   // Reading a view's schema must not require its execution identity to be configured.
   if (const auto comment = ViewComment(backend, table); comment.has_value()) {
     if (const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
