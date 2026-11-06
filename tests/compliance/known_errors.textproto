@@ -696,13 +696,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "SUM over NUMERIC overflows on sums BigQuery computes"
-  label: "analytic_sum_test:analytic_moving_sum_numeric_no_overflow_1"
-  label: "numeric_aggregation_queries_test:numeric_sum_large"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "Variance and standard deviation lose precision on high-precision NUMERIC values"
   label: "stat_aggregation_test:stddev_pop_numeric_high_prec_values"

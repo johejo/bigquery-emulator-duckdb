@@ -466,9 +466,10 @@ void RegisterSum(duckdb_connection connection) {
   }
 }
 
-// AVG of the non-NULL NUMERIC values that list() collects, rounded half away from zero, which
-// is in range even where SUM overflows.
-void NumericAverage(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+// Accumulate the non-NULL NUMERIC values that list() collects without overflowing on partial
+// sums. Only the final SUM must fit NUMERIC; AVG rounds half away from zero.
+template <bool kAverage>
+void NumericAggregate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output,
           [](const Arguments& arguments) -> absl::StatusOr<std::optional<__int128>> {
             const std::vector<__int128> units = arguments.Decimals(0);
@@ -483,11 +484,11 @@ void NumericAverage(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
               }
               sum.Add(*numeric);
             }
-            const auto average = sum.GetAverage(units.size());
-            if (!average.ok()) {
-              return average.status();
+            const auto result = kAverage ? sum.GetAverage(units.size()) : sum.GetSum();
+            if (!result.ok()) {
+              return result.status();
             }
-            return average->as_packed_int();
+            return result->as_packed_int();
           });
 }
 
@@ -507,7 +508,8 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
     Register(connection, (name + suffix).c_str(), {type.get()}, type.get(), function);
   }
   LogicalType const list(duckdb_create_list_type(type.get()));
-  Register(connection, "bq_numeric_avg", {list.get()}, type.get(), NumericAverage);
+  Register(connection, "bq_numeric_sum", {list.get()}, type.get(), NumericAggregate<false>);
+  Register(connection, "bq_numeric_avg", {list.get()}, type.get(), NumericAggregate<true>);
   RegisterWithContext(connection, "bq_generate_array_numeric", {type.get(), type.get(), type.get()},
                       list.get(), ApplyWithContext<GenerateArray<T>>, extended_array_limit);
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
