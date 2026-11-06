@@ -7,6 +7,7 @@
 
 #include "src/field_schema.h"
 #include "src/statement_resources.h"
+#include "src/storage_read_codec.h"
 
 struct duckdb_result;
 
@@ -33,7 +34,9 @@ class StorageSnapshot {
   [[nodiscard]] size_t row_count() const;
   // Rows [offset, offset + count) as one encapsulated Arrow IPC record batch message, or as Avro
   // binary rows. count must fit in a DuckDB vector.
-  [[nodiscard]] std::string ReadRows(size_t offset, size_t count, bool arrow) const;
+  [[nodiscard]] std::string ReadRows(
+      size_t offset, size_t count, bool arrow,
+      StorageReadCompression compression = StorageReadCompression::kNone) const;
 
  private:
   class Impl;

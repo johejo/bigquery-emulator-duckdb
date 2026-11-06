@@ -209,6 +209,8 @@ struct Snapshot {
   std::shared_ptr<const StorageSnapshot> rows;
   std::string schema;
   bool arrow = false;
+  bool response_compression = false;
+  StorageReadCompression buffer_compression = StorageReadCompression::kNone;
   Clock::time_point expiry;
 };
 
@@ -259,11 +261,21 @@ class ReadService final : public pb::BigQueryRead::Service {
         Fail(grpc::StatusCode::UNIMPLEMENTED,
              "Storage Read does not support timestamp precision options");
       }
-      if (options.has_sample_percentage() || options.response_compression_codec() != 0 ||
-          options.arrow_serialization_options().buffer_compression() != 0 ||
+      const auto response_codec = options.response_compression_codec();
+      const auto buffer_codec = options.arrow_serialization_options().buffer_compression();
+      if ((response_codec != 0 &&
+           response_codec != pb::ReadSession::TableReadOptions::RESPONSE_COMPRESSION_CODEC_LZ4) ||
+          !pb::ArrowSerializationOptions::CompressionCodec_IsValid(buffer_codec)) {
+        Fail(grpc::StatusCode::INVALID_ARGUMENT, "Invalid Storage Read compression codec");
+      }
+      if (response_codec != 0 && buffer_codec != 0) {
+        Fail(grpc::StatusCode::INVALID_ARGUMENT,
+             "Arrow buffer compression and response compression cannot be combined");
+      }
+      if (options.has_sample_percentage() ||
           options.avro_serialization_options().enable_display_name_attribute()) {
         Fail(grpc::StatusCode::UNIMPLEMENTED,
-             "Storage Read does not support sampling, compression or Avro display names");
+             "Storage Read does not support sampling or Avro display names");
       }
       const auto table = ParseTable(emulator_, session.table());
       const auto snapshot = std::make_shared<Snapshot>();
@@ -271,6 +283,12 @@ class ReadService final : public pb::BigQueryRead::Service {
           table, {options.selected_fields().begin(), options.selected_fields().end()},
           options.row_restriction());
       snapshot->arrow = session.data_format() == pb::ARROW;
+      snapshot->response_compression = response_codec != 0;
+      snapshot->buffer_compression = buffer_codec == pb::ArrowSerializationOptions::LZ4_FRAME
+                                         ? StorageReadCompression::kLz4Frame
+                                     : buffer_codec == pb::ArrowSerializationOptions::ZSTD
+                                         ? StorageReadCompression::kZstd
+                                         : StorageReadCompression::kNone;
       snapshot->schema = StorageReadSchema(snapshot->rows->schema(), snapshot->arrow);
       snapshot->expiry = Clock::now() + std::chrono::hours(6);
       const std::string location = emulator_
@@ -334,7 +352,8 @@ class ReadService final : public pb::BigQueryRead::Service {
         size_t count = std::min<size_t>(1024, stream.end - position);
         std::string bytes;
         while (true) {
-          bytes = stream.snapshot->rows->ReadRows(position, count, stream.snapshot->arrow);
+          bytes = stream.snapshot->rows->ReadRows(position, count, stream.snapshot->arrow,
+                                                  stream.snapshot->buffer_compression);
           if (bytes.size() <= size_t{4} * 1024 * 1024 || count <= 1) {
             break;
           }
@@ -345,6 +364,14 @@ class ReadService final : public pb::BigQueryRead::Service {
         }
         pb::ReadRowsResponse response;
         response.set_row_count(static_cast<int64_t>(count));
+        if (stream.snapshot->response_compression) {
+          std::string compressed = CompressStorageReadResponse(bytes);
+          response.set_uncompressed_byte_size(
+              compressed.empty() ? -1 : static_cast<int64_t>(bytes.size()));
+          if (!compressed.empty()) {
+            bytes = std::move(compressed);
+          }
+        }
         if (stream.snapshot->arrow) {
           response.mutable_arrow_record_batch()->set_serialized_record_batch(std::move(bytes));
           if (first) {
