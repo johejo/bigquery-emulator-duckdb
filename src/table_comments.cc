@@ -35,12 +35,15 @@ json ParseComment(const std::optional<std::string>& comment) {
 
 // Whether `field` or one of its fields has a type or setting external reads do not support. CSV
 // and JSON read DATETIME, BIGNUMERIC, JSON and GEOGRAPHY as ExternalValue takes them, and Parquet
-// reads, or rejects as BigQuery does, each as ParquetConversion gives it.
-bool UnsupportedExternalField(const FieldSchema& field) {
+// reads, or rejects as BigQuery does, each as ParquetConversion gives it. CSV also converts
+// INTERVAL and RANGE from text through FileReadQuery, as loads do.
+bool UnsupportedExternalField(const FieldSchema& field, bool csv) {
   return field.max_length || field.precision || field.scale || field.collation ||
-         !field.default_value_expression.empty() || field.type == FieldType::kInterval ||
-         field.type == FieldType::kRange ||
-         std::ranges::any_of(field.fields, UnsupportedExternalField);
+         !field.default_value_expression.empty() ||
+         (!csv && (field.type == FieldType::kInterval || field.type == FieldType::kRange)) ||
+         std::ranges::any_of(field.fields, [csv](const FieldSchema& child) {
+           return UnsupportedExternalField(child, csv);
+         });
 }
 
 // The cloneDefinition or snapshotDefinition `definition` that the emulator recorded in a table
@@ -183,7 +186,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
         throw ApiError::Unsupported(std::string(name) + " with schema auto-detection");
       }
     }
-    const auto unsupported = std::ranges::find_if(schema, UnsupportedExternalField);
+    const auto unsupported = std::ranges::find_if(schema, [&external](const FieldSchema& field) {
+      return UnsupportedExternalField(field, external.format == "CSV");
+    });
     if (unsupported != schema.end()) {
       throw ApiError::Unsupported("this external table column definition: " + unsupported->name);
     }

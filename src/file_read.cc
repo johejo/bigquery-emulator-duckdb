@@ -770,14 +770,16 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
         std::string value =
             big        ? std::format("CAST(bq_bignumeric_from_string({}, false) AS {})", name,
                                      ToDuckDbReadType(field))
-            : range    ? RangeFromText(name, field)
+            : range    ? RangeFromText(name, field, csv->numbered_records)
             : interval ? std::format("bq_interval_from_csv({})", name)
                        : StoredValue(bytes ? std::format("from_base64({})", name) : name, field);
         if (csv->numbered_records && (big || range || interval || bytes)) {
           // These conversions run outside read_csv, whose ignore_errors cannot skip them.
           // Keep NULL inputs, but leave out failed conversions just as read_csv does, so
           // AddUnparsable finds and counts their records too.
-          value = std::format("TRY({})", value);
+          if (!range) {
+            value = std::format("TRY({})", value);
+          }
           valid.push_back(std::format("({} IS NULL OR {} IS NOT NULL)", name, value));
         }
         conversions.push_back(std::format("{} AS {}", value, name));

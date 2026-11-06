@@ -55,7 +55,9 @@ std::string ReadColumns(const std::vector<FieldSchema>& schema, bool selected = 
 
 // The DuckDB value of the RANGE `field` that `text`, a VARCHAR in the form "[start, end)", holds,
 // where NULL and UNBOUNDED are unbounded ends and each other bound is cast to the element type.
-std::string RangeFromText(const std::string& text, const FieldSchema& field);
+// With null_on_error, invalid text or bounds yield NULL, for readers that skip bad records.
+std::string RangeFromText(const std::string& text, const FieldSchema& field,
+                          bool null_on_error = false);
 
 // The DuckDB value `sql` of the REPEATED `field` with each element replaced by
 // `element(name, element_field, depth + 1)`, where `name` is the lambda's parameter, _e and

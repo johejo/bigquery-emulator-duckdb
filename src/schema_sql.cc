@@ -227,13 +227,18 @@ std::string ToDuckDbReadType(const FieldSchema& field) {
   return *std::move(type);
 }
 
-std::string RangeFromText(const std::string& text, const FieldSchema& field) {
+std::string RangeFromText(const std::string& text, const FieldSchema& field, bool null_on_error) {
   const std::string element = ToDuckDbType(RangeBoundField(field, field.name));
-  return std::format(
+  // DuckDB rejects TRY around error(), a volatile function. Return NULL directly for an
+  // invalid bound order, and let TRY catch parsing and cast errors.
+  const std::string value = std::format(
       "list_transform([bq_range_bounds({}, false)], lambda _b: CASE WHEN _b IS NULL THEN NULL ELSE "
       "CAST({} AS {}) END)[1]",
-      text, DuckDbRange("CAST(_b[1] AS " + element + ")", "CAST(_b[2] AS " + element + ")"),
+      text,
+      DuckDbRange("CAST(_b[1] AS " + element + ")", "CAST(_b[2] AS " + element + ")",
+                  null_on_error ? "NULL" : ""),
       ToDuckDbType(field));
+  return null_on_error ? "TRY(" + value + ")" : value;
 }
 
 std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
