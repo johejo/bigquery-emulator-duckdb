@@ -786,8 +786,48 @@ std::optional<std::string> ArrayAggregate(const googlesql::ResolvedArrayAggregat
     fields.push_back(std::move(binding));
     bound[computed->column().column_id()] = std::move(reference);
   }
-  return NonScalarCall(*aggregate.aggregate(), aggregate.aggregate(), "", scope, bound, "", nullptr,
-                       "", *array, element);
+  const auto* modifier = aggregate.aggregate()->having_modifier();
+  if (modifier == nullptr) {
+    return NonScalarCall(*aggregate.aggregate(), aggregate.aggregate(), "", scope, bound, "",
+                         nullptr, "", *array, element);
+  }
+  const auto key = Expression(*modifier->having_expr(), scope, bound);
+  if (!key) {
+    return std::nullopt;
+  }
+  // Bind the decorated input and its extremum once inside list lambdas, rather than a
+  // subquery, so an unselected conditional branch still evaluates neither. The key is
+  // materialized once per element, before HAVING filters rows or ARRAY_AGG sorts them.
+  const std::string key_name = scope.context.FreshName("_having");
+  auto projection = fields;
+  projection.push_back(key_name + " := " + IntervalKey(modifier->having_expr()->type(), *key));
+  *array = "list_transform(COALESCE(" + *array + ", []), lambda " + element + ": struct_pack(" +
+           Join(projection, ", ") + "))";
+  const std::string rows = scope.context.FreshName("_rows");
+  const std::string extreme = scope.context.FreshName("_extreme");
+  const std::string row_key = element + "." + key_name;
+  const std::string keys = "list_transform(" + rows + ", lambda " + element + ": " + row_key + ")";
+  std::string extremum =
+      (modifier->kind() == googlesql::ResolvedAggregateHavingModifier::MAX ? "list_max("
+                                                                           : "list_min(") +
+      keys + ")";
+  if (modifier->having_expr()->type()->IsFloatingPoint()) {
+    // MIN/MAX propagates NaN in BigQuery, and NaN is not SQL-equal to any value.
+    // DuckDB's MIN and equality differ, so neither modifier may retain a NaN group.
+    extremum =
+        "CASE WHEN list_contains(" + keys + ", 'NaN'::DOUBLE) THEN NULL ELSE " + extremum + " END";
+  }
+  const std::string predicate = row_key + " = " + extreme;
+  const std::string filtered =
+      "list_filter(" + rows + ", lambda " + element + ": " + predicate + ")";
+  const auto result = NonScalarCall(*aggregate.aggregate(), aggregate.aggregate(), "", scope, bound,
+                                    predicate, nullptr, "", filtered, element);
+  if (!result) {
+    return std::nullopt;
+  }
+  return "list_extract(list_transform([" + *array + "], lambda " + rows +
+         ": list_extract(list_transform([" + extremum + "], lambda " + extreme + ": " + *result +
+         "), 1)), 1)";
 }
 
 namespace {

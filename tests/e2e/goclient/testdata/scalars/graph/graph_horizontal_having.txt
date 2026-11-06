@@ -1,0 +1,90 @@
+# HAVING retains all rows whose key is SQL-equal to its extremum, before NULL
+# handling, DISTINCT, ORDER BY and LIMIT, as for ordinary aggregates.
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+# The modifier combinations also follow GoogleSQL compliance
+# graph_table_gql_extended1.test: horizontal_aggregation_array_agg_options_without_limit,
+# horizontal_aggregation_array_agg_options and
+# horizontal_aggregation_having_max_and_order_by_same_variable.
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 2, 3] LET r = SUM(x HAVING MAX MOD(x, 2)) RETURN r
+=> "4"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 2, 3] LET r = COUNT(x HAVING MIN MOD(x, 2)) RETURN r
+=> "2"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 2, 3] LET r = AVG(x HAVING MAX MOD(x, 2)) RETURN r
+=> "2.0"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 2, 3] LET r = MIN(x HAVING MAX MOD(x, 2)) RETURN r
+=> "1"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 2, 3] LET r = MAX(x HAVING MIN MOD(x, 2)) RETURN r
+=> "2"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 2, 3] LET r = ARRAY_AGG(x HAVING MIN MOD(x, 2)) RETURN TO_JSON_STRING(r) AS result
+=> "[2,2]"
+GRAPH scalar_graph.FinGraph LET x = [1, 3, 2, 3, 5] LET r = ARRAY_AGG(DISTINCT x HAVING MAX MOD(x, 2) ORDER BY x DESC LIMIT 2) RETURN TO_JSON_STRING(r) AS result
+=> "[5,3]"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, 3] LET y = 3 LET z = ARRAY_AGG(x HAVING MIN y ORDER BY y) LET r = SUM(z) RETURN r
+=> "6"
+
+# Quantified group variables: both documented transfers have amount 300, so ties
+# retain the same totals as the graph-patterns.md example in graph_horizontal.txt.
+GRAPH scalar_graph.TransferGraph
+MATCH (src:Account {id: 7})-[e:Transfers WHERE e.amount > 100]->{0,2}(dst:Account)
+WHERE src.id != dst.id
+LET total_amount = SUM(e.amount HAVING MAX e.amount)
+RETURN src.id AS src, dst.id AS dst, ARRAY_LENGTH(e) AS hops, total_amount
+NEXT
+RETURN STRING_AGG(FORMAT('%d:%d:%d:%d', src, dst, hops, total_amount), ',' ORDER BY dst) AS result
+=> "7:16:1:300,7:20:2:600"
+
+# NULL keys do not match even when every key is NULL; NULL aggregate arguments
+# are handled only after selecting the HAVING rows.
+GRAPH scalar_graph.FinGraph LET x = [1, NULL, 2] LET r = SUM(x HAVING MAX x) RETURN r
+=> "2"
+GRAPH scalar_graph.FinGraph LET x = [1, NULL, 2] LET r = COUNT(x HAVING MIN CAST(NULL AS INT64)) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET x = [1, NULL, 2] LET r = ARRAY_AGG(x HAVING MAX CAST(NULL AS INT64)) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [1, NULL, 2] LET r = ARRAY_AGG(x RESPECT NULLS HAVING MAX 1) RETURN TO_JSON_STRING(r) AS result
+=> "[1,null,2]"
+GRAPH scalar_graph.FinGraph LET x = [1, NULL, 2] LET r = ARRAY_AGG(x IGNORE NULLS HAVING MIN 1 ORDER BY x DESC LIMIT 1) RETURN TO_JSON_STRING(r) AS result
+=> "[2]"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(1 AS v, 1 AS k), STRUCT(NULL AS v, 2 AS k)] LET r = ARRAY_AGG(x.v IGNORE NULLS HAVING MAX x.k) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(1 AS v, 1 AS k), STRUCT(NULL AS v, 2 AS k)] LET r = COUNT(x.v HAVING MAX x.k) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET x = [] LET r = SUM(x HAVING MAX x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<INT64>) LET r = COUNT(x HAVING MIN x) RETURN r
+=> "0"
+
+# NaN keys keep no rows (the same documented MIN/MAX and SQL-equality behavior
+# exercised in ../aggregate_having_nan.txt); infinities remain orderable.
+GRAPH scalar_graph.FinGraph LET x = [1., CAST('NaN' AS FLOAT64)] LET r = COUNT(x HAVING MIN x) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET x = [1., CAST('NaN' AS FLOAT64)] LET r = SUM(x HAVING MAX x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [CAST('NaN' AS FLOAT64)] LET r = ARRAY_AGG(x HAVING MAX x) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [CAST('-inf' AS FLOAT64), 1., CAST('inf' AS FLOAT64)] LET r = MIN(x HAVING MAX x) RETURN r
+=> "Infinity"
+
+# INTERVAL keys compare by length, not DuckDB's structural ordering.
+# ../interval_aggregates.txt and the ordinary HAVING semantics above.
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(1 AS v, INTERVAL 1 MONTH AS k), STRUCT(2 AS v, INTERVAL 30 DAY AS k)] LET r = SUM(x.v HAVING MAX x.k) RETURN r
+=> "3"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(1 AS v, NUMERIC '1' AS k), STRUCT(2 AS v, NUMERIC '2' AS k)] LET r = SUM(x.v HAVING MIN x.k) RETURN r
+=> "1"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(1 AS v, 'a' AS k), STRUCT(2 AS v, 'b' AS k)] LET r = SUM(x.v HAVING MAX x.k) RETURN r
+=> "2"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(1 AS v, BIGNUMERIC '-1e-38' AS k), STRUCT(2 AS v, BIGNUMERIC '1e-38' AS k)] LET r = SUM(x.v HAVING MAX x.k) RETURN r
+=> "2"
+
+# HAVING does not allow collated keys, as in ../collation_aggregate.txt.
+GRAPH scalar_graph.FinGraph LET x = ['a', 'A'] LET r = COUNT(x HAVING MAX COLLATE(x, 'und:ci')) RETURN r
+=> error:
+
+# Like the existing conditional_evaluation compliance case, neither arguments nor
+# HAVING keys in an unselected branch may be evaluated.
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = SUM(x HAVING MAX DIV(2, x)) RETURN r
+=> error contains: division by zero
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = IF(TRUE, 1, SUM(x HAVING MAX DIV(2, x))) RETURN r
+=> "1"
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = IF(TRUE, [1], ARRAY_AGG(DISTINCT DIV(2, x) HAVING MIN DIV(1, x) ORDER BY DIV(2, x) LIMIT 1)) RETURN TO_JSON_STRING(r) AS result
+=> "[1]"

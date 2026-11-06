@@ -100,6 +100,8 @@ query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{1,2}(b:Acc
 query GQL queries | GRAPH d.g LET x = [1, NULL, 2, 1] LET values = ARRAY_AGG(DISTINCT x ORDER BY x DESC NULLS FIRST) RETURN TO_JSON_STRING(values) AS values
 query GQL queries | GRAPH d.g LET x = [1, NULL, 2, 1] LET values = ARRAY_AGG(x IGNORE NULLS ORDER BY -x, x DESC) RETURN values
 query GQL queries | GRAPH d.g LET x = [1, 2] LET values = ARRAY_AGG(x ORDER BY x LIMIT 1) RETURN values
+query GQL queries | GRAPH d.g LET x = [1, 2, 3] LET total = SUM(x HAVING MAX MOD(x, 2)) RETURN total
+query GQL queries | GRAPH d.g LET x = [1, 2, 3] LET values = ARRAY_AGG(DISTINCT x HAVING MIN MOD(x, 2) ORDER BY x LIMIT 1) RETURN values
 query GQL queries | GRAPH d.g MATCH ANY CHEAPEST (a:Person)-[e:Knows COST 1]->(b:Person) RETURN a.id
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_EXPAND` | [Graph limits](compatibility.md#graphs).
