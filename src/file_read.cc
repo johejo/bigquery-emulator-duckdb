@@ -275,6 +275,8 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
   if (column == nullptr ||
       (field.type != FieldType::kGeography && !HasType(field.fields, FieldType::kGeography) &&
        field.type != FieldType::kBigNumeric && !HasType(field.fields, FieldType::kBigNumeric) &&
+       field.type != FieldType::kString && !HasType(field.fields, FieldType::kString) &&
+       field.type != FieldType::kNumeric && !HasType(field.fields, FieldType::kNumeric) &&
        !column->HasWideDecimal())) {
     return cast;
   }
@@ -305,8 +307,23 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
     }
     return std::format("bq_geography_input(CAST({} AS VARCHAR))", sql);
   }
-  if (column->IsWideDecimal() &&
-      (field.type != FieldType::kBigNumeric || column->scale > kBigNumericScale)) {
+  if (column->IsDecimal() && field.type == FieldType::kString) {
+    if (column->IsWideDecimal()) {
+      return std::format("bq_parquet_decimal_string({}, {})", sql, column->scale);
+    }
+    // Like the observed external-table conversion, omit trailing fractional zeros.
+    return std::format(
+        R"(regexp_replace(regexp_replace(CAST({} AS VARCHAR), '(\.[0-9]*?)0+$', '\1'), '\.$', ''))",
+        sql);
+  }
+  if (column->IsDecimal() && field.type == FieldType::kNumeric) {
+    const std::string text =
+        column->IsWideDecimal()
+            ? std::format("bq_parquet_decimal_string({}, {})", sql, column->scale)
+            : std::format("CAST({} AS VARCHAR)", sql);
+    return std::format("CAST(bq_parquet_numeric({}) AS {})", text, ToDuckDbReadType(field));
+  }
+  if (column->IsWideDecimal() && field.type != FieldType::kBigNumeric) {
     throw ApiError::Unsupported(
         std::format("loading a Parquet DECIMAL({}, {}) column into {} field {}", column->precision,
                     column->scale, FieldTypeName(field.type), field.name));
@@ -410,10 +427,9 @@ void WideDecimals(const ParquetColumn& column, std::vector<size_t>& elements) {
   }
 }
 
-// Gives `field` the type BigQuery detects for `column` when it is a wide DECIMAL. Of the
-// `targets`, decimalTargetTypes, NUMERIC cannot hold one, and BIGNUMERIC is picked unless it
-// cannot either and STRING is listed. Converting to NUMERIC, which is picked when it is the only
-// one, or to STRING is unsupported.
+// Selects a DECIMAL's target by range, not by the order in decimalTargetTypes. If none
+// holds its precision and scale, BigQuery selects the widest listed type and checks values
+// when reading them (third_party/bigquery_docs/reference/rest/v2/Job.md).
 void DetectDecimals(FieldSchema& field, const ParquetColumn* column,
                     const std::vector<DecimalTargetType>& targets) {
   if (column == nullptr) {
@@ -431,20 +447,23 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column,
     }
     return;
   }
-  if (!column->IsWideDecimal()) {
+  if (!column->IsDecimal()) {
     return;
   }
   const auto listed = [&targets](DecimalTargetType type) {
     return std::ranges::find(targets, type) != targets.end();
   };
-  const bool fits = column->precision <= 76 && column->scale <= kBigNumericScale;
-  if (!listed(DecimalTargetType::kBigNumeric) || (!fits && listed(DecimalTargetType::kString))) {
-    throw ApiError::Unsupported(std::format(
-        "detecting the type of a Parquet DECIMAL({}, {}) column unless decimalTargetTypes picks "
-        "BIGNUMERIC",
-        column->precision, column->scale));
+  if (listed(DecimalTargetType::kNumeric) && column->HoldsNumeric()) {
+    field.type = FieldType::kNumeric;
+  } else if (listed(DecimalTargetType::kBigNumeric) && column->scale <= kBigNumericScale &&
+             column->precision - column->scale <= 38) {
+    field.type = FieldType::kBigNumeric;
+  } else if (listed(DecimalTargetType::kString)) {
+    field.type = FieldType::kString;
+  } else {
+    field.type =
+        listed(DecimalTargetType::kBigNumeric) ? FieldType::kBigNumeric : FieldType::kNumeric;
   }
-  field.type = FieldType::kBigNumeric;
 }
 
 // Makes `field` and its fields REQUIRED where `column` and its fields are, as BigQuery detects
