@@ -83,6 +83,37 @@ GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<INT64>) LET r = ARRAY_AGG
 GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INT64)] LET r = ARRAY_AGG(DISTINCT x IGNORE NULLS ORDER BY x) RETURN r IS NULL AS result
 => "true"
 
+# LIMIT follows NULL handling, DISTINCT and ORDER BY, as for ordinary ARRAY_AGG.
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+GRAPH scalar_graph.FinGraph LET x = [4, 5, 6] LET r = ARRAY_AGG(x + 3 LIMIT 2) RETURN TO_JSON_STRING(r) AS result
+=> "[7,8]"
+GRAPH scalar_graph.FinGraph LET x = [4, 5] LET r = ARRAY_AGG(x LIMIT 10) RETURN TO_JSON_STRING(r) AS result
+=> "[4,5]"
+GRAPH scalar_graph.FinGraph LET x = [NULL, 4, 5] LET r = ARRAY_AGG(x IGNORE NULLS LIMIT 1) RETURN TO_JSON_STRING(r) AS result
+=> "[4]"
+GRAPH scalar_graph.FinGraph LET x = [NULL, 4, 5] LET r = ARRAY_AGG(x RESPECT NULLS LIMIT 2) RETURN TO_JSON_STRING(r) AS result
+=> "[null,4]"
+GRAPH scalar_graph.FinGraph LET x = [2, 1, 2, 3, 1] LET r = ARRAY_AGG(DISTINCT x ORDER BY x DESC LIMIT 2) RETURN TO_JSON_STRING(r) AS result
+=> "[3,2]"
+GRAPH scalar_graph.FinGraph LET x = [2, NULL, 1, NULL, 2] LET r = ARRAY_AGG(DISTINCT x IGNORE NULLS ORDER BY x LIMIT 1) RETURN TO_JSON_STRING(r) AS result
+=> "[1]"
+GRAPH scalar_graph.FinGraph LET x = [2, NULL, 1, NULL, 2] LET r = ARRAY_AGG(DISTINCT x ORDER BY x LIMIT 2) RETURN TO_JSON_STRING(r) AS result
+=> "[null,1]"
+GRAPH scalar_graph.FinGraph LET x = [] LET r = ARRAY_AGG(x LIMIT 2) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<INT64>) LET r = ARRAY_AGG(x LIMIT 2) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INT64)] LET r = ARRAY_AGG(x IGNORE NULLS LIMIT 1) RETURN r IS NULL AS result
+=> "true"
+
+# LIMIT 0 gives NULL, as in GoogleSQL's aggregation_order_by tests (aggregates.txt).
+GRAPH scalar_graph.FinGraph LET x = [1, 2] LET r = ARRAY_AGG(x LIMIT 0) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [1, 2] LET r = ARRAY_AGG(DISTINCT x ORDER BY x LIMIT 0) RETURN r IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [4, 0, 5] LET r = IF(TRUE, [1], ARRAY_AGG(DISTINCT DIV(2, x) ORDER BY DIV(2, x) LIMIT 1)) RETURN TO_JSON_STRING(r) AS result
+=> "[1]"
+
 # Ordering FLOAT64 follows BigQuery's documented NULL, NaN, -inf, finite, +inf order.
 # third_party/bigquery_docs/reference/standard-sql/data-types.md
 GRAPH scalar_graph.FinGraph LET x = [CAST('inf' AS FLOAT64), 1., CAST('NaN' AS FLOAT64), NULL, CAST('-inf' AS FLOAT64)] LET r = ARRAY_AGG(x ORDER BY x) RETURN TO_JSON_STRING(r) AS result
