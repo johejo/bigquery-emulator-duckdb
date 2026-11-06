@@ -30,8 +30,6 @@ Loads and extracts also accept local paths. Their limits are:
   Other encodings, coordinate reference systems and coordinate epochs are unsupported, as are
   loads combining files with differing GeoParquet metadata or explicitly mapping geometry to a
   non-GEOGRAPHY field. Planar polygons with an edge along a pole are unsupported.
-- Parquet DECIMAL values wider than 38 digits require BIGNUMERIC; schema detection selects it
-  only when `decimalTargetTypes` includes it.
 - Parquet files with differing schemas cannot load if one contains a nullable LIST or a
   single-field group that DuckDB reads as its field, including a LIST without
   `parquetOptions.enableListInference`.

@@ -130,15 +130,20 @@ std::vector<DecimalTargetType> ParseDecimalTargetTypes(const nlohmann::json& con
   }
   std::vector<DecimalTargetType> result;
   for (const auto& target : targets) {
+    DecimalTargetType type = DecimalTargetType::kNumeric;
     if (target == "NUMERIC") {
-      result.push_back(DecimalTargetType::kNumeric);
+      type = DecimalTargetType::kNumeric;
+    } else if (target == "BIGNUMERIC") {
+      type = DecimalTargetType::kBigNumeric;
+    } else if (target == "STRING") {
+      type = DecimalTargetType::kString;
+    } else {
+      throw ApiError::Invalid("Invalid decimalTargetTypes");
     }
-    if (target == "BIGNUMERIC") {
-      result.push_back(DecimalTargetType::kBigNumeric);
+    if (std::ranges::find(result, type) != result.end()) {
+      throw ApiError::Invalid("Duplicate decimalTargetTypes");
     }
-    if (target == "STRING") {
-      result.push_back(DecimalTargetType::kString);
-    }
+    result.push_back(type);
   }
   return result;
 }

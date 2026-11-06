@@ -4,8 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -47,6 +49,63 @@ using googlesql_functions::PrecisionScale;
 // The BIGNUMERIC of argument `column`, which holds the units of a BIGNUM.
 absl::StatusOr<BigNumericValue> Units(const Arguments& arguments, idx_t column) {
   return BigNumericFromUnits(arguments.String(column));
+}
+
+// Parquet stores a DECIMAL as a big-endian two's-complement integer. Convert its magnitude
+// directly to decimal digits so STRING is not limited by BIGNUMERIC's range or scale.
+absl::StatusOr<std::string> ParquetDecimalString(std::string_view bytes, int64_t scale) {
+  if (bytes.empty() || scale < 0 || scale > std::numeric_limits<int32_t>::max()) {
+    return absl::InvalidArgumentError("Invalid Parquet DECIMAL");
+  }
+  const bool negative = (static_cast<unsigned char>(bytes.front()) & 0x80U) != 0;
+  std::vector<unsigned> magnitude;
+  magnitude.reserve(bytes.size());
+  std::ranges::transform(bytes, std::back_inserter(magnitude),
+                         [negative](unsigned char byte) { return negative ? byte ^ 0xffU : byte; });
+  if (negative) {
+    unsigned carry = 1;
+    for (unsigned& byte : std::views::reverse(magnitude)) {
+      carry += byte;
+      byte = carry & 0xffU;
+      carry >>= 8U;
+    }
+  }
+  std::string digits = "0";
+  for (const unsigned byte : magnitude) {
+    unsigned carry = byte;
+    for (char& digit : std::views::reverse(digits)) {
+      carry += static_cast<unsigned>(digit - '0') * 256U;
+      digit = static_cast<char>('0' + (carry % 10U));
+      carry /= 10U;
+    }
+    while (carry != 0) {
+      digits.insert(digits.begin(), static_cast<char>('0' + (carry % 10U)));
+      carry /= 10U;
+    }
+  }
+  if (scale > 0) {
+    const auto point = static_cast<size_t>(scale);
+    if (digits.size() <= point) {
+      digits.insert(0, point + 1 - digits.size(), '0');
+    }
+    digits.insert(digits.size() - point, ".");
+    while (digits.back() == '0') {
+      digits.pop_back();
+    }
+    if (digits.back() == '.') {
+      digits.pop_back();
+    }
+  }
+  return negative ? "-" + digits : digits;
+}
+
+// A load must fail rather than round a DECIMAL that NUMERIC cannot represent exactly.
+absl::StatusOr<std::string> ParquetNumeric(std::string_view text) {
+  const auto value = googlesql::NumericValue::FromStringStrict(text);
+  if (!value.ok()) {
+    return value.status();
+  }
+  return value->ToString();
 }
 
 // ROUND with a rounding mode.
@@ -388,6 +447,9 @@ void RegisterBigNumericFunctions(duckdb_connection connection, const Options& op
   Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar,
            Apply<FromDouble, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_bignumeric_to_string", {kVarchar}, kVarchar, Apply<ToString>);
+  Register(connection, "bq_parquet_numeric", {kVarchar}, kVarchar, Apply<ParquetNumeric>);
+  Register(connection, "bq_parquet_decimal_string", {kBlob, kBigint}, kVarchar,
+           Apply<ParquetDecimalString>);
   Register(connection, "bq_bignumeric_from_decimal_bytes", {kBlob, kBigint}, kVarchar,
            Apply<BigNumericFromDecimalBytes>);
   Register(connection, "bq_bignumeric_to_decimal_bytes", {kVarchar}, kBlob,

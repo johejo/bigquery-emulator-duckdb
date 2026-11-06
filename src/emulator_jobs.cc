@@ -373,13 +373,14 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     if (std::holds_alternative<JsonLoadOptions>(options)) {
       sources = StageJsonNumerics(sources, requested_schema, downloads);
     } else if (const auto* parquet_options = std::get_if<ParquetLoadOptions>(&options)) {
+      const auto targets = ParseDecimalTargetTypes(config);
       ParquetSources staged =
           StageParquetSources(sources, downloads, parquet_options->enable_list_inference);
       sources = std::move(staged.sources);
       parquet = std::move(staged.columns);
       if (requested_schema.empty()) {
         requested_schema = Prepare(FileReadQuery(read_options, sources, {}, parquet)).schema;
-        DetectParquetSchema(requested_schema, parquet, ParseDecimalTargetTypes(config));
+        DetectParquetSchema(requested_schema, parquet, targets);
       }
     }
     auto read_schema = requested_schema;

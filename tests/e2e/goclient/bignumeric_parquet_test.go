@@ -267,7 +267,7 @@ func TestBigNumericParquetErrors(t *testing.T) {
 	overflowing := writeParquet(t, []arrow.Field{{Name: "n", Type: integral, Nullable: true}},
 		[]arrow.Array{overflow.NewArray()})
 	wide := array.NewDecimal256Builder(allocator, bigNumericParquet)
-	wide.Append(decimal(t, "1.5", 38))
+	wide.Append(decimal(t, tinyBigNumeric, 38))
 	source := writeParquet(t, []arrow.Field{{Name: "n", Type: bigNumericParquet, Nullable: true}},
 		[]arrow.Array{wide.NewArray()})
 
