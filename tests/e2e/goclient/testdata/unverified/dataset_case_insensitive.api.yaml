@@ -1,0 +1,145 @@
+version: 1
+# Basic name matching is specified by data-definition-language.md and datasets.md.
+# These cases collect the unspecified update, collision and response details instead.
+description: Dataset case sensitivity updates and resource spelling.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  metadata:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            isCaseInsensitive: true
+        observe:
+          flag: /body/isCaseInsensitive
+      - name: modify
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body: ${body}
+        observe:
+          flag: /body/isCaseInsensitive
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          flag: /body/isCaseInsensitive
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: patch_omitted
+    template: metadata
+    vars: {method: PATCH, body: {description: kept}}
+  - name: update_omitted
+    template: metadata
+    vars: {method: PUT, body: {description: kept}}
+  - name: patch_null
+    template: metadata
+    vars: {method: PATCH, body: {isCaseInsensitive: null}}
+  - name: patch_false
+    template: metadata
+    vars: {method: PATCH, body: {isCaseInsensitive: false}}
+  - name: canonical_spelling
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_Mixed'}
+            isCaseInsensitive: true
+      - name: table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}_mixed', tableId: MixedTable}
+            schema: {fields: [{name: id, type: INTEGER}]}
+        observe:
+          reference: /body/tableReference
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables/mixedtable
+        observe:
+          reference: /body/tableReference
+      - name: dataset
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed
+        observe:
+          reference: /body/datasetReference
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed?deleteContents=true
+  - name: conflicting_tables
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+      - name: tables
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CREATE TABLE `${project}.${dataset}.Mixed` (id INT64); CREATE TABLE `${project}.${dataset}.mixed` (id INT64)'
+            useLegacySql: false
+      - name: modify
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body: {isCaseInsensitive: true}
+        observe:
+          status: /status
+          error: /body/error
+          flag: /body/isCaseInsensitive
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  - name: conflicting_datasets
+    steps:
+      - name: lower
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_mixed'}
+      - name: upper
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_Mixed'}
+      - name: modify
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed
+          body: {isCaseInsensitive: true}
+        observe:
+          status: /status
+          error: /body/error
+          flag: /body/isCaseInsensitive
+    cleanup:
+      - name: delete_lower
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed?deleteContents=true
+      - name: delete_upper
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed?deleteContents=true
