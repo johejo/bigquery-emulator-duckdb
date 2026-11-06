@@ -1,5 +1,6 @@
 #include "src/duckdb_catalog.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -90,16 +91,45 @@ DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded)
   return metadata;
 }
 
+namespace {
+
+bool AsciiName(const std::string& name) {
+  return std::ranges::all_of(name, [](unsigned char c) { return c < 128; });
+}
+
+bool CaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset) {
+  // Native catalogs and script-local databases have no dataset metadata table.
+  if (backend
+          .Execute(std::format("SELECT 1 FROM information_schema.tables WHERE table_catalog = {}"
+                               " AND table_schema = 'main' AND table_name = 'emulator_datasets'",
+                               QuoteLiteral(dataset.project_id)))
+          .rows.empty()) {
+    return false;
+  }
+  const QueryResult result =
+      backend.Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
+  return !result.rows.empty() &&
+         ParseDatasetMetadata(result.rows.OptionalString(0, 1)).is_case_insensitive;
+}
+
+}  // namespace
+
 std::optional<DatasetReference> FindDatasetReference(Backend& backend,
                                                      const DatasetReference& dataset) {
   const QueryResult result = backend.Execute(
       std::format("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = {}"
-                  " AND schema_name = {}",
+                  " AND lower(schema_name) = lower({})",
                   QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id)));
-  if (result.rows.empty()) {
-    return std::nullopt;
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    DatasetReference candidate{
+        .project_id = dataset.project_id,
+        .dataset_id = result.rows.String(row, 0),
+    };
+    if (candidate.dataset_id == dataset.dataset_id || CaseInsensitiveDataset(backend, candidate)) {
+      return candidate;
+    }
   }
-  return DatasetReference{.project_id = dataset.project_id, .dataset_id = result.rows.String(0, 0)};
+  return std::nullopt;
 }
 
 std::optional<TableReference> FindTableReference(Backend& backend, const TableReference& table) {
@@ -110,17 +140,65 @@ std::optional<TableReference> FindTableReference(Backend& backend, const TableRe
   }
   const QueryResult result = backend.Execute(
       std::format("SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
-                  " AND table_schema = {} AND table_name = {}",
+                  " AND table_schema = {} AND lower(table_name) = lower({})",
                   QuoteLiteral(dataset->project_id), QuoteLiteral(dataset->dataset_id),
                   QuoteLiteral(table.table_id)));
-  if (result.rows.empty()) {
-    return std::nullopt;
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    TableReference candidate{
+        .project_id = dataset->project_id,
+        .dataset_id = dataset->dataset_id,
+        .table_id = result.rows.String(row, 0),
+    };
+    if (candidate.table_id == table.table_id) {
+      return candidate;
+    }
+    if (CaseInsensitiveDataset(backend, *dataset)) {
+      if (!AsciiName(candidate.table_id) || !AsciiName(table.table_id)) {
+        throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");
+      }
+      return candidate;
+    }
   }
-  return TableReference{
-      .project_id = dataset->project_id,
-      .dataset_id = dataset->dataset_id,
-      .table_id = result.rows.String(0, 0),
-  };
+  return std::nullopt;
+}
+
+void CheckCaseInsensitiveTableName(Backend& backend, const TableReference& table) {
+  if (!AsciiName(table.table_id) &&
+      CaseInsensitiveDataset(backend,
+                             {.project_id = table.project_id, .dataset_id = table.dataset_id})) {
+    throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");
+  }
+}
+
+void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset,
+                                 const DatasetMetadata& metadata) {
+  if (metadata.is_case_insensitive &&
+      std::ranges::any_of(FirstColumnStrings(backend.Execute(TablesQuery(dataset))),
+                          [](const std::string& name) { return !AsciiName(name); })) {
+    throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");
+  }
+}
+
+void CheckDatasetNameCollision(Backend& backend, const DatasetReference& dataset) {
+  const QueryResult result = backend.Execute(
+      std::format("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = {}"
+                  " AND lower(schema_name) = lower({}) AND schema_name <> {}",
+                  QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id),
+                  QuoteLiteral(dataset.dataset_id)));
+  if (!result.rows.empty()) {
+    throw ApiError::Unsupported("distinct dataset names differing only in case");
+  }
+}
+
+void CheckTableNameCollision(Backend& backend, const TableReference& table) {
+  const QueryResult result = backend.Execute(
+      std::format("SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
+                  " AND table_schema = {} AND lower(table_name) = lower({}) AND table_name <> {}",
+                  QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
+                  QuoteLiteral(table.table_id), QuoteLiteral(table.table_id)));
+  if (!result.rows.empty()) {
+    throw ApiError::Unsupported("distinct table names differing only in case");
+  }
 }
 
 // The tables and views of `dataset` by name.
@@ -204,10 +282,12 @@ std::optional<std::optional<std::string>> ViewComment(Backend& backend,
 // describe them, each replaced by the field its comment records. Throws BackendError when the
 // table does not exist, and ApiError when a column's DuckDB type is one the emulator does not
 // support.
-std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
-  if (!FindTableReference(backend, table)) {
-    throw BackendError("Table not found: " + TableName(table));
+std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& requested) {
+  const auto resolved = FindTableReference(backend, requested);
+  if (!resolved) {
+    throw BackendError("Table not found: " + TableName(requested));
   }
+  const TableReference& table = *resolved;
   // Reading a view's schema must not require its execution identity to be configured.
   if (const auto comment = ViewComment(backend, table); comment.has_value()) {
     if (const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);

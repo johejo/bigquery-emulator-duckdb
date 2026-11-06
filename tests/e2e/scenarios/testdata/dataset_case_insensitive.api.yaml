@@ -1,0 +1,201 @@
+version: 1
+# Dataset and table names are case-insensitive with is_case_insensitive=TRUE.
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# third_party/bigquery_docs/reference/rest/v2/datasets.md
+# SCHEMATA_OPTIONS has one row per set schema option, with its declared type and value.
+# third_party/bigquery_docs/information-schema-datasets-schemata-options.md
+description: Case-insensitive names share table data and metadata across SQL and REST.
+vars:
+  dataset: e2e_${run}_${case}
+  configure_method: POST
+  configure_path: queries
+  configure_body: {query: SELECT 1, useLegacySql: false}
+templates:
+  names:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/${create_path}
+          body: ${create_body}
+      - name: configure
+        rest:
+          method: ${configure_method}
+          path: /bigquery/v2/projects/${project}/${configure_path}
+          body: ${configure_body}
+      - name: dataset
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed
+        observe:
+          flag: /body/isCaseInsensitive
+      - name: table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}_mixed', tableId: MixedTable}
+            schema: {fields: [{name: id, type: INTEGER}]}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'INSERT INTO `${project}.${dataset}_mixed.mixedtable` (id) VALUES (1)'
+            useLegacySql: false
+      - name: modify
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              UPDATE `${project}.${dataset}_mixed.MIXEDTABLE` SET id = id + 1 WHERE TRUE;
+              ALTER TABLE `${project}.${dataset}_mixed.mixedtable` SET OPTIONS (description = 'updated');
+              SELECT id FROM `${project}.${dataset}_mixed.mixedtable`
+            useLegacySql: false
+        observe:
+          value: /body/rows/0/f/0/v
+      - name: metadata
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables/MIXEDTABLE
+        observe:
+          description: /body/description
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT option_type, CAST(option_value AS BOOL)
+              FROM `${project}.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`
+              WHERE schema_name = '${dataset}_Mixed' AND option_name = 'is_case_insensitive'
+            useLegacySql: false
+        observe:
+          type: /body/rows/0/f/0/v
+          value: /body/rows/0/f/1/v
+      - name: view
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CREATE VIEW `${project}.${dataset}_mixed.MixedView` AS
+              SELECT id FROM `${project}.${dataset}_mixed.mixedtable`;
+              SELECT id FROM mixedview
+            defaultDataset: {projectId: '${project}', datasetId: '${dataset}_mixed'}
+            useLegacySql: false
+        observe:
+          value: /body/rows/0/f/0/v
+      - name: streaming_insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables/mixedtable/insertAll
+          body:
+            rows: [{json: {id: 0}}]
+      - name: destination
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            configuration:
+              query:
+                query: SELECT 3 AS id
+                useLegacySql: false
+                destinationTable: {projectId: '${project}', datasetId: '${dataset}_mixed', tableId: mixedtable}
+                writeDisposition: WRITE_APPEND
+      - name: appended
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT COUNT(*) AS n, SUM(id) AS total FROM mixedview
+            defaultDataset: {projectId: '${project}', datasetId: '${dataset}_mixed'}
+            useLegacySql: false
+        observe:
+          count: /body/rows/0/f/0/v
+          sum: /body/rows/0/f/1/v
+      - name: drop
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'DROP TABLE `${project}.${dataset}_mixed.mixedtable`'
+            useLegacySql: false
+      - name: missing
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed/tables/MixedTable
+        expectFailure: true
+        observe:
+          status: /status
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed?deleteContents=true
+cases:
+  - name: create_schema
+    template: names
+    vars:
+      create_path: queries
+      create_body:
+        query: 'CREATE SCHEMA `${project}.${dataset}_Mixed` OPTIONS (is_case_insensitive = TRUE)'
+        useLegacySql: false
+    expect:
+      dataset: {flag: true}
+      modify: {value: '2'}
+      metadata: {description: updated}
+      options: {type: BOOL, value: 'true'}
+      view: {value: '2'}
+      appended: {count: '3', sum: '5'}
+      missing: {status: 404}
+  - name: alter_schema
+    template: names
+    vars:
+      create_path: datasets
+      create_body:
+        datasetReference: {datasetId: '${dataset}_Mixed'}
+      configure_body:
+        query: 'ALTER SCHEMA `${project}.${dataset}_Mixed` SET OPTIONS (is_case_insensitive = TRUE)'
+        useLegacySql: false
+    expect:
+      dataset: {flag: true}
+      modify: {value: '2'}
+      metadata: {description: updated}
+      options: {type: BOOL, value: 'true'}
+      view: {value: '2'}
+      appended: {count: '3', sum: '5'}
+      missing: {status: 404}
+  - name: datasets_patch
+    template: names
+    vars:
+      create_path: datasets
+      create_body:
+        datasetReference: {datasetId: '${dataset}_Mixed'}
+      configure_method: PATCH
+      configure_path: datasets/${dataset}_Mixed
+      configure_body: {isCaseInsensitive: true}
+    expect:
+      dataset: {flag: true}
+      modify: {value: '2'}
+      metadata: {description: updated}
+      options: {type: BOOL, value: 'true'}
+      view: {value: '2'}
+      appended: {count: '3', sum: '5'}
+      missing: {status: 404}
+  - name: datasets_insert
+    template: names
+    vars:
+      create_path: datasets
+      create_body:
+        datasetReference: {datasetId: '${dataset}_Mixed'}
+        isCaseInsensitive: true
+    expect:
+      dataset: {flag: true}
+      modify: {value: '2'}
+      metadata: {description: updated}
+      options: {type: BOOL, value: 'true'}
+      view: {value: '2'}
+      appended: {count: '3', sum: '5'}
+      missing: {status: 404}

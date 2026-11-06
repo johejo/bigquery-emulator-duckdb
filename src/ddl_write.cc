@@ -424,6 +424,9 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
   if (alteration.options.storage_billing_model.has_value()) {
     metadata.storage_billing_model = *alteration.options.storage_billing_model;
   }
+  if (alteration.options.is_case_insensitive.has_value()) {
+    metadata.is_case_insensitive = *alteration.options.is_case_insensitive;
+  }
   return DatasetMetadataStatements(alteration.dataset, metadata);
 }
 

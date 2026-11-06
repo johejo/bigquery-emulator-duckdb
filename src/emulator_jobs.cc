@@ -514,6 +514,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       }
       source.project_id = ResolveProject(source.project_id);
       const TableInfo table = GetTable(source);
+      source = table.reference;
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
       }
@@ -631,6 +632,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     }
     source.project_id = ResolveProject(source.project_id);
     const TableInfo table = GetTable(source);
+    source = table.reference;
     if (table.view_query) {
       throw ApiError::Invalid("Cannot extract a view: " + TableName(source));
     }

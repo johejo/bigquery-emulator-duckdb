@@ -150,6 +150,7 @@ cc_library(
         "//:duckdb_sql",
         "//:references",
         "//:table_path",
+        "//:table_source",
         "//:translated_statement",
     ],
     linkstatic = True,

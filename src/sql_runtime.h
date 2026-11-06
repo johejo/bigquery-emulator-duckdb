@@ -223,6 +223,8 @@ class SqlRuntime {
                                            bool skip_invalid_rows, bool ignore_unknown_values);
 
  private:
+  DatasetReference ResolveDatasetReference(DatasetReference dataset);
+  TableReference ResolveTableReference(TableReference table, bool create = false);
   // The application uses native writes and location checks for load/copy/extract; friendship
   // keeps those orchestration-only operations out of the public client-facing catalog API.
   friend class Emulator;

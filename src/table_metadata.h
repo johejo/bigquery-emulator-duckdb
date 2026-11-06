@@ -207,6 +207,7 @@ struct DatasetMetadata {
   std::optional<int64_t> default_table_expiration_ms;
   std::optional<int64_t> max_time_travel_hours;
   std::string storage_billing_model;  // Empty when no model was explicitly set.
+  bool is_case_insensitive = false;
   RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
   std::optional<std::string> default_collation;
   // Output only and recorded with the dataset.
@@ -219,8 +220,8 @@ struct DatasetMetadata {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !default_table_expiration_ms.has_value() &&
            !max_time_travel_hours.has_value() && storage_billing_model.empty() &&
-           default_rounding_mode == RoundingMode::kUnspecified && creation_time == 0 &&
-           location.empty() && !default_collation.has_value();
+           !is_case_insensitive && default_rounding_mode == RoundingMode::kUnspecified &&
+           creation_time == 0 && location.empty() && !default_collation.has_value();
   }
   [[nodiscard]] std::string Location() const {
     return location.empty() ? kDefaultLocation : location;

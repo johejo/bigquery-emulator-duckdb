@@ -21,6 +21,13 @@ cases:
           body:
             tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: MixedTable}
             schema: {fields: [{name: id, type: INTEGER}]}
+      - name: drop_different_case
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'DROP TABLE IF EXISTS `${project}.${dataset}.mixedtable`'
+            useLegacySql: false
       - name: exact
         rest:
           method: POST

@@ -2,12 +2,14 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
 #include "src/table_path.h"
+#include "src/table_source.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 
@@ -25,8 +27,15 @@ std::optional<std::string> TargetTable(const std::vector<std::string>& path, con
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
-  scope.context.statement.ddl_target_table =
-      TableReference{.project_id = parts.at(0), .dataset_id = parts.at(1), .table_id = parts.at(2)};
+  TableReference reference{
+      .project_id = parts.at(0),
+      .dataset_id = parts.at(1),
+      .table_id = parts.at(2),
+  };
+  if (defaults.source != nullptr) {
+    reference = defaults.source->ResolveTableReference(reference);
+  }
+  scope.context.statement.ddl_target_table = std::move(reference);
   return QualifiedName(*scope.context.statement.ddl_target_table);
 }
 
@@ -41,8 +50,11 @@ std::optional<std::string> TargetDataset(const std::vector<std::string>& path, c
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
-  scope.context.statement.ddl_target_dataset =
-      DatasetReference{.project_id = parts.at(0), .dataset_id = parts.at(1)};
+  DatasetReference reference{.project_id = parts.at(0), .dataset_id = parts.at(1)};
+  if (scope.context.defaults.source != nullptr) {
+    reference = scope.context.defaults.source->ResolveDatasetReference(reference);
+  }
+  scope.context.statement.ddl_target_dataset = std::move(reference);
   return QualifiedName(*scope.context.statement.ddl_target_dataset);
 }
 
