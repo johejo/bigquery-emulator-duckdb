@@ -340,6 +340,22 @@ absl::Status RoutineCatalog::FindTable(const absl::Span<const std::string>& path
                                       reference.table_id + "'");
   }
   const auto& query = *analyzed->statement().GetAs<googlesql::ResolvedQueryStmt>();
+  // Requests cannot supply secure context values. Report their absence when a stored view
+  // is resolved, before expansion loses the distinction from a standalone function call.
+  std::vector<const googlesql::ResolvedNode*> calls;
+  query.GetDescendantsWithKinds({googlesql::RESOLVED_FUNCTION_CALL}, &calls);
+  for (const auto* node : calls) {
+    const auto& call = *node->GetAs<googlesql::ResolvedFunctionCall>();
+    if (IsBuiltinFunction(*call.function()) && call.function()->Name() == "secure_context") {
+      const auto* context_key = call.argument_list(0)->GetAs<googlesql::ResolvedLiteral>();
+      if (context_key == nullptr) {
+        return absl::InvalidArgumentError(
+            "The emulator does not support parameterized SECURE_CONTEXT keys");
+      }
+      return absl::InvalidArgumentError("Missing value for SECURE_CONTEXT('" +
+                                        context_key->value().string_value() + "')");
+    }
+  }
   auto resolved =
       std::make_unique<AnnotatedSqlView>(stored->FullName(), query.is_value_table(), query.query());
   for (int i = 0; i < query.output_column_list_size(); ++i) {

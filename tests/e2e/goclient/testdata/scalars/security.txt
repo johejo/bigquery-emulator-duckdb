@@ -33,3 +33,20 @@ SELECT TYPEOF(SAFE.SESSION_USER())
 DECLARE identity STRING DEFAULT SAFE.SESSION_USER();
 SELECT identity
 => error:
+
+# Observed BigQuery answers collected with tools/bqanswers. SECURE_CONTEXT is
+# recognized but cannot run in a standalone SELECT.
+SELECT SECURE_CONTEXT('bq_emulator_unverified_key')
+=> error: SECURE_CONTEXT() is only supported inside logical view definitions or row access policy definitions.
+
+SELECT SECURE_CONTEXT('')
+=> error: SECURE_CONTEXT() is only supported inside logical view definitions or row access policy definitions.
+
+SELECT SECURE_CONTEXT(CAST(NULL AS STRING))
+=> error contains: The argument to SECURE_CONTEXT must be non-NULL
+
+SELECT SECURE_CONTEXT(123)
+=> error contains: Argument 1: Unable to coerce type INT64 to expected type STRING
+
+SELECT SAFE.SECURE_CONTEXT('bq_emulator_unverified_key')
+=> error contains: Function SECURE_CONTEXT does not support SAFE error mode

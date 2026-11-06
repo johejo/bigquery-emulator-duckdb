@@ -6,6 +6,11 @@
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
 
+# Observed BigQuery answer collected with tools/bqanswers. FPE key generation remains
+# unsupported until the key format and its semantics are implemented, rather than approximated.
+SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{"radix": 10, "input_length": 6}'))
+!> "1"
+
 # Observed BigQuery answer recorded with tools/bqanswers: as a window function, AVG of two
 # infinities is Infinity, though the aggregate gives NaN (aggregates.txt). Which mean BigQuery's
 # windows compute is unknown; bq_avg_double gives NaN for both.

@@ -624,13 +624,14 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     const std::string_view message = status.message();
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
-        std::array<std::string_view, 11>{
+        std::array<std::string_view, 12>{
             "Unsupported primary key column ",
             "Duplicate column name ",
             "column attributes are unsupported for columns in WITH PARTITION COLUMNS clause",
             "Casting between arrays with incompatible element types",
             "DISTINCT is not allowed for function ",
             "First argument (key type) in function KEYS.NEW_KEYSET",
+            "Metadata argument is not supported for key type '",
             "Argument 2 to BIGQUERYGOOGLESQL:TF_IDF ",
             "Argument 3 to BIGQUERYGOOGLESQL:TF_IDF ",
             "Analytic function BIGQUERYGOOGLESQL:TF_IDF ",
@@ -688,7 +689,8 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     // The analyzer nests an error of the catalog's, such as EXTERNAL_QUERY's, in one of its own.
     // One that the emulator does not support is the statement's error.
     const std::string_view formatted_message = formatted.message();
-    if (formatted_message.starts_with("The emulator does not support ")) {
+    if (formatted_message.starts_with("The emulator does not support ") ||
+        formatted_message.starts_with("Missing value for SECURE_CONTEXT('")) {
       throw std::runtime_error(std::string(formatted_message));
     }
     if (const size_t nested = formatted_message.find("\nThe emulator does not support ");

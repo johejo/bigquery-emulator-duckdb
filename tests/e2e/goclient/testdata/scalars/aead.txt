@@ -143,6 +143,19 @@ SELECT SAFE.DETERMINISTIC_DECRYPT_BYTES(FROM_HEX('08011280010a780a30747970652e67
 ## KEYS functions
 
 # A new keyset has one enabled primary key of the type, with a TINK prefix.
+# Observed BigQuery errors collected with tools/bqanswers.
+SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1'))
+=> error: KEYS.NEW_KEYSET with key type FPE_FF1 requires metadata JSON. Error in KEYS.NEW_KEYSET expression
+
+SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{}'))
+=> error: KEYS.NEW_KEYSET metadata JSON object must contain exactly two fields: radix and input_length. Error in KEYS.NEW_KEYSET expression
+
+SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => 'not json'))
+=> error: KEYS.NEW_KEYSET failed to parse metadata JSON: syntax error while parsing value - invalid literal; last read: 'no'; error in KEYS.NEW_KEYSET expression
+
+SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('AEAD_AES_GCM_256', metadata => '{}'))
+=> error: Metadata argument is not supported for key type 'AEAD_AES_GCM_256' at [1:27]
+
 SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('AEAD_AES_GCM_256'))
 => "1"
 

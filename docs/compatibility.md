@@ -257,6 +257,9 @@ a view's schema cannot change. For resource tags, see [Resource tags](#resource-
 
 Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
 
+Logical views may use `SECURE_CONTEXT`, but requests cannot supply secure context values, so
+queries on those views fail with a missing-value error. Row access policies are unsupported.
+
 Queries resolve views using the current definitions of persistent SQL UDFs and table functions.
 A changed UDF return type is reflected in query results, while the stored view schema stays
 unchanged.
@@ -438,6 +441,11 @@ Inside procedures, including their dynamic SQL, system variable reads are limite
 assignments are limited to `@@dataset_id` and `@@dataset_project_id`.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`. CALL queries do not support dry runs, destination
 tables or positional query parameters.
+
+## Encryption keysets
+
+`KEYS.NEW_KEYSET` rejects FPE_FF1 key generation as unsupported. Its missing metadata,
+malformed JSON and missing metadata fields report BigQuery's validation errors.
 
 ## Approximate aggregates
 

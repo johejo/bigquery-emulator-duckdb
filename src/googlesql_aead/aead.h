@@ -22,7 +22,8 @@ absl::StatusOr<std::string> DeterministicDecryptBytes(std::string_view keyset_by
 absl::StatusOr<std::string> DeterministicDecryptString(std::string_view keyset_bytes,
                                                        std::string_view input,
                                                        std::string_view aad);
-absl::StatusOr<std::string> NewKeyset(std::string_view key_type);
+absl::StatusOr<std::string> NewKeyset(std::string_view key_type,
+                                      std::optional<std::string_view> metadata = std::nullopt);
 absl::StatusOr<std::optional<std::string>> RotateKeyset(
     std::optional<std::string_view> keyset_bytes, std::string_view key_type);
 absl::StatusOr<std::string> AddAesGcmKey(std::string_view keyset_bytes, std::string_view raw);

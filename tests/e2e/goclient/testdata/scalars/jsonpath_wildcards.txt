@@ -1,0 +1,59 @@
+# Observed BigQuery answers collected with tools/bqanswers: JSONPath wildcard
+# and descendant operators are rejected, including in lax mode. These are
+# distinct from the supported lax recursive mode.
+
+# JSON_QUERY on JSON, including missing members and JSON null.
+SELECT JSON_QUERY(JSON '{"a": 1, "b": null}', '$.*')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY(JSON '[{"a": 1}, {"a": null}, {}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY(JSON '{"a": 1, "nested": {"a": 2}}', '$..a')
+=> error: Unsupported operator in JSONPath: ..
+
+# JSON_QUERY_ARRAY on JSON.
+SELECT JSON_QUERY_ARRAY(JSON '{"a": 1, "b": null}', '$.*')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY_ARRAY(JSON '[{"a": 1}, {"a": null}, {}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY_ARRAY(JSON '{"a": 1, "nested": {"a": 2}}', '$..a')
+=> error: Unsupported operator in JSONPath: ..
+
+# STRING input.
+SELECT JSON_QUERY('{"a": 1, "b": null}', '$.*')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY('[{"a": 1}, {"a": null}, {}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY('{"a": 1, "nested": {"a": 2}}', '$..a')
+=> error: Unsupported operator in JSONPath: ..
+
+SELECT JSON_QUERY_ARRAY('[{"a": 1}, {"a": null}, {}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+# Scalar and legacy extraction. JSON_VALUE adds its expression context to the error.
+SELECT JSON_VALUE(JSON '[{"a": 1}, {"a": 2}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *; error in JSON_VALUE expression
+
+SELECT JSON_VALUE_ARRAY(JSON '[{"a": 1}, {"a": 2}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_EXTRACT(JSON '[{"a": 1}, {"a": 2}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_EXTRACT_ARRAY('[{"a": 1}, {"a": 2}]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+# Empty matches and lax mode on JSON_QUERY.
+SELECT JSON_QUERY(JSON '[]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY_ARRAY(JSON '[]', '$[*].a')
+=> error: Unsupported operator in JSONPath: *
+
+SELECT JSON_QUERY(JSON '{"a": [{"b": 1}, {"b": 2}]}', 'lax $.a[*].b')
+=> error: Invalid token in JSONPath at: [*].b

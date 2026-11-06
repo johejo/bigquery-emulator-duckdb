@@ -313,105 +313,113 @@ void JsonExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
   bool previous_standard = false;
   std::unique_ptr<googlesql::functions::JsonPathEvaluator> evaluator;
   std::unique_ptr<googlesql::functions::json_internal::StrictJSONPathIterator> lax_iterator;
-  EachRow(info, input, output,
-          [&](const Arguments& arguments) -> absl::StatusOr<std::optional<Result>> {
-            const std::string_view path = arguments.StringView(1);
-            const bool standard = arguments.Bool(2);
-            // Assigned in the kJson branch, which const-correctness does not see.
-            // NOLINTNEXTLINE(misc-const-correctness)
-            std::optional<googlesql::JSONValue> document;
-            if constexpr (kJson) {
-              auto parsed = ParseJson(arguments.String(0));
-              if (!parsed.ok()) {
-                return parsed.status();
-              }
-              document = *std::move(parsed);
+  EachRow(
+      info, input, output,
+      [&](const Arguments& arguments) -> absl::StatusOr<std::optional<Result>> {
+        const std::string_view path = arguments.StringView(1);
+        const bool standard = arguments.Bool(2);
+        // Assigned in the kJson branch, which const-correctness does not see.
+        // NOLINTNEXTLINE(misc-const-correctness)
+        std::optional<googlesql::JSONValue> document;
+        if constexpr (kJson) {
+          auto parsed = ParseJson(arguments.String(0));
+          if (!parsed.ok()) {
+            return parsed.status();
+          }
+          document = *std::move(parsed);
+        }
+        if ((!evaluator && !lax_iterator) || path != previous_path ||
+            standard != previous_standard) {
+          evaluator.reset();
+          lax_iterator.reset();
+          if constexpr (kJson && kExtraction == Extraction::kQuery) {
+            // Legacy paths allow ['key'], which the standard/lax validator rejects.
+            // Only JSON_QUERY of JSON takes a lax JSONPath, such as "lax $.a".
+            const auto lax = standard
+                                 ? googlesql::functions::json_internal::IsValidAndLaxJSONPath(path)
+                                 : absl::StatusOr<bool>(false);
+            if (!lax.ok()) {
+              return lax.status();
             }
-            if ((!evaluator && !lax_iterator) || path != previous_path ||
-                standard != previous_standard) {
-              evaluator.reset();
-              lax_iterator.reset();
-              if constexpr (kJson && kExtraction == Extraction::kQuery) {
-                // Legacy paths allow ['key'], which the standard/lax validator rejects.
-                // Only JSON_QUERY of JSON takes a lax JSONPath, such as "lax $.a".
-                const auto lax =
-                    standard ? googlesql::functions::json_internal::IsValidAndLaxJSONPath(path)
-                             : absl::StatusOr<bool>(false);
-                if (!lax.ok()) {
-                  return lax.status();
-                }
-                if (*lax) {
-                  auto iterator =
-                      googlesql::functions::json_internal::StrictJSONPathIterator::Create(
-                          path, /*enable_lax_mode=*/true);
-                  if (!iterator.ok()) {
-                    return iterator.status();
-                  }
-                  lax_iterator = *std::move(iterator);
-                }
+            if (*lax) {
+              auto iterator = googlesql::functions::json_internal::StrictJSONPathIterator::Create(
+                  path, /*enable_lax_mode=*/true);
+              if (!iterator.ok()) {
+                return iterator.status();
               }
-              if (!lax_iterator) {
-                auto prepared = googlesql::functions::JsonPathEvaluator::Create(
-                    path, standard, /*enable_special_character_escaping_in_values=*/true,
-                    /*enable_special_character_escaping_in_keys=*/true);
-                if (!prepared.ok()) {
-                  return prepared.status();
-                }
-                evaluator = *std::move(prepared);
-              }
-              previous_path = path;
-              previous_standard = standard;
+              lax_iterator = *std::move(iterator);
             }
-            if constexpr (kJson && kExtraction == Extraction::kQuery) {
-              if (lax_iterator) {
-                const auto result =
-                    googlesql::functions::JsonQueryLax(document->GetConstRef(), *lax_iterator);
-                if (!result.ok()) {
-                  return result.status();
+          }
+          if (!lax_iterator) {
+            auto prepared = googlesql::functions::JsonPathEvaluator::Create(
+                path, standard, /*enable_special_character_escaping_in_values=*/true,
+                /*enable_special_character_escaping_in_keys=*/true);
+            if (!prepared.ok()) {
+              if constexpr (kJson && kExtraction == Extraction::kValue) {
+                if (standard && FunctionContext<bool>(info) &&
+                    prepared.status().message().starts_with("Unsupported operator in JSONPath:")) {
+                  return absl::Status(prepared.status().code(),
+                                      std::string(prepared.status().message()) +
+                                          "; error in JSON_VALUE expression");
                 }
-                return result->GetConstRef().ToString();
               }
+              return prepared.status();
             }
-            if constexpr (kJson) {
-              const googlesql::JSONValueConstRef json = document->GetConstRef();
-              if constexpr (kExtraction == Extraction::kQuery) {
-                const auto value = evaluator->Extract(json);
-                return value ? std::optional<std::string>(value->ToString()) : std::nullopt;
-              } else if constexpr (kExtraction == Extraction::kValue) {
-                return evaluator->ExtractScalar(json);
-              } else if constexpr (kExtraction == Extraction::kQueryArray) {
-                const auto elements = evaluator->ExtractArray(json);
-                if (!elements) {
-                  return std::nullopt;
-                }
-                std::vector<std::string> texts;
-                std::ranges::transform(
-                    *elements, std::back_inserter(texts),
-                    [](googlesql::JSONValueConstRef element) { return element.ToString(); });
-                return texts;
-              } else {
-                return evaluator->ExtractStringArray(json);
-              }
-            } else {
-              const std::string_view json = arguments.StringView(0);
-              Result out;
-              bool is_null = false;
-              absl::Status status;
-              if constexpr (kExtraction == Extraction::kQuery) {
-                status = evaluator->Extract(json, &out, &is_null);
-              } else if constexpr (kExtraction == Extraction::kValue) {
-                status = evaluator->ExtractScalar(json, &out, &is_null);
-              } else if constexpr (kExtraction == Extraction::kQueryArray) {
-                status = evaluator->ExtractArray(json, &out, &is_null);
-              } else {
-                status = evaluator->ExtractStringArray(json, &out, &is_null);
-              }
-              if (!status.ok()) {
-                return status;
-              }
-              return is_null ? std::nullopt : std::optional<Result>(std::move(out));
+            evaluator = *std::move(prepared);
+          }
+          previous_path = path;
+          previous_standard = standard;
+        }
+        if constexpr (kJson && kExtraction == Extraction::kQuery) {
+          if (lax_iterator) {
+            const auto result =
+                googlesql::functions::JsonQueryLax(document->GetConstRef(), *lax_iterator);
+            if (!result.ok()) {
+              return result.status();
             }
-          });
+            return result->GetConstRef().ToString();
+          }
+        }
+        if constexpr (kJson) {
+          const googlesql::JSONValueConstRef json = document->GetConstRef();
+          if constexpr (kExtraction == Extraction::kQuery) {
+            const auto value = evaluator->Extract(json);
+            return value ? std::optional<std::string>(value->ToString()) : std::nullopt;
+          } else if constexpr (kExtraction == Extraction::kValue) {
+            return evaluator->ExtractScalar(json);
+          } else if constexpr (kExtraction == Extraction::kQueryArray) {
+            const auto elements = evaluator->ExtractArray(json);
+            if (!elements) {
+              return std::nullopt;
+            }
+            std::vector<std::string> texts;
+            std::ranges::transform(
+                *elements, std::back_inserter(texts),
+                [](googlesql::JSONValueConstRef element) { return element.ToString(); });
+            return texts;
+          } else {
+            return evaluator->ExtractStringArray(json);
+          }
+        } else {
+          const std::string_view json = arguments.StringView(0);
+          Result out;
+          bool is_null = false;
+          absl::Status status;
+          if constexpr (kExtraction == Extraction::kQuery) {
+            status = evaluator->Extract(json, &out, &is_null);
+          } else if constexpr (kExtraction == Extraction::kValue) {
+            status = evaluator->ExtractScalar(json, &out, &is_null);
+          } else if constexpr (kExtraction == Extraction::kQueryArray) {
+            status = evaluator->ExtractArray(json, &out, &is_null);
+          } else {
+            status = evaluator->ExtractStringArray(json, &out, &is_null);
+          }
+          if (!status.ok()) {
+            return status;
+          }
+          return is_null ? std::nullopt : std::optional<Result>(std::move(out));
+        }
+      });
 }
 
 // json[key] and json.key, which are NULL unless the JSON is an object with the key.
@@ -712,8 +720,13 @@ void RegisterJsonFunctions(duckdb_connection connection, const Options& options)
              {"bq_json_value_array", JsonExtract<Extraction::kValueArray, false>, true},
              {"bq_json_value_array_json", JsonExtract<Extraction::kValueArray, true>, true},
          }) {
-      Register(connection, name, {kVarchar, kVarchar, kBoolean}, array ? list.get() : varchar.get(),
-               function);
+      if (function == JsonExtract<Extraction::kValue, true>) {
+        RegisterWithContext(connection, name, {kVarchar, kVarchar, kBoolean}, varchar.get(),
+                            function, options.json_value_error_context);
+      } else {
+        Register(connection, name, {kVarchar, kVarchar, kBoolean},
+                 array ? list.get() : varchar.get(), function);
+      }
     }
   }
   Register(connection, "bq_json_keys", {kVarchar, kBigint, kVarchar}, kVarchar, JsonKeys,

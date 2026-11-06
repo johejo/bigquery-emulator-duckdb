@@ -394,6 +394,17 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                                 call.function()->FullName(/*include_group=*/false) +
                                 " is not supported.");
   }
+  if (name == "SECURE_CONTEXT") {
+    // Views are read through their GoogleSQL definitions. Keep a failing STRING expression
+    // in the DuckDB definition too, so it can never expose a fabricated context value.
+    if (scope.context.defines_view) {
+      return "CAST(error('The emulator reads SECURE_CONTEXT only through its GoogleSQL view "
+             "definition') AS VARCHAR)";
+    }
+    throw std::invalid_argument(
+        "SECURE_CONTEXT() is only supported inside logical view definitions or row access "
+        "policy definitions.");
+  }
   if (name == "SESSION_USER" && !scope.context.defaults.has_session_user) {
     return Unsupported(scope, "function SESSION_USER");
   }

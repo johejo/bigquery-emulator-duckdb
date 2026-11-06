@@ -26,6 +26,7 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // comparing or ordering arrays, including arrays inside structs.
     for (const googlesql::LanguageFeature feature : {
              googlesql::FEATURE_MAP_TYPE,
+             googlesql::FEATURE_MAP_LITERAL,
              googlesql::FEATURE_UUID_TYPE,
              googlesql::FEATURE_TIMESTAMP_NANOS,
              googlesql::FEATURE_TIMESTAMP_PICOS,
@@ -35,17 +36,10 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
          }) {
       options->DisableLanguageFeature(feature);
     }
-    // These released GoogleSQL features are not implemented by the emulator. Keep an upgrade
-    // from enabling new forms through maximum language features or analyzer rewrites alone.
-    for (const googlesql::LanguageFeature feature : {
-             googlesql::FEATURE_FPE_NEW_KEYSET,
-             googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT,
-             googlesql::FEATURE_MAP_LITERAL,
-             googlesql::FEATURE_SECURE_CONTEXT,
-             googlesql::FEATURE_LOOKUP_TABLE_TVF,
-         }) {
-      options->DisableLanguageFeature(feature);
-    }
+    // BigQuery rejects JSONPath wildcard and descendant operators, including in lax mode.
+    options->DisableLanguageFeature(googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT);
+    // BigQuery rejects LookupTable with literal, quoted and constant-expression table names.
+    options->DisableLanguageFeature(googlesql::FEATURE_LOOKUP_TABLE_TVF);
     // GoogleSQL released JSON_EXISTS functions before BigQuery documented them. BigQuery casts
     // no other type to JSON, leaving that to TO_JSON and PARSE_JSON.
     options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);
