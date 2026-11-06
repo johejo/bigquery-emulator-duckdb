@@ -926,6 +926,16 @@ TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
   // set to null too.
   if (table.has_schema()) {
     request.schema = SchemaFromJson(body["schema"]);
+    // An omitted expression removes a default; an explicitly empty expression is invalid.
+    for (const json& field : body["schema"].value("fields", json::array())) {
+      if (const auto value = field.find("defaultValueExpression");
+          value != field.end() && value->is_string() &&
+          value->get_ref<const std::string&>().empty()) {
+        throw ApiError::Invalid("Invalid default value expression for column " +
+                                field.at("name").get<std::string>() +
+                                "; Syntax error: Unexpected end of expression");
+      }
+    }
   }
   if (const auto it = body.find("externalDataConfiguration"); it != body.end() && !it->is_null()) {
     json config = *it;

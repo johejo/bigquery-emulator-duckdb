@@ -72,8 +72,9 @@ std::string MapFields(
 
 // Checks that BigQuery lets the schema `current` of `table` become `updated` through tables.patch
 // or tables.update, and returns the ALTER TABLE statements that make the change. Existing fields
-// keep their order, name, type, type parameters and default; REQUIRED may become NULLABLE;
-// NULLABLE and REPEATED fields may be added after them.
+// keep their order, name, type and type parameters; REQUIRED may become NULLABLE;
+// NULLABLE and REPEATED fields may be added after them. The caller applies changes to top-level
+// column defaults.
 std::vector<std::string> SchemaUpdateStatements(const TableReference& table,
                                                 const std::vector<FieldSchema>& current,
                                                 const std::vector<FieldSchema>& updated);

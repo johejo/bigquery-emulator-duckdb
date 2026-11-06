@@ -290,6 +290,32 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
                         std::back_inserter(statements));
       statements.push_back(CommitVersionsStatement(table.project_id));
     }
+    std::vector<FieldSchema> defaults;
+    for (size_t i = 0; i < info.schema.size(); ++i) {
+      const FieldSchema& before = info.schema.at(i);
+      const FieldSchema& after = updated_schema->at(i);
+      if (after.default_value_expression == before.default_value_expression) {
+        continue;
+      }
+      if (std::ranges::any_of(info.metadata.primary_key, [&](const std::string& name) {
+            return ToLowerAscii(name) == ToLowerAscii(before.name);
+          })) {
+        throw ApiError::Invalid(std::format(
+            "Key column {} cannot be modified or removed. column's default_value_expression "
+            "changed: {} -> {}",
+            before.name, before.default_value_expression, after.default_value_expression));
+      }
+      if (after.default_value_expression.empty()) {
+        statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT",
+                                         QualifiedName(table), QuoteIdentifier(after.name)));
+        // REPEATED columns without a declared default still default to an empty array.
+        std::ranges::move(RepeatedColumnDefaultStatements(table, {after}),
+                          std::back_inserter(statements));
+      } else {
+        defaults.push_back(after);
+      }
+    }
+    std::ranges::move(ColumnDefaultStatements(table, defaults), std::back_inserter(statements));
     std::ranges::move(ColumnCommentStatements(table, *updated_schema),
                       std::back_inserter(statements));
   }

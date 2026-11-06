@@ -1,0 +1,137 @@
+version: 1
+# Expected values follow third_party/bigquery_docs/default-values.md:
+# changing a default affects future writes only, and NULL removes the default.
+description: Change column defaults through tables.patch and tables.update.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  change:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CREATE TABLE `${project}.${dataset}.t` (id INT64, v INT64 DEFAULT 1);
+              INSERT `${project}.${dataset}.t` (id) VALUES (1);
+            useLegacySql: false
+        observe:
+          errors: /body/errors
+      - name: change
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: id, type: INT64, defaultValueExpression: '7'}
+                - {name: v, type: INT64, defaultValueExpression: '2'}
+        observe:
+          default: /body/schema/fields/1/defaultValueExpression
+      - name: invalid_default
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: id, type: INT64, defaultValueExpression: '99'}
+                - {name: v, type: INT64, defaultValueExpression: "'not an integer'"}
+        expectFailure: true
+        observe:
+          status: /status
+      - name: read_default
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          default: /body/schema/fields/1/defaultValueExpression
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              INSERT `${project}.${dataset}.t` (id) VALUES (2);
+              INSERT `${project}.${dataset}.t` (v) VALUES (9);
+              SELECT id, v FROM `${project}.${dataset}.t` ORDER BY id;
+            useLegacySql: false
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+      - name: remove
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: id, type: INT64, defaultValueExpression: '7'}
+                - {name: v, type: INT64, defaultValueExpression: 'NULL'}
+      - name: insert_without_default
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              INSERT `${project}.${dataset}.t` (id) VALUES (3);
+              SELECT id, v FROM `${project}.${dataset}.t` ORDER BY id;
+            useLegacySql: false
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: patch
+    template: change
+    vars: {method: PATCH}
+    expect:
+      create: {}
+      change: {default: '2'}
+      invalid_default: {status: 400}
+      read_default: {default: '2'}
+      insert:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: '2'}]}
+          - {f: [{v: '7'}, {v: '9'}]}
+      insert_without_default:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: '2'}]}
+          - {f: [{v: '3'}, {v: null}]}
+          - {f: [{v: '7'}, {v: '9'}]}
+  - name: update
+    template: change
+    vars: {method: PUT}
+    expect:
+      create: {}
+      change: {default: '2'}
+      invalid_default: {status: 400}
+      read_default: {default: '2'}
+      insert:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: '2'}]}
+          - {f: [{v: '7'}, {v: '9'}]}
+      insert_without_default:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: '2'}]}
+          - {f: [{v: '3'}, {v: null}]}
+          - {f: [{v: '7'}, {v: '9'}]}

@@ -1,0 +1,176 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run jf6yplgz5dprj7o2u3qaxfoeev.
+# Omission removes the default; NULL remains in metadata; an empty expression is invalid.
+description: Default removal and metadata spelling through schema updates.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  update:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CREATE TABLE `${project}.${dataset}.t` (id INT64, v INT64 DEFAULT 1);
+              INSERT `${project}.${dataset}.t` (id) VALUES (1);
+            useLegacySql: false
+      - name: update
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: id, type: INT64}
+                - ${field}
+        observe:
+          schema: /body/schema
+          error: /body/error
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          schema: /body/schema
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              INSERT `${project}.${dataset}.t` (id) VALUES (2);
+              SELECT id, v FROM `${project}.${dataset}.t` ORDER BY id;
+            useLegacySql: false
+        observe:
+          errors: /body/errors
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (id INT64, v INT64 DEFAULT 1)
+            useLegacySql: false
+      - name: update
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            schema:
+              fields:
+                - {name: id, type: INT64}
+                - {name: v, type: INT64, defaultValueExpression: ''}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: patch_omitted
+    template: update
+    vars:
+      method: PATCH
+      field: {name: v, type: INT64}
+    expect:
+      update: {schema: {fields: [{name: id, type: INTEGER}, {name: v, type: INTEGER}]}}
+      get: {schema: {fields: [{name: id, type: INTEGER}, {name: v, type: INTEGER}]}}
+      insert:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: null}]}
+  - name: update_omitted
+    template: update
+    vars:
+      method: PUT
+      field: {name: v, type: INT64}
+    expect:
+      update: {schema: {fields: [{name: id, type: INTEGER}, {name: v, type: INTEGER}]}}
+      get: {schema: {fields: [{name: id, type: INTEGER}, {name: v, type: INTEGER}]}}
+      insert:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: null}]}
+  - name: patch_empty
+    template: rejected
+    vars: {method: PATCH}
+    expect:
+      update:
+        status: 400
+        reason: invalid
+        message: 'Invalid default value expression for column v; Syntax error: Unexpected end of expression'
+  - name: update_empty
+    template: rejected
+    vars: {method: PUT}
+    expect:
+      update:
+        status: 400
+        reason: invalid
+        message: 'Invalid default value expression for column v; Syntax error: Unexpected end of expression'
+  - name: patch_null
+    template: update
+    vars:
+      method: PATCH
+      field: {name: v, type: INT64, defaultValueExpression: 'NULL'}
+    expect:
+      update:
+        schema:
+          fields:
+            - {name: id, type: INTEGER}
+            - {name: v, type: INTEGER, defaultValueExpression: 'NULL'}
+      get:
+        schema:
+          fields:
+            - {name: id, type: INTEGER}
+            - {name: v, type: INTEGER, defaultValueExpression: 'NULL'}
+      insert:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: null}]}
+  - name: update_null
+    template: update
+    vars:
+      method: PUT
+      field: {name: v, type: INT64, defaultValueExpression: 'NULL'}
+    expect:
+      update:
+        schema:
+          fields:
+            - {name: id, type: INTEGER}
+            - {name: v, type: INTEGER, defaultValueExpression: 'NULL'}
+      get:
+        schema:
+          fields:
+            - {name: id, type: INTEGER}
+            - {name: v, type: INTEGER, defaultValueExpression: 'NULL'}
+      insert:
+        rows:
+          - {f: [{v: '1'}, {v: '1'}]}
+          - {f: [{v: '2'}, {v: null}]}
