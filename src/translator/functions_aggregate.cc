@@ -137,11 +137,12 @@ std::string BigNumericSum(const std::string& sql, const std::vector<std::string>
   return "CAST(bq_bignumeric_sum(CAST(" + sql + " AS VARCHAR)) AS BIGNUM)";
 }
 
-// DuckDB's AVG of a DECIMAL passes through DOUBLE and its sum overflows, so
-// src/googlesql_functions_duckdb/math.cc averages the non-NULL values that list() collects.
-std::string NumericAvg(const std::string& sql, const std::vector<std::string>& /*arguments*/,
-                       const std::string& /*tail*/) {
-  return "bq_numeric_avg(" + sql + ")";
+// DuckDB's DECIMAL sum can overflow on partial sums, and AVG passes through DOUBLE.
+// src/googlesql_functions_duckdb/math.cc aggregates the non-NULL values that list() collects.
+template <bool kAverage>
+std::string NumericAggregate(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                             const std::string& /*tail*/) {
+  return std::string(kAverage ? "bq_numeric_avg(" : "bq_numeric_sum(") + sql + ")";
 }
 
 // DuckDB returns NaN for one pair, but CORR needs at least two non-NULL pairs. Use the
@@ -415,6 +416,12 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
       Define("SUM",
              {
                  {
+                     .function = "list",
+                     .type = googlesql::TYPE_NUMERIC,
+                     .skip_nulls = true,
+                     .finish = NumericAggregate<false>,
+                 },
+                 {
                      .function = "sum",
                      .type = googlesql::TYPE_BIGNUMERIC,
                      .finish = BigNumericSum,
@@ -435,7 +442,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .function = "list",
                      .type = googlesql::TYPE_NUMERIC,
                      .skip_nulls = true,
-                     .finish = NumericAvg,
+                     .finish = NumericAggregate<true>,
                  },
                  // src/googlesql_functions_duckdb/math.cc; DuckDB's avg() overflows.
                  {.function = "bq_avg_double", .type = googlesql::TYPE_DOUBLE},
