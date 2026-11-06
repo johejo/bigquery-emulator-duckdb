@@ -526,18 +526,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
-  label: "code:CastTo_NUMERIC_FLOAT64_1e29"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
-  label: "code:CastTo_NUMERIC_FLOAT64_1@844674407370955e19"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "SAFE.ERROR fails, as BigQuery does, where the reference implementation returns NULL"
   label: "code:safe_error_mode__safe_error_STRING_<message>"
@@ -679,13 +667,6 @@ known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "RANGE window frames treat a NULL NUMERIC offset as CURRENT ROW instead of rejecting it"
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_null_offset"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Large FLOAT64 values become NULL as NUMERIC or lose precision under SAFE_CAST"
-  label: "code:SafeCastTo_NUMERIC_FLOAT64_1@844674407370955e19"
-  label: "code:SafeCastTo_NUMERIC_FLOAT64_1e29"
 }
 
 known_errors {

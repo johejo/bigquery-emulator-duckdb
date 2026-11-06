@@ -25,6 +25,8 @@ void RegisterCastFunctions(duckdb_connection connection) {
   Register(connection, "bq_cast_constrain_string", {kVarchar, kBigint}, kVarchar,
            Apply<ConstrainString>);
   Register(connection, "bq_cast_constrain_bytes", {kBlob, kBigint}, kBlob, Apply<ConstrainBytes>);
+  Register(connection, "bq_float64_to_numeric", {kDouble, kBoolean}, numeric.get(),
+           Apply<CastFloat64ToNumeric, kSafe>);
   LogicalType const bigint(duckdb_create_logical_type(kBigint));
   Register(connection, "bq_cast_constrain_numeric", {numeric.get(), bigint.get(), bigint.get()},
            numeric.get(), Apply<ConstrainNumeric>);

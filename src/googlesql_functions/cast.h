@@ -21,6 +21,8 @@ absl::StatusOr<std::string> CastBytesToUtf8(std::string_view bytes);
 
 absl::StatusOr<int64_t> CastFloat64ToInt64(double value);
 
+absl::StatusOr<googlesql::NumericValue> CastFloat64ToNumeric(double value);
+
 absl::StatusOr<bool> CastStringToBool(std::string_view text);
 
 absl::StatusOr<std::string> CastBytesToString(std::string_view bytes, std::string_view format);

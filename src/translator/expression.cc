@@ -46,6 +46,9 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
     // DuckDB rounds halfway values to even and reports different overflow errors.
     return "bq_float64_to_int64(" + sql + ", " + (safe ? "true" : "false") + ")";
   }
+  if (from->IsDouble() && to->IsNumericType()) {
+    return "bq_float64_to_numeric(" + sql + ", " + (safe ? "true" : "false") + ")";
+  }
   if (from->IsTimestamp() && to->IsTime()) {
     return "CAST((" + sql + " AT TIME ZONE 'UTC') AS TIME)";
   }
