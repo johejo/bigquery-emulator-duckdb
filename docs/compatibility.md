@@ -529,8 +529,8 @@ because they have rows or properties of their own.
 - Graph values in grouping sets, `PARTITION BY`, and aggregate or analytic functions other than
   `COUNT`; paths in `GROUP BY`, `DISTINCT` and `COUNT(DISTINCT)`.
 - Horizontal aggregates other than `SUM`, `AVG`, `MIN`, `MAX`, `COUNT` and `ARRAY_AGG`;
-  horizontal aggregates with `LIMIT`, `HAVING` or collation; `DISTINCT` or `ORDER BY` on
-  horizontal aggregates other than `ARRAY_AGG`; and horizontal `MIN` and `MAX` over INTERVAL.
+  horizontal aggregates with collation; `DISTINCT`, `ORDER BY` or `LIMIT` on horizontal
+  aggregates other than `ARRAY_AGG`; and horizontal `MIN` and `MAX` over INTERVAL.
 - `ELEMENT_ID`, `SOURCE_NODE_ID` and `DESTINATION_NODE_ID`.
 - NULL operands of `IS [NOT] SOURCE [OF]` and `IS [NOT] DESTINATION [OF]`, until their BigQuery
   behavior is verified.
