@@ -733,6 +733,7 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
       // are a RANGE, which has no text form in DuckDB, and an INTERVAL, whose text form differs.
       // A GEOGRAPHY is read from its text, as in the other formats.
       std::vector<std::string> conversions;
+      std::vector<std::string> valid;
       if (csv->numbered_records) {
         columns.emplace_back("'bad.record': 'BIGINT'");
         conversions.emplace_back(QuoteIdentifier("bad.record"));
@@ -747,18 +748,25 @@ std::string FileReadQuery(const FileReadOptions& options, const std::vector<File
                           QuoteLiteral(big || range || interval || bytes
                                            ? "VARCHAR"
                                            : ToDuckDbReadType(TextGeographies(field))));
-        conversions.push_back(
-            big     ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}", name,
-                                  ToDuckDbReadType(field))
-            : range ? RangeFromText(name, field) + " AS " + name
-            : interval
-                ? std::format("bq_interval_from_csv({0}) AS {0}", name)
-                : std::format(
-                      "{} AS {}",
-                      StoredValue(bytes ? std::format("from_base64({})", name) : name, field),
-                      name));
+        std::string value =
+            big        ? std::format("CAST(bq_bignumeric_from_string({}, false) AS {})", name,
+                                     ToDuckDbReadType(field))
+            : range    ? RangeFromText(name, field)
+            : interval ? std::format("bq_interval_from_csv({})", name)
+                       : StoredValue(bytes ? std::format("from_base64({})", name) : name, field);
+        if (csv->numbered_records && (big || range || interval || bytes)) {
+          // These conversions run outside read_csv, whose ignore_errors cannot skip them.
+          // Keep NULL inputs, but leave out failed conversions just as read_csv does, so
+          // AddUnparsable finds and counts their records too.
+          value = std::format("TRY({})", value);
+          valid.push_back(std::format("({} IS NULL OR {} IS NOT NULL)", name, value));
+        }
+        conversions.push_back(std::format("{} AS {}", value, name));
       }
       sql += ", columns={" + Join(columns, ", ") + "})";
+      if (!valid.empty()) {
+        sql += " WHERE " + Join(valid, " AND ");
+      }
       return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);
     }
     sql += ')';

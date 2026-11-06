@@ -1,0 +1,131 @@
+version: 1
+# Observed on BigQuery in johejo-sandbox, run wk4wucamzlk2mabbsyznozpp35.
+# The sidecar retains the original answers.
+description: >-
+  CSV conversion errors with and without column projection and max_bad_records.
+  Extends the INT64 projection observations in external_table_bad_records.api.yaml
+  to types converted before the DuckDB reader and conversions outside that reader.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: gs://${bucket}/${run}/${case}/source.csv
+  type: DATETIME
+  options: ''
+  limit: 1
+  # "1,x\n2,y\n": two invalid values, exceeding max_bad_records = 1 when converted.
+  source: MSx4CjIseQo=
+templates:
+  projection:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs:
+          method: PUT
+          object: ${run}/${case}/source.csv
+          base64: ${source}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: >-
+              CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, v ${type})
+              OPTIONS (format = 'CSV', uris = ['${uri}'], max_bad_records = ${limit}${options})
+        observe:
+          status: /status
+          message: /body/error/message
+      - name: count
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: SELECT COUNT(*) FROM `${project}.${dataset}.t`
+        observe:
+          status: /status
+          rows: /body/rows
+          errors: /body/errors
+          message: /body/error/message
+      - name: other_column
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: SELECT id FROM `${project}.${dataset}.t` ORDER BY id
+        observe:
+          status: /status
+          rows: /body/rows
+          errors: /body/errors
+          message: /body/error/message
+      - name: converted_column
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: SELECT v FROM `${project}.${dataset}.t` ORDER BY id
+        observe:
+          status: /status
+          rows: /body/rows
+          errors: /body/errors
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs:
+          method: DELETE
+          object: ${run}/${case}/source.csv
+cases:
+  - name: datetime
+    template: projection
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: datetime_within_limit
+    template: projection
+    vars: {limit: 2}
+    expect: {"converted_column": {"errors": [{"location": "${uri}", "reason": "invalid"}, {"location": "${uri}", "reason": "invalid"}], "status": 200}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: datetime_zero_limit
+    template: projection
+    vars: {limit: 0}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 0; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 0; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: bignumeric
+    template: projection
+    vars: {type: BIGNUMERIC}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: json
+    template: projection
+    vars: {type: JSON}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: geography
+    template: projection
+    vars: {type: GEOGRAPHY}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: timestamp
+    template: projection
+    vars: {type: TIMESTAMP}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: formatted_date
+    template: projection
+    vars: {type: DATE, options: ", date_format = 'YYYY/MM/DD'"}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: formatted_time
+    template: projection
+    vars: {type: TIME, options: ", time_format = 'HH24:MI:SS'"}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
+  - name: bytes
+    template: projection
+    vars: {type: BYTES}
+    expect: {"converted_column": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: CSV processing encountered too many errors, giving up. Rows: 2; errors: 2; max bad: 1; error percent: 0", "status": "INVALID_ARGUMENT"}}, "status": 400}}, "count": {"rows": [{"f": [{"v": "2"}]}], "status": 200}, "create": {"status": 200}, "other_column": {"rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}], "status": 200}}
