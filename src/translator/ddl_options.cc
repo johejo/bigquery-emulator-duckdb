@@ -277,7 +277,7 @@ bool ApplySchemaOption(DdlOptionId name, const googlesql::Value& value, DatasetM
       return TimeTravelOption(value, metadata.max_time_travel_hours);
     case kIsCaseInsensitive:
       return !value.is_null() && value.bool_value() &&
-             BoolOption(value, metadata.is_case_insensitive);
+             BoolOption(value, metadata.is_case_insensitive.emplace());
     case kStorageBillingModel:
       return StorageBillingModelOption(value, metadata.storage_billing_model);
     case kDefaultRoundingMode:

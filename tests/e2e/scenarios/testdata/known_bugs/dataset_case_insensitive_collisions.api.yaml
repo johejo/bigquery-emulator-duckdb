@@ -1,0 +1,97 @@
+version: 1
+# Observed on BigQuery in project johejo-sandbox, run 4fun2x7ua3e2k2iridfjv4ann3.
+# DuckDB cannot yet store distinct dataset or table names differing only in case.
+description: Enabling case-insensitive names rejects preexisting name collisions.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: conflicting_tables
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+      - name: tables
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CREATE TABLE `${project}.${dataset}.Mixed` (id INT64); CREATE TABLE `${project}.${dataset}.mixed` (id INT64)'
+            useLegacySql: false
+        observe: {error: /body/error}
+      - name: modify
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body: {isCaseInsensitive: true}
+        observe:
+          status: /status
+          error: /body/error
+          flag: /body/isCaseInsensitive
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      tables: {}
+      modify:
+        error:
+          status: 400
+          body:
+            error:
+              code: 400
+              errors:
+                - domain: global
+                  message: Cannot enable is_case_insensitive because there are case insensitive duplicate table names in the dataset
+                  reason: invalid
+              message: Cannot enable is_case_insensitive because there are case insensitive duplicate table names in the dataset
+              status: INVALID_ARGUMENT
+  - name: conflicting_datasets
+    steps:
+      - name: lower
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_mixed'}
+      - name: upper
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_Mixed'}
+        observe: {error: /body/error}
+      - name: modify
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed
+          body: {isCaseInsensitive: true}
+        observe:
+          status: /status
+          error: /body/error
+          flag: /body/isCaseInsensitive
+    cleanup:
+      - name: delete
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'DROP SCHEMA IF EXISTS `${project}.${dataset}_mixed` CASCADE; DROP SCHEMA IF EXISTS `${project}.${dataset}_Mixed` CASCADE'
+            useLegacySql: false
+    expect:
+      upper: {}
+      modify:
+        error:
+          status: 400
+          body:
+            error:
+              code: 400
+              errors:
+                - domain: global
+                  message: Cannot enable is_case_insensitive the dataset name is case insensitively duplicate with other dataset(s)
+                  reason: invalid
+              message: Cannot enable is_case_insensitive the dataset name is case insensitively duplicate with other dataset(s)
+              status: INVALID_ARGUMENT

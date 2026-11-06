@@ -608,8 +608,8 @@ json TableMetadata::ToJson() const {
 
 json DatasetMetadata::ToJson() const {
   json fields = json::object();
-  if (is_case_insensitive) {
-    fields["isCaseInsensitive"] = true;
+  if (is_case_insensitive.has_value()) {
+    fields["isCaseInsensitive"] = *is_case_insensitive;
   }
   if (creation_time != 0) {
     fields["creationTime"] = std::to_string(creation_time);
@@ -1059,20 +1059,21 @@ DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
 }
 
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool patch) {
-  if (body.contains("isCaseInsensitive")) {
-    const json& flag = body["isCaseInsensitive"];
-    if (!flag.is_boolean() && flag != "false") {
-      throw ApiError::Unsupported("isCaseInsensitive other than a boolean or 'false'");
+  // BigQuery preserves this setting when PATCH or PUT omits it, and for PATCH null.
+  if (const auto flag = body.find("isCaseInsensitive"); flag != body.end()) {
+    if (flag->is_null()) {
+      if (!patch) {
+        throw ApiError::Unsupported("null isCaseInsensitive outside datasets.patch");
+      }
+    } else {
+      if (!flag->is_boolean() && *flag != "false") {
+        throw ApiError::Unsupported("isCaseInsensitive other than a boolean or 'false'");
+      }
+      if (*flag == "false" && metadata.is_case_insensitive.value_or(false)) {
+        throw ApiError::Unsupported("disabling isCaseInsensitive with a string");
+      }
+      metadata.is_case_insensitive = flag->is_boolean() && flag->get<bool>();
     }
-    const bool enabled = flag.is_boolean() && flag.get<bool>();
-    if (metadata.is_case_insensitive && !enabled) {
-      throw ApiError::Unsupported("disabling isCaseInsensitive");
-    }
-    metadata.is_case_insensitive = enabled;
-  } else if (!patch && metadata.is_case_insensitive) {
-    // The omitted-field behavior of datasets.update has not been independently verified.
-    throw ApiError::Unsupported(
-        "datasets.update omitting isCaseInsensitive on a case-insensitive dataset");
   }
   // Whether BigQuery rejects another location or ignores it is not known.
   if (const std::optional<std::string> location = DatasetLocationField(body);

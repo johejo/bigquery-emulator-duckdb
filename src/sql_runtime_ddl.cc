@@ -234,7 +234,7 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     }
     DatasetMetadata metadata = ParseDatasetMetadata(result.rows.OptionalString(0, 1));
     if (alteration->options.is_case_insensitive.has_value()) {
-      metadata.is_case_insensitive = *alteration->options.is_case_insensitive;
+      metadata.is_case_insensitive = alteration->options.is_case_insensitive;
     }
     CheckCaseInsensitiveDataset(backend_, dataset, metadata);
     return AlterDatasetStatements(*alteration, std::move(metadata));

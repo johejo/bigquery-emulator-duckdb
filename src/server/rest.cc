@@ -322,14 +322,16 @@ class RestServer::Impl {
           }));
     Route("bigquery.datasets.get", {"accessPolicyVersion", "datasetView"},
           Json([this](const httplib::Request& request, httplib::Response&) {
-            const DatasetReference dataset = DatasetFromPath(request);
+            const DatasetReference dataset =
+                emulator_.ResolveDatasetReference(DatasetFromPath(request));
             return DatasetResource(dataset, emulator_.GetDataset(dataset));
           }));
     // datasets.patch and datasets.update differ as tables.patch and tables.update do; see
     // UpdateDatasetMetadata.
     const auto update_dataset = [this](bool patch) {
       return Json([this, patch](const httplib::Request& request, httplib::Response&) {
-        const DatasetReference dataset = DatasetFromPath(request);
+        const DatasetReference dataset =
+            emulator_.ResolveDatasetReference(DatasetFromPath(request));
         const json body = ParseDatasetUpdate(ParseBody(request), patch);
         DatasetMetadata metadata = emulator_.GetDataset(dataset);
         UpdateDatasetMetadata(metadata, body, patch);

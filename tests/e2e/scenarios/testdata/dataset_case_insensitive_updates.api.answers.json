@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "cases": {
+    "canonical_spelling": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "dataset": {
+          "reference": {
+            "datasetId": "bqa_4fun2x7ua3e2k2iridfjv4ann3_canonical_spelling_Mixed",
+            "projectId": "johejo-sandbox"
+          }
+        },
+        "get": {
+          "reference": {
+            "datasetId": "bqa_4fun2x7ua3e2k2iridfjv4ann3_canonical_spelling_Mixed",
+            "projectId": "johejo-sandbox",
+            "tableId": "MixedTable"
+          }
+        },
+        "table": {
+          "reference": {
+            "datasetId": "bqa_4fun2x7ua3e2k2iridfjv4ann3_canonical_spelling_Mixed",
+            "projectId": "johejo-sandbox",
+            "tableId": "MixedTable"
+          }
+        }
+      }
+    },
+    "patch_false": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "create": {
+          "flag": true
+        },
+        "get": {
+          "flag": false
+        },
+        "modify": {
+          "flag": false
+        }
+      }
+    },
+    "patch_null": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "create": {
+          "flag": true
+        },
+        "get": {
+          "flag": true
+        },
+        "modify": {
+          "flag": true
+        }
+      }
+    },
+    "patch_omitted": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "create": {
+          "flag": true
+        },
+        "get": {
+          "flag": true
+        },
+        "modify": {
+          "flag": true
+        }
+      }
+    },
+    "update_omitted": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "create": {
+          "flag": true
+        },
+        "get": {
+          "flag": true
+        },
+        "modify": {
+          "flag": true
+        }
+      }
+    }
+  }
+}

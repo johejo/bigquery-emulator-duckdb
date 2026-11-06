@@ -109,7 +109,7 @@ bool CaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset) {
   const QueryResult result =
       backend.Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
   return !result.rows.empty() &&
-         ParseDatasetMetadata(result.rows.OptionalString(0, 1)).is_case_insensitive;
+         ParseDatasetMetadata(result.rows.OptionalString(0, 1)).is_case_insensitive.value_or(false);
 }
 
 }  // namespace
@@ -172,7 +172,7 @@ void CheckCaseInsensitiveTableName(Backend& backend, const TableReference& table
 
 void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset,
                                  const DatasetMetadata& metadata) {
-  if (metadata.is_case_insensitive &&
+  if (metadata.is_case_insensitive.value_or(false) &&
       std::ranges::any_of(FirstColumnStrings(backend.Execute(TablesQuery(dataset))),
                           [](const std::string& name) { return !AsciiName(name); })) {
     throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");

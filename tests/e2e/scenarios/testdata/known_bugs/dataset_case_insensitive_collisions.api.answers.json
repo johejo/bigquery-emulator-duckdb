@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "cases": {
+    "conflicting_datasets": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "modify": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot enable is_case_insensitive the dataset name is case insensitively duplicate with other dataset(s)",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot enable is_case_insensitive the dataset name is case insensitively duplicate with other dataset(s)",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "conflicting_tables": {
+      "project": "johejo-sandbox",
+      "run": "4fun2x7ua3e2k2iridfjv4ann3",
+      "steps": {
+        "modify": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot enable is_case_insensitive because there are case insensitive duplicate table names in the dataset",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot enable is_case_insensitive because there are case insensitive duplicate table names in the dataset",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

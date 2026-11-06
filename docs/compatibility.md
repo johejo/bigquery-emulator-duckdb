@@ -66,9 +66,9 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 ### Case sensitivity
 
 Dataset `is_case_insensitive` supports `TRUE` through CREATE/ALTER SCHEMA and REST
-`isCaseInsensitive: true`. DDL `FALSE`, REST NULL, disabling the setting and `datasets.update`
-omitting the field on a case-insensitive dataset are unsupported. REST `false` (including the
-string `"false"`) is accepted on a dataset whose setting is already false. Non-ASCII table names in a case-insensitive
+`isCaseInsensitive: true`. DDL `FALSE` is unsupported; REST can disable the setting with
+`isCaseInsensitive: false`. The string `"false"` is accepted only when the setting is already
+false. REST NULL is supported only by `datasets.patch`. Non-ASCII table names in a case-insensitive
 dataset are unsupported, including enabling the setting on a dataset containing such names.
 
 Distinct dataset or table names differing only in case cannot coexist in the emulator, even
