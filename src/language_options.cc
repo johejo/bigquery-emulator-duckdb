@@ -38,8 +38,6 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     }
     // BigQuery rejects JSONPath wildcard and descendant operators, including in lax mode.
     options->DisableLanguageFeature(googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT);
-    // BigQuery supports FPE key generation with metadata, but the emulator does not implement it.
-    options->DisableLanguageFeature(googlesql::FEATURE_FPE_NEW_KEYSET);
     // BigQuery rejects LookupTable with literal, quoted and constant-expression table names.
     options->DisableLanguageFeature(googlesql::FEATURE_LOOKUP_TABLE_TVF);
     // GoogleSQL released JSON_EXISTS functions before BigQuery documented them. BigQuery casts

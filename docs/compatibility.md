@@ -442,6 +442,11 @@ assignments are limited to `@@dataset_id` and `@@dataset_project_id`.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`. CALL queries do not support dry runs, destination
 tables or positional query parameters.
 
+## Encryption keysets
+
+`KEYS.NEW_KEYSET` rejects FPE_FF1 key generation as unsupported. Its missing metadata,
+malformed JSON and missing metadata fields report BigQuery's validation errors.
+
 ## Approximate aggregates
 
 `APPROX_TOP_SUM` computes exact sums, collecting the input rows before grouping them, so its memory

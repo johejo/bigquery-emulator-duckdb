@@ -39,7 +39,7 @@ functions.
 
 | Category | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [AEAD encryption functions](#aead-encryption-functions) | 5 | 7 | 4 | 0 |
+| [AEAD encryption functions](#aead-encryption-functions) | 4 | 8 | 4 | 0 |
 | [Aggregate functions](#aggregate-functions) | 18 | 0 | 0 | 1 |
 | [Approximate aggregate functions](#approximate-aggregate-functions) | 4 | 0 | 0 | 0 |
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
@@ -91,7 +91,7 @@ functions.
 | [`KEYS.KEYSET_FROM_JSON`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Supported | GoogleSQL function |  |
 | [`KEYS.KEYSET_LENGTH`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Supported | GoogleSQL function |  |
 | [`KEYS.KEYSET_TO_JSON`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Supported | GoogleSQL function |  |
-| [`KEYS.NEW_KEYSET`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Supported | GoogleSQL function |  |
+| [`KEYS.NEW_KEYSET`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Partial | GoogleSQL function | Unsupported: FPE_FF1 key generation. |
 | [`KEYS.NEW_WRAPPED_KEYSET`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Unsupported |  |  |
 | [`KEYS.REWRAP_KEYSET`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Unsupported |  |  |
 | [`KEYS.ROTATE_KEYSET`](../third_party/bigquery_docs/reference/standard-sql/aead_encryption_functions.md) | Supported | GoogleSQL function |  |

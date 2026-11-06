@@ -6,23 +6,10 @@
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
 
-# Observed BigQuery answers collected with tools/bqanswers. FPE key generation is
-# available with metadata; the emulator disables FEATURE_FPE_NEW_KEYSET until
-# the key format and its semantics are implemented, rather than approximating it.
-SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1'))
-!> error: KEYS.NEW_KEYSET with key type FPE_FF1 requires metadata JSON. Error in KEYS.NEW_KEYSET expression
-
+# Observed BigQuery answer collected with tools/bqanswers. FPE key generation remains
+# unsupported until the key format and its semantics are implemented, rather than approximated.
 SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{"radix": 10, "input_length": 6}'))
 !> "1"
-
-SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{}'))
-!> error: KEYS.NEW_KEYSET metadata JSON object must contain exactly two fields: radix and input_length. Error in KEYS.NEW_KEYSET expression
-
-SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => 'not json'))
-!> error: KEYS.NEW_KEYSET failed to parse metadata JSON: syntax error while parsing value - invalid literal; last read: 'no'; error in KEYS.NEW_KEYSET expression
-
-SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('AEAD_AES_GCM_256', metadata => '{}'))
-!> error: Metadata argument is not supported for key type 'AEAD_AES_GCM_256' at [1:27]
 
 # Observed BigQuery answer recorded with tools/bqanswers: as a window function, AVG of two
 # infinities is Infinity, though the aggregate gives NaN (aggregates.txt). Which mean BigQuery's

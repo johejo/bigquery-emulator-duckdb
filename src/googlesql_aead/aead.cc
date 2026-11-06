@@ -699,9 +699,42 @@ std::string AddKey(Keyset keyset, KeysetKey key, bool primary) {
 
 }  // namespace
 
-// KEYS.NEW_KEYSET(key_type), where key_type can't be NULL.
-absl::StatusOr<std::string> NewKeyset(std::string_view key_type) {
+// KEYS.NEW_KEYSET(key_type, metadata => ...), where key_type can't be NULL.
+absl::StatusOr<std::string> NewKeyset(std::string_view key_type,
+                                      std::optional<std::string_view> metadata) {
   constexpr std::string_view kFunction = "KEYS.NEW_KEYSET";
+  if (key_type == "FPE_FF1") {
+    if (!metadata) {
+      return Error(kFunction, "KEYS.NEW_KEYSET with key type FPE_FF1 requires metadata JSON",
+                   ". Error in ");
+    }
+    nlohmann::json parsed;
+    try {
+      parsed = nlohmann::json::parse(*metadata);
+    } catch (const nlohmann::json::parse_error& error) {
+      // nlohmann prefixes the diagnostic with its exception ID and input position; BigQuery
+      // exposes only the syntax diagnostic from the same parser.
+      const std::string_view message = error.what();
+      const auto syntax = message.find("syntax error");
+      return Error(kFunction,
+                   "KEYS.NEW_KEYSET failed to parse metadata JSON: " +
+                       std::string(message.substr(syntax == std::string_view::npos ? 0 : syntax)));
+    }
+    if (!parsed.is_object() || parsed.size() != 2 || !parsed.contains("radix") ||
+        !parsed.contains("input_length")) {
+      return Error(kFunction,
+                   "KEYS.NEW_KEYSET metadata JSON object must contain exactly two fields: "
+                   "radix and input_length",
+                   ". Error in ");
+    }
+    // Do not manufacture an approximate keyset: its serialized key and metadata are visible
+    // through KEYS.KEYSET_TO_JSON and must be usable by BigQuery.
+    return absl::UnimplementedError("The emulator does not support FPE_FF1 key generation");
+  }
+  if (metadata) {
+    return absl::UnimplementedError(
+        "The emulator does not support KEYS.NEW_KEYSET metadata for this key type");
+  }
   Keyset keyset;
   auto key = NewKey(kFunction, key_type, keyset);
   if (!key.ok()) {

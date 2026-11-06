@@ -18,6 +18,14 @@ auto NewKeyset(const Arguments& arguments) {
   return googlesql_aead::NewKeyset(arguments.IsNull(0) ? "" : arguments.String(0));
 }
 
+auto NewKeysetWithMetadata(const Arguments& arguments) {
+  const std::optional<std::string> metadata =
+      arguments.IsNull(1) ? std::nullopt : std::optional(arguments.String(1));
+  return googlesql_aead::NewKeyset(
+      arguments.IsNull(0) ? "" : arguments.String(0),
+      metadata ? std::optional<std::string_view>(*metadata) : std::nullopt);
+}
+
 auto RotateKeyset(const Arguments& arguments) {
   const std::optional<std::string> keyset =
       arguments.IsNull(0) ? std::nullopt : std::optional(arguments.String(0));
@@ -45,6 +53,8 @@ void RegisterAeadFunctions(duckdb_connection connection) {
   // New random keys make each call's keyset differ. A NULL key type is an error.
   Register(connection, "bq_keys_new_keyset", {kVarchar}, kBlob, EachRow<NewKeyset, false>, false,
            std::nullopt, true);
+  Register(connection, "bq_keys_new_keyset", {kVarchar, kVarchar}, kBlob,
+           EachRow<NewKeysetWithMetadata, false>, false, std::nullopt, true);
   Register(connection, "bq_keys_rotate_keyset", {kBlob, kVarchar}, kBlob,
            EachRow<RotateKeyset, false>, false, std::nullopt, true);
   // GoogleSQL takes this as immutable, which lets SAFE. take it, although the key ID is random.

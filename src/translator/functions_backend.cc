@@ -605,7 +605,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
                      .conditions = ArgumentType<TYPE_BYTES>::kFirst,
                  },
              }),
-      Define("KEYS.NEW_KEYSET", {{.arity = 1, .spelling = "bq_keys_new_keyset($1)"}}),
+      Define("KEYS.NEW_KEYSET",
+             {
+                 {.arity = 1, .spelling = "bq_keys_new_keyset($1)"},
+                 {.arity = 2, .spelling = "bq_keys_new_keyset($1, $2)"},
+             }),
 
       Define("KEYS.ROTATE_KEYSET",
              {
