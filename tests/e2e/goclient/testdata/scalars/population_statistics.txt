@@ -1,0 +1,58 @@
+# VAR_POP and STDDEV_POP produce NaN for any nonfinite input, including a singleton.
+# NULL-only/empty inputs return NULL and finite singletons return zero.
+# third_party/bigquery_docs/reference/standard-sql/statistical_aggregate_functions.md
+SELECT IS_NAN(VAR_POP(x)) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT IS_NAN(STDDEV_POP(x)) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT IS_NAN(VAR_POP(x)) FROM UNNEST([CAST('inf' AS FLOAT64), NULL]) AS x
+=> "true"
+
+SELECT IS_NAN(STDDEV_POP(x)) FROM UNNEST([CAST('-inf' AS FLOAT64), NULL]) AS x
+=> "true"
+
+SELECT IS_NAN(VAR_POP(DISTINCT x)) FROM UNNEST([CAST('-inf' AS FLOAT64), CAST('-inf' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT IS_NAN(STDDEV_POP(DISTINCT x)) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT VAR_POP(x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT STDDEV_POP(x) FROM UNNEST(ARRAY<FLOAT64>[]) AS x
+=> null
+
+SELECT VAR_POP(x) FROM UNNEST([42.0, NULL]) AS x
+=> "0.0"
+
+SELECT STDDEV_POP(x) FROM UNNEST([42.0, NULL]) AS x
+=> "0.0"
+
+# Each ROWS frame contains just its own row; a nonfinite neighboring row must not affect it.
+SELECT ARRAY(
+  SELECT IF(IS_NAN(v), 'nan', IF(v IS NULL, 'null', CAST(v AS STRING)))
+  FROM (
+    SELECT VAR_POP(x) OVER (ORDER BY i ROWS BETWEEN CURRENT ROW AND CURRENT ROW) AS v, i
+    FROM UNNEST([CAST('inf' AS FLOAT64), 42.0, NULL, CAST('-inf' AS FLOAT64), CAST('NaN' AS FLOAT64)]) AS x WITH OFFSET AS i
+  ) ORDER BY i
+)
+=> [{"v":"nan"},{"v":"0"},{"v":"null"},{"v":"nan"},{"v":"nan"}]
+
+SELECT ARRAY(
+  SELECT IF(IS_NAN(v), 'nan', IF(v IS NULL, 'null', CAST(v AS STRING)))
+  FROM (
+    SELECT STDDEV_POP(x) OVER (ORDER BY i ROWS BETWEEN CURRENT ROW AND CURRENT ROW) AS v, i
+    FROM UNNEST([CAST('inf' AS FLOAT64), 42.0, NULL, CAST('-inf' AS FLOAT64), CAST('NaN' AS FLOAT64)]) AS x WITH OFFSET AS i
+  ) ORDER BY i
+)
+=> [{"v":"nan"},{"v":"0"},{"v":"null"},{"v":"nan"},{"v":"nan"}]
+
+# Empty preceding frames return NULL, including immediately before a nonfinite input.
+SELECT VAR_POP(x) OVER (ORDER BY i ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x WITH OFFSET AS i
+=> null
+
+SELECT STDDEV_POP(x) OVER (ORDER BY i ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x WITH OFFSET AS i
+=> null
