@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "cases": {
+    "patch_empty": {
+      "project": "johejo-sandbox",
+      "run": "jf6yplgz5dprj7o2u3qaxfoeev",
+      "steps": {
+        "update": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid default value expression for column v; Syntax error: Unexpected end of expression",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid default value expression for column v; Syntax error: Unexpected end of expression",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_null": {
+      "project": "johejo-sandbox",
+      "run": "jf6yplgz5dprj7o2u3qaxfoeev",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "defaultValueExpression": "NULL",
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "insert": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "defaultValueExpression": "NULL",
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "patch_omitted": {
+      "project": "johejo-sandbox",
+      "run": "jf6yplgz5dprj7o2u3qaxfoeev",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "insert": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "update_empty": {
+      "project": "johejo-sandbox",
+      "run": "jf6yplgz5dprj7o2u3qaxfoeev",
+      "steps": {
+        "update": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Invalid default value expression for column v; Syntax error: Unexpected end of expression",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid default value expression for column v; Syntax error: Unexpected end of expression",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "update_null": {
+      "project": "johejo-sandbox",
+      "run": "jf6yplgz5dprj7o2u3qaxfoeev",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "defaultValueExpression": "NULL",
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "insert": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "defaultValueExpression": "NULL",
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "update_omitted": {
+      "project": "johejo-sandbox",
+      "run": "jf6yplgz5dprj7o2u3qaxfoeev",
+      "steps": {
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "insert": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "v",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

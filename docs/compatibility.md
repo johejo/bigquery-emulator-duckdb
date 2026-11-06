@@ -208,7 +208,7 @@ The option cannot be enabled on an unpartitioned table or view.
 ### Column defaults
 
 Parameterized columns accept literal defaults only. `tables.update` and `tables.patch` cannot
-add or change defaults, and the Storage Write API cannot write to a table with defaults.
+add a new column with a default, and the Storage Write API cannot write to a table with defaults.
 
 ### Primary and foreign keys
 

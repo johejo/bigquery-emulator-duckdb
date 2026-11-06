@@ -168,8 +168,8 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
                                           name, FieldModeName(before.mode),
                                           FieldModeName(after.mode)));
     }
-    if (after.default_value_expression != before.default_value_expression) {
-      throw ApiError::Unsupported("changing the default value of field " + name);
+    if (!path.empty() && after.default_value_expression != before.default_value_expression) {
+      throw ApiError::Invalid("Cannot set a default value on nested field " + name);
     }
     if (after.collation != before.collation) {
       throw ApiError::Invalid(std::format(

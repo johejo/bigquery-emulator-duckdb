@@ -156,6 +156,7 @@ request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "defaultValueExpression": "3"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultRoundingMode": "ROUND_HALF_EVEN"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultCollation": "und:ci"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/h {"defaultRoundingMode": "ROUND_HALF_EVEN", "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}, {"name": "added", "type": "NUMERIC", "precision": "5", "scale": "1"}]}}
@@ -165,6 +166,7 @@ request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/e {"externalDataConfiguration": {"sourceFormat": "PARQUET", "sourceUris": ["gs://bucket/other.parquet"]}}
 note bigquery.tables.patch | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes), [Resource tags](compatibility.md#resource-tags) and [External tables](compatibility.md#external-tables).
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
+request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER", "defaultValueExpression": "3"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "expirationTime": "1893456000000"}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
