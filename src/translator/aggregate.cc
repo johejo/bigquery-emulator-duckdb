@@ -208,8 +208,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     if (aggregate == nullptr || arguments.size() != 1 || !collation->empty() ||
         row_arguments.size() != 1 || rule->distinct == AggregateRule::Distinct::kRequired ||
         rule->distinct == AggregateRule::Distinct::kAlways ||
-        (name != "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty())) ||
-        aggregate->limit() != nullptr ||
+        (name != "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty() ||
+                                 aggregate->limit() != nullptr)) ||
         (name != "SUM" && name != "AVG" && name != "MIN" && name != "MAX" && name != "COUNT" &&
          name != "ARRAY_AGG") ||
         (name != "ARRAY_AGG" && call.null_handling_modifier() ==
@@ -273,6 +273,15 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
         values = "list_sort(" + values + ", 'ASC', 'NULLS FIRST')";
       }
       values = "list_transform(" + values + ", lambda " + row + ": " + row + ".value)";
+    }
+    if (aggregate->limit() != nullptr) {
+      const auto limit = Expression(*aggregate->limit(), scope, columns);
+      if (!limit) {
+        return std::nullopt;
+      }
+      // LIMIT follows NULL filtering, DISTINCT and ORDER BY. Slicing before aggregation
+      // also makes LIMIT 0 an empty input, so ARRAY_AGG returns NULL rather than [].
+      values = "list_slice(" + values + ", 1, " + *limit + ")";
     }
     if (!rule->arguments.empty()) {
       values = "list_transform(" + values + ", lambda " + row + ": " + row_arguments.at(0) + ")";

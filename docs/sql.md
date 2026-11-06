@@ -20,7 +20,7 @@ rejected.
 
 | Section | Supported | Partial |
 | --- | --- | --- |
-| [Graphs](#graphs) | 1 | 4 |
+| [Graphs](#graphs) | 2 | 3 |
 | [Queries](#queries) | 34 | 2 |
 | [DML](#dml) | 9 | 0 |
 | [DDL](#ddl) | 24 | 9 |
@@ -36,7 +36,7 @@ rejected.
 | `DROP PROPERTY GRAPH` | Supported |  |
 | `GRAPH_EXPAND` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: GRAPH_EXPAND of a node table related to more than one node table; GRAPH_EXPAND of an edge table with rows or properties of its own; GRAPH_EXPAND with flatten_results => FALSE. |
 | `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: function $EQUAL with graph values. |
-| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: horizontal aggregate ARRAY_AGG with this type or modifiers. |
+| GQL queries | Supported | [Graph limits](compatibility.md#graphs). |
 
 ## Queries
 
