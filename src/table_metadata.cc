@@ -23,39 +23,12 @@
 #include "src/field_schema.h"
 #include "src/json_int64.h"
 #include "src/location.h"
+#include "src/partitioning.h"
 #include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 
 using nlohmann::json;
-
-std::string_view TimePartitionUnitName(TimePartitionUnit unit) {
-  switch (unit) {
-    case TimePartitionUnit::kDay:
-      return "DAY";
-    case TimePartitionUnit::kHour:
-      return "HOUR";
-    case TimePartitionUnit::kMonth:
-      return "MONTH";
-    case TimePartitionUnit::kYear:
-      return "YEAR";
-  }
-  return "";
-}
-
-std::optional<TimePartitionUnit> ParseTimePartitionUnit(std::string_view name) {
-  for (const auto unit : {
-           TimePartitionUnit::kDay,
-           TimePartitionUnit::kHour,
-           TimePartitionUnit::kMonth,
-           TimePartitionUnit::kYear,
-       }) {
-    if (name == TimePartitionUnitName(unit)) {
-      return unit;
-    }
-  }
-  return std::nullopt;
-}
 
 namespace {
 
@@ -332,25 +305,6 @@ const FieldSchema* FindField(const std::vector<FieldSchema>& schema, const std::
     });
   });
   return it == schema.end() ? nullptr : &*it;
-}
-
-void ValidateTimePartitioning(const TimePartitioning& partitioning,
-                              const std::vector<FieldSchema>& schema) {
-  const FieldSchema* field = FindField(schema, partitioning.field);
-  if (field == nullptr) {
-    throw ApiError::Invalid("The field specified for partitioning cannot be found in the schema: " +
-                            partitioning.field);
-  }
-  const bool time = field->type == FieldType::kTimestamp || field->type == FieldType::kDatetime;
-  if ((!time && field->type != FieldType::kDate) || field->mode == FieldMode::kRepeated) {
-    throw ApiError::Invalid(std::format(
-        "The field specified for time partitioning can only be of type TIMESTAMP, DATE or "
-        "DATETIME. The type found is: {}.",
-        FieldTypeName(field->type)));
-  }
-  if (!time && partitioning.type == TimePartitionUnit::kHour) {
-    throw ApiError::Invalid("A DATE field cannot be partitioned by HOUR: " + field->name);
-  }
 }
 
 void ValidateRangePartitioning(const RangePartitioning& partitioning,
@@ -1200,7 +1154,7 @@ void ValidatePartitioning(const TableMetadata& metadata, const std::vector<Field
     throw ApiError::Unsupported("requirePartitionFilter on an unpartitioned table");
   }
   if (metadata.time_partitioning.has_value()) {
-    ValidateTimePartitioning(*metadata.time_partitioning, schema);
+    (void)TimePartitionColumn(*metadata.time_partitioning, schema);
   }
   if (metadata.range_partitioning.has_value()) {
     ValidateRangePartitioning(*metadata.range_partitioning, schema);

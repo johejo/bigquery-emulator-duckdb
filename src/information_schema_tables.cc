@@ -20,6 +20,7 @@
 #include "src/information_schema_options.h"
 #include "src/information_schema_rows.h"
 #include "src/information_schema_view.h"
+#include "src/partitioning.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"

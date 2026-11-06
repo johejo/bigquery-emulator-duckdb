@@ -1,0 +1,328 @@
+{
+  "version": 1,
+  "cases": {
+    "insert_into_expired_partition_then_remove": {
+      "project": "johejo-sandbox",
+      "run": "plezlhjqj2azsv67kwtbspzwqp",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "expired_insert"
+                    },
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "expired_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "current_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "shorten_then_extend": {
+      "project": "johejo-sandbox",
+      "run": "plezlhjqj2azsv67kwtbspzwqp",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "ordinary"
+                    }
+                  ]
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": [
+                    {
+                      "v": "ordinary"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "expired_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "current_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "shorten_then_remove": {
+      "project": "johejo-sandbox",
+      "run": "plezlhjqj2azsv67kwtbspzwqp",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "ordinary"
+                    }
+                  ]
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": [
+                    {
+                      "v": "ordinary"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "expired_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "current_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "special_partitions_then_remove": {
+      "project": "johejo-sandbox",
+      "run": "plezlhjqj2azsv67kwtbspzwqp",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "after_range"
+                    },
+                    {
+                      "v": "before_range"
+                    },
+                    {
+                      "v": "null"
+                    },
+                    {
+                      "v": "ordinary"
+                    },
+                    {
+                      "v": "range_end"
+                    },
+                    {
+                      "v": "range_start"
+                    },
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "after_range"
+                    },
+                    {
+                      "v": "before_range"
+                    },
+                    {
+                      "v": "null"
+                    },
+                    {
+                      "v": "range_end"
+                    },
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "after_range"
+                    },
+                    {
+                      "v": "before_range"
+                    },
+                    {
+                      "v": "null"
+                    },
+                    {
+                      "v": "range_end"
+                    },
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "after_range"
+                    },
+                    {
+                      "v": "before_range"
+                    },
+                    {
+                      "v": "null"
+                    },
+                    {
+                      "v": "ordinary"
+                    },
+                    {
+                      "v": "range_end"
+                    },
+                    {
+                      "v": "range_start"
+                    },
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "expired_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "current_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

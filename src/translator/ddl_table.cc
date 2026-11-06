@@ -27,6 +27,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/hive_partitioning.h"
+#include "src/partitioning.h"
 #include "src/references.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"

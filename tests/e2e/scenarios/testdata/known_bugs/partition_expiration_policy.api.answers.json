@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "cases": {
+    "create_explicit_partition_with_table_default": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "create": {
+          "creationTime": "1793970711644",
+          "expirationTime": "1794575511644",
+          "partitioning": {
+            "expirationMs": "172800000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "creationTime": "1793970711644",
+          "expirationTime": "1794575511644",
+          "partitioning": {
+            "expirationMs": "172800000",
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "create_explicit_table_with_partition_default": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "create": {
+          "creationTime": "1793970713784",
+          "expirationTime": "4102444800000",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "creationTime": "1793970713784",
+          "expirationTime": "4102444800000",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "create_null_with_both_defaults": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "create": {
+          "creationTime": "1793970708103",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "creationTime": "1793970708103",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "create_omitted_with_both_defaults": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "create": {
+          "creationTime": "1793970706104",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "creationTime": "1793970706104",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "create_zero_with_both_defaults": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "TTL for interval partition must be a positive number.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "TTL for interval partition must be a positive number.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_null_duration": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "patch": {
+          "partitioning": {
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "partitioning": {
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "patch_null_partitioning": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "patch": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot change partitioned table to non partitioned table.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot change partitioned table to non partitioned table.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_omits_duration": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "patch": {
+          "partitioning": {
+            "expirationMs": "172800000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "partitioning": {
+            "expirationMs": "172800000",
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "patch_omits_partitioning": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "patch": {
+          "partitioning": {
+            "expirationMs": "172800000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "read": {
+          "partitioning": {
+            "expirationMs": "172800000",
+            "field": "d",
+            "type": "DAY"
+          }
+        }
+      }
+    },
+    "patch_zero_duration": {
+      "project": "johejo-sandbox",
+      "run": "taglermssygoihvjn5alngtlub",
+      "steps": {
+        "patch": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "TTL for interval partition must be a positive number.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "TTL for interval partition must be a positive number.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

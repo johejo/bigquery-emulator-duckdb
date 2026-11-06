@@ -1,0 +1,173 @@
+version: 1
+description: DDL partition expiration omission, removal and dataset defaults
+# Known incompatibility: partition expiration options/defaults are rejected.
+# Stable expectations are derived from the adjacent BigQuery observations; the
+# recorded generated timestamps are evidence, not literal expected values.
+vars:
+  dataset: bqa_${run}_${case}
+  create_options: ""
+  alteration: ""
+  expected_partitioning: {type: DAY, field: d, expirationMs: "86400000"}
+  rejection_query:
+    error:
+      status: 400
+      body:
+        error:
+          code: 400
+          status: INVALID_ARGUMENT
+          message: "${error_message}"
+          errors:
+            - {domain: global, reason: invalidQuery, location: q, locationType: parameter, message: "${error_message}"}
+templates:
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+            defaultTableExpirationMs: "604800000"
+            defaultPartitionExpirationMs: "86400000"
+        observe: {datasetId: /body/datasetReference/datasetId}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: |
+              CREATE TABLE `${project}.${dataset}.t` (d DATE) PARTITION BY d ${create_options};
+              ${alteration}
+        observe:
+          jobComplete: /body/jobComplete
+          errors: /body/errors
+        bind:
+          job: /body/jobReference/jobId
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {"/body/jobComplete": true}
+        observe:
+          errors: /body/errors
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          partitioning: /body/timePartitioning
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: create_omitted
+    template: ddl
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      query: {jobComplete: true}
+      results: {}
+      read: {partitioning: "${expected_partitioning}"}
+  - name: create_null
+    template: ddl
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      query: {jobComplete: true}
+      results: {}
+      read: {partitioning: "${expected_partitioning}"}
+    vars:
+      create_options: OPTIONS (partition_expiration_days=NULL)
+  - name: create_zero
+    template: ddl
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      query: "${rejection_query}"
+    vars:
+      error_message: partition_expiration_days value in table OPTIONS must be positive
+      create_options: OPTIONS (partition_expiration_days=0)
+  - name: alter_null
+    template: ddl
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      query: {jobComplete: true}
+      results: {}
+      read: {partitioning: "${expected_partitioning}"}
+    vars:
+      expected_partitioning: {type: DAY, field: d}
+      create_options: OPTIONS (partition_expiration_days=2)
+      alteration: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=NULL);
+  - name: alter_zero
+    template: ddl
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      query: "${rejection_query}"
+    vars:
+      error_message: "Query error: partition_expiration_days value in table OPTIONS must be positive at [2:1]"
+      create_options: OPTIONS (partition_expiration_days=2)
+      alteration: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=0);
+  - name: change_dataset_default
+    expect:
+      query: {jobComplete: true}
+      results:
+        schema:
+          fields:
+            - {name: table_name, type: STRING, mode: NULLABLE}
+            - {name: option_name, type: STRING, mode: NULLABLE}
+            - {name: option_value, type: STRING, mode: NULLABLE}
+        rows:
+          - {f: [{v: cleared}, {v: expiration_timestamp}, {v: present}]}
+          - {f: [{v: new}, {v: partition_expiration_days}, {v: "2.0"}]}
+          - {f: [{v: old}, {v: partition_expiration_days}, {v: "1.0"}]}
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: |
+              ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (
+                default_table_expiration_days=7, default_partition_expiration_days=1);
+              CREATE TABLE `${project}.${dataset}.old` (d DATE) PARTITION BY d;
+              ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (default_partition_expiration_days=2);
+              CREATE TABLE `${project}.${dataset}.new` (d DATE) PARTITION BY d;
+              ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (default_partition_expiration_days=NULL);
+              CREATE TABLE `${project}.${dataset}.cleared` (d DATE) PARTITION BY d;
+              SELECT table_name, option_name,
+                IF(option_name = 'expiration_timestamp', 'present', option_value) AS option_value
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS`
+              WHERE option_name IN ('partition_expiration_days', 'expiration_timestamp')
+              ORDER BY table_name, option_name;
+        observe:
+          jobComplete: /body/jobComplete
+          errors: /body/errors
+        bind:
+          job: /body/jobReference/jobId
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {"/body/jobComplete": true}
+        observe:
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

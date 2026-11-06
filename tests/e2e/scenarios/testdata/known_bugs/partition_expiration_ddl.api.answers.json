@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "cases": {
+    "alter_null": {
+      "project": "johejo-sandbox",
+      "run": "p7c6o5tbjdlta7hqh3qixmxdp3",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "read": {
+          "creationTime": "1793970657479",
+          "partitioning": {
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "results": {}
+      }
+    },
+    "alter_zero": {
+      "project": "johejo-sandbox",
+      "run": "p7c6o5tbjdlta7hqh3qixmxdp3",
+      "steps": {
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Query error: partition_expiration_days value in table OPTIONS must be positive at [2:1]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Query error: partition_expiration_days value in table OPTIONS must be positive at [2:1]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "change_dataset_default": {
+      "project": "johejo-sandbox",
+      "run": "p7c6o5tbjdlta7hqh3qixmxdp3",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "cleared"
+                },
+                {
+                  "v": "expiration_timestamp"
+                },
+                {
+                  "v": "TIMESTAMP \"2026-11-13T13:11:05.974Z\""
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "new"
+                },
+                {
+                  "v": "partition_expiration_days"
+                },
+                {
+                  "v": "2.0"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "old"
+                },
+                {
+                  "v": "partition_expiration_days"
+                },
+                {
+                  "v": "1.0"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "table_name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "option_name",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "option_value",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "create_null": {
+      "project": "johejo-sandbox",
+      "run": "p7c6o5tbjdlta7hqh3qixmxdp3",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "read": {
+          "creationTime": "1793970653047",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "results": {}
+      }
+    },
+    "create_omitted": {
+      "project": "johejo-sandbox",
+      "run": "p7c6o5tbjdlta7hqh3qixmxdp3",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "read": {
+          "creationTime": "1793970650412",
+          "partitioning": {
+            "expirationMs": "86400000",
+            "field": "d",
+            "type": "DAY"
+          }
+        },
+        "results": {}
+      }
+    },
+    "create_zero": {
+      "project": "johejo-sandbox",
+      "run": "p7c6o5tbjdlta7hqh3qixmxdp3",
+      "steps": {
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "partition_expiration_days value in table OPTIONS must be positive",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "partition_expiration_days value in table OPTIONS must be positive",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,149 @@
+version: 1
+description: Partition expiration policy changes, special partitions and time travel
+# Known incompatibility: the emulator rejects partition expiration. BigQuery
+# observations in the adjacent answer sidecar show policy-dependent historical
+# visibility and rows becoming visible again after removing/extending expiration.
+# Each historical timestamp is read in a separate statement because BigQuery
+# restricts mixing snapshots of a table in one query. No sleeps or delay loops.
+vars:
+  dataset: bqa_${run}_${case}
+  result_schema:
+    fields:
+      - {name: before_labels, type: STRING, mode: REPEATED}
+      - {name: after_labels, type: STRING, mode: REPEATED}
+      - {name: expired_labels, type: STRING, mode: REPEATED}
+      - {name: current_labels, type: STRING, mode: REPEATED}
+  initial_rows: SELECT DATE_SUB(CURRENT_DATE('UTC'), INTERVAL 2 DAY) AS d, 'ordinary' AS label
+  prepare: ""
+  mutation: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=1);
+  subsequent_policy: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=NULL);
+templates:
+  history:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: |
+              DECLARE before_mutation TIMESTAMP;
+              DECLARE after_mutation TIMESTAMP;
+              DECLARE before_labels ARRAY<STRING>;
+              DECLARE after_labels ARRAY<STRING>;
+              DECLARE expired_labels ARRAY<STRING>;
+              CREATE TABLE `${project}.${dataset}.t` PARTITION BY d AS ${initial_rows};
+              ${prepare}
+              SET before_mutation = CURRENT_TIMESTAMP();
+              ${mutation}
+              SET after_mutation = CURRENT_TIMESTAMP();
+              SET expired_labels = (
+                SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`
+              );
+              ${subsequent_policy}
+              SET before_labels = (
+                SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`
+                FOR SYSTEM_TIME AS OF before_mutation
+              );
+              SET after_labels = (
+                SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`
+                FOR SYSTEM_TIME AS OF after_mutation
+              );
+              SELECT before_labels, after_labels, expired_labels,
+                (SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`) AS current_labels;
+        observe:
+          jobComplete: /body/jobComplete
+          errors: /body/errors
+        bind:
+          job: /body/jobReference/jobId
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {"/body/jobComplete": true}
+        observe:
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: shorten_then_remove
+    template: history
+    expect:
+      query: {jobComplete: true}
+      results:
+        schema: "${result_schema}"
+        rows:
+          - f:
+              - {v: [{v: ordinary}]}
+              - {v: []}
+              - {v: []}
+              - {v: [{v: ordinary}]}
+  - name: shorten_then_extend
+    template: history
+    expect:
+      query: {jobComplete: true}
+      results:
+        schema: "${result_schema}"
+        rows:
+          - f:
+              - {v: [{v: ordinary}]}
+              - {v: []}
+              - {v: []}
+              - {v: [{v: ordinary}]}
+    vars:
+      subsequent_policy: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=365);
+  - name: insert_into_expired_partition_then_remove
+    template: history
+    expect:
+      query: {jobComplete: true}
+      results:
+        schema: "${result_schema}"
+        rows:
+          - f:
+              - {v: [{v: recent}]}
+              - {v: [{v: recent}]}
+              - {v: [{v: recent}]}
+              - {v: [{v: expired_insert}, {v: recent}]}
+    vars:
+      # The inserted row belongs to an already expired partition. BigQuery's
+      # observation shows it becoming visible after policy removal.
+      initial_rows: SELECT CURRENT_DATE('UTC') AS d, 'recent' AS label
+      prepare: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=1);
+      mutation: INSERT INTO `${project}.${dataset}.t` VALUES (DATE_SUB(CURRENT_DATE('UTC'), INTERVAL 2 DAY), 'expired_insert');
+  - name: special_partitions_then_remove
+    template: history
+    expect:
+      query: {jobComplete: true}
+      results:
+        schema: "${result_schema}"
+        rows:
+          - f:
+              - {v: [{v: after_range}, {v: before_range}, {v: "null"}, {v: ordinary}, {v: range_end}, {v: range_start}, {v: recent}]}
+              - {v: [{v: after_range}, {v: before_range}, {v: "null"}, {v: range_end}, {v: recent}]}
+              - {v: [{v: after_range}, {v: before_range}, {v: "null"}, {v: range_end}, {v: recent}]}
+              - {v: [{v: after_range}, {v: before_range}, {v: "null"}, {v: ordinary}, {v: range_end}, {v: range_start}, {v: recent}]}
+    vars:
+      # CTAS avoids using DML to insert pre-1970 values. The saved partitioning
+      # documentation distinguishes that DML restriction from the partition range.
+      initial_rows: |
+        SELECT CAST(NULL AS DATE) AS d, 'null' AS label
+        UNION ALL SELECT DATE '1959-12-31', 'before_range'
+        UNION ALL SELECT DATE '1960-01-01', 'range_start'
+        UNION ALL SELECT DATE_SUB(CURRENT_DATE('UTC'), INTERVAL 2 DAY), 'ordinary'
+        UNION ALL SELECT CURRENT_DATE('UTC'), 'recent'
+        UNION ALL SELECT DATE '2159-12-31', 'range_end'
+        UNION ALL SELECT DATE '2160-01-01', 'after_range'
