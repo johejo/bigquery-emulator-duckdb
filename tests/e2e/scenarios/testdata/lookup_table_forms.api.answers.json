@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "cases": {
+    "constant_expression": {
+      "project": "johejo-sandbox",
+      "run": "flcj4d7omhfcdwhuvwa2csc5zp",
+      "steps": {
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Table-valued function not found: LookupTable at [2:6]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Table-valued function not found: LookupTable at [2:6]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "quoted_name": {
+      "project": "johejo-sandbox",
+      "run": "flcj4d7omhfcdwhuvwa2csc5zp",
+      "steps": {
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Table-valued function not found: LookupTable at [2:6]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Table-valued function not found: LookupTable at [2:6]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

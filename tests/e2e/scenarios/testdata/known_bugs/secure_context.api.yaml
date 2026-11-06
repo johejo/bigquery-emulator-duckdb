@@ -1,0 +1,70 @@
+version: 1
+description: >-
+  BigQuery accepts logical views using SECURE_CONTEXT with unknown or empty
+  keys, then rejects queries on those views with a missing-value error. The
+  emulator rejects the view definition instead because SECURE_CONTEXT is
+  disabled. Observed with tools/bqanswers; the adjacent answers file retains
+  the original observations. No real secrets are used.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  view:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_view
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE VIEW `${project}.${dataset}.context_view` AS
+              SELECT SECURE_CONTEXT('${key}') AS context_value
+            useLegacySql: false
+            timeoutMs: 200000
+        observe:
+          error: /body/error
+          errors: /body/errors
+      - name: query_view
+        expectFailure: true
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT context_value FROM `${project}.${dataset}.context_view`
+            useLegacySql: false
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: unknown_key
+    template: view
+    vars:
+      key: bq_emulator_unverified_key
+    expect:
+      create_view: {}
+      query_view:
+        status: 400
+        reason: invalidQuery
+        message: "Missing value for SECURE_CONTEXT('bq_emulator_unverified_key')"
+  - name: empty_key
+    template: view
+    vars:
+      key: ''
+    expect:
+      create_view: {}
+      query_view:
+        status: 400
+        reason: invalidQuery
+        message: "Missing value for SECURE_CONTEXT('')"

@@ -1,0 +1,63 @@
+version: 1
+description: >-
+  BigQuery rejects LookupTable with quoted names and constant expressions even
+  when the physical table exists. Observed with tools/bqanswers; the adjacent
+  answers file retains the original observations. Literal names are covered in
+  lookup_table.api.yaml.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  lookup:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.source` AS
+              SELECT 1 AS id, 'one' AS value UNION ALL SELECT 2, 'two'
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: query
+        expectFailure: true
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${statement}'
+            useLegacySql: false
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: quoted_name
+    template: lookup
+    vars:
+      statement: |
+        SELECT id, value
+        FROM LookupTable('`${project}.${dataset}.source`')
+        ORDER BY id
+    expect:
+      query: {status: 400, reason: invalidQuery}
+  - name: constant_expression
+    template: lookup
+    vars:
+      statement: |
+        SELECT id, value
+        FROM LookupTable(CONCAT('${project}.${dataset}.', 'source'))
+        ORDER BY id
+    expect:
+      query: {status: 400, reason: invalidQuery}

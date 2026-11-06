@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "cases": {
+    "empty_key": {
+      "project": "johejo-sandbox",
+      "run": "54cbpzdz5ypsar6s264u6pqlz7",
+      "steps": {
+        "create_view": {},
+        "query_view": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Missing value for SECURE_CONTEXT('')",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Missing value for SECURE_CONTEXT('')",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unknown_key": {
+      "project": "johejo-sandbox",
+      "run": "54cbpzdz5ypsar6s264u6pqlz7",
+      "steps": {
+        "create_view": {},
+        "query_view": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Missing value for SECURE_CONTEXT('bq_emulator_unverified_key')",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Missing value for SECURE_CONTEXT('bq_emulator_unverified_key')",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}
