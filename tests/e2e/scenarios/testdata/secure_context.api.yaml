@@ -1,9 +1,8 @@
 version: 1
 description: >-
   BigQuery accepts logical views using SECURE_CONTEXT with unknown or empty
-  keys, then rejects queries on those views with a missing-value error. The
-  emulator rejects the view definition instead because SECURE_CONTEXT is
-  disabled. Observed with tools/bqanswers; the adjacent answers file retains
+  keys, then rejects queries on those views with a missing-value error.
+  Observed with tools/bqanswers; the adjacent answers file retains
   the original observations. No real secrets are used.
 vars:
   dataset: bqa_${run}_${case}

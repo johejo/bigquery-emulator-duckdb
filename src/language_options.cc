@@ -40,10 +40,6 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     options->DisableLanguageFeature(googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT);
     // BigQuery supports FPE key generation with metadata, but the emulator does not implement it.
     options->DisableLanguageFeature(googlesql::FEATURE_FPE_NEW_KEYSET);
-    // BigQuery restricts SECURE_CONTEXT to logical view and row access policy definitions.
-    // Views accept unknown or empty keys but fail when queried without their context values.
-    // Context values and these restrictions are not implemented by the emulator.
-    options->DisableLanguageFeature(googlesql::FEATURE_SECURE_CONTEXT);
     // BigQuery rejects LookupTable with literal, quoted and constant-expression table names.
     options->DisableLanguageFeature(googlesql::FEATURE_LOOKUP_TABLE_TVF);
     // GoogleSQL released JSON_EXISTS functions before BigQuery documented them. BigQuery casts

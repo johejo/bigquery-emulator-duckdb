@@ -29,27 +29,6 @@ SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => 'not json'))
 SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('AEAD_AES_GCM_256', metadata => '{}'))
 !> error: Metadata argument is not supported for key type 'AEAD_AES_GCM_256' at [1:27]
 
-# Observed BigQuery answers collected with tools/bqanswers. SECURE_CONTEXT is
-# recognized but cannot run in a standalone SELECT. The emulator disables it
-# until context semantics and restrictions are implemented.
-SELECT SECURE_CONTEXT('bq_emulator_unverified_key')
-!> error: SECURE_CONTEXT() is only supported inside logical view definitions or row access policy definitions.
-
-SELECT SECURE_CONTEXT('')
-!> error: SECURE_CONTEXT() is only supported inside logical view definitions or row access policy definitions.
-
-SELECT SECURE_CONTEXT(CAST(NULL AS STRING))
-!> error: The argument to SECURE_CONTEXT must be non-NULL at [1:23]
-
-SELECT SECURE_CONTEXT(123)
-!> error: No matching signature for function SECURE_CONTEXT
-  Argument types: INT64
-  Signature: SECURE_CONTEXT(STRING)
-    Argument 1: Unable to coerce type INT64 to expected type STRING at [1:8]
-
-SELECT SAFE.SECURE_CONTEXT('bq_emulator_unverified_key')
-!> error: Function SECURE_CONTEXT does not support SAFE error mode at [1:8]
-
 # Observed BigQuery answer recorded with tools/bqanswers: as a window function, AVG of two
 # infinities is Infinity, though the aggregate gives NaN (aggregates.txt). Which mean BigQuery's
 # windows compute is unknown; bq_avg_double gives NaN for both.

@@ -4,6 +4,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -47,6 +48,15 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
                                       const Scope& scope) {
   const bool materialized = create.Is<googlesql::ResolvedCreateMaterializedViewStmt>();
   if (materialized) {
+    // Secure context is meaningful only for logical views; materialization cannot preserve it.
+    std::vector<const googlesql::ResolvedNode*> calls;
+    create.query()->GetDescendantsWithKinds({googlesql::RESOLVED_FUNCTION_CALL}, &calls);
+    if (std::ranges::any_of(calls, [](const googlesql::ResolvedNode* node) {
+          return node->GetAs<googlesql::ResolvedFunctionCall>()->function()->Name() ==
+                 "secure_context";
+        })) {
+      return Unsupported(scope, "SECURE_CONTEXT in materialized views");
+    }
     const auto& mv = *create.GetAs<googlesql::ResolvedCreateMaterializedViewStmt>();
     if (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE ||
         !mv.partition_by_list().empty() || !mv.cluster_by_list().empty() ||

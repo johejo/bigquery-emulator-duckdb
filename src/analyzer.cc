@@ -688,7 +688,8 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     // The analyzer nests an error of the catalog's, such as EXTERNAL_QUERY's, in one of its own.
     // One that the emulator does not support is the statement's error.
     const std::string_view formatted_message = formatted.message();
-    if (formatted_message.starts_with("The emulator does not support ")) {
+    if (formatted_message.starts_with("The emulator does not support ") ||
+        formatted_message.starts_with("Missing value for SECURE_CONTEXT('")) {
       throw std::runtime_error(std::string(formatted_message));
     }
     if (const size_t nested = formatted_message.find("\nThe emulator does not support ");
