@@ -1,5 +1,4 @@
-# INTERVAL and RANGE external columns are rejected at creation; BigQuery creates them
-# and counts their invalid CSV values against max_bad_records when the column is read.
+# INTERVAL and RANGE CSV conversions count against max_bad_records only when read.
 version: 1
 # Observed on BigQuery in johejo-sandbox, run wk4wucamzlk2mabbsyznozpp35.
 # The sidecar retains the original answers.

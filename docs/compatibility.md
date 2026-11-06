@@ -94,7 +94,7 @@ have each REQUIRED and REPEATED column and field of the schema.
 
 CSV takes a flat schema of the scalar types listed above, given or detected as
 [loads detect it](#loads-extracts-and-copies), and a given schema can also have DATETIME,
-BIGNUMERIC, JSON and GEOGRAPHY columns. It supports `skip_leading_rows` /
+BIGNUMERIC, JSON, GEOGRAPHY, INTERVAL and RANGE columns. It supports `skip_leading_rows` /
 `csvOptions.skipLeadingRows`, a single ASCII `field_delimiter` / `csvOptions.fieldDelimiter`,
 other than a quote, line break or NUL, and the [CSV options](#loads-extracts-and-copies) loads
 take. Schema detection does not take a quote, quoted line breaks or NULL markers. Other CSV
