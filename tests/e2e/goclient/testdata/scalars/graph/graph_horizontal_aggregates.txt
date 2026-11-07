@@ -1,0 +1,86 @@
+# Horizontal calls use ordinary aggregate semantics.
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+# GoogleSQL graph_table_gql_extended1.test also covers
+# horizontal_aggregation_string_agg_with_constant_arg and horizontal_aggregation_having_max.
+GRAPH scalar_graph.FinGraph LET x = ['hello', 'world'] LET r = STRING_AGG(x, ', ') RETURN r
+=> "hello, world"
+GRAPH scalar_graph.FinGraph LET x = ['b', NULL, 'a', 'b'] LET r = STRING_AGG(DISTINCT x ORDER BY x LIMIT 2) RETURN r
+=> "a,b"
+GRAPH scalar_graph.FinGraph LET x = ['b', NULL, 'a'] LET r = STRING_AGG(x, ':' ORDER BY x DESC LIMIT 1) RETURN r
+=> "b"
+GRAPH scalar_graph.FinGraph LET x = [b'b', NULL, b'a', b'b'] LET r = STRING_AGG(DISTINCT x, b':' ORDER BY x) RETURN TO_HEX(r) AS result
+=> "613a62"
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<STRING>) LET r = STRING_AGG(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS STRING)] LET r = STRING_AGG(x LIMIT 1) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = ['a', 'b'] LET r = STRING_AGG(x LIMIT 0) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [STRUCT('banana' AS name, 100 AS price), STRUCT('apple' AS name, 20 AS price), STRUCT('orange' AS name, 200 AS price)] LET r = ANY_VALUE(x.name HAVING MAX x.price) RETURN r
+=> "orange"
+GRAPH scalar_graph.FinGraph LET x = [NULL, 7, NULL] LET r = ANY_VALUE(x) RETURN r
+=> "7"
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<INT64>) LET r = ANY_VALUE(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [TRUE, FALSE, NULL, TRUE] LET r = COUNTIF(x) RETURN r
+=> "2"
+GRAPH scalar_graph.FinGraph LET x = [TRUE, FALSE, NULL, TRUE] LET r = COUNTIF(DISTINCT x) RETURN r
+=> "1"
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<BOOL>) LET r = COUNTIF(x) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET x = [TRUE, NULL, TRUE] LET r = LOGICAL_AND(x) RETURN r
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [TRUE, NULL, FALSE] LET r = LOGICAL_AND(x) RETURN r
+=> "false"
+GRAPH scalar_graph.FinGraph LET x = [FALSE, NULL, TRUE] LET r = LOGICAL_OR(x) RETURN r
+=> "true"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS BOOL)] LET r = LOGICAL_OR(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS BOOL)] LET r = LOGICAL_AND(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [7, NULL, 3] LET r = BIT_AND(x) RETURN r
+=> "3"
+GRAPH scalar_graph.FinGraph LET x = [4, NULL, 3] LET r = BIT_OR(x) RETURN r
+=> "7"
+GRAPH scalar_graph.FinGraph LET x = [7, NULL, 3, 7] LET r = BIT_XOR(x) RETURN r
+=> "3"
+GRAPH scalar_graph.FinGraph LET x = [7, NULL, 3, 7] LET r = BIT_XOR(DISTINCT x) RETURN r
+=> "4"
+GRAPH scalar_graph.FinGraph LET x = CAST(NULL AS ARRAY<INT64>) LET r = BIT_AND(x) RETURN r
+=> null
+GRAPH scalar_graph.FinGraph LET x = [1, 2, NULL, 2] LET r = SUM(DISTINCT x) RETURN r
+=> "3"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, NULL, 2] LET r = AVG(DISTINCT x) RETURN r
+=> "1.5"
+GRAPH scalar_graph.FinGraph LET x = [1, 2, NULL, 2] LET r = COUNT(DISTINCT x) RETURN r
+=> "2"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INT64)] LET r = COUNT(DISTINCT x) RETURN r
+=> "0"
+GRAPH scalar_graph.FinGraph LET x = [NUMERIC '1', NUMERIC '2', NUMERIC '2'] LET r = SUM(DISTINCT x) RETURN r
+=> "3"
+GRAPH scalar_graph.FinGraph LET x = [INTERVAL 1 DAY, INTERVAL 2 DAY, INTERVAL 1 DAY] LET r = SUM(DISTINCT x) RETURN r
+=> "0-0 3 0:0:0"
+GRAPH scalar_graph.FinGraph LET x = [INTERVAL 2 DAY, NULL, INTERVAL 1 DAY] LET r = MIN(x) RETURN r
+=> "0-0 1 0:0:0"
+GRAPH scalar_graph.FinGraph LET x = [INTERVAL 2 DAY, NULL, INTERVAL 1 DAY] LET r = MAX(x) RETURN r
+=> "0-0 2 0:0:0"
+GRAPH scalar_graph.FinGraph LET x = [CAST(NULL AS INTERVAL)] LET r = MIN(x) RETURN r
+=> null
+
+# Arrays are fields of the group variable, not arrays of arrays.
+GRAPH scalar_graph.FinGraph LET x = [STRUCT([1, 2] AS a), STRUCT([3] AS a)] LET r = ARRAY_CONCAT_AGG(x.a) RETURN TO_JSON_STRING(r) AS result
+=> "[1,2,3]"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT([1, 2] AS a, 1 AS k), STRUCT([3] AS a, 2 AS k)] LET r = ARRAY_CONCAT_AGG(x.a ORDER BY x.k DESC LIMIT 1) RETURN TO_JSON_STRING(r) AS result
+=> "[3]"
+GRAPH scalar_graph.FinGraph LET x = [STRUCT(CAST(NULL AS ARRAY<INT64>) AS a), STRUCT([1] AS a)] LET r = ARRAY_CONCAT_AGG(x.a LIMIT 1) RETURN TO_JSON_STRING(r) AS result
+=> "[1]"
+
+# Short-circuit evaluation must cover every added aggregate path, not just ARRAY_AGG.
+GRAPH scalar_graph.FinGraph LET x = [1, 0] LET r = IF(TRUE, 'ok', STRING_AGG(CAST(DIV(1, x) AS STRING) ORDER BY x)) RETURN r
+=> "ok"
+GRAPH scalar_graph.FinGraph LET x = [1, 0] LET r = IF(TRUE, 1, BIT_AND(DIV(1, x))) RETURN r
+=> "1"
+GRAPH scalar_graph.FinGraph LET x = [1, 0] LET r = IF(TRUE, 1, COUNTIF(DIV(1, x) > 0)) RETURN r
+=> "1"
+GRAPH scalar_graph.FinGraph LET x = [1, 0] LET r = IF(TRUE, 1, SUM(DISTINCT DIV(1, x))) RETURN r
+=> "1"

@@ -114,6 +114,12 @@ query GQL queries | GRAPH d.g LET x = [1, NULL, 2, 1] LET values = ARRAY_AGG(x I
 query GQL queries | GRAPH d.g LET x = [1, 2] LET values = ARRAY_AGG(x ORDER BY x LIMIT 1) RETURN values
 query GQL queries | GRAPH d.g LET x = [1, 2, 3] LET total = SUM(x HAVING MAX MOD(x, 2)) RETURN total
 query GQL queries | GRAPH d.g LET x = [1, 2, 3] LET values = ARRAY_AGG(DISTINCT x HAVING MIN MOD(x, 2) ORDER BY x LIMIT 1) RETURN values
+query GQL queries | GRAPH d.g LET x = ['a', NULL, 'b', 'a'] LET text = STRING_AGG(DISTINCT x, ':' ORDER BY x LIMIT 2) RETURN text
+query GQL queries | GRAPH d.g LET x = [STRUCT([1] AS a), STRUCT([2] AS a)] LET combined = ARRAY_CONCAT_AGG(x.a LIMIT 1) RETURN combined
+query GQL queries | GRAPH d.g LET x = [1, 2, 2] LET total = SUM(DISTINCT x) LET mean = AVG(DISTINCT x) LET n = COUNT(DISTINCT x) RETURN total, mean, n
+query GQL queries | GRAPH d.g LET x = [1, NULL, 2] LET picked = ANY_VALUE(x HAVING MAX x) LET bits = BIT_OR(x) RETURN picked, bits
+query GQL queries | GRAPH d.g LET x = [TRUE, NULL, FALSE] LET n = COUNTIF(x) LET all_true = LOGICAL_AND(x) LET any_true = LOGICAL_OR(x) RETURN n, all_true, any_true
+query GQL queries | GRAPH d.g LET x = [INTERVAL 1 DAY, INTERVAL 2 DAY] LET lo = MIN(x) LET hi = MAX(x) RETURN lo, hi
 query GQL queries | GRAPH d.g MATCH ANY CHEAPEST (a:Person)-[e:Knows COST 1]->(b:Person) RETURN a.id
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_EXPAND` | [Graph limits](compatibility.md#graphs).
