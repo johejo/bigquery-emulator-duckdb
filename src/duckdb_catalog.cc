@@ -1,5 +1,6 @@
 #include "src/duckdb_catalog.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -32,8 +33,8 @@ std::string PropertyGraphsTable(const std::string& project) {
 
 std::string PropertyGraphQuery(const TableReference& graph) {
   return "SELECT definition, native_sql FROM " + PropertyGraphsTable(graph.project_id) +
-         " WHERE lower(dataset_id) = lower(" + QuoteLiteral(graph.dataset_id) +
-         ") AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) + ")";
+         " WHERE dataset_id = " + QuoteLiteral(graph.dataset_id) + " AND lower(graph_id) = lower(" +
+         QuoteLiteral(graph.table_id) + ")";
 }
 
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
@@ -56,9 +57,9 @@ bool IsDuckDbSchema(const std::string& name) {
 // The datasets of `project`, by name.
 std::string DatasetsQuery(const std::string& project) {
   return std::format(
-      "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = {}"
+      "SELECT schema_name FROM {} WHERE catalog_name = {}"
       " AND schema_name NOT IN {} ORDER BY schema_name",
-      QuoteLiteral(project), kDuckDbSchemas);
+      LogicalCatalog("information_schema.schemata"), QuoteLiteral(project), kDuckDbSchemas);
 }
 
 // The datasets of `project` by name, each with the metadata recorded for it, or only `dataset`.
@@ -66,9 +67,10 @@ std::string DatasetEntriesQuery(const std::string& project,
                                 const std::optional<std::string>& dataset) {
   return std::format(
       "SELECT schema_name, (SELECT metadata FROM {} WHERE dataset_id = schema_name)"
-      " FROM information_schema.schemata WHERE catalog_name = {} AND schema_name NOT IN {}{}"
+      " FROM {} WHERE catalog_name = {} AND schema_name NOT IN {}{}"
       " ORDER BY schema_name",
-      DatasetMetadataTable(project), QuoteLiteral(project), kDuckDbSchemas,
+      DatasetMetadataTable(project), LogicalCatalog("information_schema.schemata"),
+      QuoteLiteral(project), kDuckDbSchemas,
       dataset.has_value() ? " AND schema_name = " + QuoteLiteral(*dataset) : "");
 }
 
@@ -90,12 +92,125 @@ DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded)
   return metadata;
 }
 
+namespace {
+
+bool AsciiName(const std::string& name) {
+  return std::ranges::all_of(name, [](unsigned char c) { return c < 128; });
+}
+
+bool CaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset) {
+  // Native catalogs and script-local databases have no dataset metadata table.
+  if (backend
+          .Execute(std::format("SELECT 1 FROM information_schema.tables WHERE table_catalog = {}"
+                               " AND table_schema = 'main' AND table_name = 'emulator_datasets'",
+                               QuoteLiteral(dataset.project_id)))
+          .rows.empty()) {
+    return false;
+  }
+  const QueryResult result =
+      backend.Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
+  return !result.rows.empty() &&
+         ParseDatasetMetadata(result.rows.OptionalString(0, 1)).is_case_insensitive.value_or(false);
+}
+
+}  // namespace
+
+std::optional<DatasetReference> FindDatasetReference(Backend& backend,
+                                                     const DatasetReference& dataset) {
+  const QueryResult result = backend.Execute(
+      std::format("SELECT schema_name FROM {} WHERE catalog_name = {}"
+                  " AND lower(schema_name) = lower({}) ORDER BY schema_name = {} DESC",
+                  LogicalCatalog("information_schema.schemata"), QuoteLiteral(dataset.project_id),
+                  QuoteLiteral(dataset.dataset_id), QuoteLiteral(dataset.dataset_id)));
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    DatasetReference candidate{
+        .project_id = dataset.project_id,
+        .dataset_id = result.rows.String(row, 0),
+    };
+    if (candidate.dataset_id == dataset.dataset_id || CaseInsensitiveDataset(backend, candidate)) {
+      return candidate;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<TableReference> FindTableReference(Backend& backend, const TableReference& table) {
+  const auto dataset = FindDatasetReference(
+      backend, {.project_id = table.project_id, .dataset_id = table.dataset_id});
+  if (!dataset) {
+    return std::nullopt;
+  }
+  const QueryResult result = backend.Execute(
+      std::format("SELECT table_name FROM {} WHERE table_catalog = {}"
+                  " AND table_schema = {} AND lower(table_name) = lower({})",
+                  LogicalCatalog("information_schema.tables"), QuoteLiteral(dataset->project_id),
+                  QuoteLiteral(dataset->dataset_id), QuoteLiteral(table.table_id)));
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    TableReference candidate{
+        .project_id = dataset->project_id,
+        .dataset_id = dataset->dataset_id,
+        .table_id = result.rows.String(row, 0),
+    };
+    if (candidate.table_id == table.table_id) {
+      return candidate;
+    }
+    if (CaseInsensitiveDataset(backend, *dataset)) {
+      if (!AsciiName(candidate.table_id) || !AsciiName(table.table_id)) {
+        throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");
+      }
+      return candidate;
+    }
+  }
+  return std::nullopt;
+}
+
+void CheckCaseInsensitiveTableName(Backend& backend, const TableReference& table) {
+  if (!AsciiName(table.table_id) &&
+      CaseInsensitiveDataset(backend,
+                             {.project_id = table.project_id, .dataset_id = table.dataset_id})) {
+    throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");
+  }
+}
+
+void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset,
+                                 const DatasetMetadata& metadata) {
+  if (!metadata.is_case_insensitive.value_or(false)) {
+    return;
+  }
+  if (!backend
+           .Execute(std::format("SELECT 1 FROM {} WHERE catalog_name = {} AND lower(schema_name) = "
+                                "lower({}) AND schema_name <> {}",
+                                LogicalCatalog("information_schema.schemata"),
+                                QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id),
+                                QuoteLiteral(dataset.dataset_id)))
+           .rows.empty()) {
+    throw ApiError::Invalid(
+        "Cannot enable is_case_insensitive the dataset name is case insensitively duplicate with "
+        "other dataset(s)");
+  }
+  if (!backend
+           .Execute(std::format("SELECT 1 FROM {} WHERE table_catalog = {} AND table_schema = {} "
+                                "GROUP BY lower(table_name) HAVING count(*) > 1",
+                                LogicalCatalog("information_schema.tables"),
+                                QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id)))
+           .rows.empty()) {
+    throw ApiError::Invalid(
+        "Cannot enable is_case_insensitive because there are case insensitive duplicate table "
+        "names in the dataset");
+  }
+  if (std::ranges::any_of(FirstColumnStrings(backend.Execute(TablesQuery(dataset))),
+                          [](const std::string& name) { return !AsciiName(name); })) {
+    throw ApiError::Unsupported("non-ASCII table names in a case-insensitive dataset");
+  }
+}
+
 // The tables and views of `dataset` by name.
 std::string TablesQuery(const DatasetReference& dataset) {
   return std::format(
-      "SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
+      "SELECT table_name FROM {} WHERE table_catalog = {}"
       " AND table_schema = {} ORDER BY table_name",
-      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
+      LogicalCatalog("information_schema.tables"), QuoteLiteral(dataset.project_id),
+      QuoteLiteral(dataset.dataset_id));
 }
 
 // Expiration is lazy: catalog reads remove expired relations before exposing them. Sweep
@@ -110,11 +225,11 @@ void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
                         QuoteLiteral(dataset->project_id), QuoteLiteral(dataset->dataset_id))
           : "";
   const QueryResult relations = backend.Execute(std::format(
-      "SELECT database_name, schema_name, table_name, comment, 'TABLE' FROM duckdb_tables()"
+      "SELECT database_name, schema_name, table_name, comment, 'TABLE' FROM {}"
       " WHERE comment IS NOT NULL{}"
-      " UNION ALL SELECT database_name, schema_name, view_name, comment, 'VIEW' FROM duckdb_views()"
+      " UNION ALL SELECT database_name, schema_name, view_name, comment, 'VIEW' FROM {}"
       " WHERE comment IS NOT NULL{}",
-      where, where));
+      LogicalCatalog("duckdb_tables()"), where, LogicalCatalog("duckdb_views()"), where));
   const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
                           .count();
@@ -135,7 +250,7 @@ void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
     const std::string skip = std::format(
         "SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM {} WHERE database_name = {}"
         " AND schema_name = {} AND {} = {} AND comment = {})",
-        view ? "duckdb_views()" : "duckdb_tables()", QuoteLiteral(table.project_id),
+        LogicalCatalog(view ? "duckdb_views()" : "duckdb_tables()"), QuoteLiteral(table.project_id),
         QuoteLiteral(table.dataset_id), view ? "view_name" : "table_name",
         QuoteLiteral(table.table_id), QuoteLiteral(comment));
     std::scoped_lock const lock(expiration_mutex);
@@ -153,9 +268,9 @@ std::optional<std::optional<std::string>> RelationComment(Backend& backend,
                                                           std::string_view name,
                                                           const TableReference& table) {
   const QueryResult result = backend.Execute(std::format(
-      "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {} AND {} = {}", relations,
-      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), name,
-      QuoteLiteral(table.table_id)));
+      "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {} AND {} = {}",
+      LogicalCatalog(relations), QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
+      name, QuoteLiteral(table.table_id)));
   if (result.rows.empty()) {
     return std::nullopt;
   }
@@ -171,7 +286,12 @@ std::optional<std::optional<std::string>> ViewComment(Backend& backend,
 // describe them, each replaced by the field its comment records. Throws BackendError when the
 // table does not exist, and ApiError when a column's DuckDB type is one the emulator does not
 // support.
-std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
+std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& requested) {
+  const auto resolved = FindTableReference(backend, requested);
+  if (!resolved) {
+    throw BackendError("Table not found: " + TableName(requested));
+  }
+  const TableReference& table = *resolved;
   // Reading a view's schema must not require its execution identity to be configured.
   if (const auto comment = ViewComment(backend, table); comment.has_value()) {
     if (const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);

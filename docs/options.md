@@ -22,8 +22,8 @@ the emulator rejected.
 
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [CREATE SCHEMA](#create-schema) | 9 | 0 | 3 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 8 | 0 | 3 | 3 |
+| [CREATE SCHEMA](#create-schema) | 10 | 0 | 2 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 9 | 0 | 2 | 3 |
 | [CREATE TABLE](#create-table) | 7 | 2 | 3 | 3 |
 | [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 7 | 0 | 5 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
@@ -59,7 +59,7 @@ the emulator rejected.
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`failover_reservation`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`is_case_insensitive`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`is_case_insensitive`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`is_primary`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
@@ -79,7 +79,7 @@ the emulator rejected.
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`failover_reservation`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`is_case_insensitive`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`is_case_insensitive`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`is_primary`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
 | [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`max_time_travel_hours`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |

@@ -17,6 +17,14 @@ std::string QuoteLiteral(std::string_view value);
 // "..." with the DuckDB escaping rules: a double quote is doubled.
 std::string QuoteIdentifier(std::string_view name);
 
+// Reversible, case-sensitive physical names for BigQuery datasets and their relations.
+// DuckDB's native schemas (including main and its internal tables) keep their names.
+std::string DatasetCatalogName(std::string_view name);
+std::string TableCatalogName(std::string_view dataset, std::string_view name);
+
+// A DuckDB catalog relation with physical dataset and relation names decoded.
+std::string LogicalCatalog(std::string_view relation);
+
 // Quotes a resolved table name as project.dataset.table. Domain-scoped project IDs may
 // contain dots; only the last two dots delimit the dataset and table in that case.
 std::string QuoteIdentifierPath(std::string_view path);

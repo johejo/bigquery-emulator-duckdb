@@ -39,6 +39,7 @@ enum class DdlOptionId : uint8_t {
   kDefaultTableExpirationDays,
   kStorageBillingModel,
   kMaxTimeTravelHours,
+  kIsCaseInsensitive,
   kLocation,
   kRoundingMode,
   kRuntimeVersion,

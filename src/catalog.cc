@@ -84,11 +84,17 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
     tables_.emplace(std::move(key), *std::move(view));
     return absl::OkStatus();
   }
-  const std::vector<std::string> normalized =
+  std::vector<std::string> normalized =
       ResolveTablePath(path, default_project_, default_dataset_, temporary_, &source_);
   if (normalized.empty()) {
     return absl::NotFoundError("Table not found: " + absl::StrJoin(path, "."));
   }
+  const auto reference = source_.ResolveTableReference({
+      .project_id = normalized.at(0),
+      .dataset_id = normalized.at(1),
+      .table_id = normalized.at(2),
+  });
+  normalized = {reference.project_id, reference.dataset_id, reference.table_id};
   if (auto const it = tables_.find(normalized); it != tables_.end()) {
     *table = it->second.get();
     return absl::OkStatus();

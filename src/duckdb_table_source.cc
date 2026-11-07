@@ -45,6 +45,22 @@ class DuckDbTableSource : public TableSource {
         project_ids_(project_ids),
         location_(location) {}
 
+  DatasetReference ResolveDatasetReference(const DatasetReference& dataset) override {
+    return FindDatasetReference(backend_, dataset).value_or(dataset);
+  }
+
+  TableReference ResolveTableReference(const TableReference& table) override {
+    if (const auto found = FindTableReference(backend_, table)) {
+      return *found;
+    }
+    const auto dataset =
+        ResolveDatasetReference({.project_id = table.project_id, .dataset_id = table.dataset_id});
+    TableReference resolved = table;
+    resolved.dataset_id = dataset.dataset_id;
+    CheckCaseInsensitiveTableName(backend_, resolved);
+    return resolved;
+  }
+
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                     const std::string& dataset,
                                                     const std::string& table) override {
@@ -107,7 +123,8 @@ class DuckDbTableSource : public TableSource {
   std::optional<TableDescription> DescribeTable(const std::string& project,
                                                 const std::string& dataset,
                                                 const std::string& table) override {
-    const TableReference reference{.project_id = project, .dataset_id = dataset, .table_id = table};
+    const TableReference reference =
+        ResolveTableReference({.project_id = project, .dataset_id = dataset, .table_id = table});
     if (IsDuckDbSchema(dataset)) {
       return std::nullopt;
     }
@@ -132,7 +149,8 @@ class DuckDbTableSource : public TableSource {
     if (IsDuckDbSchema(dataset)) {
       return std::nullopt;
     }
-    const QueryResult result = backend_.Execute(DatasetEntriesQuery(project, dataset));
+    const auto reference = ResolveDatasetReference({.project_id = project, .dataset_id = dataset});
+    const QueryResult result = backend_.Execute(DatasetEntriesQuery(project, reference.dataset_id));
     if (result.rows.empty()) {
       return std::nullopt;
     }
@@ -166,8 +184,8 @@ class DuckDbTableSource : public TableSource {
     if (const auto it = locations_.find(key); it != locations_.end()) {
       return it->second;
     }
-    std::optional<std::string> location =
-        LocationOf(backend_, {.project_id = project, .dataset_id = dataset});
+    std::optional<std::string> location = LocationOf(
+        backend_, ResolveDatasetReference({.project_id = project, .dataset_id = dataset}));
     if (location.has_value()) {
       locations_[key] = *location;
     }
@@ -183,7 +201,7 @@ class DuckDbTableSource : public TableSource {
   std::vector<std::string> ListTables(const std::string& project,
                                       const std::string& dataset) override {
     return FirstColumnStrings(backend_.Execute(
-        TablesQuery(DatasetReference{.project_id = project, .dataset_id = dataset})));
+        TablesQuery(ResolveDatasetReference({.project_id = project, .dataset_id = dataset}))));
   }
 
   std::optional<std::vector<std::pair<std::optional<std::string>, int64_t>>> CountRows(
@@ -210,7 +228,8 @@ class DuckDbTableSource : public TableSource {
   std::optional<ViewDescription> FindView(const std::string& project, const std::string& dataset,
                                           const std::string& table) override {
     const auto comment = ViewComment(
-        backend_, TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
+        backend_,
+        ResolveTableReference({.project_id = project, .dataset_id = dataset, .table_id = table}));
     if (!comment.has_value()) {
       return std::nullopt;
     }

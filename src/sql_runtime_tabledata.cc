@@ -91,6 +91,7 @@ QueryResult SqlRuntime::ListTableData(TableReference table, int64_t start_index,
                                       int64_t max_results, std::string_view selected_fields) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table);
+  table = info.reference;
   if (info.materialized) {
     throw ApiError::Invalid("Cannot list a table of type MATERIALIZED_VIEW.");
   }
@@ -110,6 +111,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
                                                       bool validate_only) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
+  table = info.reference;
   if (info.view_query) {
     throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
   }
@@ -119,11 +121,11 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
   try {
     const auto session = backend_.NewSession();
     session->Transaction("BEGIN TRANSACTION");
-    const QueryResult identity =
-        session->Execute(std::format("SELECT table_oid FROM duckdb_tables() WHERE database_name = "
-                                     "{} AND schema_name = {} AND table_name = {}",
-                                     QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
-                                     QuoteLiteral(table.table_id)));
+    const QueryResult identity = session->Execute(
+        std::format("SELECT table_oid FROM {} WHERE database_name = "
+                    "{} AND schema_name = {} AND table_name = {}",
+                    LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
+                    QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id)));
     if (identity.rows.empty() || identity.rows.Int64(0, 0) != storage_id) {
       throw ApiError::NotFound("The Storage Write destination table was dropped or replaced");
     }
@@ -187,6 +189,7 @@ std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const
     throw ApiError::Invalid("rows must be an array");
   }
   const TableInfo info = GetTable(table, false);
+  table = info.reference;
   if (info.view_query) {
     throw ApiError::Invalid("Cannot insert into a view: " + TableName(table));
   }

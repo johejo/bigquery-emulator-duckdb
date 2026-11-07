@@ -315,6 +315,8 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
       }
     }
     if (dataset.has_value()) {
+      *dataset = source.ResolveDatasetReference({.project_id = project, .dataset_id = *dataset})
+                     .dataset_id;
       const std::optional<std::string> location = source.DatasetLocation(project, *dataset);
       if (!location.has_value()) {
         return not_found();

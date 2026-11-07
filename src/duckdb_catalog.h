@@ -26,6 +26,15 @@ std::string DatasetsQuery(const std::string& project);
 std::string DatasetEntriesQuery(const std::string& project,
                                 const std::optional<std::string>& dataset = std::nullopt);
 DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded);
+// Resolve resource names according to the dataset's case-sensitivity setting before
+// encoding their DuckDB identifiers. Returned references retain the stored spelling.
+std::optional<DatasetReference> FindDatasetReference(Backend& backend,
+                                                     const DatasetReference& dataset);
+std::optional<TableReference> FindTableReference(Backend& backend, const TableReference& table);
+// Unicode identifier case folding remains unsupported; do not silently use DuckDB's rules.
+void CheckCaseInsensitiveTableName(Backend& backend, const TableReference& table);
+void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset,
+                                 const DatasetMetadata& metadata);
 std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment
@@ -42,7 +51,7 @@ std::optional<std::optional<std::string>> ViewComment(Backend& backend,
                                                       const TableReference& table);
 
 // Restores view and column metadata without requiring a view's execution identity.
-std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table);
+std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& requested);
 // An alternative query of the table's rows, or nullopt for its named relation.
 std::optional<std::string> TableReadQuery(Backend& backend, const TableReference& table);
 // Restrictions on ordinary row writes, independent of the table's read query.

@@ -370,6 +370,7 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
     const std::string& restriction) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
+  table = info.reference;
   if (info.metadata.external_data) {
     throw ApiError::Unsupported("Storage Read of external tables");
   }
@@ -621,12 +622,13 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     const std::string dataset_project = ResolveProject(request.default_dataset->project_id.empty()
                                                            ? request.project_id
                                                            : request.default_dataset->project_id);
-    setup.push_back("USE " + QualifiedName(DatasetReference{
-                                 .project_id = dataset_project,
-                                 .dataset_id = request.default_dataset->dataset_id,
-                             }));
-    settings.default_project = dataset_project;
-    settings.default_dataset = request.default_dataset->dataset_id;
+    const DatasetReference dataset = ResolveDatasetReference({
+        .project_id = dataset_project,
+        .dataset_id = request.default_dataset->dataset_id,
+    });
+    setup.push_back("USE " + QualifiedName(dataset));
+    settings.default_project = dataset.project_id;
+    settings.default_dataset = dataset.dataset_id;
   } else {
     setup.push_back("USE " + QuoteIdentifier(request.project_id));
   }
@@ -709,9 +711,7 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
   std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_, std::defer_lock);
   // CREATE responses read the stored schema after committing the DDL. Keep another
   // request's expiration sweep from dropping the relation before that read completes.
-  if (translation.statement_type == "DROP_SCHEMA" ||
-      (translation.table && translation.table->as_select) ||
-      (translation.view && !translation.view->materialized)) {
+  if (translation.ddl_target_dataset || translation.ddl_target_table) {
     expiration_lock.lock();
   }
   std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
@@ -719,6 +719,45 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
     graph_lock.lock();
   }
   CheckDdlTarget(translation);
+  if (const auto& target = translation.ddl_target_dataset) {
+    const auto found = FindDatasetReference(backend, *target);
+    if (!found && translation.statement_type == "DROP_SCHEMA") {
+      if (translation.ddl_if_exists) {
+        return {};
+      }
+      throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" +
+                               target->dataset_id);
+    }
+    if (found && found->dataset_id != target->dataset_id) {
+      throw ApiError::Unsupported("dataset name resolution changed while preparing DDL");
+    }
+    if (translation.dataset && !found) {
+      CheckCaseInsensitiveDataset(backend, *target, translation.dataset->metadata);
+    }
+  }
+  if (const auto& target = translation.ddl_target_table) {
+    const auto found = FindTableReference(backend, *target);
+    if (!found && translation.statement_type.starts_with("DROP_")) {
+      if (translation.ddl_if_exists) {
+        return {};
+      }
+      throw ApiError::NotFound(std::string(translation.statement_type == "DROP_EXTERNAL_TABLE"
+                                               ? "Not found: External table "
+                                               : "Not found: Table ") +
+                               TableName(*target));
+    }
+    const auto dataset = FindDatasetReference(
+        backend, {.project_id = target->project_id, .dataset_id = target->dataset_id});
+    if (!dataset) {
+      throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" +
+                               target->dataset_id);
+    }
+    if (dataset->dataset_id != target->dataset_id ||
+        (found && found->table_id != target->table_id)) {
+      throw ApiError::Unsupported("table name resolution changed while preparing DDL");
+    }
+    CheckCaseInsensitiveTableName(backend, *target);
+  }
   CheckRelationTarget(backend, translation);
   if (const auto& table = translation.table;
       table && table->metadata.external_data && !table->sources_read &&
@@ -797,9 +836,9 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       }
       throw;
     }
-    const std::string predicate =
-        " WHERE lower(dataset_id) = lower(" + QuoteLiteral(graph.dataset_id) +
-        ") AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) + ")";
+    const std::string predicate = " WHERE dataset_id = " + QuoteLiteral(graph.dataset_id) +
+                                  " AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) +
+                                  ")";
     backend.Execute("DELETE FROM " + PropertyGraphsTable(graph.project_id) + predicate);
     if (creating) {
       backend.Execute("INSERT INTO " + PropertyGraphsTable(graph.project_id) + " VALUES (" +

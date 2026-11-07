@@ -36,25 +36,25 @@ namespace bigquery_emulator_duckdb {
 using nlohmann::json;
 
 std::vector<std::string> SqlRuntime::ListTables(DatasetReference dataset) {
-  dataset.project_id = ResolveProject(dataset.project_id);
+  dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
 std::vector<TableListEntry> SqlRuntime::ListTableEntries(DatasetReference dataset) {
-  dataset.project_id = ResolveProject(dataset.project_id);
+  dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
   const std::string where =
       std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
                   QuoteLiteral(dataset.dataset_id));
   std::vector<TableListEntry> entries;
-  const QueryResult result =
-      Execute(std::format("SELECT table_name, 'TABLE', comment FROM duckdb_tables() {}"
-                          " UNION ALL SELECT view_name, 'VIEW', comment FROM duckdb_views() {}"
-                          " ORDER BY 1",
-                          where, where));
+  const QueryResult result = Execute(std::format(
+      "SELECT table_name, 'TABLE', comment FROM {} {}"
+      " UNION ALL SELECT view_name, 'VIEW', comment FROM {} {}"
+      " ORDER BY 1",
+      LogicalCatalog("duckdb_tables()"), where, LogicalCatalog("duckdb_views()"), where));
   for (size_t row = 0; row < result.rows.size(); ++row) {
     TableMetadata metadata = CommentMetadata(result.rows.OptionalString(row, 2));
     const auto view = ParseViewMetadata(result.rows.OptionalString(row, 2));
@@ -72,7 +72,7 @@ std::vector<TableListEntry> SqlRuntime::ListTableEntries(DatasetReference datase
 }
 
 TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, bool expire) {
-  table.project_id = ResolveProject(table.project_id);
+  table = ResolveTableReference(std::move(table));
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   const std::string location = GetDataset(dataset).Location();
   if (expire) {
@@ -98,11 +98,11 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
     info.schema = TableSchema(backend_, table);
     info.metadata = CommentMetadata(
         RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(std::nullopt));
-    const QueryResult identity =
-        backend_.Execute(std::format("SELECT table_oid FROM duckdb_tables() WHERE database_name = "
-                                     "{} AND schema_name = {} AND table_name = {}",
-                                     QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
-                                     QuoteLiteral(table.table_id)));
+    const QueryResult identity = backend_.Execute(
+        std::format("SELECT table_oid FROM {} WHERE database_name = "
+                    "{} AND schema_name = {} AND table_name = {}",
+                    LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
+                    QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id)));
     if (identity.rows.empty()) {
       throw ApiError::NotFound("Table not found: " + table.table_id);
     }
@@ -164,7 +164,7 @@ std::vector<FieldSchema> SqlRuntime::ExternalSchema(GcsExternalData& definition,
 
 TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema> schema,
                                   const TableMetadata& given) {
-  table.project_id = ResolveProject(table.project_id);
+  table = ResolveTableReference(std::move(table), /*create=*/true);
   TableMetadata metadata = given;
   // Read the sources before holding the mutex, after the checks that fail without them.
   if (metadata.external_data && (schema.empty() || metadata.external_data->hive_partitioning)) {
@@ -177,6 +177,7 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
     schema = ExternalSchema(*metadata.external_data, std::move(schema), {}, table.table_id);
   }
   std::scoped_lock const lock(expiration_mutex_);
+  table = ResolveTableReference(std::move(table), /*create=*/true);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   ExpireTables(backend_, expiration_mutex_,
@@ -210,7 +211,7 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
 TableInfo SqlRuntime::CreateView(TableReference table, const json& definition,
                                  const TableMetadata& metadata, bool materialized) {
   std::scoped_lock const lock(expiration_mutex_);
-  table.project_id = ResolveProject(table.project_id);
+  table = ResolveTableReference(std::move(table), /*create=*/true);
   WriteView(table, definition, metadata, /*replace=*/false, materialized);
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
@@ -221,7 +222,7 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
                                   const std::optional<TableMetadata>& metadata,
                                   bool rounding_mode_unspecified) {
   std::scoped_lock const lock(expiration_mutex_);
-  table.project_id = ResolveProject(table.project_id);
+  table = ResolveTableReference(std::move(table));
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
   if (info.view_query.has_value()) {
     if (metadata.has_value() && metadata->default_collation.has_value()) {
@@ -342,7 +343,7 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
 
 void SqlRuntime::WriteView(TableReference table, const json& definition,
                            const TableMetadata& metadata, bool replace, bool materialized) {
-  table.project_id = ResolveProject(table.project_id);
+  table = ResolveTableReference(std::move(table), /*create=*/true);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   if (!definition.is_object()) {
@@ -458,7 +459,8 @@ void RejectReadOnlyWrite(const TableInfo& table) {
 }
 
 void SqlRuntime::DeleteTable(TableReference table) {
-  table.project_id = ResolveProject(table.project_id);
+  std::scoped_lock const lock(expiration_mutex_);
+  table = ResolveTableReference(std::move(table));
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   // Views the emulator did not create have no metadata for GetTable, but can still be dropped.

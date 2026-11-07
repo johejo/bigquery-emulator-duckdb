@@ -22,6 +22,14 @@ class TableSource {
  public:
   virtual ~TableSource() = default;
 
+  // Canonical spellings for table references and DDL targets. Missing resources retain their
+  // input names so CREATE and IF EXISTS can apply their own existence rules. Routine references
+  // deliberately do not use these methods.
+  virtual DatasetReference ResolveDatasetReference(const DatasetReference& dataset) {
+    return dataset;
+  }
+  virtual TableReference ResolveTableReference(const TableReference& table) { return table; }
+
   // Returns the columns of `project`.`dataset`.`table`, or nothing if there is no such table.
   virtual std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                             const std::string& dataset,

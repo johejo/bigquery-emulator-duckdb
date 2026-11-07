@@ -72,6 +72,7 @@ const ResourceMask& DatasetFields() {
                                              "defaultTableExpirationMs",
                                              "maxTimeTravelHours",
                                              "storageBillingModel",
+                                             "isCaseInsensitive",
                                              "defaultRoundingMode",
                                              "defaultCollation",
                                              "location",

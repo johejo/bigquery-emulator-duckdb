@@ -33,16 +33,18 @@ namespace {
 
 std::string TableExists(const TableReference& table) {
   return std::format(
-      "EXISTS (SELECT 1 FROM information_schema.tables"
+      "EXISTS (SELECT 1 FROM {}"
       " WHERE table_catalog = {} AND table_schema = {} AND table_name = {})",
-      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+      LogicalCatalog("information_schema.tables"), QuoteLiteral(table.project_id),
+      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
 }
 
 std::string DatasetExists(const DatasetReference& dataset) {
   return std::format(
-      "EXISTS (SELECT 1 FROM information_schema.schemata"
+      "EXISTS (SELECT 1 FROM {}"
       " WHERE catalog_name = {} AND schema_name = {})",
-      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
+      LogicalCatalog("information_schema.schemata"), QuoteLiteral(dataset.project_id),
+      QuoteLiteral(dataset.dataset_id));
 }
 
 // The options `updates` sets on the table's or dataset's `metadata`.
@@ -326,8 +328,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                        QuoteIdentifier(column->name)));
       schema.erase(column);
     } else if (const auto* rename = std::get_if<RenameTableAction>(&action)) {
-      statements.push_back(std::format("ALTER TABLE {} RENAME TO {}", QualifiedName(table),
-                                       QuoteIdentifier(rename->table_id)));
+      statements.push_back(
+          std::format("ALTER TABLE {} RENAME TO {}", QualifiedName(table),
+                      QuoteIdentifier(TableCatalogName(table.dataset_id, rename->table_id))));
       table.table_id = rename->table_id;
     } else if (const auto* options = std::get_if<ColumnOptionsAction>(&action)) {
       const auto column = FindColumn(schema, options->name);
@@ -423,6 +426,9 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
   }
   if (alteration.options.storage_billing_model.has_value()) {
     metadata.storage_billing_model = *alteration.options.storage_billing_model;
+  }
+  if (alteration.options.is_case_insensitive.has_value()) {
+    metadata.is_case_insensitive = alteration.options.is_case_insensitive;
   }
   return DatasetMetadataStatements(alteration.dataset, metadata);
 }

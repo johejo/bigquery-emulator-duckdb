@@ -608,6 +608,9 @@ json TableMetadata::ToJson() const {
 
 json DatasetMetadata::ToJson() const {
   json fields = json::object();
+  if (is_case_insensitive.has_value()) {
+    fields["isCaseInsensitive"] = *is_case_insensitive;
+  }
   if (creation_time != 0) {
     fields["creationTime"] = std::to_string(creation_time);
   }
@@ -1056,6 +1059,22 @@ DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
 }
 
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool patch) {
+  // BigQuery preserves this setting when PATCH or PUT omits it, and for PATCH null.
+  if (const auto flag = body.find("isCaseInsensitive"); flag != body.end()) {
+    if (flag->is_null()) {
+      if (!patch) {
+        throw ApiError::Unsupported("null isCaseInsensitive outside datasets.patch");
+      }
+    } else {
+      if (!flag->is_boolean() && *flag != "false") {
+        throw ApiError::Unsupported("isCaseInsensitive other than a boolean or 'false'");
+      }
+      if (*flag == "false" && metadata.is_case_insensitive.value_or(false)) {
+        throw ApiError::Unsupported("disabling isCaseInsensitive with a string");
+      }
+      metadata.is_case_insensitive = flag->is_boolean() && flag->get<bool>();
+    }
+  }
   // Whether BigQuery rejects another location or ignores it is not known.
   if (const std::optional<std::string> location = DatasetLocationField(body);
       location.has_value() && *location != metadata.Location()) {

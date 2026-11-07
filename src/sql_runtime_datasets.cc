@@ -2,6 +2,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "src/api_error.h"
@@ -35,8 +36,31 @@ std::vector<DatasetListEntry> SqlRuntime::ListDatasetEntries(std::string project
   return entries;
 }
 
-DatasetMetadata SqlRuntime::GetDataset(DatasetReference dataset) {
+DatasetReference SqlRuntime::ResolveDatasetReference(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
+  if (const auto found = FindDatasetReference(backend_, dataset)) {
+    return *found;
+  }
+  throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
+}
+
+TableReference SqlRuntime::ResolveTableReference(TableReference table, bool create) {
+  table.project_id = ResolveProject(table.project_id);
+  if (const auto found = FindTableReference(backend_, table)) {
+    return *found;
+  }
+  table.dataset_id =
+      ResolveDatasetReference({.project_id = table.project_id, .dataset_id = table.dataset_id})
+          .dataset_id;
+  if (!create) {
+    throw ApiError::NotFound("Not found: Table " + TableName(table));
+  }
+  CheckCaseInsensitiveTableName(backend_, table);
+  return table;
+}
+
+DatasetMetadata SqlRuntime::GetDataset(DatasetReference dataset) {
+  dataset = ResolveDatasetReference(std::move(dataset));
   const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
   if (result.rows.empty()) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
@@ -45,7 +69,13 @@ DatasetMetadata SqlRuntime::GetDataset(DatasetReference dataset) {
 }
 
 void SqlRuntime::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+  std::scoped_lock const lock(expiration_mutex_);
   dataset.project_id = ResolveProject(dataset.project_id);
+  if (FindDatasetReference(backend_, dataset)) {
+    throw ApiError::Duplicate("Already Exists: Dataset " + dataset.project_id + ":" +
+                              dataset.dataset_id);
+  }
+  CheckCaseInsensitiveDataset(backend_, dataset, metadata);
   const std::vector<std::string> statements =
       CreateDatasetWrite({.dataset = dataset, .metadata = metadata}).metadata_statements;
   try {
@@ -60,8 +90,10 @@ void SqlRuntime::CreateDataset(DatasetReference dataset, const DatasetMetadata& 
 }
 
 void SqlRuntime::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
-  dataset.project_id = ResolveProject(dataset.project_id);
+  std::scoped_lock const lock(expiration_mutex_);
+  dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
+  CheckCaseInsensitiveDataset(backend_, dataset, metadata);
   const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
   try {
     backend_.ExecuteDdl(statements.front(), {statements.begin() + 1, statements.end()}, "");
@@ -73,7 +105,7 @@ void SqlRuntime::UpdateDataset(DatasetReference dataset, const DatasetMetadata& 
 void SqlRuntime::DeleteDataset(DatasetReference dataset, bool delete_contents) {
   // CASCADE drops expired relations too, and must not race the lazy expiration sweep.
   std::scoped_lock const lock(expiration_mutex_);
-  dataset.project_id = ResolveProject(dataset.project_id);
+  dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
   if (!delete_contents &&
       (!ListTables(dataset).empty() || !Execute(RoutinesQuery(dataset)).rows.empty())) {

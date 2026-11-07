@@ -90,6 +90,7 @@ struct OptionUpdates {
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
   std::optional<std::optional<int64_t>> max_time_travel_hours = {};
   std::optional<std::string> storage_billing_model = {};
+  std::optional<bool> is_case_insensitive = {};
   std::optional<RoundingMode> default_rounding_mode = {};
   std::optional<std::string> default_collation = {};
 };
@@ -186,6 +187,7 @@ struct TranslatedStatement {
   // Whether CREATE OR REPLACE replaces the relation or property graph its target names, if there
   // is one.
   bool replaces = false;
+  bool ddl_if_exists = false;
   // What the emulator records besides DuckDB's own catalog, at most one of which is set.
   std::optional<TableDefinition> table;
   std::optional<TableAlteration> altered_table;

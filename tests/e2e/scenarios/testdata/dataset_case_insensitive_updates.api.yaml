@@ -1,0 +1,109 @@
+version: 1
+# Observed on BigQuery in project johejo-sandbox, run 4fun2x7ua3e2k2iridfjv4ann3.
+# The answers sidecar preserves the update and canonical resource spelling observations.
+# Name matching follows the dataset's case-insensitive setting:
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+description: Dataset case sensitivity updates and resource spelling.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  metadata:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_Mixed'}
+            isCaseInsensitive: true
+        observe:
+          flag: /body/isCaseInsensitive
+      - name: modify
+        rest:
+          method: ${method}
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed
+          body: ${body}
+        observe:
+          flag: /body/isCaseInsensitive
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed
+        observe:
+          flag: /body/isCaseInsensitive
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed?deleteContents=true
+cases:
+  - name: patch_omitted
+    template: metadata
+    vars: {method: PATCH, body: {description: kept}}
+    expect:
+      create: {flag: true}
+      modify: {flag: true}
+      get: {flag: true}
+  - name: update_omitted
+    template: metadata
+    vars: {method: PUT, body: {description: kept}}
+    expect:
+      create: {flag: true}
+      modify: {flag: true}
+      get: {flag: true}
+  - name: patch_null
+    template: metadata
+    vars: {method: PATCH, body: {isCaseInsensitive: null}}
+    expect:
+      create: {flag: true}
+      modify: {flag: true}
+      get: {flag: true}
+  - name: patch_false
+    template: metadata
+    vars: {method: PATCH, body: {isCaseInsensitive: false}}
+    expect:
+      create: {flag: true}
+      modify: {flag: false}
+      get: {flag: false}
+  - name: canonical_spelling
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}_Mixed'}
+            isCaseInsensitive: true
+      - name: table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}_mixed', tableId: MixedTable}
+            schema: {fields: [{name: id, type: INTEGER}]}
+        observe:
+          reference: /body/tableReference
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed/tables/mixedtable
+        observe:
+          reference: /body/tableReference
+      - name: dataset
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_mixed
+        observe:
+          reference: /body/datasetReference
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed?deleteContents=true
+    expect:
+      table:
+        reference: {projectId: '${project}', datasetId: '${dataset}_Mixed', tableId: MixedTable}
+      get:
+        reference: {projectId: '${project}', datasetId: '${dataset}_Mixed', tableId: MixedTable}
+      dataset:
+        reference: {projectId: '${project}', datasetId: '${dataset}_Mixed'}

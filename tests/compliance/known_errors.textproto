@@ -570,13 +570,6 @@ known_errors {
   label: "analytic_bignumeric_range_window_frames_test:range_window_asc_with_special_values_7"
 }
 
-# BigQuery TO_JSON encoding rejects lossy decimals. GoogleSQL without
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "JSON comparisons are not translated as BigQuery orders JSON values"
-  label: "json_comparison_test:group_by"
-}
-
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "JSON comparisons are not translated as BigQuery orders JSON values"
@@ -591,7 +584,6 @@ known_errors {
   label: "json_comparison_test:object_keys"
   label: "json_comparison_test:object_nested"
   label: "json_comparison_test:object_with_null_values"
-  label: "json_comparison_test:order_by"
   label: "json_comparison_test:partition_by"
   label: "json_comparison_test:scalar_coercion_basic"
   label: "json_comparison_test:scalar_mixed_types"

@@ -3,6 +3,7 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -231,8 +232,12 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
       throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" +
                                dataset.dataset_id);
     }
-    return AlterDatasetStatements(*alteration,
-                                  ParseDatasetMetadata(result.rows.OptionalString(0, 1)));
+    DatasetMetadata metadata = ParseDatasetMetadata(result.rows.OptionalString(0, 1));
+    if (alteration->options.is_case_insensitive.has_value()) {
+      metadata.is_case_insensitive = alteration->options.is_case_insensitive;
+    }
+    CheckCaseInsensitiveDataset(backend_, dataset, metadata);
+    return AlterDatasetStatements(*alteration, std::move(metadata));
   }
   return std::nullopt;
 }
@@ -256,7 +261,8 @@ DatasetMetadata SqlRuntime::CreatedInDataset(Backend& backend,
 
 std::optional<std::string> SqlRuntime::DatasetLocation(Backend& backend,
                                                        const DatasetReference& dataset) {
-  return LocationOf(backend, dataset);
+  const auto found = FindDatasetReference(backend, dataset);
+  return found ? LocationOf(backend, *found) : std::nullopt;
 }
 
 void SqlRuntime::UseTargets(Backend& backend, const TranslatedStatement& translation,

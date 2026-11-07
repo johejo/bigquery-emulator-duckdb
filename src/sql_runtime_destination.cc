@@ -9,6 +9,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "src/api_error.h"
@@ -120,7 +121,8 @@ QueryResult SqlRuntime::WriteDestination(
   if (destination.project_id.empty()) {
     destination.project_id = project_id;
   }
-  destination.project_id = ResolveProject(destination.project_id);
+  std::scoped_lock const namespace_lock(expiration_mutex_);
+  destination = ResolveTableReference(std::move(destination), /*create=*/true);
   const DatasetMetadata dataset = GetDataset(
       DatasetReference{.project_id = destination.project_id, .dataset_id = destination.dataset_id});
   std::optional<TableInfo> existing;

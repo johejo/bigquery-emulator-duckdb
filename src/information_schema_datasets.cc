@@ -58,7 +58,10 @@ absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
                 metadata->default_collation.has_value()
                     ? "DEFAULT COLLATE " + QuoteLiteral(*metadata->default_collation) + "\n"
                     : "",
-                "OPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
+                "OPTIONS(\n  location=\"", ToLowerAscii(location), "\"",
+                metadata->is_case_insensitive.value_or(false) ? ",\n  is_case_insensitive=true"
+                                                              : "",
+                "\n);")),
             metadata->default_collation.has_value() ? String(*metadata->default_collation) : kNull,
             kNull,
         }));
@@ -84,6 +87,9 @@ absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context)
         .type = "STRING",
         .value = StringOptionValue(ToLowerAscii(metadata->Location())),
     });
+    if (metadata->is_case_insensitive.value_or(false)) {
+      options.push_back({.name = "is_case_insensitive", .type = "BOOL", .value = "true"});
+    }
     if (metadata->default_table_expiration_ms.has_value()) {
       constexpr double kMillisPerDay = 24.0 * 60 * 60 * 1000;
       options.push_back({

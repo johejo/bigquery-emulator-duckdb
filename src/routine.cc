@@ -106,17 +106,18 @@ std::vector<std::string> RoutineCommentStatements(const Routine& routine) {
 
 std::string RoutinesQuery(const DatasetReference& dataset) {
   return std::format(
-      "SELECT function_name, comment FROM duckdb_functions() WHERE database_name = {}"
+      "SELECT function_name, comment FROM {} WHERE database_name = {}"
       " AND schema_name = {} AND function_type = 'macro' ORDER BY function_name",
-      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
+      LogicalCatalog("duckdb_functions()"), QuoteLiteral(dataset.project_id),
+      QuoteLiteral(dataset.dataset_id));
 }
 
 std::string RoutineQuery(const RoutineReference& routine) {
   return std::format(
-      "SELECT comment FROM duckdb_functions() WHERE database_name = {} AND schema_name = {}"
+      "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {}"
       " AND function_name = {} AND function_type = 'macro'",
-      QuoteLiteral(routine.project_id), QuoteLiteral(routine.dataset_id),
-      QuoteLiteral(routine.routine_id));
+      LogicalCatalog("duckdb_functions()"), QuoteLiteral(routine.project_id),
+      QuoteLiteral(routine.dataset_id), QuoteLiteral(routine.routine_id));
 }
 
 namespace {

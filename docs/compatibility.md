@@ -63,6 +63,12 @@ BigQuery Omni locations, default partition expiration and access controls are un
 location. Datasets created before the emulator recorded creation times have no `creationTime`
 in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
+### Case sensitivity
+
+REST `isCaseInsensitive` accepts the string `"false"` only when the setting is already false.
+REST NULL is supported only by `datasets.patch`. Non-ASCII table names in a case-insensitive
+dataset are unsupported, including enabling the setting on a dataset containing such names.
+
 ## Tables
 
 ### External tables

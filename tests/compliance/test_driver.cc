@@ -426,7 +426,10 @@ class EmulatorTestDriver : public googlesql::TestDriver {
         googlesql_geography::Options{.expand_bounding_box = true},
         functions_duckdb::Options{.timestamp_precision = TimestampPrecision::kNanoseconds},
         ExcludedFunctionIds{}, FunctionDeclarations::kGoogleSQL);
-    runtime_->CreateDataset(DatasetReference{kProject, kDataset});
+    // GoogleSQL's reference catalog resolves table names without regard to case.
+    DatasetMetadata metadata;
+    metadata.is_case_insensitive = true;
+    runtime_->CreateDataset(DatasetReference{kProject, kDataset}, metadata);
   }
 
   googlesql::TypeFactory type_factory_;

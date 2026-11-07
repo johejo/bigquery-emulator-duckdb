@@ -33,6 +33,7 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
     };
     return "DROP PROPERTY GRAPH " + DuckPGQName(parts);
   }
+  scope.context.statement.ddl_if_exists = drop.is_if_exists();
   const bool is_schema = object_type == "SCHEMA";
   // An external table is a DuckDB table; DROP EXTERNAL TABLE drops only external tables, which
   // the emulator checks when it runs.
@@ -59,6 +60,7 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
 
 std::optional<std::string> DropMaterializedView(
     const googlesql::ResolvedDropMaterializedViewStmt& drop, const Scope& scope) {
+  scope.context.statement.ddl_if_exists = drop.is_if_exists();
   const auto path = TargetTable(drop.name_path(), scope);
   if (!path) {
     return std::nullopt;
@@ -70,6 +72,7 @@ std::optional<std::string> DropMaterializedView(
 // emulator checks when it runs.
 std::optional<std::string> DropSnapshotTable(const googlesql::ResolvedDropSnapshotTableStmt& drop,
                                              const Scope& scope) {
+  scope.context.statement.ddl_if_exists = drop.is_if_exists();
   const auto path = TargetTable(drop.name_path(), scope);
   if (!path) {
     return std::nullopt;
