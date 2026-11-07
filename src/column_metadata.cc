@@ -45,11 +45,10 @@ std::vector<std::string> RepeatedColumnDefaultStatements(const TableReference& t
 }
 
 std::string ColumnCommentsQuery(const TableReference& table) {
-  return std::format(
-      "SELECT comment FROM duckdb_columns()"
-      " WHERE database_name = {} AND schema_name = {} AND table_name = {} ORDER BY column_index",
-      QuoteLiteral(table.project_id), QuoteLiteral(DatasetCatalogName(table.dataset_id)),
-      QuoteLiteral(TableCatalogName(table.dataset_id, table.table_id)));
+  return std::format("SELECT comment FROM bq_column_comments({}, {}, {}) ORDER BY column_index",
+                     QuoteLiteral(table.project_id),
+                     QuoteLiteral(DatasetCatalogName(table.dataset_id)),
+                     QuoteLiteral(TableCatalogName(table.dataset_id, table.table_id)));
 }
 
 namespace {

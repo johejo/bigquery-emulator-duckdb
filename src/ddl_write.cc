@@ -34,19 +34,12 @@ namespace bigquery_emulator_duckdb {
 namespace {
 
 std::string TableExists(const TableReference& table) {
-  return std::format(
-      "EXISTS (SELECT 1 FROM {}"
-      " WHERE table_catalog = {} AND table_schema = {} AND table_name = {})",
-      LogicalCatalog("information_schema.tables"), QuoteLiteral(table.project_id),
-      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+  return "EXISTS (SELECT 1 FROM " +
+         RelationsQuery(table.project_id, table.dataset_id, table.table_id) + ")";
 }
 
 std::string DatasetExists(const DatasetReference& dataset) {
-  return std::format(
-      "EXISTS (SELECT 1 FROM {}"
-      " WHERE catalog_name = {} AND schema_name = {})",
-      LogicalCatalog("information_schema.schemata"), QuoteLiteral(dataset.project_id),
-      QuoteLiteral(dataset.dataset_id));
+  return "EXISTS (SELECT 1 FROM " + SchemasQuery(dataset.project_id, dataset.dataset_id) + ")";
 }
 
 // The options `updates` sets on the table's or dataset's `metadata`.

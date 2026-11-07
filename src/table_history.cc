@@ -127,12 +127,12 @@ void SweepHistory(Backend& backend, const std::string& project) {
   const std::string tables = std::format(
       "SELECT schema_name AS dataset_id, table_name AS table_id, "
       "TRY_CAST(CASE WHEN json_valid(comment) THEN json_extract_string(comment, '$.creationTime') "
-      "END AS BIGINT) AS creation_time FROM {} WHERE database_name = {} AND "
-      "schema_name <> 'main'",
-      LogicalCatalog("duckdb_tables()"), QuoteLiteral(project));
+      "END AS BIGINT) AS creation_time FROM {} WHERE type = 'TABLE' AND schema_name <> 'main'",
+      LogicalCatalog("bq_relations(database := " + QuoteLiteral(project) + ")"));
   try {
     const QueryResult forgotten = backend.Execute(std::format(
-        "SELECT table_name FROM duckdb_tables() WHERE database_name = {} AND schema_name = 'main' "
+        "SELECT table_name FROM bq_relations(database := {}, schema := 'main') WHERE type = "
+        "'TABLE' "
         "AND starts_with(table_name, 'emulator_history.') AND table_name NOT IN (SELECT "
         "'emulator_history.' || lower(hex(dataset_id)) || '.' || lower(hex(table_id)) || '.' || "
         "creation_time FROM ({}) "

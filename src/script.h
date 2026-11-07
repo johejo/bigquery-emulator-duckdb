@@ -2,18 +2,21 @@
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
 #include "src/backend.h"
 #include "src/builtin_function_options.h"
+#include "src/expiration_mutex.h"
 #include "src/function_catalog/catalog.h"
 #include "src/query_parameters.h"
 
+// Forward-declared so that the parse tree's header stays out of the runtime's sources that
+// include this one.
 namespace googlesql {
+class ASTNode;
 class ParserOutput;
-}
+}  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
 
@@ -30,12 +33,10 @@ class ScriptHost {
 
   // The backend that the script's temporary tables are attached to and its sessions come from.
   virtual Backend& backend() = 0;
-  // Prepares a statement before it opens its snapshot: expires tables when `expire` is set and,
-  // for a statement that `writes`, acquires the runtime's write coordination, which it must not
-  // wait for later.
-  virtual std::unique_lock<std::recursive_mutex> LockStatement(bool /*writes*/, bool /*expire*/) {
-    return {};
-  }
+  // Prepares a statement before it opens its snapshot: expires tables when `expire` is set and
+  // acquires the runtime's coordination for what the statement `writes`, which it must not wait
+  // for later.
+  virtual StatementLock LockStatement(StatementWrites /*writes*/, bool /*expire*/) { return {}; }
   // Whether SESSION_USER is enabled.
   [[nodiscard]] virtual bool has_session_user() const = 0;
   [[nodiscard]] virtual const ExcludedFunctionIds& excluded_function_ids() const = 0;
@@ -52,6 +53,9 @@ class ScriptHost {
                                    const std::vector<std::string>& setup, bool null_arrays,
                                    Backend* session) = 0;
 };
+
+// What the statement `statement` may change.
+StatementWrites StatementWritesOf(const googlesql::ASTNode& statement);
 
 // Runs the multi-statement query `script`, the text `query`, with `setup` selecting the default
 // dataset `default_project`.`default_dataset`, and returns the result of the last statement it

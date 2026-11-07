@@ -124,9 +124,12 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
     if (!source.profile.empty()) {
       connection_options.set<cbt::AppProfileIdOption>(source.profile);
     }
+    // Client-side metrics export to Cloud Monitoring, and detecting their resource waits for the
+    // GCE metadata server, which made each read take seconds.
     cbt::Table table(
         cbt::MakeDataConnection(
-            {cbt::InstanceResource(google::cloud::Project(source.project), source.instance)}),
+            {cbt::InstanceResource(google::cloud::Project(source.project), source.instance)},
+            google::cloud::Options{}.set<cbt::EnableMetricsOption>(false)),
         cbt::TableResource(source.project, source.instance, source.table), connection_options);
     std::string query;
     for (const auto& row :

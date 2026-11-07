@@ -1,11 +1,11 @@
 #pragma once
 
-#include <mutex>
+#include <cstdint>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
+#include "src/expiration_mutex.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
@@ -39,13 +39,14 @@ std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment
 // in its transaction so a concurrent replacement or extended expiration is preserved.
-void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
+void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
                   const std::optional<DatasetReference>& dataset = std::nullopt);
 
-// An absent relation returns nullopt; a relation without a comment returns an empty comment.
-std::optional<std::optional<std::string>> RelationComment(Backend& backend,
-                                                          std::string_view relations,
-                                                          std::string_view name,
+enum class RelationType : std::uint8_t { kTable, kView };
+
+// The comment of `table`, a table or view as `type` says. An absent relation returns nullopt; a
+// relation without a comment returns an empty comment.
+std::optional<std::optional<std::string>> RelationComment(Backend& backend, RelationType type,
                                                           const TableReference& table);
 std::optional<std::optional<std::string>> ViewComment(Backend& backend,
                                                       const TableReference& table);

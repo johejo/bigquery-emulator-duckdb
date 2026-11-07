@@ -17,6 +17,7 @@
 #include "src/backend.h"
 #include "src/backend_initializer.h"
 #include "src/builtin_function_options.h"
+#include "src/expiration_mutex.h"
 #include "src/external_table_provider.h"
 #include "src/field_schema.h"
 #include "src/function_options.h"
@@ -299,6 +300,9 @@ class SqlRuntime {
   // The metadata of the dataset the table or view that `translation` creates belongs to, as
   // `backend` sees it, or none for any other statement, a temporary table or a missing dataset.
   static DatasetMetadata CreatedInDataset(Backend& backend, const TranslatedStatement& translation);
+  // Expires tables when `expire` is set and acquires the coordination for what a statement
+  // `writes`, before the statement opens its snapshot.
+  StatementLock LockStatement(StatementWrites writes, bool expire);
   // A catalog source for the tables, views and datasets the emulator holds; what it finds counts
   // toward `location` when it is set.
   std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true,
@@ -359,7 +363,7 @@ class SqlRuntime {
 
   // Mutations also hold this while reading their response. Recursive because their catalog
   // lookups may expire other relations on the same thread.
-  std::recursive_mutex expiration_mutex_;
+  ExpirationMutex expiration_mutex_;
   Backend backend_;
   // The translator's functions, chosen by the same options as the backend's.
   const function_catalog::Catalog& functions_;
