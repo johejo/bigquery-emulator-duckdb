@@ -185,8 +185,16 @@ resolved, leaving a historical read pointing only at current rows. `tables.get`
 row counts and `tabledata.list` use this boundary for native time-partitioned
 tables. Their runtime-owned read transaction includes metadata discovery, row
 execution and the unpaginated `tabledata.list` count, with one explicit cutoff.
-SQL (including time travel) and Storage Read
-are not wired into it, and it does not coordinate writes. Expiration settings
+`DuckDbTableSource` also uses this boundary for native time-partitioned SQL scans,
+time travel and INFORMATION_SCHEMA.PARTITIONS counts when constructed with an
+explicit partition cutoff. `NewTableSource` supplies that cutoff only when its
+backend already has an active transaction. Historical scans supply their requested
+timestamp and resolve raw row history before applying policy history; partition
+counts use the current-read cutoff and do not suppress policy evaluation errors.
+The caller must keep discovery, translation and execution in that same transaction.
+Ordinary SQL analysis without an execution transaction and Storage Read are not
+wired into it, and it does not coordinate writes. This plumbing does not establish
+expiration semantics inside explicit script transactions. Expiration settings
 remain unsupported until their other observable paths are implemented.
 
 Keep physically retained rows available for policy removal/extension and for time
@@ -300,7 +308,7 @@ clock and accidentally use different policies or table identities.
 
 | Path | Current backend and transaction boundary | Required expiration integration |
 | --- | --- | --- |
-| SQL analysis and ordinary SELECT | `NewTableSource` uses the supplied session, otherwise `backend_`; currently sweeps table expiration before analysis | Cleanup and scan must agree on identity and cutoff, including wildcards and INFORMATION_SCHEMA. Dry-run analysis must not add a row mutation. |
+| SQL analysis and ordinary SELECT | `NewTableSource` uses the supplied session, otherwise `backend_`; currently sweeps table expiration before analysis. An already-active backend transaction enables policy-aware scans, time travel and partition counts with one source cutoff. | Ordinary SQL still needs a transaction spanning discovery, translation and execution; scans must agree on identity and cutoff, including wildcards and INFORMATION_SCHEMA. Dry-run analysis must not add a row mutation. |
 | SQL DML | `RunStatement` uses the script session or `backend_`; `KeepVersion` uses the caller's transaction when present | Evaluate both existing rows and newly written expired rows, with history and DML under the same write coordination. |
 | Script transaction | The session backend sees uncommitted writes; `KeepVersion` registers commit finalization there | Never clean through `backend_` in place of the session. Define visibility at statement boundaries and commit, and preserve rollback behavior. |
 | `tabledata.list` | `BeginTableRead` sweeps table expiration, then discovers metadata and selects rows in one read-only session transaction | Native time-partitioned reads use `PartitionPolicyTableReadQuery` with the operation's cutoff; projection and pagination run after visibility filtering, and `totalRows` is counted in the same snapshot. No row or policy history is written. |

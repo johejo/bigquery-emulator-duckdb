@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <iterator>
 #include <map>
@@ -18,6 +19,8 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/analyzer.h"
@@ -342,8 +345,13 @@ std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool e
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
+  // Only a caller-owned execution transaction can keep discovery, row-version resolution
+  // and policy evaluation in one snapshot. Ordinary analysis is not such a boundary.
+  const std::optional<int64_t> partition_cutoff =
+      backend.InTransaction() ? std::optional(absl::ToUnixMicros(absl::Now())) : std::nullopt;
   return NewDuckDbTableSource(backend, project_ids_, location,
-                              external_tables_ ? external_tables_(backend_) : nullptr);
+                              external_tables_ ? external_tables_(backend_) : nullptr,
+                              partition_cutoff);
 }
 
 QueryResult SqlRuntime::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }

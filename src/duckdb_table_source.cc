@@ -20,6 +20,7 @@
 #include "src/external_table_provider.h"
 #include "src/field_schema.h"
 #include "src/location.h"
+#include "src/partition_policy_read.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/statement_resources.h"
@@ -39,11 +40,13 @@ class DuckDbTableSource : public TableSource {
   // `project_ids` maps each project's ID and number to its ID, as Emulator::ResolveProject does.
   DuckDbTableSource(Backend& backend,
                     const std::unordered_map<std::string, std::string>& project_ids,
-                    JobLocation* location, std::unique_ptr<ExternalTableProvider> external)
+                    JobLocation* location, std::unique_ptr<ExternalTableProvider> external,
+                    std::optional<int64_t> partition_cutoff_micros)
       : backend_(backend),
         external_(std::move(external)),
         project_ids_(project_ids),
-        location_(location) {}
+        location_(location),
+        partition_cutoff_micros_(partition_cutoff_micros) {}
 
   DatasetReference ResolveDatasetReference(const DatasetReference& dataset) override {
     return FindDatasetReference(backend_, dataset).value_or(dataset);
@@ -100,6 +103,14 @@ class DuckDbTableSource : public TableSource {
       return external_->Read(*metadata.external_data, TableSchema(backend_, table),
                              table.project_id + "." + table.dataset_id + "." + table.table_id);
     }
+    if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
+      auto query = PartitionPolicyTableReadQuery(backend_, table, *partition_cutoff_micros_,
+                                                 PartitionRowVersion::kCurrent);
+      if (!query.ok()) {
+        throw ApiError::QueryFailure(std::string(query.status().message()));
+      }
+      return TableRead(*std::move(query));
+    }
     const auto query = TableReadQuery(backend_, table);
     return query ? std::optional<TableRead>(*query) : std::nullopt;
   }
@@ -113,11 +124,14 @@ class DuckDbTableSource : public TableSource {
     if (!comment.has_value() || !project_ids_.contains(table.project_id)) {
       return absl::UnimplementedError("FOR SYSTEM_TIME AS OF a temporary table");
     }
-    if (CommentMetadata(*comment).external_data) {
+    const auto metadata = CommentMetadata(*comment);
+    if (metadata.external_data) {
       return absl::UnimplementedError("FOR SYSTEM_TIME AS OF an external table");
     }
-    return bigquery_emulator_duckdb::TimeTravelQuery(backend_, table,
-                                                     CommentMetadata(*comment).creation_time, time);
+    if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
+      return PartitionPolicyTableReadQuery(backend_, table, time, PartitionRowVersion::kHistorical);
+    }
+    return bigquery_emulator_duckdb::TimeTravelQuery(backend_, table, metadata.creation_time, time);
   }
 
   std::optional<TableDescription> DescribeTable(const std::string& project,
@@ -210,10 +224,28 @@ class DuckDbTableSource : public TableSource {
       return std::nullopt;
     }
     QueryResult result;
+    bool policy_read = false;
     try {
+      std::string relation = QualifiedName(table);
+      const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+      const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
+      if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
+        auto rows = PartitionPolicyTableReadQuery(backend_, table, *partition_cutoff_micros_,
+                                                  PartitionRowVersion::kCurrent);
+        if (!rows.ok()) {
+          throw ApiError::QueryFailure(std::string(rows.status().message()));
+        }
+        policy_read = true;
+        relation = "(" + *rows + ") AS _bq_partition_counts";
+      }
       result = backend_.Execute("SELECT k, COUNT(*) FROM (SELECT " + key + " AS k FROM " +
-                                QualifiedName(table) + ") GROUP BY k");
+                                relation + ") GROUP BY k");
     } catch (const BackendError&) {
+      // Policy reads have an execution snapshot, so disappearance is not a concurrent drop.
+      // In particular, do not turn unsupported staged-policy visibility into empty metadata.
+      if (policy_read) {
+        throw;
+      }
       // Dropped since it was listed.
       return std::nullopt;
     }
@@ -289,6 +321,12 @@ class DuckDbTableSource : public TableSource {
   }
 
  private:
+  [[nodiscard]] bool UsesPartitionPolicy(const TableReference& table,
+                                         const TableMetadata& metadata) const {
+    return project_ids_.contains(table.project_id) && metadata.time_partitioning &&
+           !metadata.external_data && !metadata.snapshot && !metadata.clone;
+  }
+
   // Records that the job uses `project`.`dataset`, which exists.
   void Use(const std::string& project, const std::string& dataset) {
     if (location_ == nullptr) {
@@ -303,6 +341,7 @@ class DuckDbTableSource : public TableSource {
   std::unique_ptr<ExternalTableProvider> external_;
   const std::unordered_map<std::string, std::string>& project_ids_;
   JobLocation* location_;
+  std::optional<int64_t> partition_cutoff_micros_;
   // DatasetLocation's answers, by project:dataset.
   std::map<std::string, std::string> locations_;
 };
@@ -311,8 +350,10 @@ class DuckDbTableSource : public TableSource {
 
 std::unique_ptr<TableSource> NewDuckDbTableSource(
     Backend& backend, const std::unordered_map<std::string, std::string>& project_ids,
-    JobLocation* location, std::unique_ptr<ExternalTableProvider> external) {
-  return std::make_unique<DuckDbTableSource>(backend, project_ids, location, std::move(external));
+    JobLocation* location, std::unique_ptr<ExternalTableProvider> external,
+    std::optional<int64_t> partition_cutoff_micros) {
+  return std::make_unique<DuckDbTableSource>(backend, project_ids, location, std::move(external),
+                                             partition_cutoff_micros);
 }
 
 }  // namespace bigquery_emulator_duckdb
