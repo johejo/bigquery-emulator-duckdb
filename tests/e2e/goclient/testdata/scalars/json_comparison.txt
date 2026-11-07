@@ -1,0 +1,67 @@
+# Observed BigQuery answers collected with tools/bqanswers: JSON comparison,
+# ordering and grouping are rejected, including implicit comparison coercions
+# and distinctness operators. Check rejection without depending on analyzer
+# diagnostics and source-location formatting.
+
+SELECT JSON '1' = JSON '1'
+=> error:
+
+SELECT JSON '1' != JSON '2'
+=> error:
+
+SELECT JSON '1' < JSON '2'
+=> error:
+
+SELECT JSON '1' = 1
+=> error:
+
+SELECT 1 = JSON '1'
+=> error:
+
+SELECT JSON '1' = '1'
+=> error:
+
+SELECT JSON '1' < 2
+=> error:
+
+SELECT JSON '1' IN (JSON '1', JSON '2')
+=> error:
+
+SELECT JSON '1' BETWEEN JSON '0' AND JSON '2'
+=> error:
+
+SELECT JSON '1' IS DISTINCT FROM JSON '1'
+=> error:
+
+SELECT JSON '1' IS NOT DISTINCT FROM JSON '1'
+=> error:
+
+SELECT JSON '1' IS DISTINCT FROM 1
+=> error:
+
+SELECT JSON 'null' = JSON 'null'
+=> error:
+
+SELECT CAST(NULL AS JSON) = CAST(NULL AS JSON)
+=> error:
+
+SELECT j FROM UNNEST([JSON '1', JSON '2']) AS j ORDER BY j
+=> error:
+
+SELECT COUNT(*) FROM UNNEST([JSON '1', JSON '2']) AS j GROUP BY j
+=> error:
+
+SELECT DISTINCT j FROM UNNEST([JSON '1', JSON '2']) AS j
+=> error:
+
+SELECT COUNT(*) OVER (PARTITION BY j) FROM UNNEST([JSON '1', JSON '2']) AS j
+=> error:
+
+SELECT COUNT(*) FROM UNNEST([JSON '1']) AS l JOIN UNNEST([JSON '1']) AS r ON l = r
+=> error:
+
+SELECT STRUCT(JSON '1' AS j) = STRUCT(JSON '1' AS j)
+=> error:
+
+SELECT MIN(j) FROM UNNEST([JSON '1', JSON '2']) AS j
+=> error:

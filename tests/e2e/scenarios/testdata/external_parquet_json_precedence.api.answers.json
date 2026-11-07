@@ -1,0 +1,478 @@
+{
+  "version": 1,
+  "cases": {
+    "compare_json": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "count_rows": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "invalid_function_signature": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "missing_column": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "no_rows": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "order_json": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "order_other_column": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "select_constant": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "select_json": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "select_other_column": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unused_cte": {
+      "project": "johejo-sandbox",
+      "run": "74gsjjsz2wam75m735wiugmgds",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "j",
+                "type": "JSON"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Unsupported field type: JSON",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Unsupported field type: JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}
