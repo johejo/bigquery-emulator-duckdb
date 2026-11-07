@@ -85,6 +85,13 @@ std::string TableCatalogName(std::string_view dataset, std::string_view name) {
              : DatasetCatalogName(name);
 }
 
+std::string RelationsQuery(std::string_view project, std::string_view dataset,
+                           std::string_view table) {
+  return "bq_relations(database := " + QuoteLiteral(project) +
+         ", schema := " + QuoteLiteral(DatasetCatalogName(dataset)) +
+         ", name := " + QuoteLiteral(TableCatalogName(dataset, table)) + ")";
+}
+
 std::string LogicalCatalog(std::string_view relation) {
   const auto decode = [relation](std::string_view column) {
     const std::string name(column);

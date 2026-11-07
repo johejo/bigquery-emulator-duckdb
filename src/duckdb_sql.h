@@ -25,6 +25,12 @@ std::string TableCatalogName(std::string_view dataset, std::string_view name);
 // A DuckDB catalog relation with physical dataset and relation names decoded.
 std::string LogicalCatalog(std::string_view relation);
 
+// bq_relations() restricted to the table or view `table` of `dataset` in `project`, which it looks
+// up by its physical names instead of scanning the catalog: one row with its type, comment and
+// table_oid, or none when it does not exist.
+std::string RelationsQuery(std::string_view project, std::string_view dataset,
+                           std::string_view table);
+
 // Quotes a resolved table name as project.dataset.table. Domain-scoped project IDs may
 // contain dots; only the last two dots delimit the dataset and table in that case.
 std::string QuoteIdentifierPath(std::string_view path);

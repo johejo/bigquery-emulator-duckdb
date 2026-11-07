@@ -56,7 +56,7 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
       (translation.replaces && materialized)) {
     throw ApiError::InvalidQuery("Object type does not match " + TableName(*target));
   }
-  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", *target);
+  const auto comment = RelationComment(backend, RelationType::kTable, *target);
   if (translation.statement_type == "DROP_MATERIALIZED_VIEW" && comment.has_value()) {
     throw ApiError::InvalidQuery("A materialized view was expected: " + TableName(*target));
   }
@@ -186,7 +186,7 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     if (ViewComment(backend, table).has_value()) {
       throw ApiError::Invalid("ALTER TABLE cannot alter view " + TableName(table));
     }
-    const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend, RelationType::kTable, table);
     if (!comment.has_value()) {
       if (alteration->if_exists) {
         return std::vector<std::string>{};

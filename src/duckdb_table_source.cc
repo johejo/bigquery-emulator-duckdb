@@ -111,7 +111,7 @@ class DuckDbTableSource : public TableSource {
   }
 
   std::optional<TableRead> ReadQuery(const TableReference& table) override {
-    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend_, RelationType::kTable, table);
     const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
     RequirePolicySnapshot(table, metadata);
     if (metadata.external_data) {
@@ -135,7 +135,7 @@ class DuckDbTableSource : public TableSource {
 
   std::optional<std::string> DmlTargetFilter(const TableReference& table,
                                              const std::string& alias) override {
-    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend_, RelationType::kTable, table);
     const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
     RequirePolicySnapshot(table, metadata);
     if (!partition_cutoff_micros_ || !metadata.time_partitioning ||
@@ -161,7 +161,7 @@ class DuckDbTableSource : public TableSource {
   }
 
   absl::StatusOr<std::string> TimeTravelQuery(const TableReference& table, int64_t time) override {
-    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend_, RelationType::kTable, table);
     if (!comment.has_value() || !project_ids_.contains(table.project_id)) {
       return absl::UnimplementedError("FOR SYSTEM_TIME AS OF a temporary table");
     }
@@ -186,7 +186,7 @@ class DuckDbTableSource : public TableSource {
       return std::nullopt;
     }
     try {
-      const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", reference);
+      const auto comment = RelationComment(backend_, RelationType::kTable, reference);
       if (!comment.has_value()) {
         return std::nullopt;
       }
@@ -270,7 +270,7 @@ class DuckDbTableSource : public TableSource {
     bool policy_read = false;
     try {
       std::string relation = QualifiedName(table);
-      const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+      const auto comment = RelationComment(backend_, RelationType::kTable, table);
       const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
       RequirePolicySnapshot(table, metadata);
       if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
@@ -384,11 +384,9 @@ class DuckDbTableSource : public TableSource {
     }
     const QueryResult policies = backend_.Execute(
         std::format("SELECT count(*) FROM {}.main.emulator_partition_policy_history p "
-                    "JOIN {} t ON p.storage_id = t.table_oid WHERE t.database_name = {} "
-                    "AND t.schema_name = {} AND t.table_name = {}",
-                    QuoteIdentifier(table.project_id), LogicalCatalog("duckdb_tables()"),
-                    QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
-                    QuoteLiteral(table.table_id)));
+                    "JOIN {} t ON p.storage_id = t.table_oid WHERE t.type = 'TABLE'",
+                    QuoteIdentifier(table.project_id),
+                    RelationsQuery(table.project_id, table.dataset_id, table.table_id)));
     return policies.rows.Int64(0, 0) != 0;
   }
 

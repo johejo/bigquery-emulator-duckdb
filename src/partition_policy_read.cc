@@ -25,17 +25,15 @@ absl::StatusOr<std::string> PartitionPolicyTableReadQuery(Backend& backend,
   if (!backend.InTransaction()) {
     return absl::FailedPreconditionError("partition policy reads require an execution transaction");
   }
-  const std::string identity = std::format(
-      "SELECT table_oid FROM {} WHERE database_name = {} AND schema_name = {} "
-      "AND table_name = {}",
-      LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
-      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+  const std::string identity = "SELECT table_oid FROM " +
+                               RelationsQuery(table.project_id, table.dataset_id, table.table_id) +
+                               " WHERE type = 'TABLE'";
   const auto stored = backend.Execute(identity);
   if (stored.rows.empty()) {
     return absl::NotFoundError("Not found: Table " + TableName(table));
   }
   const int64_t storage_id = stored.rows.Int64(0, 0);
-  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
+  const auto comment = RelationComment(backend, RelationType::kTable, table);
   const TableMetadata metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
   if (!metadata.time_partitioning || metadata.external_data || metadata.snapshot ||
       metadata.clone) {

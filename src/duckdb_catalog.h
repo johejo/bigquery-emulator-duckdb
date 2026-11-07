@@ -42,10 +42,11 @@ std::string TablesQuery(const DatasetReference& dataset);
 void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
                   const std::optional<DatasetReference>& dataset = std::nullopt);
 
-// An absent relation returns nullopt; a relation without a comment returns an empty comment.
-std::optional<std::optional<std::string>> RelationComment(Backend& backend,
-                                                          std::string_view relations,
-                                                          std::string_view name,
+enum class RelationType { kTable, kView };
+
+// The comment of `table`, a table or view as `type` says. An absent relation returns nullopt; a
+// relation without a comment returns an empty comment.
+std::optional<std::optional<std::string>> RelationComment(Backend& backend, RelationType type,
                                                           const TableReference& table);
 std::optional<std::optional<std::string>> ViewComment(Backend& backend,
                                                       const TableReference& table);

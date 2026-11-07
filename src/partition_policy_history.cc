@@ -59,13 +59,11 @@ std::string KeepPartitionPolicyStatement(const TableReference& table,
     throw ApiError::Invalid("TTL for interval partition must be a positive number.");
   }
   return std::format(
-      "INSERT INTO {} SELECT table_oid, txid_current(), NULL, {} FROM {} "
-      "WHERE database_name = {} AND schema_name = {} AND table_name = {} "
+      "INSERT INTO {} SELECT table_oid, txid_current(), NULL, {} FROM {} WHERE type = 'TABLE' "
       "ON CONFLICT (storage_id, txid) DO UPDATE SET expiration_ms = excluded.expiration_ms, "
       "valid_from = NULL",
       Policies(table.project_id), expiration_ms ? std::to_string(*expiration_ms) : "NULL",
-      LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
-      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+      RelationsQuery(table.project_id, table.dataset_id, table.table_id));
 }
 
 std::string CommitPartitionPoliciesStatement(const std::string& project) {

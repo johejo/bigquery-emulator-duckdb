@@ -48,15 +48,12 @@ std::vector<TableListEntry> SqlRuntime::ListTableEntries(DatasetReference datase
   dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
-  const std::string where =
-      std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
-                  QuoteLiteral(dataset.dataset_id));
   std::vector<TableListEntry> entries;
   const QueryResult result = Execute(std::format(
-      "SELECT table_name, 'TABLE', comment FROM {} {}"
-      " UNION ALL SELECT view_name, 'VIEW', comment FROM {} {}"
-      " ORDER BY 1",
-      LogicalCatalog("duckdb_tables()"), where, LogicalCatalog("duckdb_views()"), where));
+      "SELECT table_name, type, comment FROM {} ORDER BY 1",
+      LogicalCatalog(std::format("bq_relations(database := {}, schema := {})",
+                                 QuoteLiteral(dataset.project_id),
+                                 QuoteLiteral(DatasetCatalogName(dataset.dataset_id))))));
   for (size_t row = 0; row < result.rows.size(); ++row) {
     TableMetadata metadata = CommentMetadata(result.rows.OptionalString(row, 2));
     const auto view = ParseViewMetadata(result.rows.OptionalString(row, 2));
@@ -137,12 +134,11 @@ SqlRuntime::TableReadSnapshot SqlRuntime::BeginTableRead(TableReference table, b
   try {
     info.schema = TableSchema(session, table);
     info.metadata = CommentMetadata(
-        RelationComment(session, "duckdb_tables()", "table_name", table).value_or(std::nullopt));
-    const QueryResult identity = session.Execute(
-        std::format("SELECT table_oid FROM {} WHERE database_name = "
-                    "{} AND schema_name = {} AND table_name = {}",
-                    LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
-                    QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id)));
+        RelationComment(session, RelationType::kTable, table).value_or(std::nullopt));
+    const QueryResult identity =
+        session.Execute("SELECT table_oid FROM " +
+                        RelationsQuery(table.project_id, table.dataset_id, table.table_id) +
+                        " WHERE type = 'TABLE'");
     if (identity.rows.empty()) {
       throw ApiError::NotFound("Table not found: " + table.table_id);
     }
@@ -205,8 +201,7 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
   // Read the sources before holding the mutex, after the checks that fail without them.
   if (metadata.external_data && (schema.empty() || metadata.external_data->hive_partitioning)) {
     GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
-    if (RelationComment(backend_, "duckdb_tables()", "table_name", table) ||
-        ViewComment(backend_, table)) {
+    if (RelationComment(backend_, RelationType::kTable, table) || ViewComment(backend_, table)) {
       throw ApiError::Duplicate("Already Exists: Table " + table.project_id + ":" +
                                 table.dataset_id + "." + table.table_id);
     }
@@ -471,7 +466,7 @@ std::unique_lock<std::mutex> SqlRuntime::KeepVersion(Backend& backend,
   if (!backend.InTransaction()) {
     lock = std::unique_lock(HistoryMutex(table));
   }
-  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
+  const auto comment = RelationComment(backend, RelationType::kTable, table);
   const int64_t creation_time =
       comment.has_value() ? HistoryCreationTime(table, CommentMetadata(*comment)) : 0;
   if (creation_time == 0) {

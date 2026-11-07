@@ -823,9 +823,8 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       table && table->metadata.external_data && !table->sources_read &&
       (table->schema.empty() || table->metadata.external_data->hive_partitioning)) {
     // IF NOT EXISTS keeps what is there without reading the sources.
-    if (table->if_not_exists &&
-        (RelationComment(backend, "duckdb_tables()", "table_name", table->table) ||
-         ViewComment(backend, table->table))) {
+    if (table->if_not_exists && (RelationComment(backend, RelationType::kTable, table->table) ||
+                                 ViewComment(backend, table->table))) {
       return {};
     }
     TranslatedStatement detected = translation;
