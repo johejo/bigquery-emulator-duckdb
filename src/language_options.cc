@@ -36,6 +36,9 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
          }) {
       options->DisableLanguageFeature(feature);
     }
+    // BigQuery cannot group or partition by graph paths, including with DISTINCT, as "Groupable
+    // data types" in third_party/bigquery_docs/reference/standard-sql/data-types.md lists.
+    options->DisableLanguageFeature(googlesql::FEATURE_GROUP_BY_GRAPH_PATH);
     // BigQuery rejects JSONPath wildcard and descendant operators, including in lax mode.
     options->DisableLanguageFeature(googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT);
     // BigQuery rejects LookupTable with literal, quoted and constant-expression table names.

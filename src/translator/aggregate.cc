@@ -61,15 +61,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   // A graph value's STRUCT is equal to another exactly when their identities are, so functions
-  // that count, compare or carry whole values opt in. BigQuery does not group paths, which
-  // GoogleSQL lets DISTINCT do.
+  // that count, compare or carry whole values opt in.
   if ((HasGraph(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGraph(argument->type()); })) &&
-      (!functions.HasTypeUse(name, TypeUse::kGraphValues) ||
-       (call.distinct() && std::ranges::any_of(call.argument_list(), [](const auto& argument) {
-          return argument->type()->IsGraphPath();
-        })))) {
+      !functions.HasTypeUse(name, TypeUse::kGraphValues)) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with graph values");
   }
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
@@ -472,7 +468,7 @@ std::optional<std::vector<std::string>> PartitionKeys(
         return std::nullopt;
       }
       if (HasGraph(ref->type()) && !ref->type()->IsGraphElement()) {
-        Unsupported(scope, "PARTITION BY with graph paths or nested graph values");
+        Unsupported(scope, "PARTITION BY with nested graph values");
         return std::nullopt;
       }
       if (scope.context.functions.restrictions().scalar_window_partition_keys_only &&
@@ -848,7 +844,7 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
         const googlesql::Type* type = key->expr()->type();
         return HasGraph(type) && !type->IsGraphElement();
       })) {
-    return Unsupported(scope, "GROUP BY with graph values");
+    return Unsupported(scope, "GROUP BY with nested graph values");
   }
   // The collation of each key, which SELECT DISTINCT records as GROUP BY does.
   for (int i = static_cast<int>(collations.size()); i < aggregate.group_by_list_size(); ++i) {

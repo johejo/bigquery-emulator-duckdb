@@ -97,3 +97,24 @@ SELECT COUNT(*) FROM (
   GROUP BY ROLLUP((n, m))
 )
 => "10"
+
+# GRAPH_PATH is not groupable, so BigQuery rejects it in GROUP BY, DISTINCT, distinct aggregate
+# calls and PARTITION BY, including inside an array or a struct.
+SELECT COUNT(*) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN gp) GROUP BY gp
+=> error:
+SELECT COUNT(*) FROM (SELECT DISTINCT gp FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN gp))
+=> error:
+SELECT n FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN COUNT(DISTINCT gp) AS n)
+=> error:
+SELECT ARRAY_LENGTH(paths) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN ARRAY_AGG(DISTINCT gp) AS paths)
+=> error:
+SELECT n FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN gp NEXT RETURN COUNT(*) AS n GROUP BY gp)
+=> error:
+SELECT n FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) WITH DISTINCT gp RETURN COUNT(*) AS n)
+=> error:
+SELECT MAX(n) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN COUNT(*) OVER (PARTITION BY gp) AS n)
+=> error:
+SELECT COUNT(*) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN [gp] AS paths) GROUP BY paths
+=> error:
+SELECT COUNT(*) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH gp = (a:Person)-[:Knows]->(b:Person) RETURN STRUCT(gp AS p) AS s) GROUP BY s
+=> error:
