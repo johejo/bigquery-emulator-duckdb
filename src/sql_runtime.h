@@ -79,6 +79,12 @@ struct InsertError {
   std::string message;
 };
 
+// The page and its unpaginated visible row count come from the same read snapshot.
+struct TableDataPage {
+  QueryResult result;
+  int64_t total_rows = 0;
+};
+
 // Where a job writes its destination table. The enumerators take BigQuery's names.
 enum class CreateDisposition : std::uint8_t { kCreateIfNeeded, kCreateNever };
 enum class WriteDisposition : std::uint8_t {
@@ -206,8 +212,8 @@ class SqlRuntime {
   void DeleteRoutine(RoutineReference routine);
   // Reads the rows of `table` from `start_index` on, with only the fields `selected_fields` names,
   // as SelectFields takes them, unless it is empty.
-  QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results,
-                            std::string_view selected_fields);
+  TableDataPage ListTableData(TableReference table, int64_t start_index, int64_t max_results,
+                              std::string_view selected_fields);
   // Materializes a Storage Read snapshot of the selected fields, or all of them, without
   // creating a query job. The restriction is parsed as one GoogleSQL expression before it is
   // included in the SELECT.
@@ -289,6 +295,17 @@ class SqlRuntime {
   // toward `location` when it is set.
   std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true,
                                               JobLocation* location = nullptr);
+  // Metadata discovery and row execution for one API read share a backend snapshot and cutoff.
+  // The session must stay alive until the result is materialized; destroying it rolls back the
+  // read-only transaction, including on an exception.
+  struct TableReadSnapshot {
+    std::unique_ptr<Backend> session;
+    TableInfo info = {};
+    int64_t evaluation_time_micros = 0;
+
+    [[nodiscard]] std::string Relation() const;
+  };
+  TableReadSnapshot BeginTableRead(TableReference table, bool expire = true);
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // The schema BigQuery detects from the sources of an external table created without one, with
   // the mode of each field given. Throws ApiError::Unsupported without an external table provider.

@@ -449,10 +449,9 @@ class RestServer::Impl {
           Json([this](const httplib::Request& request, httplib::Response&) {
             const TableReference table = TableFromPath(request);
             const ResultPage page = ParseResultPage(request);
-            const QueryResult result =
-                emulator_.ListTableData(table, page.start_index, page.max_results,
-                                        request.get_param_value("selectedFields"));
-            return TableDataList(result, emulator_.GetTable(table).num_rows, page);
+            const auto data = emulator_.ListTableData(table, page.start_index, page.max_results,
+                                                      request.get_param_value("selectedFields"));
+            return TableDataList(data.result, data.total_rows, page);
           }));
     Route("bigquery.tabledata.insertAll", {},
           Json([this](const httplib::Request& request, httplib::Response&) {

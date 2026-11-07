@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "googlesql/public/strings.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -23,6 +25,7 @@
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
 #include "src/location.h"
+#include "src/partition_policy_read.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
 #include "src/sql_runtime.h"
@@ -71,17 +74,55 @@ std::vector<TableListEntry> SqlRuntime::ListTableEntries(DatasetReference datase
   return entries;
 }
 
+std::string SqlRuntime::TableReadSnapshot::Relation() const {
+  const auto& metadata = info.metadata;
+  if (metadata.time_partitioning && !metadata.external_data && !metadata.clone &&
+      !metadata.snapshot) {
+    const auto query = PartitionPolicyTableReadQuery(
+        *session, info.reference, evaluation_time_micros, PartitionRowVersion::kCurrent);
+    if (!query.ok()) {
+      throw ApiError::QueryFailure(std::string(query.status().message()));
+    }
+    return "(" + *query + ") AS _bq_visible_rows";
+  }
+  return ReadTableRelation(*session, info.reference);
+}
+
 TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, bool expire) {
+  auto read = BeginTableRead(std::move(table), expire);
+  if (include_row_count && !read.info.view_query && !read.info.metadata.external_data) {
+    try {
+      const QueryResult count = read.session->Execute("SELECT count(*) FROM " + read.Relation());
+      read.info.num_rows = count.rows.Int64(0, 0);
+    } catch (const BackendError& error) {
+      throw ApiError::QueryFailure(error.what());
+    }
+  }
+  read.session->Transaction("COMMIT");
+  return std::move(read.info);
+}
+
+SqlRuntime::TableReadSnapshot SqlRuntime::BeginTableRead(TableReference table, bool expire) {
   table = ResolveTableReference(std::move(table));
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
-  const std::string location = GetDataset(dataset).Location();
+  GetDataset(dataset);
+  // Relation expiration may mutate the catalog. Finish it before starting the read snapshot;
+  // a read never takes a history mutex or writes retained rows/policies.
   if (expire) {
     ExpireTables(backend_, expiration_mutex_, dataset);
   }
-  TableInfo info;
+  TableReadSnapshot read{.session = backend_.NewSession()};
+  Backend& session = *read.session;
+  session.Transaction("BEGIN TRANSACTION");
+  read.evaluation_time_micros = absl::ToUnixMicros(absl::Now());
+  const auto location = LocationOf(session, dataset);
+  if (!location) {
+    throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
+  }
+  TableInfo& info = read.info;
   info.reference = table;
-  info.location = location;
-  if (const auto comment = ViewComment(backend_, table); comment.has_value()) {
+  info.location = *location;
+  if (const auto comment = ViewComment(session, table); comment.has_value()) {
     std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
     if (!metadata.has_value()) {
       throw ApiError::Invalid("View " + TableName(table) +
@@ -92,13 +133,13 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
     info.view_query = std::move(metadata->query);
     info.schema = std::move(metadata->schema);
     info.metadata = std::move(metadata->metadata);
-    return info;
+    return read;
   }
   try {
-    info.schema = TableSchema(backend_, table);
+    info.schema = TableSchema(session, table);
     info.metadata = CommentMetadata(
-        RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(std::nullopt));
-    const QueryResult identity = backend_.Execute(
+        RelationComment(session, "duckdb_tables()", "table_name", table).value_or(std::nullopt));
+    const QueryResult identity = session.Execute(
         std::format("SELECT table_oid FROM {} WHERE database_name = "
                     "{} AND schema_name = {} AND table_name = {}",
                     LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
@@ -107,15 +148,11 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
       throw ApiError::NotFound("Table not found: " + table.table_id);
     }
     info.storage_id = identity.rows.Int64(0, 0);
-    if (include_row_count && !info.metadata.external_data) {
-      const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
-      info.num_rows = count.rows.Int64(0, 0);
-    }
   } catch (const BackendError& error) {
     throw ApiError::NotFound("Not found: Table " + table.project_id + ":" + table.dataset_id + "." +
                              table.table_id);
   }
-  return info;
+  return read;
 }
 
 std::vector<FieldSchema> SqlRuntime::DetectExternalSchema(const GcsExternalData& definition,

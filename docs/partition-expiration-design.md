@@ -181,8 +181,13 @@ not by itself a lifecycle entry point.
 history resolution, policy filtering and execution-time storage identity validation.
 It requires construction and execution in the same active backend transaction:
 otherwise a write can create the first retained row version after row history was
-resolved, leaving a historical read pointing only at current rows. This read
-boundary is not yet wired into SQL or API requests and does not coordinate writes.
+resolved, leaving a historical read pointing only at current rows. `tables.get`
+row counts and `tabledata.list` use this boundary for native time-partitioned
+tables. Their runtime-owned read transaction includes metadata discovery, row
+execution and the unpaginated `tabledata.list` count, with one explicit cutoff.
+SQL (including time travel) and Storage Read
+are not wired into it, and it does not coordinate writes. Expiration settings
+remain unsupported until their other observable paths are implemented.
 
 Keep physically retained rows available for policy removal/extension and for time
 travel. Do not introduce a purge until independently verified retention behavior
@@ -298,8 +303,8 @@ clock and accidentally use different policies or table identities.
 | SQL analysis and ordinary SELECT | `NewTableSource` uses the supplied session, otherwise `backend_`; currently sweeps table expiration before analysis | Cleanup and scan must agree on identity and cutoff, including wildcards and INFORMATION_SCHEMA. Dry-run analysis must not add a row mutation. |
 | SQL DML | `RunStatement` uses the script session or `backend_`; `KeepVersion` uses the caller's transaction when present | Evaluate both existing rows and newly written expired rows, with history and DML under the same write coordination. |
 | Script transaction | The session backend sees uncommitted writes; `KeepVersion` registers commit finalization there | Never clean through `backend_` in place of the session. Define visibility at statement boundaries and commit, and preserve rollback behavior. |
-| `tabledata.list` | `GetTable` followed by a separate SELECT on `backend_` | A cleanup in `GetTable` alone leaves a race before SELECT. Coordinate the lifecycle operation with the actual read. |
-| `tables.get` row count | `GetTable` sweeps then reads metadata and count on `backend_` | Count must reflect expiration under the same identity and cutoff; do not copy history when no rows expire. |
+| `tabledata.list` | `BeginTableRead` sweeps table expiration, then discovers metadata and selects rows in one read-only session transaction | Native time-partitioned reads use `PartitionPolicyTableReadQuery` with the operation's cutoff; projection and pagination run after visibility filtering, and `totalRows` is counted in the same snapshot. No row or policy history is written. |
+| `tables.get` row count | `BeginTableRead` sweeps table expiration, then discovers metadata and counts rows in one read-only session transaction | Native time-partitioned counts use the same policy read boundary and cutoff as row reads. No row or policy history is written. |
 | Storage Read creation | `ReadStorageTable` gets metadata, translates, materializes with `ExecuteStorageRead`, then rechecks schema and OID | Apply expiration before materialization without changing an already created snapshot. A schema/OID recheck alone cannot detect policy changes. |
 | Query/load/copy destination publication | `WriteDestination` uses `GetTable` and executes a transaction containing destination writes; append history is protected by `HistoryMutex` | Resolve creation versus inheritance separately; expire appended rows in the publication transaction rather than only during initial metadata lookup. |
 | Copy/extract source | Job orchestration resolves source metadata and then reads source data | Apply source expiration to the source read, not merely destination creation or source metadata lookup. |
