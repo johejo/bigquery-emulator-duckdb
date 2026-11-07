@@ -19,6 +19,7 @@
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
 #include "src/backend_initializer.h"
+#include "src/catalog_functions.h"
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_types.h"
@@ -228,6 +229,13 @@ struct Backend::Database {
     }
     RegisterBackendFunctions(handle.get(), session_user, storage, geography, functions, initialize);
     RegisterDuckPGQ(handle.get());
+    RegisterCatalogFunctions(handle.get());
+    {
+      // Extension options can be set once for every connection; the grammar is per connection.
+      const Connection connection = Connect();
+      Configure(connection.get(), "SET GLOBAL duckpgq_vertex_join_elimination = false");
+      Configure(connection.get(), "SET GLOBAL duckpgq_factorized_joins = false");
+    }
     if (initialize_database) {
       initialize_database(handle.get());
     }
@@ -239,8 +247,6 @@ struct Backend::Database {
       throw BackendError("DuckDB failed to connect");
     }
     Configure(connection.get(), "SET active_grammar_extensions = ['duckpgq']");
-    Configure(connection.get(), "SET duckpgq_vertex_join_elimination = false");
-    Configure(connection.get(), "SET duckpgq_factorized_joins = false");
     return Connection(connection.release());
   }
 };

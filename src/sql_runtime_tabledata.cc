@@ -131,11 +131,10 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
   try {
     const auto session = backend_.NewSession();
     session->Transaction("BEGIN TRANSACTION");
-    const QueryResult identity = session->Execute(
-        std::format("SELECT table_oid FROM {} WHERE database_name = "
-                    "{} AND schema_name = {} AND table_name = {}",
-                    LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
-                    QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id)));
+    const QueryResult identity =
+        session->Execute("SELECT table_oid FROM " +
+                         RelationsQuery(table.project_id, table.dataset_id, table.table_id) +
+                         " WHERE type = 'TABLE'");
     if (identity.rows.empty() || identity.rows.Int64(0, 0) != storage_id) {
       throw ApiError::NotFound("The Storage Write destination table was dropped or replaced");
     }

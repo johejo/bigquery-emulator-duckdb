@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstddef>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -85,6 +86,18 @@ std::string TableCatalogName(std::string_view dataset, std::string_view name) {
              : DatasetCatalogName(name);
 }
 
+std::string SchemasQuery(std::string_view project, std::optional<std::string_view> dataset) {
+  return "bq_schemas(database := " + QuoteLiteral(project) +
+         (dataset ? ", schema := " + QuoteLiteral(DatasetCatalogName(*dataset)) : "") + ")";
+}
+
+std::string RelationsQuery(std::string_view project, std::string_view dataset,
+                           std::string_view table) {
+  return "bq_relations(database := " + QuoteLiteral(project) +
+         ", schema := " + QuoteLiteral(DatasetCatalogName(dataset)) +
+         ", name := " + QuoteLiteral(TableCatalogName(dataset, table)) + ")";
+}
+
 std::string LogicalCatalog(std::string_view relation) {
   const auto decode = [relation](std::string_view column) {
     const std::string name(column);
@@ -99,7 +112,8 @@ std::string LogicalCatalog(std::string_view relation) {
            " THEN decode(from_hex(substr(" + name + ", 5))) ELSE " + name + " END AS " + name;
   };
   std::vector<std::string> columns;
-  if (relation == "information_schema.schemata" || relation == "duckdb_functions()") {
+  if (relation == "information_schema.schemata" || relation == "duckdb_functions()" ||
+      relation.starts_with("bq_schemas(")) {
     columns = {"schema_name"};
   } else if (relation == "information_schema.tables") {
     columns = {"table_schema", "table_name"};
