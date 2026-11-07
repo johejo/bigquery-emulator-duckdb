@@ -1,5 +1,6 @@
 #include "src/catalog.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
@@ -18,11 +19,13 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/annotation.h"
 #include "src/analyzer_functions/functions.h"
+#include "src/api_error.h"
 #include "src/builtin_catalog.h"
 #include "src/builtin_function_options.h"
 #include "src/catalog_table.h"
 #include "src/field_schema.h"
 #include "src/information_schema.h"
+#include "src/table_metadata.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
 #include "src/timestamp_precision.h"
@@ -123,6 +126,14 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
   }
   if (const auto description = simple_table->Describe();
       description && description->metadata.external_data) {
+    // BigQuery validates a Parquet table's declared JSON columns before resolving expressions,
+    // even in an unused CTE or a query that selects no JSON column. Metadata reads still work.
+    // See external_parquet_json_precedence.api.answers.json.
+    if (description->metadata.external_data->format == "PARQUET" &&
+        std::ranges::any_of(
+            *schema, [](const FieldSchema& field) { return field.type == FieldType::kJson; })) {
+      throw ApiError::Invalid("Unsupported field type: JSON");
+    }
     if (absl::Status status = simple_table->AddColumn(std::make_unique<googlesql::SimpleColumn>(
             normalized.at(2), "_FILE_NAME", googlesql::types::StringType(),
             /*is_pseudo_column=*/true));

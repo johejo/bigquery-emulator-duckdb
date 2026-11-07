@@ -1,0 +1,116 @@
+version: 1
+# BigQuery observations are retained in the adjacent answers sidecar.
+description: External Parquet JSON schema validation precedes query analysis and column pruning.
+vars:
+  dataset: bqa_${run}_${case}
+  schema: {fields: [{name: id, type: INTEGER}, {name: j, type: JSON}]}
+  # One row: id INT64 = 1, j STRING = '{"a":1}'. Declare j as JSON below.
+  parquet: UEFSMRUAFRAVECwVAhUAFQYVBgAAAQAAAAAAAAAVABUWFRYsFQIVABUGFQYAAAcAAAB7ImEiOjF9FQIZPDUAGA1kdWNrZGJfc2NoZW1hFQQAFQQlABgCaWQlJAAVDCUAGAFqJQAAFgIZHBksJgAcFQQZFQAZGAJpZBUAFgIWMhYyJgg8GAgBAAAAAAAAABgIAQAAAAAAAAAWACgIAQAAAAAAAAAYCAEAAAAAAAAAEREAGRwVABUAFQIAAAAmABwVDBkVABkYAWoVABYCFjgWOCY6PBgHeyJhIjoxfRgHeyJhIjoxfRYAKAd7ImEiOjF9GAd7ImEiOjF9EREAGRwVABUAFQIAAAAWahYCJggWagAoKER1Y2tEQiB2ZXJzaW9uIHYyLjAuMCAoYnVpbGQgZDU0Y2JiZTNkZikZLBwAABwAAAAKAQAAUEFSMQ==
+templates:
+  query:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}.parquet', base64: '${parquet}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: "CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64, j JSON) OPTIONS (format = 'PARQUET', uris = ['gs://${bucket}/${run}/${case}.parquet'])"
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${sql}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}.parquet'}
+cases:
+  - name: select_json
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT j FROM `${project}.${dataset}.t`
+  - name: order_json
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT j FROM `${project}.${dataset}.t` ORDER BY j
+  - name: compare_json
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT j = JSON '1' FROM `${project}.${dataset}.t`
+  - name: count_rows
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT COUNT(*) FROM `${project}.${dataset}.t`
+  - name: select_other_column
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT id FROM `${project}.${dataset}.t`
+  - name: order_other_column
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT id FROM `${project}.${dataset}.t` ORDER BY id
+  - name: select_constant
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT 1 FROM `${project}.${dataset}.t`
+  - name: missing_column
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT missing FROM `${project}.${dataset}.t`
+  - name: invalid_function_signature
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT ABS('not a number') FROM `${project}.${dataset}.t`
+  - name: no_rows
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: SELECT j FROM `${project}.${dataset}.t` WHERE FALSE
+  - name: unused_cte
+    template: query
+    expect: {create: {status: 200}, get: {status: 200, schema: '${schema}'}, query: {status: 400, reason: invalid, message: 'Unsupported field type: JSON'}}
+    vars:
+      sql: WITH unused AS (SELECT * FROM `${project}.${dataset}.t`) SELECT 1
