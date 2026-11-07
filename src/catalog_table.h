@@ -45,6 +45,7 @@ class BigQueryTable : public googlesql::SimpleTable {
   // The columns of the table's primary key, which graph element tables without a KEY clause take.
   [[nodiscard]] std::optional<std::vector<int>> PrimaryKey() const override;
   [[nodiscard]] std::optional<TableRead> ReadQuery() const;
+  [[nodiscard]] std::optional<std::string> DmlTargetFilter(const std::string& alias) const;
   [[nodiscard]] TableWriteRestriction WriteRestriction() const;
   [[nodiscard]] TableReference reference() const {
     return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};

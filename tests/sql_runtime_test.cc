@@ -52,6 +52,52 @@ TEST(SqlRuntimeTest, ConcurrentScriptsAndReturnedResultsHaveIndependentLifetimes
   }
 }
 
+// Inject atomic row/policy changes while both normal SQL and script expressions read. A
+// reader that resolves policy or raw rows outside its execution snapshot can report 0 or 2.
+TEST(SqlRuntimeTest, SqlReadsKeepRowsAndPolicyInOneSnapshot) {
+  SqlRuntime runtime("", std::vector<Project>{{.project_id = "runtime"}});
+  runtime.CreateDataset({.project_id = "runtime", .dataset_id = "policy"});
+  const auto query = [&](const std::string& sql) {
+    QueryRequest request;
+    request.project_id = "runtime";
+    request.query = sql;
+    QueryJob metadata;
+    JobLocation location;
+    return runtime.ExecuteQuery(std::move(request), metadata, location);
+  };
+  query("CREATE TABLE policy.t PARTITION BY d AS SELECT DATE '2000-01-01' AS d");
+  const auto publish = [&](bool expires) {
+    const std::string duration = expires ? "86400000" : "NULL";
+    runtime.ExecuteDuckDb(
+        "BEGIN; DELETE FROM runtime.policy.t; "
+        "INSERT INTO runtime.policy.t VALUES (DATE '2000-01-01'); " +
+        std::string(expires ? "INSERT INTO runtime.policy.t VALUES (DATE '2159-12-31'); " : "") +
+        "INSERT INTO runtime.main.emulator_partition_policy_history "
+        "SELECT table_oid, txid_current(), epoch_us(get_current_timestamp()), " +
+        duration +
+        " FROM duckdb_tables() WHERE database_name = 'runtime' "
+        "AND schema_name = 'policy' AND table_name = 't'; COMMIT");
+  };
+  publish(false);
+  constexpr int kChanges = 64;
+  std::barrier ready(2);
+  auto writer = std::async(std::launch::async, [&] {
+    ready.arrive_and_wait();
+    for (int i = 0; i < kChanges; ++i) {
+      publish(i % 2 == 0);
+    }
+  });
+  ready.arrive_and_wait();
+  for (int i = 0; i < kChanges; ++i) {
+    const auto result =
+        query(i % 2 == 0 ? "SELECT count(*) FROM policy.t"
+                         : "DECLARE n INT64 DEFAULT (SELECT count(*) FROM policy.t); SELECT n");
+    ASSERT_EQ(result.rows.size(), 1);
+    EXPECT_EQ(result.rows.Int64(0, 0), 1);
+  }
+  EXPECT_NO_THROW(writer.get());
+}
+
 // Catalog reads in another dataset may expire a newly committed relation while its CREATE
 // response is still being assembled. Exercise that overlap without relying on wall-clock waits.
 TEST(SqlRuntimeTest, ConcurrentExpirationDoesNotFailCreateResponses) {

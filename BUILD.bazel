@@ -189,6 +189,7 @@ cc_library(
         ":backend",
         ":field_schema",
         ":partitioning",
+        ":references",
     ],
 )
 
@@ -1181,6 +1182,8 @@ cc_library(
     implementation_deps = [
         ":column_default",
         ":duckdb_catalog",
+        ":expiration_policy",
+        ":partition_policy_history",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:value",
     ],

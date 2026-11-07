@@ -116,4 +116,19 @@ class Backend {
   std::unique_ptr<Session> session_;
 };
 
+// A statement's transaction on an existing session. An explicit caller transaction is left
+// untouched; otherwise failure rolls back and Commit publishes the statement atomically.
+class StatementTransaction {
+ public:
+  explicit StatementTransaction(Backend& session);
+  ~StatementTransaction();
+  StatementTransaction(const StatementTransaction&) = delete;
+  StatementTransaction& operator=(const StatementTransaction&) = delete;
+  void Commit();
+
+ private:
+  Backend& session_;
+  bool owns_;
+};
+
 }  // namespace bigquery_emulator_duckdb

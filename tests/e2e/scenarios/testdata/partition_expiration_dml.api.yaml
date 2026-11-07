@@ -1,7 +1,6 @@
 version: 1
 description: DML visibility of physically retained rows in expired partitions
-# Known incompatibility: partition expiration is rejected. The adjacent BigQuery
-# answers establish that hidden rows are not DML targets and remain after policy
+# The adjacent BigQuery answers establish that hidden rows are not DML targets and remain after policy
 # removal, including when MERGE inserts a new row for an invisible target.
 vars:
   dataset: bqa_${run}_${case}

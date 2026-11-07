@@ -88,6 +88,8 @@ struct OptionUpdates {
   std::map<std::string, std::string> removed_tags;
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
+  std::optional<std::optional<int64_t>> partition_expiration_ms = {};
+  std::optional<std::optional<int64_t>> default_partition_expiration_ms = {};
   std::optional<std::optional<int64_t>> max_time_travel_hours = {};
   std::optional<std::string> storage_billing_model = {};
   std::optional<bool> is_case_insensitive = {};

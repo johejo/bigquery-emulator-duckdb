@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <map>
 #include <memory>
 #include <optional>
@@ -96,6 +97,7 @@ class DuckDbTableSource : public TableSource {
   std::optional<TableRead> ReadQuery(const TableReference& table) override {
     const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
     const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
+    RequirePolicySnapshot(table, metadata);
     if (metadata.external_data) {
       if (!external_) {
         throw ApiError::UnsupportedQuery("external table reads without an external provider");
@@ -105,7 +107,7 @@ class DuckDbTableSource : public TableSource {
     }
     if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
       auto query = PartitionPolicyTableReadQuery(backend_, table, *partition_cutoff_micros_,
-                                                 PartitionRowVersion::kCurrent);
+                                                 PartitionRowVersion::kCurrent, true);
       if (!query.ok()) {
         throw ApiError::QueryFailure(std::string(query.status().message()));
       }
@@ -113,6 +115,29 @@ class DuckDbTableSource : public TableSource {
     }
     const auto query = TableReadQuery(backend_, table);
     return query ? std::optional<TableRead>(*query) : std::nullopt;
+  }
+
+  std::optional<std::string> DmlTargetFilter(const TableReference& table,
+                                             const std::string& alias) override {
+    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
+    RequirePolicySnapshot(table, metadata);
+    if (!partition_cutoff_micros_ || !metadata.time_partitioning ||
+        !UsesPartitionPolicy(table, metadata)) {
+      return std::nullopt;
+    }
+    auto rows = PartitionPolicyTableReadQuery(backend_, table, *partition_cutoff_micros_,
+                                              PartitionRowVersion::kCurrent, true);
+    if (!rows.ok()) {
+      throw ApiError::QueryFailure(std::string(rows.status().message()));
+    }
+    // Visibility is constant for a partition key, including NULL and special partitions.
+    // A semijoin on that key preserves duplicate physical targets without relying on rowid,
+    // which a user column may shadow. The read also revalidates the storage identity.
+    const std::string key = QuoteIdentifier(metadata.time_partitioning->field);
+    return "EXISTS (SELECT 1 FROM (" + *rows + ") AS _bq_visible_target WHERE " +
+           "_bq_visible_target." + key + " IS NOT DISTINCT FROM " + QuoteIdentifier(alias) + "." +
+           key + ")";
   }
 
   TableWriteRestriction WriteRestriction(const TableReference& table) override {
@@ -128,8 +153,10 @@ class DuckDbTableSource : public TableSource {
     if (metadata.external_data) {
       return absl::UnimplementedError("FOR SYSTEM_TIME AS OF an external table");
     }
+    RequirePolicySnapshot(table, metadata);
     if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
-      return PartitionPolicyTableReadQuery(backend_, table, time, PartitionRowVersion::kHistorical);
+      return PartitionPolicyTableReadQuery(backend_, table, time, PartitionRowVersion::kHistorical,
+                                           true);
     }
     return bigquery_emulator_duckdb::TimeTravelQuery(backend_, table, metadata.creation_time, time);
   }
@@ -229,9 +256,10 @@ class DuckDbTableSource : public TableSource {
       std::string relation = QualifiedName(table);
       const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
       const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
+      RequirePolicySnapshot(table, metadata);
       if (partition_cutoff_micros_.has_value() && UsesPartitionPolicy(table, metadata)) {
         auto rows = PartitionPolicyTableReadQuery(backend_, table, *partition_cutoff_micros_,
-                                                  PartitionRowVersion::kCurrent);
+                                                  PartitionRowVersion::kCurrent, true);
         if (!rows.ok()) {
           throw ApiError::QueryFailure(std::string(rows.status().message()));
         }
@@ -321,10 +349,31 @@ class DuckDbTableSource : public TableSource {
   }
 
  private:
+  void RequirePolicySnapshot(const TableReference& table, const TableMetadata& metadata) const {
+    if (!partition_cutoff_micros_ && UsesPartitionPolicy(table, metadata)) {
+      throw ApiError::Unsupported(
+          "partition expiration without a statement snapshot, including "
+          "explicit transactions and query destinations");
+    }
+  }
+
+  // Whether reads of `table` evaluate partition policies: a native time-partitioned table whose
+  // storage has ever had one. History is per storage, so a table without it never expired rows,
+  // and an unfiltered read does not depend on the table's identity during its statement.
   [[nodiscard]] bool UsesPartitionPolicy(const TableReference& table,
                                          const TableMetadata& metadata) const {
-    return project_ids_.contains(table.project_id) && metadata.time_partitioning &&
-           !metadata.external_data && !metadata.snapshot && !metadata.clone;
+    if (!project_ids_.contains(table.project_id) || !metadata.time_partitioning ||
+        metadata.external_data || metadata.snapshot || metadata.clone) {
+      return false;
+    }
+    const QueryResult policies = backend_.Execute(
+        std::format("SELECT count(*) FROM {}.main.emulator_partition_policy_history p "
+                    "JOIN {} t ON p.storage_id = t.table_oid WHERE t.database_name = {} "
+                    "AND t.schema_name = {} AND t.table_name = {}",
+                    QuoteIdentifier(table.project_id), LogicalCatalog("duckdb_tables()"),
+                    QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
+                    QuoteLiteral(table.table_id)));
+    return policies.rows.Int64(0, 0) != 0;
   }
 
   // Records that the job uses `project`.`dataset`, which exists.

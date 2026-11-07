@@ -179,20 +179,21 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
 // Throws DuckDB's `error` about the macro that records the routine a CREATE or DROP FUNCTION
 // names in BigQuery's words, if it says that the routine exists or that it does not.
 std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
-    const TranslatedStatement& translation) {
+    const TranslatedStatement& translation, Backend* session) {
+  Backend& backend = session != nullptr ? *session : backend_;
   if (const auto& alteration = translation.altered_table) {
     const TableReference& table = alteration->table;
-    if (ViewComment(backend_, table).has_value()) {
+    if (ViewComment(backend, table).has_value()) {
       throw ApiError::Invalid("ALTER TABLE cannot alter view " + TableName(table));
     }
-    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
     if (!comment.has_value()) {
       if (alteration->if_exists) {
         return std::vector<std::string>{};
       }
       throw ApiError::NotFound("Not found: Table " + TableName(table));
     }
-    auto schema = TableSchema(backend_, table);
+    auto schema = TableSchema(backend, table);
     const TableMetadata metadata = CommentMetadata(*comment);
     auto statements =
         AlterTableStatements(*alteration, schema, metadata, functions_.timestamp_precision());
@@ -224,7 +225,8 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
   }
   if (const auto& alteration = translation.altered_dataset) {
     const DatasetReference& dataset = alteration->dataset;
-    const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
+    const QueryResult result =
+        backend.Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
     if (result.rows.empty()) {
       if (alteration->if_exists) {
         return std::vector<std::string>{};

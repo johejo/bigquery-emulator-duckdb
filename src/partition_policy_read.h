@@ -24,6 +24,7 @@ enum class PartitionRowVersion : uint8_t { kCurrent, kHistorical };
 absl::StatusOr<std::string> PartitionPolicyTableReadQuery(Backend& backend,
                                                           const TableReference& table,
                                                           int64_t evaluation_time_micros,
-                                                          PartitionRowVersion version);
+                                                          PartitionRowVersion version,
+                                                          bool reject_natural_deadlines = false);
 
 }  // namespace bigquery_emulator_duckdb

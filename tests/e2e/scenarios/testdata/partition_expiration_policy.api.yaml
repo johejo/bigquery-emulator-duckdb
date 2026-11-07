@@ -1,5 +1,4 @@
 version: 1
-# Known incompatibility: dataset defaults and partition expiration are rejected.
 # Expectations come from the adjacent BigQuery answers. Their original timestamp
 # observations remain as inheritance evidence; these assertions select only stable
 # partition metadata, not generated creation/expiration timestamp literals.

@@ -398,7 +398,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   absl::StatusOr<googlesql::TypeWithParameters> ResolveTypeName(
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
     const AnalyzerSettings settings = Settings(executor);
-    std::unique_ptr<TableSource> source = host_.NewTableSource(backend_.get(), /*expire=*/false);
+    std::unique_ptr<TableSource> source =
+        host_.NewTableSource(backend_.get(), /*expire=*/false, /*policy_reads=*/true);
     const TimestampPrecision precision = host_.functions().timestamp_precision();
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
                             settings.default_dataset, precision, nullptr,
@@ -440,7 +441,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const int64_t /*num_arguments*/) override {
     pending_frame_.reset();
     const auto settings = Settings(executor);
-    const auto source = host_.NewTableSource(backend_.get(), false);
+    const auto source =
+        host_.NewTableSource(backend_.get(), /*expire=*/false, /*policy_reads=*/true);
     const auto parts = NormalizeTablePath(SplitTablePath(path), settings.default_project,
                                           settings.default_dataset, source.get());
     if (parts.size() != 3) {
@@ -661,7 +663,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     // Dropping expired tables in an open transaction would make them part of it, so that its
     // commit, and other requests' drops, could conflict. Other requests drop them meanwhile.
     catalog.source =
-        host_.NewTableSource(backend_.get(), /*expire=*/list_temporary && !in_transaction_);
+        host_.NewTableSource(backend_.get(), /*expire=*/list_temporary && !in_transaction_,
+                             /*policy_reads=*/!in_transaction_);
     catalog.temporary = std::make_unique<TemporaryTables>(temporary_);
     if (list_temporary) {
       for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {
@@ -812,6 +815,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
                          segment.node()->Is<googlesql::ASTRollbackStatement>();
+    const auto lifecycle_lock = host_.LockStatement();
+    const auto transaction =
+        !control && !in_transaction_ ? std::make_unique<StatementTransaction>(*backend_) : nullptr;
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings, !control));
     // A function body resolves against tables and previously defined functions, never the
     // script's variables (which would otherwise be captured as constants).
@@ -926,7 +932,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       GOOGLESQL_RETURN_IF_ERROR(
           catalog.tables->CheckView(translation->view->table, translation->view->query));
     }
-    return host_.RunStatement(*translation, setup_, null_arrays, backend_.get());
+    QueryResult result = host_.RunStatement(*translation, setup_, null_arrays, backend_.get());
+    if (transaction) {
+      transaction->Commit();
+    }
+    return result;
   }
 
   // Evaluates the expression `sql`, the text of `segment` when it is given, coerced to
@@ -937,6 +947,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                                       const googlesql::Type* target_type) {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
+    const auto lifecycle_lock = host_.LockStatement();
+    StatementTransaction transaction(*backend_);
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(
         const AnalyzerResult analyzed,
@@ -966,7 +978,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return Unsupported(unsupported);
     }
     const QueryResult result = backend_->Execute(*query, setup_, true);
-    return Decode(result, 0, 0, analyzed.expression().type());
+    auto value = Decode(result, 0, 0, analyzed.expression().type());
+    if (value.ok()) {
+      transaction.Commit();
+    }
+    return value;
   }
 
   // A value of a result, which the emulator cannot hold in a variable when it cannot decode it.

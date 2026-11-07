@@ -96,9 +96,9 @@ partition duration:
 | Null whole `timePartitioning` on PATCH | Reject conversion to a non-partitioned table | REST `patch_null_partitioning` |
 
 The cases are in
-[`partition_expiration_policy.api.yaml`](../tests/e2e/scenarios/testdata/known_bugs/partition_expiration_policy.api.yaml)
+[`partition_expiration_policy.api.yaml`](../tests/e2e/scenarios/testdata/partition_expiration_policy.api.yaml)
 and
-[`partition_expiration_ddl.api.yaml`](../tests/e2e/scenarios/testdata/known_bugs/partition_expiration_ddl.api.yaml).
+[`partition_expiration_ddl.api.yaml`](../tests/e2e/scenarios/testdata/partition_expiration_ddl.api.yaml).
 Their adjacent answer sidecars preserve the BigQuery observations, including
 the creation and expiration timestamps that establish the inherited table
 lifetime. Null is an explicit JSON null, not a stand-in for omission. Record the
@@ -192,10 +192,11 @@ backend already has an active transaction. Historical scans supply their request
 timestamp and resolve raw row history before applying policy history; partition
 counts use the current-read cutoff and do not suppress policy evaluation errors.
 The caller must keep discovery, translation and execution in that same transaction.
-Ordinary SQL analysis without an execution transaction and Storage Read are not
-wired into it, and it does not coordinate writes. This plumbing does not establish
-expiration semantics inside explicit script transactions. Expiration settings
-remain unsupported until their other observable paths are implemented.
+Query jobs without a destination and each script statement outside an explicit
+transaction open one before analysis. Other paths that read a table with policy
+history without such a transaction, such as dry runs, query destinations, explicit
+script transactions and Storage Read, are rejected as unsupported; see
+[Partition expiration](compatibility.md#partition-expiration).
 
 Keep physically retained rows available for policy removal/extension and for time
 travel. Do not introduce a purge until independently verified retention behavior
@@ -242,7 +243,7 @@ keeping a whole-table version with `valid_to = cleanup_commit` and treating it a
 the historical answer would make the 11:00 read above expose expired rows without
 independent evidence that BigQuery does so.
 
-[`partition_expiration_history.api.yaml`](../tests/e2e/scenarios/testdata/known_bugs/partition_expiration_history.api.yaml)
+[`partition_expiration_history.api.yaml`](../tests/e2e/scenarios/testdata/partition_expiration_history.api.yaml)
 records verified expectations from its adjacent BigQuery answer sidecar:
 
 - `shorten_then_remove` and `shorten_then_extend` read snapshots before and after a
@@ -269,7 +270,7 @@ Policy history must be dated at the policy change as well as at row writes:
 shortening a duration at 12:00 must not simply rewrite the policy used at 11:00.
 Likewise, retained raw rows and visible rows are different inputs to DML. The
 recorded answers in
-[`partition_expiration_dml.api.yaml`](../tests/e2e/scenarios/testdata/known_bugs/partition_expiration_dml.api.yaml)
+[`partition_expiration_dml.api.yaml`](../tests/e2e/scenarios/testdata/partition_expiration_dml.api.yaml)
 establish these target-selection rules for the tested policy-change workflows:
 
 - UPDATE and DELETE affect visible rows only. Hidden rows remain physically

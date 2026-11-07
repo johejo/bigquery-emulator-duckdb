@@ -341,6 +341,11 @@ std::string ReadTableRelation(Backend& backend, const TableReference& table) {
 }
 
 void CheckWritableTable(Backend& backend, const TableReference& table) {
+  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
+  const auto metadata = comment ? CommentMetadata(*comment) : TableMetadata{};
+  if (metadata.time_partitioning && metadata.time_partitioning->expiration_ms) {
+    throw ApiError::Unsupported("partition expiration for API writes and query destinations");
+  }
   switch (TableWriteRestrictionOf(backend, table)) {
     case TableWriteRestriction::kExternalNumericStorage:
       throw ApiError::Unsupported("writing to external numeric storage in " + TableName(table) +

@@ -25,6 +25,7 @@
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
 #include "src/location.h"
+#include "src/partition_policy_history.h"
 #include "src/partition_policy_read.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
@@ -79,7 +80,7 @@ std::string SqlRuntime::TableReadSnapshot::Relation() const {
   if (metadata.time_partitioning && !metadata.external_data && !metadata.clone &&
       !metadata.snapshot) {
     const auto query = PartitionPolicyTableReadQuery(
-        *session, info.reference, evaluation_time_micros, PartitionRowVersion::kCurrent);
+        *session, info.reference, evaluation_time_micros, PartitionRowVersion::kCurrent, true);
     if (!query.ok()) {
       throw ApiError::QueryFailure(std::string(query.status().message()));
     }
@@ -363,6 +364,13 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
     // UNSPECIFIED leaves the stored default intact, but newly added fields above take no mode.
     if (rounding_mode_unspecified) {
       updated.default_rounding_mode = info.metadata.default_rounding_mode;
+    }
+    if (updated.time_partitioning && info.metadata.time_partitioning &&
+        updated.time_partitioning->expiration_ms !=
+            info.metadata.time_partitioning->expiration_ms) {
+      statements.push_back(
+          KeepPartitionPolicyStatement(table, updated.time_partitioning->expiration_ms));
+      statements.push_back(CommitPartitionPoliciesStatement(table.project_id));
     }
     statements.push_back(
         TableCommentStatement(table, updated, updated_schema.value_or(info.schema)));

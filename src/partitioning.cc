@@ -78,6 +78,14 @@ std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
                                       const std::vector<FieldSchema>& schema,
                                       std::string_view duration_ms_sql,
                                       int64_t evaluation_time_micros) {
+  return ExpiredPartitionPredicate(partitioning, schema, duration_ms_sql,
+                                   std::to_string(evaluation_time_micros));
+}
+
+std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
+                                      const std::vector<FieldSchema>& schema,
+                                      std::string_view duration_ms_sql,
+                                      std::string_view evaluation_time_micros_sql) {
   const auto& field = TimePartitionColumn(partitioning, schema);
   const std::string column = QuoteIdentifier(field.name);
   // TIMESTAMPTZ truncation uses the session timezone unless converted to UTC first. DATE and
@@ -92,7 +100,7 @@ std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
       "CAST(epoch_us(date_trunc({1}, {0})) AS HUGEINT) + CAST(({2}) AS HUGEINT) * 1000 <= "
       "CAST({3} AS HUGEINT), false)",
       civil, QuoteLiteral(TimePartitionUnitName(partitioning.type)), duration_ms_sql,
-      evaluation_time_micros);
+      evaluation_time_micros_sql);
 }
 
 }  // namespace bigquery_emulator_duckdb

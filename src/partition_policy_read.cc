@@ -20,14 +20,16 @@ namespace bigquery_emulator_duckdb {
 absl::StatusOr<std::string> PartitionPolicyTableReadQuery(Backend& backend,
                                                           const TableReference& table,
                                                           int64_t evaluation_time_micros,
-                                                          PartitionRowVersion version) {
+                                                          PartitionRowVersion version,
+                                                          bool reject_natural_deadlines) {
   if (!backend.InTransaction()) {
     return absl::FailedPreconditionError("partition policy reads require an execution transaction");
   }
   const std::string identity = std::format(
-      "SELECT table_oid FROM duckdb_tables() WHERE database_name = {} AND schema_name = {} "
+      "SELECT table_oid FROM {} WHERE database_name = {} AND schema_name = {} "
       "AND table_name = {}",
-      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+      LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
+      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
   const auto stored = backend.Execute(identity);
   if (stored.rows.empty()) {
     return absl::NotFoundError("Not found: Table " + TableName(table));
@@ -48,9 +50,9 @@ absl::StatusOr<std::string> PartitionPolicyTableReadQuery(Backend& backend,
     }
     rows = *historical;
   }
-  const std::string visible =
-      PartitionPolicyReadQuery(table.project_id, storage_id, rows, *metadata.time_partitioning,
-                               TableSchema(backend, table), evaluation_time_micros);
+  const std::string visible = PartitionPolicyReadQuery(
+      table.project_id, storage_id, rows, *metadata.time_partitioning, TableSchema(backend, table),
+      evaluation_time_micros, reject_natural_deadlines);
   // Keep the check in the query rather than checking the OID only during construction. It must
   // observe the same snapshot as the selected raw row version and its policy.
   return "SELECT * FROM (" + visible + ") AS _bq_visible_partition_rows WHERE CASE WHEN (" +

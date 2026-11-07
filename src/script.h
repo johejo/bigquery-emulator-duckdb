@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,8 @@ class ScriptHost {
 
   // The backend that the script's temporary tables are attached to and its sessions come from.
   virtual Backend& backend() = 0;
+  // Runtime lifecycle coordination must be acquired before a statement opens its snapshot.
+  virtual std::unique_lock<std::recursive_mutex> LockStatement() { return {}; }
   // Whether SESSION_USER is enabled.
   [[nodiscard]] virtual bool has_session_user() const = 0;
   [[nodiscard]] virtual const ExcludedFunctionIds& excluded_function_ids() const = 0;
@@ -37,7 +40,8 @@ class ScriptHost {
   [[nodiscard]] virtual const function_catalog::Catalog& functions() const = 0;
   // A catalog source for the tables, views and datasets the emulator holds, as `session` sees
   // them.
-  virtual std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) = 0;
+  virtual std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire,
+                                                      bool policy_reads) = 0;
   // Runs `translation` in `session` as a query job without a destination table does, and returns
   // its result with the schema the translation gives it.
   virtual QueryResult RunStatement(const TranslatedStatement& translation,

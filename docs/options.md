@@ -22,10 +22,10 @@ the emulator rejected.
 
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [CREATE SCHEMA](#create-schema) | 10 | 0 | 2 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 9 | 0 | 2 | 3 |
-| [CREATE TABLE](#create-table) | 7 | 2 | 3 | 3 |
-| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 7 | 1 | 4 | 3 |
+| [CREATE SCHEMA](#create-schema) | 11 | 0 | 1 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 10 | 0 | 1 | 3 |
+| [CREATE TABLE](#create-table) | 8 | 1 | 3 | 3 |
+| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 8 | 0 | 4 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ADD COLUMN](#alter-table-add-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ALTER COLUMN SET OPTIONS](#alter-table-alter-column-set-options) | 2 | 0 | 2 | 0 |
@@ -53,7 +53,7 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`default_kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`default_partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Unsupported |  |
+| [`default_partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`default_rounding_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`default_table_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
@@ -73,7 +73,7 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`default_kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`default_partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Unsupported |  |
+| [`default_partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`default_rounding_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`default_table_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
@@ -92,7 +92,7 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
-| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Partial | Unsupported: `CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS (partition_expiration_days = 7)`; `CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS (partition_expiration_days = 7.5)`. |
+| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`require_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS (kms_key_name = 'projects/test/locations/us/keyRings/r/cryptoKeys/k')`. |
 | [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
@@ -112,7 +112,7 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
-| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Partial | Unsupported: `ALTER TABLE t SET OPTIONS (partition_expiration_days = 7)`; `ALTER TABLE t SET OPTIONS (partition_expiration_days = 7.5)`. |
+| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`require_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
 | [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |

@@ -354,8 +354,7 @@ native table creation without reading the clock or mutating metadata. It resolve
 partition defaults together: a dataset partition default suppresses the dataset table default
 only for time-partitioned tables, while explicit table deadlines survive. Request layers must
 interpret omission and removal before calling it; copy, clone, snapshot, LIKE and replacement
-inheritance are separate paths. Current runtime callers use only table expiration; partition
-expiration inputs remain unsupported.
+inheritance are separate paths.
 
 [table_history.cc](../src/table_history.cc) keeps a table's rows before each write for `FOR
 SYSTEM_TIME AS OF`, in tables of the project's `main` schema keyed by dataset, table and creation
@@ -366,9 +365,11 @@ write committed; a transaction dates its versions when it commits.
 history primitive, keyed by storage OID within a project. It stages a transaction's final duration
 or explicit removal and dates publication at a caller-supplied commit cutoff. Historical lookup
 uses the policy effective at the requested microsecond, without copying or deleting rows.
-The runtime does not yet publish or read these policies; partition expiration remains unsupported.
-The primitive rejects reads of its own staged policy rather than defining unverified script
-transaction visibility.
+DDL and table updates publish policies in the transaction that changes the table's metadata.
+[partition_policy_read.cc](../src/partition_policy_read.cc) filters a table's rows by its policy
+in the snapshot that reads them, so ordinary queries, DML target selection, `tabledata.list` and
+row counts each run in a transaction with one evaluation time. The primitive rejects reads of its
+own staged policy rather than defining unverified script transaction visibility.
 
 Logical views are native DuckDB views whose comments preserve the original GoogleSQL definition
 and result schema. Materialized views use the same execution path, with their own object type

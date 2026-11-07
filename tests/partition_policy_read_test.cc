@@ -163,6 +163,7 @@ TEST_F(PartitionPolicyReadTest, ReplacementInExecutingTransactionCannotReuseReso
 }
 
 TEST_F(PartitionPolicyReadTest, SqlSourceRejectsPolicyReadsWithoutExecutionSnapshot) {
+  Publish(86400000, cutoff_ - 1000);
   const auto source = Source(backend_, cutoff_);
   EXPECT_THROW((void)source->ReadQuery(table_), ApiError);
   EXPECT_FALSE(source->TimeTravelQuery(table_, cutoff_).ok());

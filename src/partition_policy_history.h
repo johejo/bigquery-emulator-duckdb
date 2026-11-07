@@ -8,6 +8,7 @@
 #include "src/backend.h"
 #include "src/field_schema.h"
 #include "src/partitioning.h"
+#include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -28,6 +29,12 @@ std::string KeepPartitionPolicyStatement(const std::string& project, int64_t sto
 // Multiple changes in one transaction publish only its final policy. Rollback publishes none.
 std::string CommitPartitionPoliciesStatement(const std::string& project, int64_t commit_micros);
 
+// DDL publication helpers: resolve the new table's OID in the publication transaction and
+// date the policy at finalization rather than at request parsing or translation.
+std::string KeepPartitionPolicyStatement(const TableReference& table,
+                                         std::optional<int64_t> expiration_ms);
+std::string CommitPartitionPoliciesStatement(const std::string& project);
+
 // The committed policy effective at evaluation_time_micros. At a change boundary the new
 // policy applies. Reads do not create history, and later changes cannot rewrite earlier reads.
 // Reading a staged policy in its own transaction is deliberately unsupported until transaction
@@ -45,6 +52,7 @@ std::string PartitionPolicyReadQuery(const std::string& project, int64_t storage
                                      const std::string& rows_query,
                                      const TimePartitioning& partitioning,
                                      const std::vector<FieldSchema>& schema,
-                                     int64_t evaluation_time_micros);
+                                     int64_t evaluation_time_micros,
+                                     bool reject_natural_deadlines = false);
 
 }  // namespace bigquery_emulator_duckdb

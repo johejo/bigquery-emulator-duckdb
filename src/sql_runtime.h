@@ -248,7 +248,7 @@ class SqlRuntime {
       const std::string& default_project, const std::string& default_dataset,
       JobLocation* location = nullptr,
       const googlesql::SystemVariableValuesMap* system_variables = nullptr,
-      bool stores_result = false, bool dry_run = false);
+      bool stores_result = false, bool dry_run = false, Backend* session = nullptr);
   // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
   static std::optional<std::string> DatasetLocation(Backend& backend,
                                                     const DatasetReference& dataset);
@@ -287,14 +287,15 @@ class SqlRuntime {
   // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
   // for any other statement.
   std::optional<std::vector<std::string>> AlterationStatements(
-      const TranslatedStatement& translation);
+      const TranslatedStatement& translation, Backend* session = nullptr);
   // The metadata of the dataset the table or view that `translation` creates belongs to, as
   // `backend` sees it, or none for any other statement, a temporary table or a missing dataset.
   static DatasetMetadata CreatedInDataset(Backend& backend, const TranslatedStatement& translation);
   // A catalog source for the tables, views and datasets the emulator holds; what it finds counts
   // toward `location` when it is set.
   std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true,
-                                              JobLocation* location = nullptr);
+                                              JobLocation* location = nullptr,
+                                              bool policy_reads = true);
   // Metadata discovery and row execution for one API read share a backend snapshot and cutoff.
   // The session must stay alive until the result is materialized; destroying it rolls back the
   // read-only transaction, including on an exception.

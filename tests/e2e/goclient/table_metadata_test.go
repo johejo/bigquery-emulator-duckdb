@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 )
@@ -151,11 +150,6 @@ func TestTablePartitioning(t *testing.T) {
 		"ingestion-time partitioning": func() error {
 			return dataset.Table("ingestion").Create(ctx, &bigquery.TableMetadata{
 				Schema: schema, TimePartitioning: &bigquery.TimePartitioning{Type: bigquery.DayPartitioningType},
-			})
-		},
-		"partition expiration": func() error {
-			return dataset.Table("expiring").Create(ctx, &bigquery.TableMetadata{
-				Schema: schema, TimePartitioning: &bigquery.TimePartitioning{Field: "day", Expiration: time.Hour},
 			})
 		},
 		"cannot be found in the schema": func() error {

@@ -1,7 +1,6 @@
 version: 1
 description: Partition expiration policy changes, special partitions and time travel
-# Known incompatibility: the emulator rejects partition expiration. BigQuery
-# observations in the adjacent answer sidecar show policy-dependent historical
+# BigQuery observations in the adjacent answer sidecar show policy-dependent historical
 # visibility and rows becoming visible again after removing/extending expiration.
 # Each historical timestamp is read in a separate statement because BigQuery
 # restricts mixing snapshots of a table in one query. No sleeps or delay loops.

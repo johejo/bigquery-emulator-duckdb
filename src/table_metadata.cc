@@ -131,7 +131,7 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
     if (Int64Member(value, "expirationMs") <= 0) {
       throw ApiError::Invalid("TTL for interval partition must be a positive number.");
     }
-    throw ApiError::Unsupported("partition expiration");
+    partitioning.expiration_ms = Int64Member(value, "expirationMs");
   }
   return partitioning;
 }
@@ -507,6 +507,9 @@ json TableMetadata::ToJson() const {
         {"field", time_partitioning->field},
     };
   }
+  if (time_partitioning && time_partitioning->expiration_ms) {
+    fields["timePartitioning"]["expirationMs"] = std::to_string(*time_partitioning->expiration_ms);
+  }
   if (range_partitioning.has_value()) {
     fields["rangePartitioning"] = {
         {"field", range_partitioning->field},
@@ -600,6 +603,9 @@ json DatasetMetadata::ToJson() const {
   }
   if (default_table_expiration_ms.has_value()) {
     fields["defaultTableExpirationMs"] = std::to_string(*default_table_expiration_ms);
+  }
+  if (default_partition_expiration_ms) {
+    fields["defaultPartitionExpirationMs"] = std::to_string(*default_partition_expiration_ms);
   }
   if (max_time_travel_hours.has_value()) {
     fields["maxTimeTravelHours"] = std::to_string(*max_time_travel_hours);
@@ -974,6 +980,14 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
   }
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
+  // Duration is mutable; the partition key and unit are not. Omission of the nested field
+  // retains it on PATCH, whereas explicit null removes it without reapplying defaults.
+  if (partitioning.time_partitioning && metadata.time_partitioning) {
+    if (body["timePartitioning"].contains("expirationMs") || !patch) {
+      metadata.time_partitioning->expiration_ms = partitioning.time_partitioning->expiration_ms;
+    }
+    partitioning.time_partitioning->expiration_ms = metadata.time_partitioning->expiration_ms;
+  }
   if (partitioning.partitioned() &&
       (partitioning.time_partitioning != metadata.time_partitioning ||
        partitioning.range_partitioning != metadata.range_partitioning)) {
@@ -1053,6 +1067,15 @@ void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool pat
         unset ? std::nullopt : std::optional(Int64Member(body, "defaultTableExpirationMs"));
   }
   ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
+  if (body.contains("defaultPartitionExpirationMs") || !patch) {
+    const bool unset = Member(body, "defaultPartitionExpirationMs").is_null() ||
+                       Int64Member(body, "defaultPartitionExpirationMs") == 0;
+    metadata.default_partition_expiration_ms =
+        unset ? std::nullopt : std::optional(Int64Member(body, "defaultPartitionExpirationMs"));
+    if (metadata.default_partition_expiration_ms && *metadata.default_partition_expiration_ms < 0) {
+      throw ApiError::Invalid("TTL for interval partition must be a positive number.");
+    }
+  }
   if (body.contains("maxTimeTravelHours") && body["maxTimeTravelHours"].is_null()) {
     throw ApiError::Unsupported("null maxTimeTravelHours");
   }

@@ -46,6 +46,13 @@ class TableSource {
     return std::nullopt;
   }
 
+  // Runtime-owned visibility for existing DML targets, qualified by `alias`. Unlike ReadQuery,
+  // this restricts target selection without replacing the writable physical relation.
+  virtual std::optional<std::string> DmlTargetFilter(const TableReference& /*table*/,
+                                                     const std::string& /*alias*/) {
+    return std::nullopt;
+  }
+
   // Restrictions on ordinary row writes, not metadata changes or table replacement.
   // Implementations with other storage restrictions extend the snapshot check.
   virtual TableWriteRestriction WriteRestriction(const TableReference& table) {

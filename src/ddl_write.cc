@@ -19,7 +19,9 @@
 #include "src/column_metadata.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/expiration_policy.h"
 #include "src/field_schema.h"
+#include "src/partition_policy_history.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/schema_sql.h"
@@ -214,8 +216,24 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
   }
   std::vector<FieldSchema> schema = definition.schema;
   if (!definition.temporary) {
-    metadata.expiration_time =
-        ExpirationWithDefault(metadata.expiration_time, metadata.creation_time, dataset);
+    if (definition.copies_table && metadata.time_partitioning &&
+        (metadata.time_partitioning->expiration_ms || dataset.default_partition_expiration_ms)) {
+      throw ApiError::Unsupported(
+          "partition expiration inheritance for LIKE, COPY, CLONE or SNAPSHOT");
+    }
+    const auto expiration = ResolveCreationExpiration(
+        metadata.time_partitioning.has_value(), metadata.creation_time,
+        {
+            .table_deadline_ms = metadata.expiration_time,
+            .partition_duration_ms = metadata.time_partitioning
+                                         ? metadata.time_partitioning->expiration_ms
+                                         : std::nullopt,
+        },
+        dataset.default_table_expiration_ms, dataset.default_partition_expiration_ms);
+    metadata.expiration_time = expiration.table_deadline_ms;
+    if (metadata.time_partitioning) {
+      metadata.time_partitioning->expiration_ms = expiration.partition_duration_ms;
+    }
     // CREATE TABLE COPY and CLONE keep the source's default rounding mode even when it is unset,
     // and LIKE takes the dataset's then, as BigQuery answers.
     if (metadata.default_rounding_mode == RoundingMode::kUnspecified &&
@@ -261,6 +279,12 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
                     std::back_inserter(write.metadata_statements));
   if (!metadata.empty()) {
     write.metadata_statements.push_back(TableCommentStatement(definition.table, metadata, schema));
+  }
+  if (metadata.time_partitioning && metadata.time_partitioning->expiration_ms) {
+    write.metadata_statements.push_back(
+        KeepPartitionPolicyStatement(definition.table, metadata.time_partitioning->expiration_ms));
+    write.metadata_statements.push_back(
+        CommitPartitionPoliciesStatement(definition.table.project_id));
   }
   if (definition.rows_from.has_value()) {
     write.metadata_statements.push_back(
@@ -401,6 +425,18 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       if (updates.expiration_time.has_value()) {
         metadata.expiration_time = *updates.expiration_time;
       }
+      if (updates.partition_expiration_ms) {
+        if (!metadata.time_partitioning) {
+          if (*updates.partition_expiration_ms) {
+            throw ApiError::Invalid("Partition expiration requires time partitioning");
+          }
+        } else {
+          metadata.time_partitioning->expiration_ms = *updates.partition_expiration_ms;
+          statements.push_back(
+              KeepPartitionPolicyStatement(table, *updates.partition_expiration_ms));
+          statements.push_back(CommitPartitionPoliciesStatement(table.project_id));
+        }
+      }
       set_options = true;
     }
   }
@@ -420,6 +456,9 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
   ApplyOptionUpdates(alteration.options, metadata);
   if (alteration.options.default_table_expiration_ms.has_value()) {
     metadata.default_table_expiration_ms = *alteration.options.default_table_expiration_ms;
+  }
+  if (alteration.options.default_partition_expiration_ms) {
+    metadata.default_partition_expiration_ms = *alteration.options.default_partition_expiration_ms;
   }
   if (alteration.options.max_time_travel_hours.has_value()) {
     metadata.max_time_travel_hours = *alteration.options.max_time_travel_hours;

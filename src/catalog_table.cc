@@ -37,6 +37,10 @@ std::optional<std::vector<int>> BigQueryTable::PrimaryKey() const {
 
 std::optional<TableRead> BigQueryTable::ReadQuery() const { return source_.ReadQuery(reference()); }
 
+std::optional<std::string> BigQueryTable::DmlTargetFilter(const std::string& alias) const {
+  return source_.DmlTargetFilter(reference(), alias);
+}
+
 TableWriteRestriction BigQueryTable::WriteRestriction() const {
   return source_.WriteRestriction(reference());
 }

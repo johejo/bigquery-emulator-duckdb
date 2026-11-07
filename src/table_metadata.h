@@ -192,6 +192,7 @@ struct DatasetMetadata {
   std::map<std::string, std::string> resource_tags;
   std::vector<std::string> tag_order;
   std::optional<int64_t> default_table_expiration_ms;
+  std::optional<int64_t> default_partition_expiration_ms;
   std::optional<int64_t> max_time_travel_hours;
   std::string storage_billing_model;  // Empty when no model was explicitly set.
   // Preserve an explicitly disabled setting in REST responses.
@@ -207,8 +208,8 @@ struct DatasetMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !default_table_expiration_ms.has_value() &&
-           !max_time_travel_hours.has_value() && storage_billing_model.empty() &&
-           !is_case_insensitive.has_value() &&
+           !default_partition_expiration_ms.has_value() && !max_time_travel_hours.has_value() &&
+           storage_billing_model.empty() && !is_case_insensitive.has_value() &&
            default_rounding_mode == RoundingMode::kUnspecified && creation_time == 0 &&
            location.empty() && !default_collation.has_value();
   }

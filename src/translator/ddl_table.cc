@@ -434,6 +434,8 @@ bool Partitioning(const googlesql::ResolvedExpr& expression, TableMetadata& meta
 template <typename CreateTable>
 bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadata,
                                const Scope& scope) {
+  const auto expiration =
+      metadata.time_partitioning ? metadata.time_partitioning->expiration_ms : std::nullopt;
   for (const auto& expression : create.partition_by_list()) {
     // Validate and record partition metadata in order, stopping on the first error.
     // cppcheck-suppress useStlAlgorithm
@@ -441,6 +443,13 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
       Unsupported(scope, "this PARTITION BY expression");
       return false;
     }
+  }
+  if (expiration) {
+    if (!metadata.time_partitioning || metadata.time_partitioning->field.empty()) {
+      Unsupported(scope, "partition expiration without time-unit column partitioning");
+      return false;
+    }
+    metadata.time_partitioning->expiration_ms = expiration;
   }
   for (const auto& expression : create.cluster_by_list()) {
     const std::string column = ColumnName(*expression);
@@ -575,6 +584,10 @@ std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
   }
   if (description && description->metadata.external_data) {
     return Unsupported(scope, std::string(statement) + " of an external table");
+  }
+  if (description && description->metadata.time_partitioning &&
+      description->metadata.time_partitioning->expiration_ms) {
+    return Unsupported(scope, std::string(statement) + " with partition expiration");
   }
   if (description) {
     description->metadata.clone.reset();

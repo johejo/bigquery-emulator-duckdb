@@ -1,6 +1,5 @@
 version: 1
 description: DDL partition expiration omission, removal and dataset defaults
-# Known incompatibility: partition expiration options/defaults are rejected.
 # Stable expectations are derived from the adjacent BigQuery observations; the
 # recorded generated timestamps are evidence, not literal expected values.
 vars:

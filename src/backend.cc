@@ -285,6 +285,29 @@ std::unique_ptr<Backend> Backend::NewSession() {
 
 Backend::~Backend() = default;
 
+StatementTransaction::StatementTransaction(Backend& session)
+    : session_(session), owns_(!session.InTransaction()) {
+  if (owns_) {
+    session_.Transaction("BEGIN TRANSACTION");
+  }
+}
+
+StatementTransaction::~StatementTransaction() {
+  if (owns_) {
+    try {
+      session_.Transaction("ROLLBACK");
+    } catch (...) {  // NOLINT(bugprone-empty-catch): keep the statement's own error.
+    }
+  }
+}
+
+void StatementTransaction::Commit() {
+  if (owns_) {
+    session_.Transaction("COMMIT");
+    owns_ = false;
+  }
+}
+
 void Backend::Transaction(const std::string& statement) {
   if (!session_) {
     throw BackendError("Transactions require a session");

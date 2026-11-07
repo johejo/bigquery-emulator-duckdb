@@ -14,11 +14,11 @@ enum class TimePartitionUnit : uint8_t { kDay, kHour, kMonth, kYear };
 std::string_view TimePartitionUnitName(TimePartitionUnit unit);
 std::optional<TimePartitionUnit> ParseTimePartitionUnit(std::string_view name);
 
-// Table.timePartitioning on a column. Ingestion-time partitioning, which adds pseudo-columns,
-// and partition expiration are not yet exposed by the runtime.
+// Table.timePartitioning on a column. Ingestion-time partitioning adds unsupported pseudo-columns.
 struct TimePartitioning {
   TimePartitionUnit type = TimePartitionUnit::kDay;
   std::string field;
+  std::optional<int64_t> expiration_ms = std::nullopt;
 
   bool operator==(const TimePartitioning&) const = default;
 };
@@ -45,5 +45,9 @@ std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
                                       const std::vector<FieldSchema>& schema,
                                       std::string_view duration_ms_sql,
                                       int64_t evaluation_time_micros);
+std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
+                                      const std::vector<FieldSchema>& schema,
+                                      std::string_view duration_ms_sql,
+                                      std::string_view evaluation_time_micros_sql);
 
 }  // namespace bigquery_emulator_duckdb

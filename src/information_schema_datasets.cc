@@ -1,7 +1,5 @@
 #include "src/information_schema_datasets.h"
 
-#include <array>
-#include <charconv>
 #include <optional>
 #include <string>
 #include <utility>
@@ -18,23 +16,6 @@
 #include "src/table_source.h"
 
 namespace bigquery_emulator_duckdb::information_schema {
-
-namespace {
-
-// A FLOAT64 option value in its shortest round-trip form, with a fraction as BigQuery shows it,
-// such as 90.0.
-std::string Float64OptionValue(double value) {
-  std::array<char, 32> buffer{};
-  const std::to_chars_result result =
-      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
-  std::string text(buffer.data(), result.ptr);
-  if (text.find_first_of(".e") == std::string::npos) {
-    text += ".0";
-  }
-  return text;
-}
-
-}  // namespace
 
 absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
   std::vector<Row> rows;
@@ -97,6 +78,14 @@ absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context)
           .type = "FLOAT64",
           .value = Float64OptionValue(static_cast<double>(*metadata->default_table_expiration_ms) /
                                       kMillisPerDay),
+      });
+    }
+    if (metadata->default_partition_expiration_ms) {
+      options.push_back({
+          .name = "default_partition_expiration_days",
+          .type = "FLOAT64",
+          .value = Float64OptionValue(
+              static_cast<double>(*metadata->default_partition_expiration_ms) / 86400000.0),
       });
     }
     if (!metadata->storage_billing_model.empty()) {

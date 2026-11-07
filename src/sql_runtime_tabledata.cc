@@ -118,6 +118,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
                                                       const std::vector<FieldSchema>& schema,
                                                       json& rows, int64_t storage_id,
                                                       bool validate_only) {
+  const std::scoped_lock expiration_lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   table = info.reference;
@@ -193,6 +194,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
 std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const json& rows,
                                                      bool skip_invalid_rows,
                                                      bool ignore_unknown_values) {
+  const std::scoped_lock expiration_lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   if (!rows.is_array()) {
     throw ApiError::Invalid("rows must be an array");

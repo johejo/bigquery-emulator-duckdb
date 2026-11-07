@@ -42,6 +42,7 @@
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/location.h"
+#include "src/partition_policy_history.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/result_value.h"
@@ -325,8 +326,14 @@ class SqlRuntime::ScriptHostImpl : public ScriptHost {
   [[nodiscard]] const function_catalog::Catalog& functions() const override {
     return emulator_.functions_;
   }
-  std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
-    return emulator_.NewTableSource(session, expire, &location_);
+  std::unique_lock<std::recursive_mutex> LockStatement() override {
+    std::unique_lock lock(emulator_.expiration_mutex_);
+    ExpireTables(emulator_.backend_, emulator_.expiration_mutex_);
+    return lock;
+  }
+  std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire,
+                                              bool policy_reads) override {
+    return emulator_.NewTableSource(session, expire, &location_, policy_reads);
   }
   QueryResult RunStatement(const TranslatedStatement& translation,
                            const std::vector<std::string>& setup, bool null_arrays,
@@ -340,7 +347,7 @@ class SqlRuntime::ScriptHostImpl : public ScriptHost {
 };
 
 std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool expire,
-                                                        JobLocation* location) {
+                                                        JobLocation* location, bool policy_reads) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
@@ -348,7 +355,8 @@ std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool e
   // Only a caller-owned execution transaction can keep discovery, row-version resolution
   // and policy evaluation in one snapshot. Ordinary analysis is not such a boundary.
   const std::optional<int64_t> partition_cutoff =
-      backend.InTransaction() ? std::optional(absl::ToUnixMicros(absl::Now())) : std::nullopt;
+      backend.InTransaction() && policy_reads ? std::optional(absl::ToUnixMicros(absl::Now()))
+                                              : std::nullopt;
   return NewDuckDbTableSource(backend, project_ids_, location,
                               external_tables_ ? external_tables_(backend_) : nullptr,
                               partition_cutoff);
@@ -440,7 +448,9 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
 TranslatedStatement SqlRuntime::Translate(
     const std::string& query, const QueryParameters& parameters, const std::string& default_project,
     const std::string& default_dataset, JobLocation* location,
-    const googlesql::SystemVariableValuesMap* system_variables, bool stores_result, bool dry_run) {
+    const googlesql::SystemVariableValuesMap* system_variables, bool stores_result, bool dry_run,
+    Backend* session) {
+  Backend& backend = session != nullptr ? *session : backend_;
   AnalyzerSettings settings{
       .default_project = default_project,
       .default_dataset = default_dataset,
@@ -460,7 +470,7 @@ TranslatedStatement SqlRuntime::Translate(
   for (const FieldSchema& field : parameters.positional_types()) {
     settings.positional_parameters.push_back(ParameterType(field, type_factory));
   }
-  const auto source = NewTableSource(nullptr, true, location);
+  const auto source = NewTableSource(session, session == nullptr, location);
   RoutineCatalog catalog(*source, &type_factory, settings.default_project, settings.default_dataset,
                          functions_.timestamp_precision(), nullptr, excluded_function_ids_,
                          declarations_);
@@ -476,12 +486,14 @@ TranslatedStatement SqlRuntime::Translate(
           .source = source.get(),
           .resources = std::make_shared<StatementResources>(
               dry_run ? StatementResources::Mode::kDryRun : StatementResources::Mode::kExecute,
-              [this](const std::string& sql) { return Execute(sql, {}, true).TextRows(); }),
+              [&backend](const std::string& sql) {
+                return backend.Execute(sql, {}, true).TextRows();
+              }),
           .has_session_user = has_session_user_,
           .stores_result = stores_result,
           .evaluate =
-              [this](const std::string& sql, const googlesql::Type* type) {
-                return ResultValue(Execute(sql, {}, true), type);
+              [&backend](const std::string& sql, const googlesql::Type* type) {
+                return ResultValue(backend.Execute(sql, {}, true), type);
               },
       },
       &unsupported, system_variables);
@@ -665,12 +677,20 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     return RunScript(host, request.query, *script, request.parameters, settings.default_project,
                      settings.default_dataset, setup, request.project_id, next_script_number_++);
   }
+  // Keep identity discovery, raw row-version resolution and execution in one snapshot.
+  // Acquire expiration coordination before opening that snapshot, not while waiting with an
+  // already stale transaction. Destination publication has a separate transaction boundary.
+  const std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_);
+  ExpireTables(backend_, expiration_mutex_);
+  const auto session =
+      !request.dry_run && !request.destination_table ? backend_.NewSession() : nullptr;
+  const auto transaction = session ? std::make_unique<StatementTransaction>(*session) : nullptr;
   const googlesql::SystemVariableValuesMap variables{
       {{"project_id"}, googlesql::Value::String(request.project_id)},
   };
   const TranslatedStatement translation = Translate(
       request.query, request.parameters, settings.default_project, settings.default_dataset,
-      &location, &variables, request.destination_table.has_value(), request.dry_run);
+      &location, &variables, request.destination_table.has_value(), request.dry_run, session.get());
   query.statement_type = translation.statement_type;
   query.ddl_target_table = translation.ddl_target_table;
   query.ddl_target_dataset = translation.ddl_target_dataset;
@@ -679,7 +699,10 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     query.warnings = translation.resources->warnings();
   }
   if (!request.dry_run && !request.destination_table.has_value()) {
-    return RunStatement(translation, setup, request.null_arrays, nullptr, &location);
+    QueryResult result =
+        RunStatement(translation, setup, request.null_arrays, session.get(), &location);
+    transaction->Commit();
+    return result;
   }
   CheckDdlTarget(translation);
   UseTargets(backend_, translation, location);
@@ -855,7 +878,12 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
                       QuoteLiteral(translation.sql) + ")");
     }
   } else if (const std::optional<std::vector<std::string>> statements =
-                 AlterationStatements(translation)) {
+                 AlterationStatements(translation, &backend)) {
+    if (backend.InTransaction() && translation.altered_table &&
+        project_ids_.contains(translation.altered_table->table.project_id)) {
+      backend.BeforeCommit(
+          CommitPartitionPoliciesStatement(translation.altered_table->table.project_id));
+    }
     if (!statements->empty()) {
       backend.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
                          setup);
@@ -875,6 +903,10 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       }
       std::ranges::move(ColumnDefaultStatements(translation.table->table, defaults),
                         std::back_inserter(write->metadata_statements));
+    }
+    if (backend.InTransaction() && translation.table &&
+        project_ids_.contains(translation.table->table.project_id)) {
+      backend.BeforeCommit(CommitPartitionPoliciesStatement(translation.table->table.project_id));
     }
     try {
       backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);

@@ -70,6 +70,7 @@ const ResourceMask& DatasetFields() {
                                              "labels",
                                              "resourceTags",
                                              "defaultTableExpirationMs",
+                                             "defaultPartitionExpirationMs",
                                              "maxTimeTravelHours",
                                              "storageBillingModel",
                                              "isCaseInsensitive",
@@ -917,8 +918,17 @@ TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
   if (table.has_materialized_view()) {
     throw ApiError::Unsupported("updating materializedView");
   }
+  json updated = body;
+  // Nested objects are validated like insertions, which drop null fields, but an explicit null
+  // duration removes partition expiration where omission keeps it.
+  if (const auto partitioning = resource.find("timePartitioning");
+      partitioning != resource.end() && partitioning->is_object() &&
+      partitioning->contains("expirationMs") && (*partitioning)["expirationMs"].is_null() &&
+      updated.contains("timePartitioning") && updated["timePartitioning"].is_object()) {
+    updated["timePartitioning"]["expirationMs"] = nullptr;
+  }
   TableUpdateRequest request{
-      .resource = body,
+      .resource = std::move(updated),
       .schema = std::nullopt,
       .view = std::nullopt,
       .external_data_configuration = std::nullopt,

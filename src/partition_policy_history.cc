@@ -11,6 +11,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/partitioning.h"
+#include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -49,6 +50,26 @@ std::string KeepPartitionPolicyStatement(const std::string& project, int64_t sto
       Policies(project), storage_id, expiration_ms ? std::to_string(*expiration_ms) : "NULL");
 }
 
+std::string KeepPartitionPolicyStatement(const TableReference& table,
+                                         std::optional<int64_t> expiration_ms) {
+  if (expiration_ms && *expiration_ms <= 0) {
+    throw ApiError::Invalid("TTL for interval partition must be a positive number.");
+  }
+  return std::format(
+      "INSERT INTO {} SELECT table_oid, txid_current(), NULL, {} FROM {} "
+      "WHERE database_name = {} AND schema_name = {} AND table_name = {} "
+      "ON CONFLICT (storage_id, txid) DO UPDATE SET expiration_ms = excluded.expiration_ms, "
+      "valid_from = NULL",
+      Policies(table.project_id), expiration_ms ? std::to_string(*expiration_ms) : "NULL",
+      LogicalCatalog("duckdb_tables()"), QuoteLiteral(table.project_id),
+      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+}
+
+std::string CommitPartitionPoliciesStatement(const std::string& project) {
+  return "UPDATE " + Policies(project) +
+         " SET valid_from = epoch_us(get_current_timestamp()) WHERE txid = txid_current()";
+}
+
 std::string CommitPartitionPoliciesStatement(const std::string& project, int64_t commit_micros) {
   return std::format(
       "UPDATE {} SET valid_from = {} WHERE txid = txid_current() AND "
@@ -75,14 +96,27 @@ std::string PartitionPolicyReadQuery(const std::string& project, int64_t storage
                                      const std::string& rows_query,
                                      const TimePartitioning& partitioning,
                                      const std::vector<FieldSchema>& schema,
-                                     int64_t evaluation_time_micros) {
+                                     int64_t evaluation_time_micros,
+                                     bool reject_natural_deadlines) {
   const std::string duration =
       "(SELECT CASE WHEN valid_from IS NULL THEN error(" +
       QuoteLiteral("Unsupported: partition expiration policy visibility inside a transaction") +
       ") ELSE expiration_ms END" + PolicyAtClause(project, storage_id, evaluation_time_micros) +
       ")";
-  return "SELECT * FROM (" + rows_query + ") AS _bq_partition_rows WHERE NOT (" +
-         ExpiredPartitionPredicate(partitioning, schema, duration, evaluation_time_micros) + ")";
+  const std::string expired =
+      ExpiredPartitionPredicate(partitioning, schema, duration, evaluation_time_micros);
+  if (reject_natural_deadlines) {
+    const std::string policy_time =
+        "(SELECT valid_from" + PolicyAtClause(project, storage_id, evaluation_time_micros) + ")";
+    const std::string expired_at_publication =
+        ExpiredPartitionPredicate(partitioning, schema, duration, policy_time);
+    return std::format(
+        "SELECT * FROM ({}) AS _bq_partition_rows WHERE CASE WHEN ({}) AND NOT ({}) "
+        "THEN error('Unsupported: partition expiration after natural deadline passage') "
+        "ELSE NOT ({}) END",
+        rows_query, expired, expired_at_publication, expired);
+  }
+  return "SELECT * FROM (" + rows_query + ") AS _bq_partition_rows WHERE NOT (" + expired + ")";
 }
 
 }  // namespace bigquery_emulator_duckdb
