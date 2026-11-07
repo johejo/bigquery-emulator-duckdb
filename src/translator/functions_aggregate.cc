@@ -116,11 +116,6 @@ constexpr StaticAggregateRule TopSumRule() {
   };
 }
 
-std::string Unhex(const std::string& sql, const std::vector<std::string>& /*arguments*/,
-                  const std::string& /*tail*/) {
-  return "unhex(" + sql + ")";
-}
-
 std::string ExtractValue(const std::string& sql, const std::vector<std::string>& /*arguments*/,
                          const std::string& /*tail*/) {
   return "struct_extract(" + sql + ", 'value')";
@@ -209,11 +204,24 @@ constexpr char kIntervalAvg[] = "bq_interval_avg";
 constexpr char kIntervalSumDistinct[] = "bq_interval_sum_distinct";
 constexpr char kIntervalAvgDistinct[] = "bq_interval_avg_distinct";
 
+// The resolver rejects literal NULL delimiters, but parameters can still be NULL at runtime.
+// Check after aggregation so empty inputs and LIMIT use the same validation as ordinary calls.
+template <bool kBytes = false>
+std::string StringAggregate(const std::string& sql, const std::vector<std::string>& arguments,
+                            const std::string& /*tail*/) {
+  const std::string result = kBytes ? "unhex(" + sql + ")" : sql;
+  return arguments.size() > 1 ? "CASE WHEN " + arguments.at(1) + " IS NULL THEN " +
+                                    Raise("'Illegal NULL separator in STRING_AGG'", false) +
+                                    " ELSE " + result + " END"
+                              : result;
+}
+
 // STRING_AGG of the list of distinct values that bq_collation_distinct returns.
 std::string JoinStrings(const std::string& sql, const std::vector<std::string>& arguments,
                         const std::string& /*tail*/) {
-  return "list_aggr(" + sql + ", 'string_agg', " +
-         (arguments.size() > 1 ? arguments.at(1) : "','") + ")";
+  return StringAggregate("list_aggr(" + sql + ", 'string_agg', " +
+                             (arguments.size() > 1 ? arguments.at(1) : "','") + ")",
+                         arguments, "");
 }
 
 std::string IntervalDistinct(const std::string& sql, const std::vector<std::string>& /*arguments*/,
@@ -694,14 +702,19 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .collated = true,
                      .finish = JoinStrings,
                  },
-                 {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
+                 {
+                     .function = "string_agg",
+                     .type = googlesql::TYPE_STRING,
+                     .limit = kJoin,
+                     .finish = StringAggregate,
+                 },
                  {
                      .function = "string_agg",
                      .type = googlesql::TYPE_BYTES,
                      .arguments = kHexArguments,
                      .defaults = kHexDefaults,
                      .limit = kJoin,
-                     .finish = Unhex,
+                     .finish = StringAggregate<true>,
                  },
              },
              {
