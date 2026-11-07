@@ -551,10 +551,9 @@ because they have rows or properties of their own.
   `COLUMNS` clause.
 - Graph elements or paths in query results.
 - Graph element comparisons other than `=` and `!=` (`<>`); graph path comparisons.
-- Graph paths and nested graph values in `GROUP BY` and `PARTITION BY`.
+- Nested graph values, such as arrays of graph elements, in `GROUP BY` and `PARTITION BY`.
 - Graph values in aggregate or analytic functions other than `COUNT`, `ANY_VALUE`, `MIN_BY`,
-  `MAX_BY`, `ARRAY_AGG`, `ARRAY_CONCAT_AGG`, `FIRST_VALUE`, `LAST_VALUE`, `NTH_VALUE`, `LAG` and `LEAD`;
-  paths in `GROUP BY`, `DISTINCT` and distinct aggregate calls.
+  `MAX_BY`, `ARRAY_AGG`, `ARRAY_CONCAT_AGG`, `FIRST_VALUE`, `LAST_VALUE`, `NTH_VALUE`, `LAG` and `LEAD`.
 - Horizontal aggregates other than `SUM`, `AVG`, `MIN`, `MAX`, `COUNT` and `ARRAY_AGG`;
   horizontal aggregates with collation; `DISTINCT`, `ORDER BY` or `LIMIT` on horizontal
   aggregates other than `ARRAY_AGG`; and horizontal `MIN` and `MAX` over INTERVAL.
