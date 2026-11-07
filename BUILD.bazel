@@ -177,6 +177,34 @@ cc_test(
 )
 
 cc_library(
+    name = "partition_policy_history",
+    srcs = ["src/partition_policy_history.cc"],
+    hdrs = ["src/partition_policy_history.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":duckdb_sql",
+    ],
+    deps = [":backend"],
+)
+
+cc_test(
+    name = "partition_policy_history_test",
+    srcs = ["tests/partition_policy_history_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":api_error",
+        ":backend",
+        ":field_schema",
+        ":partition_policy_history",
+        ":partitioning",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "table_metadata",
     srcs = ["src/table_metadata.cc"],
     hdrs = ["src/table_metadata.h"],

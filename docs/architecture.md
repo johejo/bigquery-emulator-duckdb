@@ -354,6 +354,14 @@ SYSTEM_TIME AS OF`, in tables of the project's `main` schema keyed by dataset, t
 time. Writes outside a transaction hold a mutex so that each kept version is what the previous
 write committed; a transaction dates its versions when it commits.
 
+[partition_policy_history.cc](../src/partition_policy_history.cc) provides a separate policy
+history primitive, keyed by storage OID within a project. It stages a transaction's final duration
+or explicit removal and dates publication at a caller-supplied commit cutoff. Historical lookup
+uses the policy effective at the requested microsecond, without copying or deleting rows.
+The runtime does not yet publish or read these policies; partition expiration remains unsupported.
+The primitive rejects reads of its own staged policy rather than defining unverified script
+transaction visibility.
+
 Logical views are native DuckDB views whose comments preserve the original GoogleSQL definition
 and result schema. Materialized views use the same execution path, with their own object type
 and base-table creation identity recorded in the comment. Reads compute current results, and
