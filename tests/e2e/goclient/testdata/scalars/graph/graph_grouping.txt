@@ -1,0 +1,99 @@
+# Sources: third_party/bigquery_docs/reference/standard-sql/data-types.md (groupable types)
+# third_party/bigquery_docs/reference/standard-sql/query-syntax.md (grouping sets)
+# third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md (GROUPING)
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md (GRAPH_TABLE)
+# Graph elements group by identity, even when their visible properties are identical.
+SELECT COUNT(*) FROM (
+  SELECT n, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n)
+  GROUP BY GROUPING SETS ((n), ())
+)
+=> "4"
+SELECT COUNT(*) FROM (
+  SELECT n, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n)
+  GROUP BY ROLLUP(n)
+)
+=> "4"
+SELECT COUNT(*) FROM (
+  SELECT n, m, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person), (m:Person) RETURN n, m)
+  GROUP BY CUBE(n, m)
+)
+=> "16"
+
+# Included elements retain their properties; subtotal placeholders are NULL elements.
+SELECT STRING_AGG(FORMAT('%d:%T:%d', g, n.id, c), ',' ORDER BY g, n.id) FROM (
+  SELECT n, COUNT(*) AS c, GROUPING(n) AS g
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n)
+  GROUP BY ROLLUP(n)
+)
+=> "0:1:1,0:2:1,0:3:1,1:NULL:3"
+
+# An input NULL element and a subtotal NULL element have distinct GROUPING flags.
+SELECT STRING_AGG(FORMAT('%d:%T:%d', g, a.id, c), ',' ORDER BY g, a.id) FROM (
+  SELECT a, COUNT(*) AS c, GROUPING(a) AS g
+  FROM GRAPH_TABLE(scalar_graph.TransferGraph
+    MATCH (n:Person)
+    OPTIONAL MATCH (n)-[:Owns]->(a:Account {is_blocked: TRUE})
+    RETURN a)
+  GROUP BY GROUPING SETS ((a), ())
+)
+=> "0:NULL:2,0:16:1,1:NULL:3"
+
+# GROUPING without grouping sets is zero, including for input NULL elements.
+SELECT SUM(g) FROM (
+  SELECT a, COUNT(*) AS c, GROUPING(a) AS g
+  FROM GRAPH_TABLE(scalar_graph.TransferGraph
+    MATCH (n:Person)
+    OPTIONAL MATCH (n)-[:Owns]->(a:Account {is_blocked: TRUE})
+    RETURN a)
+  GROUP BY a
+)
+=> "0"
+
+# HAVING MAX/MIN aggregates take the per-grouping expansion path.
+SELECT STRING_AGG(FORMAT('%d:%T:%d', g, n.id, last.id), ',' ORDER BY g, n.id) FROM (
+  SELECT n, ANY_VALUE(n HAVING MAX n.id) AS last, GROUPING(n) AS g
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n)
+  GROUP BY ROLLUP(n)
+)
+=> "0:1:1,0:2:2,0:3:3,1:NULL:3"
+SELECT STRING_AGG(FORMAT('%d:%T:%d', g, n.id, first.id), ',' ORDER BY g, n.id) FROM (
+  SELECT n, ANY_VALUE(n HAVING MIN n.id) AS first, GROUPING(n) AS g
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n)
+  GROUP BY ROLLUP(n)
+)
+=> "0:1:1,0:2:2,0:3:3,1:NULL:1"
+
+# Edge elements use identity keys too. Duplicate sets remain duplicate output groups.
+SELECT COUNT(*) FROM (
+  SELECT e, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (:Person)-[e:Knows]->(:Person) RETURN e)
+  GROUP BY GROUPING SETS ((e), (e), ())
+)
+=> "9"
+
+# Scalar keys and graph identity keys can participate in the same grouping product.
+SELECT COUNT(*) FROM (
+  SELECT n, name, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n, n.name AS name)
+  GROUP BY name, ROLLUP(n)
+)
+=> "6"
+
+# The empty grouping still produces one row on empty input, with a NULL graph element.
+SELECT FORMAT('%d:%d:%d', COUNT(n), SUM(c), SUM(g)) FROM (
+  SELECT n, COUNT(*) AS c, GROUPING(n) AS g
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person WHERE n.id = 999) RETURN n)
+  GROUP BY ROLLUP(n)
+)
+=> "0:0:1"
+
+# Composite keys and grouped item sets retain all identity components.
+SELECT COUNT(*) FROM (
+  SELECT n, m, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (n:Compound), (m:Compound) RETURN n, m)
+  GROUP BY ROLLUP((n, m))
+)
+=> "10"
