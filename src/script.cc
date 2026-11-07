@@ -816,9 +816,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
                          segment.node()->Is<googlesql::ASTRollbackStatement>();
     // A query only reads, in its own snapshot, so it need not wait for other statements.
-    const auto lifecycle_lock =
-        host_.LockStatement(!segment.node()->Is<googlesql::ASTQueryStatement>(),
-                            /*expire=*/!control && !in_transaction_);
+    const auto lifecycle_lock = host_.LockStatement(StatementWritesOf(*segment.node()),
+                                                    /*expire=*/!control && !in_transaction_);
     const auto transaction =
         !control && !in_transaction_ ? std::make_unique<StatementTransaction>(*backend_) : nullptr;
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings, !control));
@@ -950,7 +949,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                                       const googlesql::Type* target_type) {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
-    const auto lifecycle_lock = host_.LockStatement(/*writes=*/false, /*expire=*/!in_transaction_);
+    const auto lifecycle_lock =
+        host_.LockStatement(StatementWrites::kNothing, /*expire=*/!in_transaction_);
     StatementTransaction transaction(*backend_);
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(
@@ -1028,6 +1028,20 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
 };
 
 }  // namespace
+
+StatementWrites StatementWritesOf(const googlesql::ASTNode& statement) {
+  switch (statement.node_kind()) {
+    case googlesql::AST_QUERY_STATEMENT:
+      return StatementWrites::kNothing;
+    case googlesql::AST_INSERT_STATEMENT:
+    case googlesql::AST_UPDATE_STATEMENT:
+    case googlesql::AST_DELETE_STATEMENT:
+    case googlesql::AST_MERGE_STATEMENT:
+      return StatementWrites::kRows;
+    default:
+      return StatementWrites::kCatalog;
+  }
+}
 
 QueryResult RunScript(ScriptHost& host, const std::string& query,
                       const googlesql::ParserOutput& script, const QueryParameters& parameters,

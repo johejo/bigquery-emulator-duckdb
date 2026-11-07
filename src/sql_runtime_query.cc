@@ -181,11 +181,12 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
   return schema;
 }
 
-// The script that `query` is, or null when it is a single statement, which `reads` tells whether
-// is a query. BigQuery parses every query as a script, so a query that does not parse as one fails
+// The script that `query` is, or null when it is a single statement, whose `writes` it sets.
+// BigQuery parses every query as a script, so a query that does not parse as one fails
 // with the script parser's error, as the analyzer reports a statement's, rather than with the
 // error of a single statement it is not.
-std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query, bool& reads) {
+std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query,
+                                                     StatementWrites& writes) {
   std::unique_ptr<googlesql::ParserOutput> output;
   if (const absl::Status status =
           googlesql::ParseScript(query, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
@@ -196,7 +197,8 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query, b
   // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
   // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
   const auto& statements = output->script()->statement_list();
-  reads = statements.size() == 1 && statements.at(0)->node_kind() == googlesql::AST_QUERY_STATEMENT;
+  writes =
+      statements.size() == 1 ? StatementWritesOf(*statements.at(0)) : StatementWrites::kCatalog;
   if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
       statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT &&
       statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT) {
@@ -329,15 +331,8 @@ class SqlRuntime::ScriptHostImpl : public ScriptHost {
   [[nodiscard]] const function_catalog::Catalog& functions() const override {
     return emulator_.functions_;
   }
-  std::unique_lock<std::recursive_mutex> LockStatement(bool writes, bool expire) override {
-    std::unique_lock<std::recursive_mutex> lock;
-    if (writes) {
-      lock = std::unique_lock(emulator_.expiration_mutex_);
-    }
-    if (expire) {
-      ExpireTables(emulator_.backend_, emulator_.expiration_mutex_);
-    }
-    return lock;
+  StatementLock LockStatement(StatementWrites writes, bool expire) override {
+    return emulator_.LockStatement(writes, expire);
   }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire,
                                               bool policy_reads) override {
@@ -353,6 +348,23 @@ class SqlRuntime::ScriptHostImpl : public ScriptHost {
   SqlRuntime& emulator_;
   JobLocation& location_;
 };
+
+StatementLock SqlRuntime::LockStatement(StatementWrites writes, bool expire) {
+  StatementLock lock;
+  // A query only reads its snapshot, so queries run concurrently, and so does DML, which only
+  // holds off expiration drops. Their drops, which wait for DML, run first. Other statements
+  // change the catalog, and are serialized with catalog mutations and drops.
+  if (writes == StatementWrites::kCatalog) {
+    lock.catalog = std::unique_lock(expiration_mutex_);
+  }
+  if (expire) {
+    ExpireTables(backend_, expiration_mutex_);
+  }
+  if (writes == StatementWrites::kRows) {
+    lock.rows.emplace(expiration_mutex_);
+  }
+  return lock;
+}
 
 std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool expire,
                                                         JobLocation* location, bool policy_reads) {
@@ -689,8 +701,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     }
   }
 
-  bool reads = false;
-  if (const auto script = ParseScript(request.query, reads)) {
+  StatementWrites writes = StatementWrites::kCatalog;
+  if (const auto script = ParseScript(request.query, writes)) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
@@ -704,13 +716,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   }
   // Keep identity discovery, raw row-version resolution and execution in one snapshot. A statement
   // that may write acquires expiration coordination before opening that snapshot, not while
-  // waiting with an already stale transaction; a query only reads its snapshot, so queries run
-  // concurrently. Destination publication has a separate transaction boundary.
-  std::unique_lock<std::recursive_mutex> expiration_lock;
-  if (!reads) {
-    expiration_lock = std::unique_lock(expiration_mutex_);
-  }
-  ExpireTables(backend_, expiration_mutex_);
+  // waiting with an already stale transaction. Destination publication has a separate
+  // transaction boundary.
+  const StatementLock statement_lock = LockStatement(writes, /*expire=*/true);
   const auto session =
       !request.dry_run && !request.destination_table ? backend_.NewSession() : nullptr;
   const auto transaction = session ? std::make_unique<StatementTransaction>(*session) : nullptr;
@@ -768,7 +776,7 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
                                      const std::vector<std::string>& setup, bool null_arrays,
                                      Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
-  std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_, std::defer_lock);
+  std::unique_lock<ExpirationMutex> expiration_lock(expiration_mutex_, std::defer_lock);
   // CREATE responses read the stored schema after committing the DDL. Keep another
   // request's expiration sweep from dropping the relation before that read completes.
   if (translation.ddl_target_dataset || translation.ddl_target_table) {

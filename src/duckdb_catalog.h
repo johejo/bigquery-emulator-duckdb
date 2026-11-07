@@ -1,11 +1,11 @@
 #pragma once
 
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "src/expiration_mutex.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
@@ -39,7 +39,7 @@ std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment
 // in its transaction so a concurrent replacement or extended expiration is preserved.
-void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
+void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
                   const std::optional<DatasetReference>& dataset = std::nullopt);
 
 enum class RelationType { kTable, kView };

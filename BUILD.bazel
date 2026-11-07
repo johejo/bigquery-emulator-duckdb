@@ -920,6 +920,13 @@ cc_library(
 )
 
 cc_library(
+    name = "expiration_mutex",
+    srcs = ["src/expiration_mutex.cc"],
+    hdrs = ["src/expiration_mutex.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_library(
     name = "catalog_functions",
     srcs = ["src/catalog_functions.cc"],
     hdrs = ["src/catalog_functions.h"],
@@ -1460,6 +1467,7 @@ cc_library(
         ":backend",
         ":backend_initializer",
         ":builtin_function_options",
+        ":expiration_mutex",
         ":external_table_provider",
         ":field_schema",
         ":function_options",
@@ -1590,6 +1598,7 @@ cc_library(
     deps = [
         ":backend",
         ":builtin_function_options",
+        ":expiration_mutex",
         ":query_parameters",
         "//src/function_catalog",
     ],
@@ -2008,6 +2017,7 @@ cc_library(
         ":table_comments",
     ],
     deps = [
+        ":expiration_mutex",
         ":field_schema",
         ":references",
         ":table_metadata",
