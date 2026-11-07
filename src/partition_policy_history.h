@@ -35,6 +35,12 @@ std::string KeepPartitionPolicyStatement(const TableReference& table,
                                          std::optional<int64_t> expiration_ms);
 std::string CommitPartitionPoliciesStatement(const std::string& project);
 
+// Opens the executing transaction's snapshot of every project's database. DuckDB starts a
+// database's transaction when a statement first reads it, so a policy committed after an
+// evaluation time was read could otherwise be invisible while its rows are visible. Run it
+// before reading the time policies are evaluated at.
+std::string OpenPartitionPolicySnapshotsStatement(const std::vector<std::string>& projects);
+
 // The committed policy effective at evaluation_time_micros. At a change boundary the new
 // policy applies. Reads do not create history, and later changes cannot rewrite earlier reads.
 // Reading a staged policy in its own transaction is deliberately unsupported until transaction

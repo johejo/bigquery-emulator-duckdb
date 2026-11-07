@@ -1,11 +1,14 @@
 #include "src/partition_policy_history.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <format>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "absl/strings/str_join.h"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/duckdb_sql.h"
@@ -75,6 +78,15 @@ std::string CommitPartitionPoliciesStatement(const std::string& project, int64_t
       "UPDATE {} SET valid_from = {} WHERE txid = txid_current() AND "
       "valid_from IS NULL",
       Policies(project), commit_micros);
+}
+
+std::string OpenPartitionPolicySnapshotsStatement(const std::vector<std::string>& projects) {
+  std::vector<std::string> reads;
+  reads.reserve(projects.size());
+  std::ranges::transform(projects, std::back_inserter(reads), [](const std::string& project) {
+    return "SELECT storage_id FROM " + Policies(project);
+  });
+  return "SELECT * FROM (" + absl::StrJoin(reads, " UNION ALL ") + ") LIMIT 0";
 }
 
 std::optional<int64_t> PartitionPolicyAt(Backend& backend, const std::string& project,

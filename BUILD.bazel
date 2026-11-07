@@ -184,6 +184,7 @@ cc_library(
     implementation_deps = [
         ":api_error",
         ":duckdb_sql",
+        "@abseil-cpp//absl/strings",
     ],
     deps = [
         ":backend",

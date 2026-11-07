@@ -6,6 +6,7 @@
 #include <array>
 #include <barrier>
 #include <cstddef>
+#include <cstdint>
 #include <future>
 #include <iterator>
 #include <memory>
@@ -22,6 +23,44 @@
 
 namespace bigquery_emulator_duckdb {
 namespace {
+
+// Atomically replaces the rows and partition policy of runtime.policy.t, which is partitioned
+// by d. With an expiration of one day, 2000-01-01 is expired and 2159-12-31 is not, so a read
+// that evaluates the rows it sees with the policy published with them always counts one row.
+void PublishPolicy(SqlRuntime& runtime, bool expires) {
+  const std::string duration = expires ? "86400000" : "NULL";
+  runtime.ExecuteDuckDb(
+      "BEGIN; DELETE FROM runtime.policy.t; "
+      "INSERT INTO runtime.policy.t VALUES (DATE '2000-01-01'); " +
+      std::string(expires ? "INSERT INTO runtime.policy.t VALUES (DATE '2159-12-31'); " : "") +
+      "INSERT INTO runtime.main.emulator_partition_policy_history "
+      "SELECT table_oid, txid_current(), epoch_us(get_current_timestamp()), " +
+      duration +
+      " FROM duckdb_tables() WHERE database_name = 'runtime' "
+      "AND schema_name = 'policy' AND table_name = 't'; COMMIT");
+}
+
+// Publishes the expiring policy right after a read takes its evaluation time, before it
+// returns it: the read's snapshot must already exclude what is committed then.
+class PublishingAtEvaluationRuntime : public SqlRuntime {
+ public:
+  PublishingAtEvaluationRuntime()
+      : SqlRuntime("", std::vector<Project>{{.project_id = "runtime"}}) {}
+
+  void PublishAtNextEvaluation() { publish_ = true; }
+
+ protected:
+  int64_t PolicyEvaluationMicros() override {
+    const int64_t now = SqlRuntime::PolicyEvaluationMicros();
+    if (std::exchange(publish_, false)) {
+      PublishPolicy(*this, true);
+    }
+    return now;
+  }
+
+ private:
+  bool publish_ = false;
+};
 
 // Concurrent scripts must not share temporary namespaces or connections. Consume their
 // results only after the runtime has gone away, as transports can do with query results.
@@ -66,18 +105,7 @@ TEST(SqlRuntimeTest, SqlReadsKeepRowsAndPolicyInOneSnapshot) {
     return runtime.ExecuteQuery(std::move(request), metadata, location);
   };
   query("CREATE TABLE policy.t PARTITION BY d AS SELECT DATE '2000-01-01' AS d");
-  const auto publish = [&](bool expires) {
-    const std::string duration = expires ? "86400000" : "NULL";
-    runtime.ExecuteDuckDb(
-        "BEGIN; DELETE FROM runtime.policy.t; "
-        "INSERT INTO runtime.policy.t VALUES (DATE '2000-01-01'); " +
-        std::string(expires ? "INSERT INTO runtime.policy.t VALUES (DATE '2159-12-31'); " : "") +
-        "INSERT INTO runtime.main.emulator_partition_policy_history "
-        "SELECT table_oid, txid_current(), epoch_us(get_current_timestamp()), " +
-        duration +
-        " FROM duckdb_tables() WHERE database_name = 'runtime' "
-        "AND schema_name = 'policy' AND table_name = 't'; COMMIT");
-  };
+  const auto publish = [&](bool expires) { PublishPolicy(runtime, expires); };
   publish(false);
   constexpr int kChanges = 64;
   std::barrier ready(2);
@@ -96,6 +124,38 @@ TEST(SqlRuntimeTest, SqlReadsKeepRowsAndPolicyInOneSnapshot) {
     EXPECT_EQ(result.rows.Int64(0, 0), 1);
   }
   EXPECT_NO_THROW(writer.get());
+}
+
+// A policy committed between a read's evaluation time and its first read of the project
+// must not be dated after that time while its rows are visible, in queries, script expressions
+// or the table API.
+TEST(SqlRuntimeTest, PolicyCommittedAtEvaluationTimeIsOutsideTheReadSnapshot) {
+  PublishingAtEvaluationRuntime runtime;
+  runtime.CreateDataset({.project_id = "runtime", .dataset_id = "policy"});
+  const auto query = [&](const std::string& sql) {
+    QueryRequest request;
+    request.project_id = "runtime";
+    request.query = sql;
+    QueryJob metadata;
+    JobLocation location;
+    return runtime.ExecuteQuery(std::move(request), metadata, location);
+  };
+  query("CREATE TABLE policy.t PARTITION BY d AS SELECT DATE '2000-01-01' AS d");
+  for (const std::string sql : {
+           "SELECT count(*) FROM policy.t",
+           "DECLARE n INT64 DEFAULT (SELECT count(*) FROM policy.t); SELECT n",
+       }) {
+    PublishPolicy(runtime, false);
+    runtime.PublishAtNextEvaluation();
+    const auto result = query(sql);
+    ASSERT_EQ(result.rows.size(), 1) << sql;
+    EXPECT_EQ(result.rows.Int64(0, 0), 1) << sql;
+  }
+  PublishPolicy(runtime, false);
+  runtime.PublishAtNextEvaluation();
+  EXPECT_EQ(
+      runtime.GetTable({.project_id = "runtime", .dataset_id = "policy", .table_id = "t"}).num_rows,
+      1);
 }
 
 // Catalog reads in another dataset may expire a newly committed relation while its CREATE
