@@ -1,0 +1,77 @@
+version: 1
+# FALSE makes dataset and table names case-sensitive, including after ALTER SCHEMA.
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# third_party/bigquery_docs/reference/rest/v2/datasets.md
+description: Explicit DDL FALSE preserves case-sensitive names and agrees with dataset metadata.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  disable:
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE SCHEMA `${project}.${dataset}_Mixed` OPTIONS (is_case_insensitive = ${initial});
+              CREATE TABLE `${project}.${dataset}_Mixed.Mixed` AS SELECT 1 AS id
+            useLegacySql: false
+      - name: configure
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: ${configure}
+            useLegacySql: false
+      - name: metadata
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}_Mixed
+        observe:
+          flag: /body/isCaseInsensitive
+      - name: names
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}_Mixed.mixed` AS SELECT 2 AS id;
+              CREATE SCHEMA `${project}.${dataset}_mixed` OPTIONS (is_case_insensitive = FALSE);
+              CREATE TABLE `${project}.${dataset}_mixed.Mixed` AS SELECT 3 AS id;
+              SELECT a.id AS original, b.id AS other_table, c.id AS other_dataset
+              FROM `${project}.${dataset}_Mixed.Mixed` a
+              CROSS JOIN `${project}.${dataset}_Mixed.mixed` b
+              CROSS JOIN `${project}.${dataset}_mixed.Mixed` c
+            useLegacySql: false
+        observe:
+          original: /body/rows/0/f/0/v
+          other_table: /body/rows/0/f/1/v
+          other_dataset: /body/rows/0/f/2/v
+    cleanup:
+      - name: delete
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DROP SCHEMA IF EXISTS `${project}.${dataset}_Mixed` CASCADE;
+              DROP SCHEMA IF EXISTS `${project}.${dataset}_mixed` CASCADE
+            useLegacySql: false
+cases:
+  - name: create_false
+    template: disable
+    vars:
+      initial: 'FALSE'
+      configure: SELECT 1
+    expect:
+      metadata: {flag: false}
+      names: {original: '1', other_table: '2', other_dataset: '3'}
+  - name: alter_false
+    template: disable
+    vars:
+      initial: 'TRUE'
+      configure: 'ALTER SCHEMA `${project}.${dataset}_mixed` SET OPTIONS (is_case_insensitive = FALSE)'
+    expect:
+      metadata: {flag: false}
+      names: {original: '1', other_table: '2', other_dataset: '3'}

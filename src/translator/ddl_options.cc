@@ -276,8 +276,7 @@ bool ApplySchemaOption(DdlOptionId name, const googlesql::Value& value, DatasetM
     case kMaxTimeTravelHours:
       return TimeTravelOption(value, metadata.max_time_travel_hours);
     case kIsCaseInsensitive:
-      return !value.is_null() && value.bool_value() &&
-             BoolOption(value, metadata.is_case_insensitive.emplace());
+      return !value.is_null() && BoolOption(value, metadata.is_case_insensitive.emplace());
     case kStorageBillingModel:
       return StorageBillingModelOption(value, metadata.storage_billing_model);
     case kDefaultRoundingMode:
@@ -312,8 +311,7 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
     case kMaxTimeTravelHours:
       return schema && TimeTravelOption(value, updates.max_time_travel_hours.emplace());
     case kIsCaseInsensitive:
-      return schema && !value.is_null() && value.bool_value() &&
-             BoolOption(value, updates.is_case_insensitive.emplace());
+      return schema && !value.is_null() && BoolOption(value, updates.is_case_insensitive.emplace());
     case kStorageBillingModel:
       return schema && (value.is_null() ||
                         StorageBillingModelOption(value, updates.storage_billing_model.emplace()));
