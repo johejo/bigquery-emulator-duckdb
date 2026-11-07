@@ -87,6 +87,18 @@ query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.name ORDER BY p.name
 query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) FILTER WHERE a.id <> b.id LET n = b.id + 1 RETURN a.name, n
 query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a, COUNT(*) AS n GROUP BY a NEXT RETURN a.name, n
 query GQL queries | GRAPH d.g MATCH (p:Person) WITH DISTINCT p RETURN p.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ANY_VALUE(p HAVING MAX p.id).id AS id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN MIN_BY(p, p.id).id AS id, MAX_BY(p, p.id).id AS max_id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ARRAY_AGG(p ORDER BY p.id LIMIT 1)[OFFSET(0)].id AS id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ARRAY_LENGTH(ARRAY_AGG(DISTINCT p)) AS n
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ARRAY_AGG(p) AS nodes NEXT RETURN ARRAY_CONCAT_AGG(nodes)[OFFSET(0)].id AS id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN FIRST_VALUE(p) OVER (ORDER BY p.id) AS first NEXT RETURN first.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN LAST_VALUE(p) OVER (ORDER BY p.id) AS last NEXT RETURN last.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN NTH_VALUE(p, 1) OVER (ORDER BY p.id) AS nth NEXT RETURN nth.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN LAG(p) OVER (ORDER BY p.id) AS previous NEXT RETURN previous.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN LEAD(p) OVER (ORDER BY p.id) AS successor NEXT RETURN successor.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ARRAY_AGG(p) OVER (PARTITION BY p) AS nodes NEXT RETURN ARRAY_LENGTH(nodes) AS n
+query GQL queries | GRAPH d.g MATCH gp = (p:Person)-[:Knows]->(q) RETURN PATH_LENGTH(ANY_VALUE(gp)) AS n
 query GQL queries | GRAPH d.g MATCH (p:Person) FOR tag IN ['x', 'y'] WITH OFFSET RETURN p.id, tag, offset
 query GQL queries | GRAPH d.g MATCH (p:Person) ORDER BY p.id DESC OFFSET 1 LIMIT 1 RETURN p.id
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.id ORDER BY p.id SKIP 1
