@@ -266,9 +266,6 @@ void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
     // that write rows.
     std::scoped_lock const lock(expiration_mutex);
     const auto drop = expiration_mutex.LockDrop();
-    if (!drop) {
-      continue;
-    }
     backend.ExecuteDdl(
         std::string(view ? "DROP VIEW IF EXISTS " : "DROP TABLE IF EXISTS ") + QualifiedName(table),
         {}, skip);

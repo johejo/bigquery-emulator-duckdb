@@ -353,8 +353,9 @@ class SqlRuntime::ScriptHostImpl : public ScriptHost {
 StatementLock SqlRuntime::LockStatement(StatementWrites writes, bool expire) {
   StatementLock lock;
   // A query only reads its snapshot, so queries run concurrently, and so does DML, which only
-  // holds off expiration drops. Their drops, which wait for DML, run first. Other statements
-  // change the catalog, and are serialized with catalog mutations and drops.
+  // holds off expiration drops. Their drops, which wait for DML, run first: while DML holds the
+  // lock, nothing it runs may expire tables, which translation and execution with a session do
+  // not. Other statements change the catalog, and are serialized with catalog mutations and drops.
   if (writes == StatementWrites::kCatalog) {
     lock.catalog = std::unique_lock(expiration_mutex_);
   }
@@ -362,7 +363,7 @@ StatementLock SqlRuntime::LockStatement(StatementWrites writes, bool expire) {
     ExpireTables(backend_, expiration_mutex_);
   }
   if (writes == StatementWrites::kRows) {
-    lock.rows.emplace(expiration_mutex_);
+    lock.rows = expiration_mutex_.LockRowWrites();
   }
   return lock;
 }

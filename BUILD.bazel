@@ -921,7 +921,6 @@ cc_library(
 
 cc_library(
     name = "expiration_mutex",
-    srcs = ["src/expiration_mutex.cc"],
     hdrs = ["src/expiration_mutex.h"],
     copts = ["-std=c++20"],
 )
