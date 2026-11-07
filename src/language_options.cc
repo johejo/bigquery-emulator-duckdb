@@ -47,6 +47,10 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // no other type to JSON, leaving that to TO_JSON and PARSE_JSON.
     options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);
     options->DisableLanguageFeature(googlesql::FEATURE_CAST_TO_JSON_TYPE);
+    // BigQuery cannot compare, order, group or partition JSON values; see operators.md and
+    // data-types.md under third_party/bigquery_docs/reference/standard-sql/.
+    options->DisableLanguageFeature(googlesql::FEATURE_JSON_TYPE_COMPARISON);
+    options->DisableLanguageFeature(googlesql::FEATURE_JSON_TYPE_COMPARISON_COERCION);
     // BigQuery rejects PARSE_TIMESTAMP's named precision argument.
     options->DisableLanguageFeature(googlesql::FEATURE_PARSE_TIMESTAMP_WITH_PRECISION_AND_TIMEZONE);
     options->EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);
