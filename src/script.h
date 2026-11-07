@@ -30,8 +30,12 @@ class ScriptHost {
 
   // The backend that the script's temporary tables are attached to and its sessions come from.
   virtual Backend& backend() = 0;
-  // Runtime lifecycle coordination must be acquired before a statement opens its snapshot.
-  virtual std::unique_lock<std::recursive_mutex> LockStatement() { return {}; }
+  // Prepares a statement before it opens its snapshot: expires tables when `expire` is set and,
+  // for a statement that `writes`, acquires the runtime's write coordination, which it must not
+  // wait for later.
+  virtual std::unique_lock<std::recursive_mutex> LockStatement(bool /*writes*/, bool /*expire*/) {
+    return {};
+  }
   // Whether SESSION_USER is enabled.
   [[nodiscard]] virtual bool has_session_user() const = 0;
   [[nodiscard]] virtual const ExcludedFunctionIds& excluded_function_ids() const = 0;

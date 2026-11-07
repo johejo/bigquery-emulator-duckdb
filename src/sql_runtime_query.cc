@@ -180,10 +180,11 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
   return schema;
 }
 
-// The script that `query` is, or null when it is a single statement. BigQuery parses every query as
-// a script, so a query that does not parse as one fails with the script parser's error, as the
-// analyzer reports a statement's, rather than with the error of a single statement it is not.
-std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query) {
+// The script that `query` is, or null when it is a single statement, which `reads` tells whether
+// is a query. BigQuery parses every query as a script, so a query that does not parse as one fails
+// with the script parser's error, as the analyzer reports a statement's, rather than with the
+// error of a single statement it is not.
+std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query, bool& reads) {
   std::unique_ptr<googlesql::ParserOutput> output;
   if (const absl::Status status =
           googlesql::ParseScript(query, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
@@ -194,6 +195,7 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query) {
   // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
   // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
   const auto& statements = output->script()->statement_list();
+  reads = statements.size() == 1 && statements.at(0)->node_kind() == googlesql::AST_QUERY_STATEMENT;
   if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
       statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT &&
       statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT) {
@@ -326,9 +328,14 @@ class SqlRuntime::ScriptHostImpl : public ScriptHost {
   [[nodiscard]] const function_catalog::Catalog& functions() const override {
     return emulator_.functions_;
   }
-  std::unique_lock<std::recursive_mutex> LockStatement() override {
-    std::unique_lock lock(emulator_.expiration_mutex_);
-    ExpireTables(emulator_.backend_, emulator_.expiration_mutex_);
+  std::unique_lock<std::recursive_mutex> LockStatement(bool writes, bool expire) override {
+    std::unique_lock<std::recursive_mutex> lock;
+    if (writes) {
+      lock = std::unique_lock(emulator_.expiration_mutex_);
+    }
+    if (expire) {
+      ExpireTables(emulator_.backend_, emulator_.expiration_mutex_);
+    }
     return lock;
   }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire,
@@ -665,7 +672,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     }
   }
 
-  if (const auto script = ParseScript(request.query)) {
+  bool reads = false;
+  if (const auto script = ParseScript(request.query, reads)) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
@@ -677,10 +685,14 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     return RunScript(host, request.query, *script, request.parameters, settings.default_project,
                      settings.default_dataset, setup, request.project_id, next_script_number_++);
   }
-  // Keep identity discovery, raw row-version resolution and execution in one snapshot.
-  // Acquire expiration coordination before opening that snapshot, not while waiting with an
-  // already stale transaction. Destination publication has a separate transaction boundary.
-  const std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_);
+  // Keep identity discovery, raw row-version resolution and execution in one snapshot. A statement
+  // that may write acquires expiration coordination before opening that snapshot, not while
+  // waiting with an already stale transaction; a query only reads its snapshot, so queries run
+  // concurrently. Destination publication has a separate transaction boundary.
+  std::unique_lock<std::recursive_mutex> expiration_lock;
+  if (!reads) {
+    expiration_lock = std::unique_lock(expiration_mutex_);
+  }
   ExpireTables(backend_, expiration_mutex_);
   const auto session =
       !request.dry_run && !request.destination_table ? backend_.NewSession() : nullptr;

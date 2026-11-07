@@ -660,11 +660,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                         const AnalyzerSettings& settings,
                                         bool list_temporary = true) {
     ScriptCatalog catalog;
-    // Dropping expired tables in an open transaction would make them part of it, so that its
-    // commit, and other requests' drops, could conflict. Other requests drop them meanwhile.
-    catalog.source =
-        host_.NewTableSource(backend_.get(), /*expire=*/list_temporary && !in_transaction_,
-                             /*policy_reads=*/!in_transaction_);
+    // LockStatement has expired tables before the statement's snapshot. Dropping them in the
+    // statement's transaction would make them part of it, so that its commit, and other requests'
+    // drops and updates, could conflict.
+    catalog.source = host_.NewTableSource(backend_.get(), /*expire=*/false,
+                                          /*policy_reads=*/!in_transaction_);
     catalog.temporary = std::make_unique<TemporaryTables>(temporary_);
     if (list_temporary) {
       for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {
@@ -815,7 +815,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
                          segment.node()->Is<googlesql::ASTRollbackStatement>();
-    const auto lifecycle_lock = host_.LockStatement();
+    // A query only reads, in its own snapshot, so it need not wait for other statements.
+    const auto lifecycle_lock =
+        host_.LockStatement(!segment.node()->Is<googlesql::ASTQueryStatement>(),
+                            /*expire=*/!control && !in_transaction_);
     const auto transaction =
         !control && !in_transaction_ ? std::make_unique<StatementTransaction>(*backend_) : nullptr;
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings, !control));
@@ -947,7 +950,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                                       const googlesql::Type* target_type) {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
-    const auto lifecycle_lock = host_.LockStatement();
+    const auto lifecycle_lock = host_.LockStatement(/*writes=*/false, /*expire=*/!in_transaction_);
     StatementTransaction transaction(*backend_);
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(
