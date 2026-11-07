@@ -168,6 +168,15 @@ current policy; historical reads obtain the row version and policy effective at
 the requested timestamp. A policy-only change must not copy an entire table.
 Repeated reads with no writes or policy changes must not create history records.
 
+Read policy history and the chosen raw row version in the same execution snapshot.
+Fetching a duration before executing the row query can combine an old policy with
+new rows, or ignore a policy committed between analysis and execution.
+`PartitionPolicyReadQuery()` in `partition_policy_history.h` composes these reads
+with an explicit cutoff. Its input is the raw row query, not an already filtered
+current read; historical reads must supply their historical row version. This
+helper does not resolve that version or revalidate the storage identity, so it is
+not by itself a lifecycle entry point.
+
 Keep physically retained rows available for policy removal/extension and for time
 travel. Do not introduce a purge until independently verified retention behavior
 settles when these rows can no longer become visible. Any eventual cleanup is a
@@ -241,7 +250,11 @@ shortening a duration at 12:00 must not simply rewrite the policy used at 11:00.
 Likewise, retained raw rows and visible rows are different inputs to DML: do not
 let an UPDATE or DELETE operate on rows a client cannot see without evidence of
 BigQuery doing so. That interaction needs independently answered cases before
-policy filtering can be enabled for DML.
+policy filtering can be enabled for DML. The unanswered cases in
+[`partition_expiration_dml.api.yaml`](../tests/e2e/goclient/testdata/unverified/partition_expiration_dml.api.yaml)
+observe affected-row counts, visible rows after UPDATE, DELETE or MERGE, and
+retained rows after policy removal. Updating an expired row's partition key is a
+separate case, since it could make a previously hidden row visible.
 
 ## Operation boundaries
 

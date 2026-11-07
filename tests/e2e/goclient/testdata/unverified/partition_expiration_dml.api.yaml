@@ -1,0 +1,80 @@
+version: 1
+description: DML visibility of physically retained rows in expired partitions
+# The verified policy-change cases show hidden rows becoming visible after policy
+# removal, but do not establish whether DML can modify those hidden rows. Observe
+# both affected-row counts and rows after removal; do not infer DML from SELECT.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  dml:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: |
+              DECLARE before_labels ARRAY<STRING>;
+              DECLARE after_labels ARRAY<STRING>;
+              DECLARE affected INT64;
+              CREATE TABLE `${project}.${dataset}.t` PARTITION BY d AS
+                SELECT DATE_SUB(CURRENT_DATE('UTC'), INTERVAL 2 DAY) AS d, 'expired' AS label
+                UNION ALL SELECT CURRENT_DATE('UTC'), 'recent';
+              ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=1);
+              SET before_labels = (SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`);
+              ${mutation}
+              SET affected = @@row_count;
+              SET after_labels = (SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`);
+              ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=NULL);
+              SELECT before_labels, affected, after_labels,
+                (SELECT ARRAY_AGG(label ORDER BY label) FROM `${project}.${dataset}.t`) AS retained_labels;
+        observe:
+          jobComplete: /body/jobComplete
+          errors: /body/errors
+        bind: {job: /body/jobReference/jobId}
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {"/body/jobComplete": true}
+        observe:
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: update_all
+    template: dml
+    vars:
+      mutation: UPDATE `${project}.${dataset}.t` SET label=CONCAT(label, '_updated') WHERE TRUE;
+  - name: update_expired_partition_key
+    template: dml
+    vars:
+      mutation: UPDATE `${project}.${dataset}.t` SET d=CURRENT_DATE('UTC') WHERE label='expired';
+  - name: delete_all
+    template: dml
+    vars:
+      mutation: DELETE FROM `${project}.${dataset}.t` WHERE TRUE;
+  - name: merge_matched_and_unmatched
+    template: dml
+    vars:
+      mutation: |
+        MERGE `${project}.${dataset}.t` AS target
+        USING (SELECT 'expired' AS label UNION ALL SELECT 'recent') AS source
+        ON target.label=source.label
+        WHEN MATCHED THEN UPDATE SET label=CONCAT(source.label, '_updated')
+        WHEN NOT MATCHED THEN INSERT (d, label) VALUES (CURRENT_DATE('UTC'), CONCAT(source.label, '_inserted'));

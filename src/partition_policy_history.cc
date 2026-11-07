@@ -4,16 +4,28 @@
 #include <format>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
+#include "src/partitioning.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
 
 std::string Policies(const std::string& project) {
   return QuoteIdentifier(project) + ".main.emulator_partition_policy_history";
+}
+
+std::string PolicyAtClause(const std::string& project, int64_t storage_id,
+                           int64_t evaluation_time_micros) {
+  return std::format(
+      " FROM {} WHERE storage_id = {} AND "
+      "(valid_from <= {} OR (txid = txid_current() AND valid_from IS NULL)) "
+      "ORDER BY valid_from DESC NULLS FIRST, txid DESC LIMIT 1",
+      Policies(project), storage_id, evaluation_time_micros);
 }
 
 }  // namespace
@@ -47,11 +59,9 @@ std::string CommitPartitionPoliciesStatement(const std::string& project, int64_t
 std::optional<int64_t> PartitionPolicyAt(Backend& backend, const std::string& project,
                                          int64_t storage_id, int64_t evaluation_time_micros) {
   const auto result = backend.Execute(
-      std::format("SELECT expiration_ms, CAST(valid_from IS NULL AS BIGINT), "
-                  "CAST(expiration_ms IS NULL AS BIGINT) FROM {} WHERE storage_id = {} AND "
-                  "(valid_from <= {} OR (txid = txid_current() AND valid_from IS NULL)) "
-                  "ORDER BY valid_from DESC NULLS FIRST, txid DESC LIMIT 1",
-                  Policies(project), storage_id, evaluation_time_micros));
+      "SELECT expiration_ms, CAST(valid_from IS NULL AS BIGINT), "
+      "CAST(expiration_ms IS NULL AS BIGINT)" +
+      PolicyAtClause(project, storage_id, evaluation_time_micros));
   if (result.rows.empty()) {
     return std::nullopt;
   }
@@ -59,6 +69,20 @@ std::optional<int64_t> PartitionPolicyAt(Backend& backend, const std::string& pr
     throw ApiError::Unsupported("partition expiration policy visibility inside a transaction");
   }
   return result.rows.Int64(0, 2) != 0 ? std::nullopt : std::optional(result.rows.Int64(0, 0));
+}
+
+std::string PartitionPolicyReadQuery(const std::string& project, int64_t storage_id,
+                                     const std::string& rows_query,
+                                     const TimePartitioning& partitioning,
+                                     const std::vector<FieldSchema>& schema,
+                                     int64_t evaluation_time_micros) {
+  const std::string duration =
+      "(SELECT CASE WHEN valid_from IS NULL THEN error(" +
+      QuoteLiteral("Unsupported: partition expiration policy visibility inside a transaction") +
+      ") ELSE expiration_ms END" + PolicyAtClause(project, storage_id, evaluation_time_micros) +
+      ")";
+  return "SELECT * FROM (" + rows_query + ") AS _bq_partition_rows WHERE NOT (" +
+         ExpiredPartitionPredicate(partitioning, schema, duration, evaluation_time_micros) + ")";
 }
 
 }  // namespace bigquery_emulator_duckdb

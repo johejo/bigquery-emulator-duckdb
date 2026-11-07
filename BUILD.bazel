@@ -185,7 +185,11 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
     ],
-    deps = [":backend"],
+    deps = [
+        ":backend",
+        ":field_schema",
+        ":partitioning",
+    ],
 )
 
 cc_test(
@@ -196,6 +200,7 @@ cc_test(
     deps = [
         ":api_error",
         ":backend",
+        ":backend_error",
         ":field_schema",
         ":partition_policy_history",
         ":partitioning",

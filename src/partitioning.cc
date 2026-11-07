@@ -70,6 +70,14 @@ std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
   if (duration_ms <= 0) {
     throw ApiError::Invalid("TTL for interval partition must be a positive number.");
   }
+  return ExpiredPartitionPredicate(partitioning, schema, std::to_string(duration_ms),
+                                   evaluation_time_micros);
+}
+
+std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
+                                      const std::vector<FieldSchema>& schema,
+                                      std::string_view duration_ms_sql,
+                                      int64_t evaluation_time_micros) {
   const auto& field = TimePartitionColumn(partitioning, schema);
   const std::string column = QuoteIdentifier(field.name);
   // TIMESTAMPTZ truncation uses the session timezone unless converted to UTC first. DATE and
@@ -81,9 +89,9 @@ std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
   // even a valid positive int64 duration can overflow int64 microseconds.
   return std::format(
       "coalesce(({0}) >= TIMESTAMP '1960-01-01' AND ({0}) < TIMESTAMP '2160-01-01' AND "
-      "CAST(epoch_us(date_trunc({1}, {0})) AS HUGEINT) + CAST({2} AS HUGEINT) * 1000 <= "
+      "CAST(epoch_us(date_trunc({1}, {0})) AS HUGEINT) + CAST(({2}) AS HUGEINT) * 1000 <= "
       "CAST({3} AS HUGEINT), false)",
-      civil, QuoteLiteral(TimePartitionUnitName(partitioning.type)), duration_ms,
+      civil, QuoteLiteral(TimePartitionUnitName(partitioning.type)), duration_ms_sql,
       evaluation_time_micros);
 }
 

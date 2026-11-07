@@ -38,4 +38,12 @@ std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
                                       const std::vector<FieldSchema>& schema, int64_t duration_ms,
                                       int64_t evaluation_time_micros);
 
+// The duration comes from a trusted SQL expression rather than a constant. Its non-NULL values
+// must already be validated as positive milliseconds; NULL means no expiration. This lets row
+// and policy history be read in the same DuckDB snapshot, without fetching a policy separately.
+std::string ExpiredPartitionPredicate(const TimePartitioning& partitioning,
+                                      const std::vector<FieldSchema>& schema,
+                                      std::string_view duration_ms_sql,
+                                      int64_t evaluation_time_micros);
+
 }  // namespace bigquery_emulator_duckdb

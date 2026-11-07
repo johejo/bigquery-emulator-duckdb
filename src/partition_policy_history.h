@@ -3,8 +3,11 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "src/backend.h"
+#include "src/field_schema.h"
+#include "src/partitioning.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -31,5 +34,17 @@ std::string CommitPartitionPoliciesStatement(const std::string& project, int64_t
 // visibility is independently established; committed policies in other sessions remain readable.
 std::optional<int64_t> PartitionPolicyAt(Backend& backend, const std::string& project,
                                          int64_t storage_id, int64_t evaluation_time_micros);
+
+// Filter a raw current or historical row query using the policy effective at the same cutoff.
+// Unlike fetching PartitionPolicyAt before executing the row query, this reads both in one
+// execution snapshot: a policy committed between query construction and execution is included.
+// The caller must supply the corresponding row version and revalidate its storage identity;
+// this helper does not resolve row history, coordinate writes, or define natural deadline passage.
+// An uncommitted policy in the executing transaction is rejected, as in PartitionPolicyAt.
+std::string PartitionPolicyReadQuery(const std::string& project, int64_t storage_id,
+                                     const std::string& rows_query,
+                                     const TimePartitioning& partitioning,
+                                     const std::vector<FieldSchema>& schema,
+                                     int64_t evaluation_time_micros);
 
 }  // namespace bigquery_emulator_duckdb

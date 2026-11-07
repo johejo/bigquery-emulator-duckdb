@@ -10,6 +10,7 @@
 
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/backend_error.h"
 #include "src/field_schema.h"
 #include "src/partitioning.h"
 
@@ -43,21 +44,16 @@ class PartitionPolicyHistoryTest : public testing::Test {
     session->Transaction("COMMIT");
   }
 
+  static std::string LabelsQuery(int64_t time, int64_t storage_id = kStorageId,
+                                 const std::string& rows = "SELECT * FROM project.main.rows") {
+    return "SELECT coalesce(string_agg(label, ',' ORDER BY label), '') FROM (" +
+           PartitionPolicyReadQuery("project", storage_id, rows, TimePartitioning{.field = "d"},
+                                    {{.name = "d", .type = FieldType::kDate}}, time) +
+           ")";
+  }
+
   static std::string Labels(Backend& backend, int64_t time, int64_t storage_id = kStorageId) {
-    const auto duration = PartitionPolicyAt(backend, "project", storage_id, time);
-    const std::string predicate =
-        duration ? "NOT (" +
-                       ExpiredPartitionPredicate(TimePartitioning{.field = "d"},
-                                                 {{.name = "d", .type = FieldType::kDate}},
-                                                 *duration, time) +
-                       ")"
-                 : "true";
-    return backend
-        .Execute(
-            "SELECT coalesce(string_agg(label, ',' ORDER BY label), '') "
-            "FROM project.main.rows WHERE " +
-            predicate)
-        .rows.String(0, 0);
+    return backend.Execute(LabelsQuery(time, storage_id)).rows.String(0, 0);
   }
 
   Backend backend_;
@@ -132,6 +128,54 @@ TEST_F(PartitionPolicyHistoryTest, ReplacementDoesNotInheritPolicyEvenWithTheSam
   Publish(365 * kDayMs, Cutoff() + 1000, kStorageId + 1);
   EXPECT_EQ(Labels(backend_, Cutoff() + 1000), "recent");
   EXPECT_EQ(Labels(backend_, Cutoff() + 1000, kStorageId + 1), "ordinary,recent");
+}
+
+// Inject the gap between query construction and execution rather than relying on timing a
+// concurrent API call. Fetching the policy before building the read would use the wrong policy.
+TEST_F(PartitionPolicyHistoryTest, PolicyIsSelectedWhenRowsAreRead) {
+  const std::string query = LabelsQuery(Cutoff());
+  Publish(kDayMs, Cutoff());
+  EXPECT_EQ(backend_.Execute(query).rows.String(0, 0), "recent");
+  Publish(std::nullopt, Cutoff() + 1000);
+  EXPECT_EQ(backend_.Execute(query).rows.String(0, 0), "recent");
+  EXPECT_EQ(Labels(backend_, Cutoff() + 1000), "ordinary,recent");
+}
+
+TEST_F(PartitionPolicyHistoryTest, RowsAndPolicyUseTheExecutingSnapshot) {
+  const auto reader = backend_.NewSession();
+  reader->Transaction("BEGIN TRANSACTION");
+  EXPECT_EQ(Labels(*reader, Cutoff()), "ordinary,recent");
+  const auto writer = backend_.NewSession();
+  writer->Transaction("BEGIN TRANSACTION");
+  writer->Execute(KeepPartitionPolicyStatement("project", kStorageId, kDayMs));
+  writer->Execute("INSERT INTO project.main.rows VALUES (DATE '2024-03-01', 'committed')");
+  writer->BeforeCommit(CommitPartitionPoliciesStatement("project", Cutoff()));
+  writer->Transaction("COMMIT");
+  EXPECT_EQ(Labels(*reader, Cutoff()), "ordinary,recent");
+  EXPECT_EQ(Labels(backend_, Cutoff()), "committed,recent");
+  reader->Transaction("COMMIT");
+}
+
+TEST_F(PartitionPolicyHistoryTest, PolicyFiltersTheSuppliedRowVersionNotCurrentRows) {
+  backend_.Execute("CREATE TABLE project.main.previous_rows AS SELECT * FROM project.main.rows");
+  Publish(kDayMs, Cutoff());
+  backend_.Execute("DELETE FROM project.main.rows");
+  const std::string query =
+      LabelsQuery(Cutoff(), kStorageId, "SELECT * FROM project.main.previous_rows");
+  EXPECT_EQ(backend_.Execute(query).rows.String(0, 0), "recent");
+  Publish(std::nullopt, Cutoff() + 1000);
+  EXPECT_EQ(backend_.Execute(query).rows.String(0, 0), "recent");
+  EXPECT_EQ(Labels(backend_, Cutoff() + 1000), "");
+}
+
+TEST_F(PartitionPolicyHistoryTest, RowQueryCannotExposeAStagedRemoval) {
+  Publish(kDayMs, Cutoff());
+  const auto session = backend_.NewSession();
+  session->Transaction("BEGIN TRANSACTION");
+  session->Execute(KeepPartitionPolicyStatement("project", kStorageId, std::nullopt));
+  EXPECT_THROW((void)Labels(*session, Cutoff()), BackendError);
+  session->Transaction("ROLLBACK");
+  EXPECT_EQ(Labels(backend_, Cutoff()), "recent");
 }
 
 TEST_F(PartitionPolicyHistoryTest, InvalidDurationsCannotRemoveExpiration) {
