@@ -332,6 +332,12 @@ json DryRunQueryResponse(const Job& job) {
 }  // namespace
 
 json ErrorBody(const ApiError& error) {
+  json detail{{"message", error.what()}, {"domain", "global"}, {"reason", error.reason()}};
+  // Request validation can identify the query parameter, unlike errors during execution.
+  if (error.location() == "q") {
+    detail["location"] = "q";
+    detail["locationType"] = "parameter";
+  }
   const char* status = "INVALID_ARGUMENT";
   if (error.http_status() == 404) {
     status = "NOT_FOUND";
@@ -346,13 +352,7 @@ json ErrorBody(const ApiError& error) {
               {"message", error.what()},
               {
                   "errors",
-                  json::array({
-                      json{
-                          {"message", error.what()},
-                          {"domain", "global"},
-                          {"reason", error.reason()},
-                      },
-                  }),
+                  json::array({detail}),
               },
               {"status", status},
           },

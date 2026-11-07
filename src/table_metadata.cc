@@ -128,6 +128,9 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
     throw ApiError::Unsupported("ingestion-time partitioning");
   }
   if (!value.value("expirationMs", json()).is_null()) {
+    if (Int64Member(value, "expirationMs") <= 0) {
+      throw ApiError::Invalid("TTL for interval partition must be a positive number.");
+    }
     throw ApiError::Unsupported("partition expiration");
   }
   return partitioning;
@@ -963,6 +966,12 @@ void RejectEncryptionConfiguration(const json& body, const char* key, const std:
 void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) {
   RejectEncryptionConfiguration(body, "encryptionConfiguration",
                                 "table field encryptionConfiguration");
+  // On PATCH, omission retains partitioning; explicit null asks to remove it, which BigQuery
+  // rejects. Check before parsing, which represents both as an empty optional.
+  if (patch && metadata.time_partitioning && body.contains("timePartitioning") &&
+      body["timePartitioning"].is_null()) {
+    throw ApiError::Invalid("Cannot change partitioned table to non partitioned table.");
+  }
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
   if (partitioning.partitioned() &&

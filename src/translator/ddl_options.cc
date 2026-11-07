@@ -72,6 +72,21 @@ bool DaysOption(const googlesql::Value& value, std::optional<int64_t>& into) {
   return true;
 }
 
+// Validate rejected durations without accepting a policy that the runtime cannot yet enforce.
+// NULL on a table without expiration is a no-op, not a zero-day policy.
+bool PartitionExpirationOption(const googlesql::Value& value) {
+  if (value.is_null()) {
+    return true;
+  }
+  if ((value.type()->IsDouble() && value.double_value() <= 0) ||
+      (value.type()->IsInt64() && value.int64_value() <= 0)) {
+    throw ApiError::InvalidQuery(
+        "partition_expiration_days value in table OPTIONS must be positive")
+        .WithLocation("q");
+  }
+  return false;
+}
+
 bool TimeTravelOption(const googlesql::Value& value, std::optional<int64_t>& into) {
   if (!value.is_null() && !value.type()->IsInt64()) {
     return false;
@@ -241,6 +256,7 @@ bool ApplyTableOption(DdlOptionId name, const googlesql::Value& value, bool tabl
     case kRequirePartitionFilter:
       return table && BoolOption(value, metadata.require_partition_filter);
     case kPartitionExpirationDays:
+      return table && PartitionExpirationOption(value);
     case kKmsKeyName:
       return table && value.is_null();
     case kDescription:
@@ -306,6 +322,8 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
       return TagsOption(value, updates.resource_tags.emplace(), updates.tag_order);
     case kExpirationTimestamp:
       return table && ExpirationOption(value, updates.expiration_time.emplace());
+    case kPartitionExpirationDays:
+      return table && PartitionExpirationOption(value);
     case kDefaultTableExpirationDays:
       return schema && DaysOption(value, updates.default_table_expiration_ms.emplace());
     case kMaxTimeTravelHours:

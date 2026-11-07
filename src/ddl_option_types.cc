@@ -115,6 +115,7 @@ constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kAlterTable, .name = I::kTags, .type = kLabels},
     {.context = C::kAlterTable, .name = I::kExpirationTimestamp, .type = kTimestamp},
     {.context = C::kAlterTable, .name = I::kRequirePartitionFilter, .type = kBool},
+    {.context = C::kAlterTable, .name = I::kPartitionExpirationDays, .type = kFloat64},
     {.context = C::kAlterTable, .name = I::kDefaultRoundingMode, .type = kString},
     {.context = C::kCreateSchema, .name = I::kDescription, .type = kString},
     {.context = C::kCreateSchema, .name = I::kFriendlyName, .type = kString},

@@ -1,0 +1,172 @@
+version: 1
+description: Partition expiration validation without enabling an unenforced policy
+# Error expectations come from known_bugs/partition_expiration_policy.api.answers.json
+# (create_zero_with_both_defaults, patch_zero_duration, patch_null_partitioning)
+# and known_bugs/partition_expiration_ddl.api.answers.json (create_zero, alter_zero).
+# No dataset default or positive duration is needed to exercise these constraints.
+vars:
+  dataset: bqa_${run}_${case}
+  partitioning: {type: DAY, field: d}
+  patch: {}
+  expected_partitioning: {type: DAY, field: d}
+  ttl_error:
+    error:
+      status: 400
+      body:
+        error:
+          code: 400
+          status: INVALID_ARGUMENT
+          message: TTL for interval partition must be a positive number.
+          errors:
+            - {domain: global, reason: invalid, message: "TTL for interval partition must be a positive number."}
+  query_error:
+    error:
+      status: 400
+      body:
+        error:
+          code: 400
+          status: INVALID_ARGUMENT
+          message: partition_expiration_days value in table OPTIONS must be positive
+          errors:
+            - {domain: global, reason: invalidQuery, location: q, locationType: parameter, message: "partition_expiration_days value in table OPTIONS must be positive"}
+templates:
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+        observe: {datasetId: /body/datasetReference/datasetId}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: "${project}", datasetId: "${dataset}", tableId: t}
+            schema: {fields: [{name: d, type: DATE}]}
+            timePartitioning: "${partitioning}"
+        observe: {partitioning: /body/timePartitioning}
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: "${patch}"
+        observe: {partitioning: /body/timePartitioning}
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {partitioning: /body/timePartitioning}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+        observe: {datasetId: /body/datasetReference/datasetId}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: "${project}", datasetId: "${dataset}", tableId: t}
+            schema: {fields: [{name: d, type: DATE}]}
+            timePartitioning: {type: DAY, field: d}
+        observe: {partitioning: /body/timePartitioning}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: "${query}"
+        observe:
+          jobComplete: /body/jobComplete
+          errors: /body/errors
+        bind: {job: /body/jobReference/jobId}
+      - name: results
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}
+        until: {"/body/jobComplete": true}
+        observe: {errors: /body/errors}
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {partitioning: /body/timePartitioning}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: create_zero
+    template: rest
+    vars:
+      partitioning: {type: DAY, field: d, expirationMs: "0"}
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${ttl_error}"
+  - name: patch_zero
+    template: rest
+    vars:
+      patch: {timePartitioning: {type: DAY, field: d, expirationMs: "0"}}
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: {partitioning: "${expected_partitioning}"}
+      patch: "${ttl_error}"
+  - name: patch_null_partitioning
+    template: rest
+    vars:
+      patch: {timePartitioning: null}
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: {partitioning: "${expected_partitioning}"}
+      patch:
+        error:
+          status: 400
+          body:
+            error:
+              code: 400
+              status: INVALID_ARGUMENT
+              message: Cannot change partitioned table to non partitioned table.
+              errors:
+                - {domain: global, reason: invalid, message: "Cannot change partitioned table to non partitioned table."}
+  - name: ddl_create_zero
+    template: ddl
+    vars:
+      query: CREATE TABLE `${project}.${dataset}.new` (d DATE) PARTITION BY d OPTIONS (partition_expiration_days=0)
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: {partitioning: "${expected_partitioning}"}
+      query: "${query_error}"
+  - name: ddl_alter_null_without_policy
+    template: ddl
+    vars:
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=NULL)
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: {partitioning: "${expected_partitioning}"}
+      query: {jobComplete: true}
+      results: {}
+      read: {partitioning: "${expected_partitioning}"}
+  - name: ddl_alter_zero
+    template: ddl
+    vars:
+      query: ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (partition_expiration_days=0)
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: {partitioning: "${expected_partitioning}"}
+      query: "${query_error}"
