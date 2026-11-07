@@ -322,6 +322,15 @@ CREATE TEMP TABLE t AS SELECT 10 AS a;
 SELECT MAX(a) FROM scalars.t
 => "3"
 
+# Reusing a name after DDL resolves the new table and its schema, not a previous statement's.
+DECLARE previous INT64;
+CREATE TEMP TABLE n AS SELECT 5 AS x;
+SET previous = (SELECT x FROM n);
+DROP TABLE n;
+CREATE TEMP TABLE n AS SELECT 'new' AS y;
+SELECT CONCAT(CAST(previous AS STRING), ':', y) FROM _SESSION.n
+=> "5:new"
+
 ## @@row_count
 # After DML, @@row_count counts the rows it inserted, updated or deleted, and for MERGE their
 # total, following third_party/bigquery_docs/reference/system-variables.md.
