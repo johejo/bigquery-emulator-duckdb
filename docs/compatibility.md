@@ -56,7 +56,7 @@ Loads and extracts also accept local paths. Their limits are:
 
 ## Datasets
 
-BigQuery Omni locations, default partition expiration and access controls are unsupported.
+BigQuery Omni locations and access controls are unsupported.
 `datasets.patch` and `datasets.update` reject changes to the dataset's location.
 
 `INFORMATION_SCHEMA.SCHEMATA` returns NULL last modified times and NULL options other than the
@@ -180,8 +180,8 @@ this behavior.
 
 ### Options and expiration
 
-[options.md](options.md) lists the DDL options the emulator accepts. Partition expiration is
-unsupported.
+[options.md](options.md) lists the DDL options the emulator accepts. See
+[Partition expiration](#partition-expiration) for its limits.
 
 DDL option values accept literals and constant expressions using query parameters and supported
 scalar functions. Other expressions, such as a parenthesized script variable, are unsupported.
@@ -197,8 +197,8 @@ Tables and views created before the emulator recorded creation times have no `cr
 
 ### Partitioning and clustering
 
-Ingestion-time partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) and partition expiration are
-unsupported. `INFORMATION_SCHEMA.PARTITIONS` counts rows when queried. Storage byte counts are 0,
+Ingestion-time partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) is unsupported.
+`INFORMATION_SCHEMA.PARTITIONS` counts rows when queried. Storage byte counts are 0,
 including `tables.get`'s `numBytes`; partition `last_modified_time` is NULL and storage tier is
 always `ACTIVE`.
 
@@ -207,6 +207,25 @@ For `require_partition_filter`, transforms of temporal partition keys are limite
 arguments besides the key. Projections propagate filters through direct column renames only. Outer
 predicates do not propagate through aggregation, LIMIT or other scan boundaries.
 The option cannot be enabled on an unpartitioned table or view.
+
+### Partition expiration
+
+Partition expiration applies only to tables partitioned by a DATE, DATETIME or TIMESTAMP column.
+The emulator keeps the rows of expired partitions and hides them from reads and DML, so removing
+or extending expiration shows them again, and time travel applies the expiration in effect at the
+requested time. A read fails as unsupported when a partition has expired since its expiration was
+last set, because when BigQuery hides such a partition has not been verified.
+
+These operations are unsupported:
+
+- On a table whose partitions have ever had an expiration: reads in an explicit transaction, by
+  dry runs, by queries with a destination table and through the Storage Read API.
+- On a table with partition expiration: loads, `tabledata.insertAll`, Storage Write, copy and
+  extract jobs, and use as a query destination or as the source of `CREATE TABLE LIKE`, `COPY`,
+  `CLONE` or `CREATE SNAPSHOT TABLE`.
+- In a dataset with a default partition expiration: `CREATE TABLE LIKE`, `COPY`, `CLONE` and
+  `CREATE SNAPSHOT TABLE` of partitioned tables, and partitioned destinations that load, copy or
+  query jobs create.
 
 ### Column defaults
 

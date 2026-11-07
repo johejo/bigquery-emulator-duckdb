@@ -1,0 +1,213 @@
+version: 1
+# Expectations come from the adjacent BigQuery answers. Their original timestamp
+# observations remain as inheritance evidence; these assertions select only stable
+# partition metadata, not generated creation/expiration timestamp literals.
+description: Partition expiration inheritance and explicit clearing forms
+vars:
+  dataset: bqa_${run}_${case}
+  expected_partitioning: {type: DAY, field: d, expirationMs: "86400000"}
+  partition_result: {partitioning: "${expected_partitioning}"}
+  initial_result: {partitioning: {type: DAY, field: d, expirationMs: "172800000"}}
+  ttl_error:
+    error:
+      status: 400
+      body:
+        error:
+          code: 400
+          status: INVALID_ARGUMENT
+          message: TTL for interval partition must be a positive number.
+          errors:
+            - {domain: global, reason: invalid, message: "TTL for interval partition must be a positive number."}
+  schema:
+    fields:
+      - {name: d, type: DATE}
+  partitioning: {type: DAY, field: d}
+  dataset_body:
+    datasetReference: {datasetId: "${dataset}"}
+    location: US
+    defaultTableExpirationMs: "${table_default}"
+    defaultPartitionExpirationMs: "${partition_default}"
+  table_body:
+    tableReference: {projectId: "${project}", datasetId: "${dataset}", tableId: t}
+    schema: "${schema}"
+    timePartitioning: "${partitioning}"
+templates:
+  create:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: "${dataset_body}"
+        observe: {datasetId: /body/datasetReference/datasetId}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: "${table_body}"
+        observe:
+          partitioning: /body/timePartitioning
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          partitioning: /body/timePartitioning
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  patch:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            location: US
+            defaultPartitionExpirationMs: "86400000"
+        observe: {datasetId: /body/datasetReference/datasetId}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: "${project}", datasetId: "${dataset}", tableId: t}
+            schema: "${schema}"
+            timePartitioning: {type: DAY, field: d, expirationMs: "172800000"}
+        observe: {partitioning: /body/timePartitioning}
+      - name: patch
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: "${patch}"
+        observe:
+          partitioning: /body/timePartitioning
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          partitioning: /body/timePartitioning
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: create_omitted_with_both_defaults
+    template: create
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      table_default: "604800000"
+      partition_default: "86400000"
+  # JSON null is intentional in these cases, not omission.
+  - name: create_null_with_both_defaults
+    template: create
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      table_default: "604800000"
+      partition_default: "86400000"
+      partitioning: {type: DAY, field: d, expirationMs: null}
+  - name: create_zero_with_both_defaults
+    template: create
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${policy_error}"
+    vars:
+      policy_error: "${ttl_error}"
+      table_default: "604800000"
+      partition_default: "86400000"
+      partitioning: {type: DAY, field: d, expirationMs: "0"}
+  - name: create_explicit_partition_with_table_default
+    template: create
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      expected_partitioning: {type: DAY, field: d, expirationMs: "172800000"}
+      dataset_body:
+        datasetReference: {datasetId: "${dataset}"}
+        location: US
+        defaultTableExpirationMs: "604800000"
+      partitioning: {type: DAY, field: d, expirationMs: "172800000"}
+  - name: create_explicit_table_with_partition_default
+    template: create
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      table_default: "604800000"
+      partition_default: "86400000"
+      table_body:
+        tableReference: {projectId: "${project}", datasetId: "${dataset}", tableId: t}
+        schema: "${schema}"
+        timePartitioning: "${partitioning}"
+        expirationTime: "4102444800000"
+  - name: patch_omits_partitioning
+    template: patch
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${initial_result}"
+      patch: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      expected_partitioning: {type: DAY, field: d, expirationMs: "172800000"}
+      patch: {description: omitted partition policy}
+  - name: patch_omits_duration
+    template: patch
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${initial_result}"
+      patch: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      expected_partitioning: {type: DAY, field: d, expirationMs: "172800000"}
+      patch: {timePartitioning: {type: DAY, field: d}}
+  - name: patch_null_duration
+    template: patch
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${initial_result}"
+      patch: "${partition_result}"
+      read: "${partition_result}"
+    vars:
+      expected_partitioning: {type: DAY, field: d}
+      patch: {timePartitioning: {type: DAY, field: d, expirationMs: null}}
+  - name: patch_zero_duration
+    template: patch
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${initial_result}"
+      patch: "${policy_error}"
+    vars:
+      policy_error: "${ttl_error}"
+      patch: {timePartitioning: {type: DAY, field: d, expirationMs: "0"}}
+  - name: patch_null_partitioning
+    template: patch
+    expect:
+      dataset: {datasetId: "${dataset}"}
+      create: "${initial_result}"
+      patch: "${policy_error}"
+    vars:
+      policy_error:
+        error:
+          status: 400
+          body:
+            error:
+              code: 400
+              status: INVALID_ARGUMENT
+              message: Cannot change partitioned table to non partitioned table.
+              errors:
+                - {domain: global, reason: invalid, message: "Cannot change partitioned table to non partitioned table."}
+      patch: {timePartitioning: null}

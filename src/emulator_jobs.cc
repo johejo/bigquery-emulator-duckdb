@@ -505,6 +505,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
                                   " of several source tables");
     }
     std::vector<FieldSchema> schema;
+    const std::scoped_lock expiration_lock(expiration_mutex_);
     TableReference first_source;
     TableMetadata source_metadata;
     std::string sql;
@@ -517,6 +518,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       source = table.reference;
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
+      }
+      if (table.metadata.time_partitioning && table.metadata.time_partitioning->expiration_ms) {
+        throw ApiError::Unsupported("copying tables with partition expiration");
       }
       CheckCopySource(copy, source, table.metadata);
       if (!table.metadata.resource_tags.empty()) {
@@ -626,6 +630,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       throw ApiError::Invalid("Unsupported destination URI: " + uri);
     }
 
+    const std::scoped_lock expiration_lock(expiration_mutex_);
     TableReference source = extract.source_table;
     if (source.project_id.empty()) {
       source.project_id = job.project_id;
@@ -635,6 +640,9 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     source = table.reference;
     if (table.view_query) {
       throw ApiError::Invalid("Cannot extract a view: " + TableName(source));
+    }
+    if (table.metadata.time_partitioning && table.metadata.time_partitioning->expiration_ms) {
+      throw ApiError::Unsupported("extracting tables with partition expiration");
     }
     if (parquet) {
       Execute(std::format("COPY (SELECT {} FROM {}) TO {} (FORMAT parquet, COMPRESSION {})",

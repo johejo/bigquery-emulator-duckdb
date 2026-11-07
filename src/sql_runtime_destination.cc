@@ -277,6 +277,11 @@ QueryResult SqlRuntime::WriteDestination(
     if (!definition.metadata.default_collation.has_value() && existing.has_value()) {
       definition.metadata.default_collation = existing->metadata.default_collation;
     }
+    if (definition.metadata.time_partitioning &&
+        (definition.metadata.time_partitioning->expiration_ms ||
+         defaults.default_partition_expiration_ms)) {
+      throw ApiError::Unsupported("partition expiration for load, copy and query destinations");
+    }
     std::ranges::move(CreateTableWrite(definition, defaults).metadata_statements,
                       std::back_inserter(statements));
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));

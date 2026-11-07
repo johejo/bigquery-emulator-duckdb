@@ -20,6 +20,7 @@
 #include "src/information_schema_options.h"
 #include "src/information_schema_rows.h"
 #include "src/information_schema_view.h"
+#include "src/partitioning.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
@@ -546,6 +547,14 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
       }
       if (metadata->require_partition_filter) {
         options.push_back({.name = "require_partition_filter", .type = "BOOL", .value = "true"});
+      }
+      if (metadata->time_partitioning && metadata->time_partitioning->expiration_ms) {
+        options.push_back({
+            .name = "partition_expiration_days",
+            .type = "FLOAT64",
+            .value = Float64OptionValue(
+                static_cast<double>(*metadata->time_partitioning->expiration_ms) / 86400000.0),
+        });
       }
       if (metadata->expiration_time.has_value()) {
         options.push_back({

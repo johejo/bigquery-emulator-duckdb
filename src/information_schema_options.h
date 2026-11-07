@@ -17,6 +17,8 @@ struct Option {
   std::string value;
 };
 
+// Shortest round-trip FLOAT64 form, with a fraction (90.0 rather than 90).
+std::string Float64OptionValue(double value);
 std::string StringOptionValue(const std::string& value);
 // The metadata options shared by datasets, tables and views.
 std::vector<Option> CommonOptions(const std::string& description, const std::string& friendly_name,

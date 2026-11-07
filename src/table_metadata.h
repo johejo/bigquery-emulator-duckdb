@@ -4,12 +4,12 @@
 #include <map>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/location.h"
+#include "src/partitioning.h"
 #include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
@@ -76,19 +76,6 @@ struct GcsExternalData {
   // differently from a detected one. The table's comment keeps it; its resource does not show it.
   bool given_schema = false;
   bool operator==(const GcsExternalData&) const = default;
-};
-
-enum class TimePartitionUnit : uint8_t { kDay, kHour, kMonth, kYear };
-std::string_view TimePartitionUnitName(TimePartitionUnit unit);
-std::optional<TimePartitionUnit> ParseTimePartitionUnit(std::string_view name);
-
-// Table.timePartitioning on a column. Ingestion-time partitioning, which adds pseudo-columns,
-// and partition expiration, which deletes data, are not emulated.
-struct TimePartitioning {
-  TimePartitionUnit type = TimePartitionUnit::kDay;
-  std::string field;
-
-  bool operator==(const TimePartitioning&) const = default;
 };
 
 // Table.rangePartitioning: `field` split into partitions of `interval` from `start` to `end`.
@@ -205,6 +192,7 @@ struct DatasetMetadata {
   std::map<std::string, std::string> resource_tags;
   std::vector<std::string> tag_order;
   std::optional<int64_t> default_table_expiration_ms;
+  std::optional<int64_t> default_partition_expiration_ms;
   std::optional<int64_t> max_time_travel_hours;
   std::string storage_billing_model;  // Empty when no model was explicitly set.
   // Preserve an explicitly disabled setting in REST responses.
@@ -220,8 +208,8 @@ struct DatasetMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !default_table_expiration_ms.has_value() &&
-           !max_time_travel_hours.has_value() && storage_billing_model.empty() &&
-           !is_case_insensitive.has_value() &&
+           !default_partition_expiration_ms.has_value() && !max_time_travel_hours.has_value() &&
+           storage_billing_model.empty() && !is_case_insensitive.has_value() &&
            default_rounding_mode == RoundingMode::kUnspecified && creation_time == 0 &&
            location.empty() && !default_collation.has_value();
   }

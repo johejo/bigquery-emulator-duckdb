@@ -87,11 +87,10 @@ json StorageDefaultValue(const json& value, const FieldSchema& field) {
 
 }  // namespace
 
-QueryResult SqlRuntime::ListTableData(TableReference table, int64_t start_index,
-                                      int64_t max_results, std::string_view selected_fields) {
-  table.project_id = ResolveProject(table.project_id);
-  const TableInfo info = GetTable(table);
-  table = info.reference;
+TableDataPage SqlRuntime::ListTableData(TableReference table, int64_t start_index,
+                                        int64_t max_results, std::string_view selected_fields) {
+  auto read = BeginTableRead(std::move(table));
+  const TableInfo& info = read.info;
   if (info.materialized) {
     throw ApiError::Invalid("Cannot list a table of type MATERIALIZED_VIEW.");
   }
@@ -101,14 +100,25 @@ QueryResult SqlRuntime::ListTableData(TableReference table, int64_t start_index,
   const std::string columns = selected_fields.empty()
                                   ? ReadColumns(info.schema)
                                   : ReadColumns(SelectFields(info.schema, selected_fields), true);
-  return Execute("SELECT " + columns + " FROM " + ReadTableRelation(backend_, table) + " LIMIT " +
-                 std::to_string(max_results) + " OFFSET " + std::to_string(start_index));
+  try {
+    const std::string relation = read.Relation();
+    QueryResult result = read.session->Execute("SELECT " + columns + " FROM " + relation +
+                                               " LIMIT " + std::to_string(max_results) +
+                                               " OFFSET " + std::to_string(start_index));
+    const auto count = read.session->Execute("SELECT count(*) FROM " + relation);
+    const int64_t total_rows = count.rows.Int64(0, 0);
+    read.session->Transaction("COMMIT");
+    return {.result = std::move(result), .total_rows = total_rows};
+  } catch (const BackendError& error) {
+    throw ApiError::QueryFailure(error.what());
+  }
 }
 
 std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
                                                       const std::vector<FieldSchema>& schema,
                                                       json& rows, int64_t storage_id,
                                                       bool validate_only) {
+  const std::scoped_lock expiration_lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   table = info.reference;
@@ -184,6 +194,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
 std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const json& rows,
                                                      bool skip_invalid_rows,
                                                      bool ignore_unknown_values) {
+  const std::scoped_lock expiration_lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   if (!rows.is_array()) {
     throw ApiError::Invalid("rows must be an array");

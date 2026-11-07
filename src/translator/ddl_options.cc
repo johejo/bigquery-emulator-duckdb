@@ -72,6 +72,20 @@ bool DaysOption(const googlesql::Value& value, std::optional<int64_t>& into) {
   return true;
 }
 
+// Table durations must be positive; NULL is removal, never a zero-day policy.
+bool PartitionExpirationOption(const googlesql::Value& value, std::optional<int64_t>& into) {
+  if (value.is_null()) {
+    return true;
+  }
+  if ((value.type()->IsDouble() && value.double_value() <= 0) ||
+      (value.type()->IsInt64() && value.int64_value() <= 0)) {
+    throw ApiError::InvalidQuery(
+        "partition_expiration_days value in table OPTIONS must be positive")
+        .WithLocation("q");
+  }
+  return DaysOption(value, into) && into.has_value() && *into > 0;
+}
+
 bool TimeTravelOption(const googlesql::Value& value, std::optional<int64_t>& into) {
   if (!value.is_null() && !value.type()->IsInt64()) {
     return false;
@@ -241,6 +255,13 @@ bool ApplyTableOption(DdlOptionId name, const googlesql::Value& value, bool tabl
     case kRequirePartitionFilter:
       return table && BoolOption(value, metadata.require_partition_filter);
     case kPartitionExpirationDays:
+      if (!table || value.is_null()) {
+        return table;
+      }
+      if (!metadata.time_partitioning) {
+        metadata.time_partitioning.emplace();
+      }
+      return PartitionExpirationOption(value, metadata.time_partitioning->expiration_ms);
     case kKmsKeyName:
       return table && value.is_null();
     case kDescription:
@@ -273,6 +294,8 @@ bool ApplySchemaOption(DdlOptionId name, const googlesql::Value& value, DatasetM
       return TagsOption(value, metadata.resource_tags, metadata.tag_order);
     case kDefaultTableExpirationDays:
       return DaysOption(value, metadata.default_table_expiration_ms);
+    case kDefaultPartitionExpirationDays:
+      return DaysOption(value, metadata.default_partition_expiration_ms);
     case kMaxTimeTravelHours:
       return TimeTravelOption(value, metadata.max_time_travel_hours);
     case kIsCaseInsensitive:
@@ -306,8 +329,12 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
       return TagsOption(value, updates.resource_tags.emplace(), updates.tag_order);
     case kExpirationTimestamp:
       return table && ExpirationOption(value, updates.expiration_time.emplace());
+    case kPartitionExpirationDays:
+      return table && PartitionExpirationOption(value, updates.partition_expiration_ms.emplace());
     case kDefaultTableExpirationDays:
       return schema && DaysOption(value, updates.default_table_expiration_ms.emplace());
+    case kDefaultPartitionExpirationDays:
+      return schema && DaysOption(value, updates.default_partition_expiration_ms.emplace());
     case kMaxTimeTravelHours:
       return schema && TimeTravelOption(value, updates.max_time_travel_hours.emplace());
     case kIsCaseInsensitive:

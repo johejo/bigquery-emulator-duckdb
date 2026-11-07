@@ -33,6 +33,7 @@ namespace {
 // The table modified by a DML statement, aliased as _t.
 struct Target {
   std::string table;
+  std::string visible = "TRUE";
   // Resolved column ID to the table's own column name.
   std::map<int, std::string> names;
   // The same columns qualified by the alias, for expressions.
@@ -93,6 +94,9 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
       .column_types = {},
       .fields = {},
   };
+  if (const auto* stored = dynamic_cast<const BigQueryTable*>(table.table())) {
+    target.visible = stored->DmlTargetFilter("_t").value_or("TRUE");
+  }
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
     if (!DuckDbType(column.type(), scope.context.timestamp_precision) ||
@@ -379,6 +383,7 @@ std::optional<std::string> Update(const googlesql::ResolvedUpdateStmt& update, c
     }
     condition = *where;
   }
+  condition = "(" + condition + ") AND (" + target->visible + ")";
   if (update.from_scan() != nullptr) {
     from = " FROM (" + CheckedDmlSource(source_sql, *target, condition) + ") AS q";
   }
@@ -397,13 +402,13 @@ std::optional<std::string> Delete(const googlesql::ResolvedDeleteStmt& del, cons
   if (!target) {
     return std::nullopt;
   }
-  std::string sql = "DELETE FROM " + target->table + " AS _t";
+  std::string sql = "DELETE FROM " + target->table + " AS _t WHERE (" + target->visible + ")";
   if (del.where_expr() != nullptr) {
     const auto where = Expression(*del.where_expr(), DmlScope(scope, *target), target->columns);
     if (!where) {
       return std::nullopt;
     }
-    sql += " WHERE " + *where;
+    sql += " AND (" + *where + ")";
   }
   return sql;
 }
@@ -439,6 +444,10 @@ std::optional<std::string> MergeClause(const googlesql::ResolvedMergeWhen& when,
       break;
     default:
       return Unsupported(scope, "MERGE match type");
+  }
+  // An invisible retained target must not be selected by NOT MATCHED BY SOURCE either.
+  if (when.match_type() == googlesql::ResolvedMergeWhen::NOT_MATCHED_BY_SOURCE) {
+    sql += " AND (" + target.visible + ")";
   }
   if (when.match_expr() != nullptr) {
     const auto condition = Expression(*when.match_expr(), scope, columns);
@@ -527,7 +536,7 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
     affected.push_back("(" + *predicate + ")");
   }
   std::string source_sql = source->sql;
-  std::string merge_condition = *condition;
+  std::string merge_condition = "(" + *condition + ") AND (" + target->visible + ")";
   if (has_matched_update) {
     source_sql = CheckedDmlSource(source_sql, *target, merge_condition, Join(affected, " OR "));
   } else if (!affected.empty()) {
@@ -551,7 +560,7 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
     std::vector<std::string> target_fields;
     for (int i = 0; i < merge.table_scan()->table()->NumColumns(); ++i) {
       const std::string name = QuoteIdentifier(merge.table_scan()->table()->GetColumn(i)->Name());
-      snapshot_fields.emplace_back(name).append(" := _r.").append(name);
+      snapshot_fields.emplace_back(name).append(" := _t.").append(name);
       target_fields.emplace_back(name).append(" := _t.").append(name);
     }
     std::vector<std::string> deletes;
@@ -578,8 +587,8 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
                  ") AS _bq_delete FROM _source AS q LEFT JOIN "
                  "(SELECT struct_pack(" +
                  Join(snapshot_fields, ", ") + ") AS _bq_row, TRUE AS _bq_present FROM " +
-                 target->table + " AS _r) AS _t ON " + *matched_condition +
-                 ")) WHERE _bq_target IS NULL OR _bq_rank = 1";
+                 target->table + " AS _t WHERE " + target->visible + ") AS _t ON " +
+                 *matched_condition + ")) WHERE _bq_target IS NULL OR _bq_rank = 1";
     merge_condition =
         "q._bq_target IS NOT NULL AND q._bq_target IS NOT DISTINCT FROM "
         "struct_pack(" +

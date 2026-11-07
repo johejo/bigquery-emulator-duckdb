@@ -18,6 +18,7 @@
 #include "src/field_schema.h"
 #include "src/location.h"
 #include "src/project.h"
+#include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -49,6 +50,52 @@ TEST(SqlRuntimeTest, ConcurrentScriptsAndReturnedResultsHaveIndependentLifetimes
     ASSERT_EQ(results.at(i).rows.size(), 1);
     EXPECT_EQ(results.at(i).rows.Int64(0, 0), i);
   }
+}
+
+// Inject atomic row/policy changes while both normal SQL and script expressions read. A
+// reader that resolves policy or raw rows outside its execution snapshot can report 0 or 2.
+TEST(SqlRuntimeTest, SqlReadsKeepRowsAndPolicyInOneSnapshot) {
+  SqlRuntime runtime("", std::vector<Project>{{.project_id = "runtime"}});
+  runtime.CreateDataset({.project_id = "runtime", .dataset_id = "policy"});
+  const auto query = [&](const std::string& sql) {
+    QueryRequest request;
+    request.project_id = "runtime";
+    request.query = sql;
+    QueryJob metadata;
+    JobLocation location;
+    return runtime.ExecuteQuery(std::move(request), metadata, location);
+  };
+  query("CREATE TABLE policy.t PARTITION BY d AS SELECT DATE '2000-01-01' AS d");
+  const auto publish = [&](bool expires) {
+    const std::string duration = expires ? "86400000" : "NULL";
+    runtime.ExecuteDuckDb(
+        "BEGIN; DELETE FROM runtime.policy.t; "
+        "INSERT INTO runtime.policy.t VALUES (DATE '2000-01-01'); " +
+        std::string(expires ? "INSERT INTO runtime.policy.t VALUES (DATE '2159-12-31'); " : "") +
+        "INSERT INTO runtime.main.emulator_partition_policy_history "
+        "SELECT table_oid, txid_current(), epoch_us(get_current_timestamp()), " +
+        duration +
+        " FROM duckdb_tables() WHERE database_name = 'runtime' "
+        "AND schema_name = 'policy' AND table_name = 't'; COMMIT");
+  };
+  publish(false);
+  constexpr int kChanges = 64;
+  std::barrier ready(2);
+  auto writer = std::async(std::launch::async, [&] {
+    ready.arrive_and_wait();
+    for (int i = 0; i < kChanges; ++i) {
+      publish(i % 2 == 0);
+    }
+  });
+  ready.arrive_and_wait();
+  for (int i = 0; i < kChanges; ++i) {
+    const auto result =
+        query(i % 2 == 0 ? "SELECT count(*) FROM policy.t"
+                         : "DECLARE n INT64 DEFAULT (SELECT count(*) FROM policy.t); SELECT n");
+    ASSERT_EQ(result.rows.size(), 1);
+    EXPECT_EQ(result.rows.Int64(0, 0), 1);
+  }
+  EXPECT_NO_THROW(writer.get());
 }
 
 // Catalog reads in another dataset may expire a newly committed relation while its CREATE
@@ -91,6 +138,63 @@ TEST(SqlRuntimeTest, ConcurrentExpirationDoesNotFailCreateResponses) {
         runtime
             .ListTables({.project_id = "runtime", .dataset_id = "expiration_" + std::to_string(i)})
             .empty());
+  }
+}
+
+// A replacement can commit between metadata discovery and row execution. API readers must
+// neither bind the previous schema against the replacement nor report its row count with the
+// previous metadata. Alternating partitioned schemas also exercises reads with no policy yet.
+TEST(SqlRuntimeTest, TableApiReadsUseOneSnapshotAcrossConcurrentReplacement) {
+  SqlRuntime runtime("", std::vector<Project>{{.project_id = "runtime"}});
+  runtime.CreateDataset({.project_id = "runtime", .dataset_id = "reads"});
+  const TableReference table{
+      .project_id = "runtime",
+      .dataset_id = "reads",
+      .table_id = "replaced",
+  };
+  const auto replace = [&](int value) {
+    const std::string name = value % 2 == 0 ? "even" : "odd";
+    const std::string row =
+        "SELECT DATE '2000-01-01' AS d, " + std::to_string(value) + " AS " + name;
+    QueryRequest request;
+    request.project_id = "runtime";
+    request.query = "CREATE OR REPLACE TABLE reads.replaced PARTITION BY d AS " + row +
+                    (value % 2 == 0 ? " UNION ALL " + row : "");
+    QueryJob metadata;
+    JobLocation location;
+    runtime.ExecuteQuery(std::move(request), metadata, location);
+  };
+  replace(0);
+  constexpr int kReaders = 4;
+  constexpr int kReplacements = 64;
+  std::barrier ready(kReaders + 1);
+  auto writer = std::async(std::launch::async, [&] {
+    ready.arrive_and_wait();
+    for (int value = 1; value <= kReplacements; ++value) {
+      replace(value);
+    }
+  });
+  std::array<std::future<void>, kReaders> readers;
+  for (auto& reader : readers) {
+    reader = std::async(std::launch::async, [&] {
+      ready.arrive_and_wait();
+      for (int n = 0; n < kReplacements; ++n) {
+        const TableInfo info = runtime.GetTable(table);
+        ASSERT_EQ(info.schema.size(), 2);
+        EXPECT_EQ(info.num_rows, info.schema.at(1).name == "even" ? 2 : 1);
+        const auto page = runtime.ListTableData(table, 0, 1, "");
+        const QueryResult& data = page.result;
+        ASSERT_EQ(data.schema.size(), 2);
+        const bool even = data.schema.at(1).name == "even";
+        EXPECT_EQ(page.total_rows, even ? 2 : 1);
+        ASSERT_EQ(data.rows.size(), 1);
+        EXPECT_EQ(data.rows.Int64(0, 1) % 2, even ? 0 : 1);
+      }
+    });
+  }
+  EXPECT_NO_THROW(writer.get());
+  for (auto& reader : readers) {
+    EXPECT_NO_THROW(reader.get());
   }
 }
 

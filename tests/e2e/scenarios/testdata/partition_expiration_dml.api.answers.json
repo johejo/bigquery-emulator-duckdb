@@ -1,0 +1,276 @@
+{
+  "version": 1,
+  "cases": {
+    "delete_all": {
+      "project": "johejo-sandbox",
+      "run": "w4z637k3dglxkens7mkxahfvkw",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": [
+                    {
+                      "v": "expired"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "affected",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "retained_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "merge_matched_and_unmatched": {
+      "project": "johejo-sandbox",
+      "run": "w4z637k3dglxkens7mkxahfvkw",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": "2"
+                },
+                {
+                  "v": [
+                    {
+                      "v": "expired_inserted"
+                    },
+                    {
+                      "v": "recent_updated"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "expired"
+                    },
+                    {
+                      "v": "expired_inserted"
+                    },
+                    {
+                      "v": "recent_updated"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "affected",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "retained_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "update_all": {
+      "project": "johejo-sandbox",
+      "run": "w4z637k3dglxkens7mkxahfvkw",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": [
+                    {
+                      "v": "recent_updated"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "expired"
+                    },
+                    {
+                      "v": "recent_updated"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "affected",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "retained_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "update_expired_partition_key": {
+      "project": "johejo-sandbox",
+      "run": "w4z637k3dglxkens7mkxahfvkw",
+      "steps": {
+        "query": {
+          "jobComplete": true
+        },
+        "results": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": "0"
+                },
+                {
+                  "v": [
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                },
+                {
+                  "v": [
+                    {
+                      "v": "expired"
+                    },
+                    {
+                      "v": "recent"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "REPEATED",
+                "name": "before_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "affected",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "after_labels",
+                "type": "STRING"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "retained_labels",
+                "type": "STRING"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

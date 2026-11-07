@@ -349,10 +349,27 @@ Table and column comments store BigQuery metadata. Dataset metadata lives in
 `main.emulator_datasets` because DuckDB cannot comment on schemas. Catalog changes and their
 metadata writes share a transaction.
 
+[expiration_policy.cc](../src/expiration_policy.cc) resolves expiration defaults for ordinary
+native table creation without reading the clock or mutating metadata. It resolves table and
+partition defaults together: a dataset partition default suppresses the dataset table default
+only for time-partitioned tables, while explicit table deadlines survive. Request layers must
+interpret omission and removal before calling it; copy, clone, snapshot, LIKE and replacement
+inheritance are separate paths.
+
 [table_history.cc](../src/table_history.cc) keeps a table's rows before each write for `FOR
 SYSTEM_TIME AS OF`, in tables of the project's `main` schema keyed by dataset, table and creation
 time. Writes outside a transaction hold a mutex so that each kept version is what the previous
 write committed; a transaction dates its versions when it commits.
+
+[partition_policy_history.cc](../src/partition_policy_history.cc) provides a separate policy
+history primitive, keyed by storage OID within a project. It stages a transaction's final duration
+or explicit removal and dates publication at a caller-supplied commit cutoff. Historical lookup
+uses the policy effective at the requested microsecond, without copying or deleting rows.
+DDL and table updates publish policies in the transaction that changes the table's metadata.
+[partition_policy_read.cc](../src/partition_policy_read.cc) filters a table's rows by its policy
+in the snapshot that reads them, so ordinary queries, DML target selection, `tabledata.list` and
+row counts each run in a transaction with one evaluation time. The primitive rejects reads of its
+own staged policy rather than defining unverified script transaction visibility.
 
 Logical views are native DuckDB views whose comments preserve the original GoogleSQL definition
 and result schema. Materialized views use the same execution path, with their own object type

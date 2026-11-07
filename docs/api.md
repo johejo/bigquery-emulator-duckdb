@@ -28,7 +28,7 @@ emulator rejected.
 | [routines](#routines) | 3 | 2 | 3 |
 | [rowAccessPolicies](#rowaccesspolicies) | 0 | 0 | 8 |
 | [tabledata](#tabledata) | 1 | 1 | 0 |
-| [tables](#tables) | 3 | 3 | 3 |
+| [tables](#tables) | 4 | 2 | 3 |
 
 ## datasets
 
@@ -112,7 +112,7 @@ emulator rejected.
 | [`tables.getIamPolicy`](../third_party/bigquery_docs/reference/rest/v2/tables/getIamPolicy.md) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy` | Unsupported |  |
 | [`tables.insert`](../third_party/bigquery_docs/reference/rest/v2/tables/insert.md) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Partial | See [Tables](compatibility.md#tables) and [Materialized views](compatibility.md#materialized-views). Unsupported: ingestion-time partitioning; materializedView field enableRefresh; table field encryptionConfiguration. |
 | [`tables.list`](../third_party/bigquery_docs/reference/rest/v2/tables/list.md) | `GET projects/{projectsId}/datasets/{datasetsId}/tables` | Supported |  |
-| [`tables.patch`](../third_party/bigquery_docs/reference/rest/v2/tables/patch.md) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Partial | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes), [Resource tags](compatibility.md#resource-tags) and [External tables](compatibility.md#external-tables). Unsupported: changing externalDataConfiguration; partition expiration; table field encryptionConfiguration. |
+| [`tables.patch`](../third_party/bigquery_docs/reference/rest/v2/tables/patch.md) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Partial | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes), [Resource tags](compatibility.md#resource-tags) and [External tables](compatibility.md#external-tables). Unsupported: changing externalDataConfiguration; table field encryptionConfiguration. |
 | [`tables.setIamPolicy`](../third_party/bigquery_docs/reference/rest/v2/tables/setIamPolicy.md) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:setIamPolicy` | Unsupported |  |
 | [`tables.testIamPermissions`](../third_party/bigquery_docs/reference/rest/v2/tables/testIamPermissions.md) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:testIamPermissions` | Unsupported |  |
-| [`tables.update`](../third_party/bigquery_docs/reference/rest/v2/tables/update.md) | `PUT projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Partial | See [Schema changes](compatibility.md#schema-changes), [Resource tags](compatibility.md#resource-tags) and [External tables](compatibility.md#external-tables). Unsupported: partition expiration. |
+| [`tables.update`](../third_party/bigquery_docs/reference/rest/v2/tables/update.md) | `PUT projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | See [Schema changes](compatibility.md#schema-changes), [Resource tags](compatibility.md#resource-tags) and [External tables](compatibility.md#external-tables). |

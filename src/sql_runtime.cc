@@ -27,6 +27,7 @@
 #include "src/googlesql_functions_duckdb/objectref_options.h"
 #include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
+#include "src/partition_policy_history.h"
 #include "src/project.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
@@ -127,6 +128,7 @@ SqlRuntime::SqlRuntime(
       for (const std::string& statement : CreateHistoryStatements(project.project_id)) {
         backend_.Execute(statement);
       }
+      backend_.Execute(CreatePartitionPolicyHistoryStatement(project.project_id));
     } catch (const BackendError& error) {
       throw ApiError::Internal("Failed to open " + database + ": " + error.what());
     }

@@ -1,6 +1,8 @@
 #include "src/information_schema_options.h"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <iterator>
 #include <map>
 #include <string>
@@ -12,6 +14,17 @@
 #include "src/information_schema_rows.h"
 
 namespace bigquery_emulator_duckdb::information_schema {
+
+std::string Float64OptionValue(double value) {
+  std::array<char, 32> buffer{};
+  const std::to_chars_result result =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+  std::string text(buffer.data(), result.ptr);
+  if (text.find_first_of(".e") == std::string::npos) {
+    text += ".0";
+  }
+  return text;
+}
 
 std::string StringOptionValue(const std::string& value) {
   return googlesql::ToDoubleQuotedStringLiteral(value);

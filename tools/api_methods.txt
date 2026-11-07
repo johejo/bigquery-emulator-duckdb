@@ -21,6 +21,7 @@ setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tab
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "r"}, "schema": {"fields": [{"name": "record", "type": "RECORD", "mode": "REPEATED", "fields": [{"name": "id", "type": "INTEGER"}]}]}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "h"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "hp"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "5", "scale": "1", "roundingMode": "ROUND_HALF_EVEN"}]}}
+setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "pt"}, "schema": {"fields": [{"name": "d", "type": "DATE"}]}, "timePartitioning": {"type": "DAY", "field": "d"}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
 setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x INT64) AS (x + 1)", "useLegacySql": false}
 setup POST /bigquery/v2/projects/test/queries {"query": "CREATE SNAPSHOT TABLE d.ts CLONE d.t", "useLegacySql": false}
@@ -155,7 +156,7 @@ note bigquery.tables.insert | See [Tables](compatibility.md#tables) and [Materia
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}
-request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/pt {"timePartitioning": {"type": "DAY", "field": "d", "expirationMs": "3600000"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "defaultValueExpression": "3"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultRoundingMode": "ROUND_HALF_EVEN"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultCollation": "und:ci"}
@@ -169,7 +170,7 @@ request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/table
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER", "defaultValueExpression": "3"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "expirationTime": "1893456000000"}
-request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
+request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/pt {"timePartitioning": {"type": "DAY", "field": "d", "expirationMs": "3600000"}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/e {"tableReference": {"tableId": "e"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}]}, "externalDataConfiguration": {"sourceFormat": "PARQUET", "sourceUris": ["gs://bucket/data.parquet"]}, "description": "external"}
 note bigquery.tables.update | See [Schema changes](compatibility.md#schema-changes), [Resource tags](compatibility.md#resource-tags) and [External tables](compatibility.md#external-tables).
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1
