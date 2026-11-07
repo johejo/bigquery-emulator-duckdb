@@ -444,7 +444,8 @@ std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& 
       if (!offset) {
         return std::nullopt;
       }
-      return *offset +
+      // DuckDB accepts NULL offsets as CURRENT ROW; GoogleSQL rejects them.
+      return "coalesce(" + *offset + ", error('The boundary offset value cannot be null'))" +
              (bound.boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_PRECEDING
                   ? " PRECEDING"
                   : " FOLLOWING");

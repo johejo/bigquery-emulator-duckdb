@@ -1,3 +1,27 @@
+## NULL window boundary offsets
+
+# Error from GoogleSQL's analytic_window_frames and analytic_numeric_range_window_frames
+# compliance tests.
+DECLARE n INT64 DEFAULT NULL;
+SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN n PRECEDING AND CURRENT ROW) FROM UNNEST([1]) AS x
+=> error: The boundary offset value cannot be null
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN 2 PRECEDING AND n PRECEDING) FROM UNNEST([1]) AS x
+=> error: The boundary offset value cannot be null
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN n FOLLOWING AND 2 FOLLOWING) FROM UNNEST([1]) AS x
+=> error: The boundary offset value cannot be null
+
+DECLARE n INT64 DEFAULT NULL;
+SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN CURRENT ROW AND n FOLLOWING) FROM UNNEST([1]) AS x
+=> error: The boundary offset value cannot be null
+
+DECLARE n NUMERIC DEFAULT NULL;
+SELECT COUNT(*) OVER (ORDER BY CAST(x AS NUMERIC) RANGE BETWEEN n PRECEDING AND CURRENT ROW) FROM UNNEST([1]) AS x
+=> error: The boundary offset value cannot be null
+
 ## RANGE window frames ordered by INT64 near the type's limits
 
 # A frame's bound past INT64's limits, from a key near them or from a large offset. Answers

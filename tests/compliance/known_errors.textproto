@@ -650,23 +650,13 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "RANGE window frames overflow INT64 near the type's limits, and infinite and NULL offsets are not handled as BigQuery does"
+  reason: "RANGE window frames overflow INT64 near the type's limits, and infinite offsets are not handled as BigQuery does"
   label: "analytic_window_frames_test:range_window_inf_offset_11"
   label: "analytic_window_frames_test:range_window_inf_offset_12"
   label: "analytic_window_frames_test:range_window_inf_offset_13"
   label: "analytic_window_frames_test:range_window_inf_offset_14"
   label: "analytic_window_frames_test:range_window_nan_offset_3"
   label: "analytic_window_frames_test:range_window_nan_offset_4"
-  label: "analytic_window_frames_test:range_window_null_offset_1"
-  label: "analytic_window_frames_test:range_window_null_offset_2"
-  label: "analytic_window_frames_test:range_window_null_offset_3"
-  label: "analytic_window_frames_test:range_window_null_offset_4"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "RANGE window frames treat a NULL NUMERIC offset as CURRENT ROW instead of rejecting it"
-  label: "analytic_numeric_range_window_frames_test:numeric_range_window_null_offset"
 }
 
 known_errors {
