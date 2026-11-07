@@ -205,11 +205,33 @@ cc_test(
 )
 
 cc_library(
+    name = "expiration_policy",
+    srcs = ["src/expiration_policy.cc"],
+    hdrs = ["src/expiration_policy.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":api_error"],
+)
+
+cc_test(
+    name = "expiration_policy_test",
+    srcs = ["tests/expiration_policy_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":api_error",
+        ":expiration_policy",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "table_metadata",
     srcs = ["src/table_metadata.cc"],
     hdrs = ["src/table_metadata.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":expiration_policy",
         ":json_int64",
         ":text_encoding",
     ],

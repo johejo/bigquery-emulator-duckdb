@@ -349,6 +349,14 @@ Table and column comments store BigQuery metadata. Dataset metadata lives in
 `main.emulator_datasets` because DuckDB cannot comment on schemas. Catalog changes and their
 metadata writes share a transaction.
 
+[expiration_policy.cc](../src/expiration_policy.cc) resolves expiration defaults for ordinary
+native table creation without reading the clock or mutating metadata. It resolves table and
+partition defaults together: a dataset partition default suppresses the dataset table default
+only for time-partitioned tables, while explicit table deadlines survive. Request layers must
+interpret omission and removal before calling it; copy, clone, snapshot, LIKE and replacement
+inheritance are separate paths. Current runtime callers use only table expiration; partition
+expiration inputs remain unsupported.
+
 [table_history.cc](../src/table_history.cc) keeps a table's rows before each write for `FOR
 SYSTEM_TIME AS OF`, in tables of the project's `main` schema keyed by dataset, table and creation
 time. Writes outside a transaction hold a mutex so that each kept version is what the previous

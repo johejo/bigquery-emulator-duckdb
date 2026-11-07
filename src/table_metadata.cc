@@ -8,7 +8,6 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
-#include <limits>
 #include <map>
 #include <optional>
 #include <string>
@@ -20,6 +19,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
+#include "src/expiration_policy.h"
 #include "src/field_schema.h"
 #include "src/json_int64.h"
 #include "src/location.h"
@@ -1093,13 +1093,9 @@ void ValidateDefaultTableExpiration(const std::optional<int64_t>& milliseconds) 
 std::optional<int64_t> ExpirationWithDefault(const std::optional<int64_t>& expiration_time,
                                              int64_t creation_time,
                                              const DatasetMetadata& dataset) {
-  if (expiration_time.has_value() || !dataset.default_table_expiration_ms.has_value()) {
-    return expiration_time;
-  }
-  if (*dataset.default_table_expiration_ms > std::numeric_limits<int64_t>::max() - creation_time) {
-    throw ApiError::Invalid("The default table expiration of the dataset is out of range");
-  }
-  return creation_time + *dataset.default_table_expiration_ms;
+  return ResolveCreationExpiration(false, creation_time, {.table_deadline_ms = expiration_time},
+                                   dataset.default_table_expiration_ms, std::nullopt)
+      .table_deadline_ms;
 }
 
 void ValidateResourceTags(const std::map<std::string, std::string>& tags) {
