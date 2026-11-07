@@ -195,26 +195,38 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!array.empty()) {
     // List aggregates stay inside the enclosing conditional branch, unlike a correlated
     // scalar subquery, which DuckDB can evaluate even in an unselected branch. Keep the
-    // forms to one argument and a rule whose DuckDB call takes one argument; the rule's
-    // finish then reads the list aggregate's result as it does the aggregate's. ARRAY_AGG
-    // decorates each value with its sort key so sorting and deduplication also stay within
-    // list expressions.
+    // forms to rules with one row-dependent DuckDB argument; STRING_AGG may also
+    // take a constant delimiter. The rule's finish reads the list aggregate's result
+    // as it does the aggregate's. Decorated values keep sorting and deduplication
+    // within list expressions too.
     const std::string row = scope.context.FreshName("_value");
-    const std::vector<std::string> row_arguments = AggregateArguments(*rule, {row});
-    if (aggregate == nullptr || arguments.size() != 1 || !collation->empty() ||
-        row_arguments.size() != 1 || rule->distinct == AggregateRule::Distinct::kRequired ||
-        rule->distinct == AggregateRule::Distinct::kAlways ||
-        (name != "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty() ||
-                                 aggregate->limit() != nullptr)) ||
+    if (arguments.empty() || !collation->empty()) {
+      return Unsupported(scope, "horizontal aggregate " + name + " with this type or modifiers");
+    }
+    auto inputs = arguments;
+    inputs.at(0) = row;
+    const std::vector<std::string> row_arguments = AggregateArguments(*rule, inputs);
+    const bool ordered = name == "ARRAY_AGG" || name == "STRING_AGG" || name == "ARRAY_CONCAT_AGG";
+    const bool interval_extremum =
+        (name == "MIN" || name == "MAX") && type_of(0) == googlesql::TYPE_INTERVAL;
+    if (aggregate == nullptr || (arguments.size() != 1 && name != "STRING_AGG") ||
+        (row_arguments.size() != 1 && name != "STRING_AGG" && !interval_extremum) ||
+        (!ordered && (!aggregate->order_by_item_list().empty() || aggregate->limit() != nullptr)) ||
+        (call.distinct() && rule->distinct == AggregateRule::Distinct::kUnsupported) ||
+        (name == "ARRAY_AGG" && rule->distinct == AggregateRule::Distinct::kRequired) ||
         (name != "SUM" && name != "AVG" && name != "MIN" && name != "MAX" && name != "COUNT" &&
-         name != "ARRAY_AGG") ||
-        (name != "ARRAY_AGG" && call.null_handling_modifier() ==
-                                    googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS)) {
+         name != "ARRAY_AGG" && name != "STRING_AGG" && name != "ARRAY_CONCAT_AGG" &&
+         name != "ANY_VALUE" && name != "COUNTIF" && name != "LOGICAL_AND" &&
+         name != "LOGICAL_OR" && name != "BIT_AND" && name != "BIT_OR" && name != "BIT_XOR") ||
+        (name != "ARRAY_AGG" && name != "ANY_VALUE" &&
+         call.null_handling_modifier() ==
+             googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS)) {
       return Unsupported(scope, "horizontal aggregate " + name + " with this type or modifiers");
     }
     std::string value = arguments.at(0);
-    const bool decorated =
-        name == "ARRAY_AGG" && (call.distinct() || !aggregate->order_by_item_list().empty());
+    // INTERVAL DISTINCT SUM/AVG have a backend finish that compares interval lengths.
+    const bool distinct = call.distinct() && rule->distinct != AggregateRule::Distinct::kRequired;
+    const bool decorated = distinct || !aggregate->order_by_item_list().empty();
     if (decorated) {
       std::vector<std::string> keys;
       for (const auto& item : aggregate->order_by_item_list()) {
@@ -223,7 +235,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
           return std::nullopt;
         }
         if (item->collation_name() != nullptr || !key_collation->empty()) {
-          return Unsupported(scope, "horizontal ARRAY_AGG ordered with collation");
+          return Unsupported(scope, "horizontal aggregate ordered with collation");
         }
         auto key = Expression(*item->column_ref(), scope, columns);
         if (!key) {
@@ -252,7 +264,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
     std::string values =
         "list_transform(COALESCE(" + array + ", []), lambda " + element + ": " + value + ")";
-    if (rule->skip_nulls ||
+    if (rule->skip_nulls || name == "STRING_AGG" ||
         (name == "ARRAY_AGG" && call.null_handling_modifier() ==
                                     googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS)) {
       values = "list_filter(" + values + ", lambda " + row + ": " + row +
@@ -262,7 +274,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       // Wrapping values in non-NULL structs retains one NULL under DISTINCT, unlike
       // list_distinct on the values themselves. DISTINCT order keys are the argument,
       // as required by the resolver, so deduplicating decorated rows is equivalent.
-      if (call.distinct()) {
+      if (distinct) {
         values = "list_distinct(" + values + ")";
       }
       if (!aggregate->order_by_item_list().empty()) {
@@ -279,10 +291,21 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       // also makes LIMIT 0 an empty input, so ARRAY_AGG returns NULL rather than [].
       values = "list_slice(" + values + ", 1, " + *limit + ")";
     }
+    if (interval_extremum) {
+      // Compare interval lengths while carrying the original representation. Keeping
+      // the key first gives list_min/list_max the same ordering as arg_min/arg_max.
+      values = "list_filter(" + values + ", lambda " + row + ": " + row + " IS NOT NULL)";
+      values = "list_transform(" + values + ", lambda " + row +
+               ": struct_pack(key := " + row_arguments.at(1) + ", value := " + row + "))";
+      return "struct_extract(list_" + std::string(name == "MIN" ? "min" : "max") + "(" + values +
+             "), 'value')";
+    }
     if (!rule->arguments.empty()) {
       values = "list_transform(" + values + ", lambda " + row + ": " + row_arguments.at(0) + ")";
     }
-    const std::string sql = "list_aggregate(" + values + ", " + QuoteLiteral(rule->function) + ")";
+    std::vector<std::string> parameters = {values, QuoteLiteral(rule->function)};
+    parameters.insert(parameters.end(), row_arguments.begin() + 1, row_arguments.end());
+    const std::string sql = "list_aggregate(" + Join(parameters, ", ") + ")";
     const auto type = DuckDbType(call.type(), scope.context.timestamp_precision);
     return type ? std::optional("CAST(" +
                                 (rule->finish == nullptr ? sql : rule->finish(sql, arguments, "")) +
