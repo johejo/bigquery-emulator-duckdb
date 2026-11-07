@@ -210,6 +210,48 @@ cc_test(
 )
 
 cc_library(
+    name = "partition_policy_read",
+    srcs = ["src/partition_policy_read.cc"],
+    hdrs = ["src/partition_policy_read.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":duckdb_catalog",
+        ":duckdb_sql",
+        ":partition_policy_history",
+        ":table_comments",
+        ":table_history",
+        ":table_metadata",
+    ],
+    deps = [
+        ":backend",
+        ":references",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_test(
+    name = "partition_policy_read_test",
+    srcs = ["tests/partition_policy_read_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":backend",
+        ":backend_error",
+        ":field_schema",
+        ":partition_policy_history",
+        ":partition_policy_read",
+        ":partitioning",
+        ":references",
+        ":table_comments",
+        ":table_history",
+        ":table_metadata",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "expiration_policy",
     srcs = ["src/expiration_policy.cc"],
     hdrs = ["src/expiration_policy.h"],

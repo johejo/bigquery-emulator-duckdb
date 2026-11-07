@@ -177,6 +177,13 @@ current read; historical reads must supply their historical row version. This
 helper does not resolve that version or revalidate the storage identity, so it is
 not by itself a lifecycle entry point.
 
+`PartitionPolicyTableReadQuery()` in `partition_policy_read.h` composes raw row
+history resolution, policy filtering and execution-time storage identity validation.
+It requires construction and execution in the same active backend transaction:
+otherwise a write can create the first retained row version after row history was
+resolved, leaving a historical read pointing only at current rows. This read
+boundary is not yet wired into SQL or API requests and does not coordinate writes.
+
 Keep physically retained rows available for policy removal/extension and for time
 travel. Do not introduce a purge until independently verified retention behavior
 settles when these rows can no longer become visible. Any eventual cleanup is a
@@ -247,14 +254,23 @@ from the time it took an API request to finish.
 
 Policy history must be dated at the policy change as well as at row writes:
 shortening a duration at 12:00 must not simply rewrite the policy used at 11:00.
-Likewise, retained raw rows and visible rows are different inputs to DML: do not
-let an UPDATE or DELETE operate on rows a client cannot see without evidence of
-BigQuery doing so. That interaction needs independently answered cases before
-policy filtering can be enabled for DML. The unanswered cases in
-[`partition_expiration_dml.api.yaml`](../tests/e2e/goclient/testdata/unverified/partition_expiration_dml.api.yaml)
-observe affected-row counts, visible rows after UPDATE, DELETE or MERGE, and
-retained rows after policy removal. Updating an expired row's partition key is a
-separate case, since it could make a previously hidden row visible.
+Likewise, retained raw rows and visible rows are different inputs to DML. The
+recorded answers in
+[`partition_expiration_dml.api.yaml`](../tests/e2e/scenarios/testdata/known_bugs/partition_expiration_dml.api.yaml)
+establish these target-selection rules for the tested policy-change workflows:
+
+- UPDATE and DELETE affect visible rows only. Hidden rows remain physically
+  retained and become visible after policy removal.
+- Updating an expired row's partition key affects zero rows; it does not bring
+  that hidden row back into visibility.
+- MERGE matches against visible targets only. An expired target does not prevent
+  a NOT MATCHED insertion, and both the old retained row and the newly inserted
+  row are visible after policy removal.
+
+Apply visibility to target selection, not merely to the result of a mutation.
+Affected-row counts must exclude hidden targets. These cases do not establish
+visibility inside an explicit transaction or the treatment of newly written rows
+whose destination partitions are already expired.
 
 ## Operation boundaries
 
