@@ -2,11 +2,12 @@
 
 #include <map>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <utility>
 
+#include "absl/base/const_init.h"
 #include "absl/status/status.h"
+#include "absl/synchronization/mutex.h"
 #include "googlesql/public/builtin_function_options.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
@@ -18,10 +19,10 @@ namespace bigquery_emulator_duckdb {
 // Registration is expensive; cache each policy independently. Lookups are thread-safe.
 googlesql::SimpleCatalog* BuiltinCatalog(const ExcludedFunctionIds& excluded_function_ids,
                                          FunctionDeclarations declarations) {
-  static std::mutex mutex;
+  static absl::Mutex mutex(absl::kConstInit);
   using Key = std::pair<ExcludedFunctionIds, FunctionDeclarations>;
   static std::map<Key, std::unique_ptr<googlesql::SimpleCatalog>> catalogs;
-  const std::scoped_lock lock(mutex);
+  const absl::MutexLock lock(mutex);
   auto& cached = catalogs[{excluded_function_ids, declarations}];
   if (cached != nullptr) {
     return cached.get();

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -11,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -125,7 +125,7 @@ class Emulator : public SqlRuntime {
 
   ExternalConnections connections_{.backend = backend_};
   GcsClient gcs_client_;
-  std::mutex mutex_;
+  absl::Mutex mutex_;
   std::unordered_map<std::string, std::shared_ptr<const Job>> jobs_;
   std::unordered_set<std::string> running_jobs_;
   int64_t next_job_number_ = 1;

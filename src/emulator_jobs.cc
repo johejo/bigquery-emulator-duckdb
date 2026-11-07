@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "absl/log/absl_log.h"
+#include "absl/synchronization/mutex.h"
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -233,7 +234,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job, JobLocatio
                                             const std::function<void(Job&)>& body) {
   job->creation_time_ms = NowMillis();
   {
-    std::scoped_lock const lock(mutex_);
+    absl::MutexLock const lock(mutex_);
     if (job->job_id.empty()) {
       while (job->job_id.empty() || jobs_.contains(JobKey(job->project_id, job->job_id)) ||
              running_jobs_.contains(JobKey(job->project_id, job->job_id))) {
@@ -277,7 +278,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job, JobLocatio
   if (job->dry_run()) {
     return job;
   }
-  std::scoped_lock const lock(mutex_);
+  absl::MutexLock const lock(mutex_);
   const std::string key = JobKey(job->project_id, job->job_id);
   running_jobs_.erase(key);
   jobs_[key] = job;
@@ -674,7 +675,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
 std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id,
                                             const std::optional<std::string>& location) {
   project_id = ResolveProject(project_id);
-  std::scoped_lock const lock(mutex_);
+  absl::MutexLock const lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
   if (it == jobs_.end() || !InLocation(*it->second, location)) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
@@ -684,7 +685,7 @@ std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::s
 
 std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_id) {
   project_id = ResolveProject(project_id);
-  std::scoped_lock const lock(mutex_);
+  absl::MutexLock const lock(mutex_);
   std::vector<std::shared_ptr<const Job>> result;
   for (const auto& entry : jobs_) {
     const auto& job = entry.second;
@@ -704,7 +705,7 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_i
 void Emulator::DeleteJob(std::string project_id, const std::string& job_id,
                          const std::optional<std::string>& location) {
   project_id = ResolveProject(project_id);
-  std::scoped_lock const lock(mutex_);
+  absl::MutexLock const lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
   if (it == jobs_.end() || !InLocation(*it->second, location)) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);

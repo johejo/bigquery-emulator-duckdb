@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <exception>
 #include <memory>
-#include <mutex>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -17,6 +16,7 @@
 #include <vector>
 
 #include "absl/log/absl_log.h"
+#include "absl/synchronization/mutex.h"
 #include "google/cloud/bigquery/storage/v1/storage.grpc.pb.h"
 #include "google/cloud/bigquery/storage/v1/storage.pb.h"
 #include "google/cloud/bigquery/storage/v1/stream.pb.h"
@@ -311,7 +311,7 @@ class ReadService final : public pb::BigQueryRead::Service {
       }
       const size_t count = std::min<size_t>(std::max(1, request->max_stream_count()),
                                             std::max<size_t>(1, snapshot->rows->row_count()));
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       std::erase_if(streams_, [](const auto& stream) {
         return stream.second.snapshot->expiry <= Clock::now();
       });
@@ -332,7 +332,7 @@ class ReadService final : public pb::BigQueryRead::Service {
     return Guard([&] {
       ReadStream stream;
       {
-        std::scoped_lock const lock(mutex_);
+        absl::MutexLock const lock(mutex_);
         stream = Lookup(request->read_stream());
       }
       if (request->has_arrow_serialization_options()) {
@@ -409,7 +409,7 @@ class ReadService final : public pb::BigQueryRead::Service {
           request->fraction() >= 1) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "Split fraction must be between zero and one");
       }
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       const ReadStream stream = Lookup(request->name());
       const size_t length = stream.end - stream.begin;
       if (length < 2) {
@@ -440,7 +440,7 @@ class ReadService final : public pb::BigQueryRead::Service {
     return stream->second;
   }
   Emulator& emulator_;
-  std::mutex mutex_;
+  absl::Mutex mutex_;
   std::unordered_map<std::string, ReadStream> streams_;
 };
 
@@ -541,7 +541,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
       const auto info = DestinationInfo(table);
       auto state = NewStream(info, TablePath(table) + "/streams/" + NewId(), type);
       *response = state->metadata;
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       streams_.emplace(state->metadata.name(), std::move(state));
     });
   }
@@ -554,7 +554,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
           request->view() != pb::FULL) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "Invalid write stream view");
       }
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       const auto state = Get(request->name());
       if (IsDefault(state->metadata.name()) && !state->metadata.has_create_time()) {
         Fail(grpc::StatusCode::UNIMPLEMENTED,
@@ -612,7 +612,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
                                    const pb::FinalizeWriteStreamRequest* request,
                                    pb::FinalizeWriteStreamResponse* response) override {
     return Guard([&] {
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       const auto state = Get(request->name());
       if (IsDefault(state->metadata.name())) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "Cannot finalize the default stream");
@@ -625,7 +625,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
   grpc::Status FlushRows(grpc::ServerContext* /*context*/, const pb::FlushRowsRequest* request,
                          pb::FlushRowsResponse* response) override {
     return Guard([&] {
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       const auto state = Get(request->write_stream());
       if (state->metadata.type() != pb::WriteStream::BUFFERED) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "FlushRows requires a BUFFERED stream");
@@ -660,7 +660,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
       if (request->write_streams().empty()) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "write_streams must not be empty");
       }
-      std::scoped_lock const lock(mutex_);
+      absl::MutexLock const lock(mutex_);
       std::vector<std::shared_ptr<WriteState>> states;
       std::unordered_map<std::string, bool> seen;
       for (const auto& name : request->write_streams()) {
@@ -727,7 +727,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
     Connection& operator=(const Connection&) = delete;
     ~Connection() {
       if (lease) {
-        std::scoped_lock const lock(service.mutex_);
+        absl::MutexLock const lock(service.mutex_);
         lease->active = false;
       }
     }
@@ -840,7 +840,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
       Fail(grpc::StatusCode::UNIMPLEMENTED,
            "Storage Write requires protobuf rows; Arrow input is unsupported");
     }
-    std::scoped_lock const lock(mutex_);
+    absl::MutexLock const lock(mutex_);
     if (connection.name.empty() && request.write_stream().empty()) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "The first request must specify write_stream");
     }
@@ -983,7 +983,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
   }
 
   Emulator& emulator_;
-  std::mutex mutex_;
+  absl::Mutex mutex_;
   std::unordered_map<std::string, std::shared_ptr<WriteState>> streams_;
 };
 

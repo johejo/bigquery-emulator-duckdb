@@ -2,11 +2,11 @@
 
 #include <exception>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
 
+#include "absl/synchronization/mutex.h"
 #include "src/server/rest.h"
 #include "src/server/storage.h"
 
@@ -21,7 +21,7 @@ class Server::Impl {
   RestServer rest;
   StorageServer storage;
   std::thread worker;
-  std::mutex stop_mutex;
+  absl::Mutex stop_mutex;
   bool started = false;
   bool stopped = false;
   bool served = false;
@@ -80,7 +80,7 @@ bool Server::Wait() {
 }
 
 void Server::Stop() {
-  std::scoped_lock const lock(impl_->stop_mutex);
+  absl::MutexLock const lock(impl_->stop_mutex);
   if (!impl_->started || impl_->stopped) {
     return;
   }

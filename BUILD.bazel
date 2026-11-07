@@ -539,7 +539,9 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "//src/analyzer_functions",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/synchronization",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:type",
@@ -769,7 +771,9 @@ cc_library(
         "//src/googlesql_functions_duckdb:math",
         "//src/googlesql_geography_duckdb",
         "//src/translator:functions",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/synchronization",
     ],
     deps = ["//src/googlesql_functions_duckdb:options"],
 )
@@ -883,6 +887,7 @@ cc_library(
     deps = [
         ":field_schema",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -1098,6 +1103,7 @@ cc_library(
         "//third_party/duckdb",
         "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:civil_time",
         "@googlesql//googlesql/public:numeric_value",
@@ -1535,6 +1541,7 @@ cc_library(
         ":sql_runtime",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
+        "@abseil-cpp//absl/synchronization",
         "@nlohmann_json//:json",
     ],
 )
@@ -1681,6 +1688,7 @@ cc_library(
     implementation_deps = [
         "//src/server:rest",
         "//src/server:storage",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -2156,6 +2164,7 @@ cc_library(
         ":table_source",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/synchronization",
     ],
     deps = [
         ":external_query",
@@ -2273,6 +2282,7 @@ cc_library(
         "@abseil-cpp//absl/log:log_entry",
         "@abseil-cpp//absl/log:log_sink",
         "@abseil-cpp//absl/log:log_sink_registry",
+        "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
     ],
 )

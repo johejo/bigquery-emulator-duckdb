@@ -8,7 +8,6 @@
 #include <exception>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -19,6 +18,7 @@
 #include <vector>
 
 #include "absl/log/absl_log.h"
+#include "absl/synchronization/mutex.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
@@ -484,7 +484,7 @@ class RestServer::Impl {
     LoadRequest request = ParseLoadInsert(project, metadata);
     std::string id;
     {
-      std::scoped_lock const lock(uploads_mutex_);
+      absl::MutexLock const lock(uploads_mutex_);
       id = std::to_string(next_upload_id_++);
       uploads_.emplace(id, std::move(request));
     }
@@ -497,7 +497,7 @@ class RestServer::Impl {
   LoadRequest TakeResumableUpload(const httplib::Request& request) {
     const std::string project = emulator_.ResolveProject(Param(request, "projectId"));
     const std::string id = Param(request, "upload");
-    std::scoped_lock const lock(uploads_mutex_);
+    absl::MutexLock const lock(uploads_mutex_);
     const auto it = uploads_.find(id);
     if (it == uploads_.end() || it->second.project_id != project) {
       throw ApiError::NotFound("Upload session not found");
@@ -512,7 +512,7 @@ class RestServer::Impl {
   httplib::Server http_;
   // The number of requests read so far, which identifies each in the log.
   std::atomic<uint64_t> requests_ = 0;
-  std::mutex uploads_mutex_;
+  absl::Mutex uploads_mutex_;
   std::unordered_map<std::string, LoadRequest> uploads_;
   uint64_t next_upload_id_ = 1;
 };

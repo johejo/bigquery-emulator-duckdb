@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -13,6 +12,7 @@
 #include <vector>
 
 #include "absl/log/absl_log.h"
+#include "absl/synchronization/mutex.h"
 #include "duckdb.h"
 #include "duckdb_static_extension.h"
 #include "nlohmann/json.hpp"
@@ -187,7 +187,7 @@ std::vector<std::vector<std::optional<std::string>>> QueryResult::TextRows() con
 
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
-  std::mutex ddl_mutex;
+  absl::Mutex ddl_mutex;
   TimestampPrecision timestamp_precision;
   Database(const std::optional<std::string>& session_user,
            const functions_duckdb::ObjectStorage& storage,
@@ -378,7 +378,7 @@ void Backend::ExecuteDdl(const std::string& sql,
                          const std::string& skip_query, const std::vector<std::string>& setup) {
   // DuckDB's IF NOT EXISTS does not resolve concurrent catalog writes. Keep the existence
   // check, DDL and metadata in one serialized transaction, across all sessions of this database.
-  const std::scoped_lock lock(db_->ddl_mutex);
+  const absl::MutexLock lock(db_->ddl_mutex);
   const CallConnection connection = Connect();
   RunSetup(connection.get(), setup);
   const bool own_transaction = !session_ || !session_->in_transaction;
