@@ -39,11 +39,7 @@ std::string TableExists(const TableReference& table) {
 }
 
 std::string DatasetExists(const DatasetReference& dataset) {
-  return std::format(
-      "EXISTS (SELECT 1 FROM {}"
-      " WHERE catalog_name = {} AND schema_name = {})",
-      LogicalCatalog("information_schema.schemata"), QuoteLiteral(dataset.project_id),
-      QuoteLiteral(dataset.dataset_id));
+  return "EXISTS (SELECT 1 FROM " + SchemasQuery(dataset.project_id, dataset.dataset_id) + ")";
 }
 
 // The options `updates` sets on the table's or dataset's `metadata`.

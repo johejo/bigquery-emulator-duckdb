@@ -42,7 +42,11 @@ starting with `_bq_` as reversible `_bq_`-prefixed UTF-8 hex names in DuckDB. Ot
 written. This keeps names differing only in case distinct despite DuckDB's identifier matching,
 without collisions between literal names and encoded ones. The runtime resolves logical names
 using the dataset's `is_case_insensitive` setting before encoding SQL identifiers. Catalog reads
-decode physical names before filtering or returning them;
+use the `bq_schemas()`, `bq_relations()` and `bq_column_comments()` table functions of
+[catalog_functions.h](../src/catalog_functions.h), which look a named schema or relation up by its
+physical name and otherwise read only names and comments; DuckDB's `duckdb_tables()` and
+`information_schema` compute every relation's storage information and DDL and cannot push filters
+down. Reads that search by logical name decode physical names before filtering or returning them;
 REST metadata, GoogleSQL analysis and INFORMATION_SCHEMA use the logical names. DuckDB's native
 schemas and the emulator's internal tables in `main` keep their native names. Table history keys
 use the resolved, case-sensitive identity, not a case-folded spelling.
@@ -342,8 +346,10 @@ component depends on `Emulator` or the parser.
 Resource operations live in `sql_runtime_datasets.cc`, `sql_runtime_tables.cc` and
 `sql_runtime_routines.cc`; `sql_runtime_tabledata.cc` handles rows, and `sql_runtime_ddl.cc`
 handles query DDL metadata.
-Mutations and their response reads share the expiration mutex; expiration drops recheck metadata
-within their transaction.
+Mutations and their response reads share the expiration mutex
+([expiration_mutex.h](../src/expiration_mutex.h)); DML only keeps the drops of expired relations
+out while it runs, so DML statements run concurrently. Expiration drops recheck metadata within
+their transaction.
 
 Table and column comments store BigQuery metadata. Dataset metadata lives in
 `main.emulator_datasets` because DuckDB cannot comment on schemas. Catalog changes and their

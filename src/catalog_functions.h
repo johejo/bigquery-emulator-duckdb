@@ -12,6 +12,8 @@ namespace bigquery_emulator_duckdb {
 // - bq_relations(database := ..., schema := ..., name := ...) returns database_name, schema_name,
 //   table_name, type ('TABLE' or 'VIEW'), comment and table_oid for each table and view. Each named
 //   argument is optional and matches the stored name exactly.
+// - bq_schemas(database := ..., schema := ...) returns database_name and schema_name for each
+//   schema, with the same optional arguments.
 // - bq_column_comments(database, schema, name) returns column_index, from 1, and comment for each
 //   column of that table or view, or no rows when there is none.
 void RegisterCatalogFunctions(duckdb_database database);

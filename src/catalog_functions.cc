@@ -69,6 +69,38 @@ bool Matches(const std::optional<std::string>& wanted, const Identifier& name) {
   return !wanted.has_value() || *wanted == name.GetIdentifierName();
 }
 
+// The schemas `filter` selects, ignoring its name, found by lookup when it names one.
+std::vector<std::reference_wrapper<SchemaCatalogEntry>> FindSchemas(ClientContext& context,
+                                                                    const RelationFilter& filter) {
+  std::vector<std::reference_wrapper<SchemaCatalogEntry>> schemas;
+  if (!filter.database.has_value()) {
+    for (SchemaCatalogEntry& schema : duckdb::Catalog::GetAllSchemas(context)) {
+      if (Matches(filter.schema, schema.name)) {
+        schemas.emplace_back(schema);
+      }
+    }
+    return schemas;
+  }
+  auto catalog = duckdb::Catalog::GetCatalogEntry(context, Identifier(*filter.database));
+  if (!catalog || catalog->GetName().GetIdentifierName() != *filter.database) {
+    return schemas;
+  }
+  if (!filter.schema.has_value()) {
+    catalog->ScanSchemas(context,
+                         [&](SchemaCatalogEntry& schema) { schemas.emplace_back(schema); });
+    return schemas;
+  }
+  auto schema =
+      catalog->GetSchema(context,
+                         duckdb::EntryLookupInfo(CatalogType::SCHEMA_ENTRY,
+                                                 duckdb::QualifiedName(Identifier(*filter.schema))),
+                         duckdb::OnEntryNotFound::RETURN_NULL);
+  if (schema && schema->name.GetIdentifierName() == *filter.schema) {
+    schemas.emplace_back(*schema);
+  }
+  return schemas;
+}
+
 // The tables and views `filter` selects, found by lookup when it names them.
 std::vector<std::reference_wrapper<CatalogEntry>> FindRelations(ClientContext& context,
                                                                 const RelationFilter& filter) {
@@ -79,42 +111,55 @@ std::vector<std::reference_wrapper<CatalogEntry>> FindRelations(ClientContext& c
       entries.emplace_back(entry);
     }
   };
-  if (!filter.database.has_value()) {
-    for (SchemaCatalogEntry& schema : duckdb::Catalog::GetAllSchemas(context)) {
-      if (Matches(filter.schema, schema.name)) {
-        schema.Scan(context, CatalogType::TABLE_ENTRY, add);
-      }
-    }
-    return entries;
-  }
-  auto catalog = duckdb::Catalog::GetCatalogEntry(context, Identifier(*filter.database));
-  if (!catalog || catalog->GetName().GetIdentifierName() != *filter.database) {
-    return entries;
-  }
-  if (!filter.schema.has_value()) {
-    catalog->ScanSchemas(context, [&](SchemaCatalogEntry& schema) {
+  for (SchemaCatalogEntry& schema : FindSchemas(context, filter)) {
+    if (!filter.name.has_value()) {
       schema.Scan(context, CatalogType::TABLE_ENTRY, add);
-    });
-    return entries;
-  }
-  auto schema =
-      catalog->GetSchema(context,
-                         duckdb::EntryLookupInfo(CatalogType::SCHEMA_ENTRY,
-                                                 duckdb::QualifiedName(Identifier(*filter.schema))),
-                         duckdb::OnEntryNotFound::RETURN_NULL);
-  if (!schema || schema->name.GetIdentifierName() != *filter.schema) {
-    return entries;
-  }
-  if (!filter.name.has_value()) {
-    schema->Scan(context, CatalogType::TABLE_ENTRY, add);
-    return entries;
-  }
-  // A table lookup also finds a view, since they share a namespace.
-  if (auto entry = schema->GetEntry(catalog->GetCatalogTransaction(context),
-                                    CatalogType::TABLE_ENTRY, Identifier(*filter.name))) {
-    add(*entry);
+      continue;
+    }
+    // A table lookup also finds a view, since they share a namespace.
+    if (auto entry = schema.GetEntry(schema.ParentCatalog().GetCatalogTransaction(context),
+                                     CatalogType::TABLE_ENTRY, Identifier(*filter.name))) {
+      add(*entry);
+    }
   }
   return entries;
+}
+
+struct SchemasState : GlobalTableFunctionState {
+  std::vector<std::reference_wrapper<SchemaCatalogEntry>> schemas;
+  size_t offset = 0;
+};
+
+duckdb::unique_ptr<FunctionData> SchemasBind(ClientContext& /*context*/,
+                                             TableFunctionBindInput& input,
+                                             duckdb::vector<LogicalType>& types,
+                                             duckdb::vector<Identifier>& names) {
+  for (const char* name : {"database_name", "schema_name"}) {
+    names.emplace_back(name);
+    types.emplace_back(LogicalType::VARCHAR);
+  }
+  auto filter = duckdb::make_uniq<RelationFilter>();
+  filter->database = NamedString(input, "database");
+  filter->schema = NamedString(input, "schema");
+  return filter;
+}
+
+duckdb::unique_ptr<GlobalTableFunctionState> SchemasInit(ClientContext& context,
+                                                         TableFunctionInitInput& input) {
+  auto state = duckdb::make_uniq<SchemasState>();
+  state->schemas = FindSchemas(context, input.bind_data->Cast<RelationFilter>());
+  return state;
+}
+
+void SchemasScan(ClientContext& /*context*/, TableFunctionInput& input, DataChunk& output) {
+  auto& state = input.global_state->Cast<SchemasState>();
+  duckdb::idx_t count = 0;
+  while (state.offset < state.schemas.size() && count < STANDARD_VECTOR_SIZE) {
+    const SchemaCatalogEntry& schema = state.schemas[state.offset++];
+    output.data[0].Append(Value(schema.ParentCatalog().GetName()));
+    output.data[1].Append(Value(schema.name));
+    ++count;
+  }
 }
 
 struct EntriesState : GlobalTableFunctionState {
@@ -238,6 +283,12 @@ void RegisterCatalogFunctions(duckdb_database database) {
                                                             .Add("schema", LogicalType::VARCHAR)
                                                             .Add("name", LogicalType::VARCHAR)),
                                           RelationsScan, RelationsBind, RelationsInit));
+    loader.RegisterFunction(TableFunction("bq_schemas",
+                                          duckdb::FunctionSignature().AddTypedKwargs(
+                                              "filter", duckdb::TypedKwargs()
+                                                            .Add("database", LogicalType::VARCHAR)
+                                                            .Add("schema", LogicalType::VARCHAR)),
+                                          SchemasScan, SchemasBind, SchemasInit));
     loader.RegisterFunction(TableFunction(
         "bq_column_comments", {LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR},
         ColumnCommentsScan, ColumnCommentsBind, ColumnCommentsInit));

@@ -56,10 +56,8 @@ bool IsDuckDbSchema(const std::string& name) {
 
 // The datasets of `project`, by name.
 std::string DatasetsQuery(const std::string& project) {
-  return std::format(
-      "SELECT schema_name FROM {} WHERE catalog_name = {}"
-      " AND schema_name NOT IN {} ORDER BY schema_name",
-      LogicalCatalog("information_schema.schemata"), QuoteLiteral(project), kDuckDbSchemas);
+  return std::format("SELECT schema_name FROM {} WHERE schema_name NOT IN {} ORDER BY schema_name",
+                     LogicalCatalog(SchemasQuery(project)), kDuckDbSchemas);
 }
 
 // The datasets of `project` by name, each with the metadata recorded for it, or only `dataset`.
@@ -67,11 +65,10 @@ std::string DatasetEntriesQuery(const std::string& project,
                                 const std::optional<std::string>& dataset) {
   return std::format(
       "SELECT schema_name, (SELECT metadata FROM {} WHERE dataset_id = schema_name)"
-      " FROM {} WHERE catalog_name = {} AND schema_name NOT IN {}{}"
-      " ORDER BY schema_name",
-      DatasetMetadataTable(project), LogicalCatalog("information_schema.schemata"),
-      QuoteLiteral(project), kDuckDbSchemas,
-      dataset.has_value() ? " AND schema_name = " + QuoteLiteral(*dataset) : "");
+      " FROM {} WHERE schema_name NOT IN {} ORDER BY schema_name",
+      DatasetMetadataTable(project),
+      LogicalCatalog(dataset.has_value() ? SchemasQuery(project, *dataset) : SchemasQuery(project)),
+      kDuckDbSchemas);
 }
 
 DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded) {
@@ -127,18 +124,14 @@ std::optional<DatasetReference> FindDatasetReference(Backend& backend,
                                                      const DatasetReference& dataset) {
   // Match stored identifiers directly before decoding the catalog for case-insensitive
   // aliases. Ordinary exact references need neither a catalog-wide decode nor sorting.
-  if (!backend
-           .Execute(std::format("SELECT 1 FROM information_schema.schemata WHERE catalog_name = {}"
-                                " AND schema_name = {}",
-                                QuoteLiteral(dataset.project_id),
-                                QuoteLiteral(DatasetCatalogName(dataset.dataset_id))))
+  if (!backend.Execute("SELECT 1 FROM " + SchemasQuery(dataset.project_id, dataset.dataset_id))
            .rows.empty()) {
     return dataset;
   }
   const QueryResult result = backend.Execute(
-      std::format("SELECT schema_name FROM {} WHERE catalog_name = {}"
-                  " AND lower(schema_name) = lower({}) ORDER BY schema_name = {} DESC",
-                  LogicalCatalog("information_schema.schemata"), QuoteLiteral(dataset.project_id),
+      std::format("SELECT schema_name FROM {} WHERE lower(schema_name) = lower({})"
+                  " ORDER BY schema_name = {} DESC",
+                  LogicalCatalog(SchemasQuery(dataset.project_id)),
                   QuoteLiteral(dataset.dataset_id), QuoteLiteral(dataset.dataset_id)));
   for (size_t row = 0; row < result.rows.size(); ++row) {
     DatasetReference candidate{
@@ -204,11 +197,10 @@ void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& datas
     return;
   }
   if (!backend
-           .Execute(std::format("SELECT 1 FROM {} WHERE catalog_name = {} AND lower(schema_name) = "
-                                "lower({}) AND schema_name <> {}",
-                                LogicalCatalog("information_schema.schemata"),
-                                QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id),
-                                QuoteLiteral(dataset.dataset_id)))
+           .Execute(std::format("SELECT 1 FROM {} WHERE lower(schema_name) = lower({})"
+                                " AND schema_name <> {}",
+                                LogicalCatalog(SchemasQuery(dataset.project_id)),
+                                QuoteLiteral(dataset.dataset_id), QuoteLiteral(dataset.dataset_id)))
            .rows.empty()) {
     throw ApiError::Invalid(
         "Cannot enable is_case_insensitive the dataset name is case insensitively duplicate with "
