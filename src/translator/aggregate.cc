@@ -61,7 +61,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   // A graph value's STRUCT is equal to another exactly when their identities are, so functions
-  // that only count or compare whole values opt in. BigQuery does not group paths, which
+  // that count, compare or carry whole values opt in. BigQuery does not group paths, which
   // GoogleSQL lets DISTINCT do.
   if ((HasGraph(call.type()) ||
        std::ranges::any_of(call.argument_list(),
@@ -470,8 +470,8 @@ std::optional<std::vector<std::string>> PartitionKeys(
       if (!collation) {
         return std::nullopt;
       }
-      if (HasGraph(ref->type())) {
-        Unsupported(scope, "PARTITION BY with graph values");
+      if (HasGraph(ref->type()) && !ref->type()->IsGraphElement()) {
+        Unsupported(scope, "PARTITION BY with graph paths or nested graph values");
         return std::nullopt;
       }
       if (scope.context.functions.restrictions().scalar_window_partition_keys_only &&
@@ -488,8 +488,11 @@ std::optional<std::vector<std::string>> PartitionKeys(
       if (!key) {
         return std::nullopt;
       }
-      keys.push_back(CollationKey(ref->type()->IsInterval() ? IntervalKey(*key) : *key, *collation,
-                                  ref->type()));
+      // Properties do not participate in graph element identity, just as in GROUP BY.
+      keys.push_back(ref->type()->IsGraphElement()
+                         ? "struct_extract(" + *key + ", '$id')"
+                         : CollationKey(ref->type()->IsInterval() ? IntervalKey(*key) : *key,
+                                        *collation, ref->type()));
     }
   }
   return keys;

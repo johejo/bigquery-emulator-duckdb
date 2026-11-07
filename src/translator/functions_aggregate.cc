@@ -502,7 +502,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
 
       Define("ANY_VALUE", {{.function = "any_value", .carries = true}},
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
       // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
       // days, so the INTERVAL function keeps the first of them, and LIMIT then slices them.
@@ -541,6 +541,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                          TypeUse::kAggregatesRange,
                          TypeUse::kBigNumeric,
                          TypeUse::kRejectsAnalyticDistinct,
+                         TypeUse::kGraphValues,
                      },
              }),
       // ARRAY_CONCAT_AGG skips NULL arrays.
@@ -556,7 +557,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  },
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("KLL_QUANTILES.INIT_INT64", {KllInit(true)}, {.uses = kKllUses}),
@@ -665,7 +666,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "arg_max_null", .carries = true},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("MIN_BY",
@@ -679,7 +680,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                  {.function = "arg_min_null", .carries = true},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
       // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their
       // hexadecimal digits; the default delimiter is b','.
@@ -931,7 +932,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
                  },
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("LEAD",
@@ -945,7 +946,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
                  },
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("FIRST_VALUE",
@@ -953,7 +954,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
                  {.function = "first_value", .nulls = kModifier, .carries = true},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("LAST_VALUE",
@@ -961,7 +962,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
                  {.function = "last_value", .nulls = kModifier, .carries = true},
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("NTH_VALUE",
@@ -974,7 +975,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> An
                  },
              },
              {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric, TypeUse::kGraphValues},
              }),
 
       Define("PERCENTILE_CONT",

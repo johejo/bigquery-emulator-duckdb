@@ -1,0 +1,57 @@
+# Sources: third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md
+# third_party/bigquery_docs/reference/standard-sql/navigation_functions.md
+# third_party/bigquery_docs/reference/standard-sql/data-types.md (groupable types)
+# These functions accept any input type (ARRAY_AGG excludes ARRAY). Keep graph values
+# inside the graph query and return only properties, predicates or path lengths.
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN ANY_VALUE(n HAVING MAX n.id).id AS result
+=> "3"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN MAX_BY(n, n.id).name AS result
+=> "Lee"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN MIN_BY(n, n.id).name AS result
+=> "Alex"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN ARRAY_AGG(n ORDER BY n.id DESC LIMIT 2)[OFFSET(1)].name AS result
+=> "Dana"
+GRAPH scalar_graph.FinGraph MATCH (n:Person)-[:Knows]->(m:Person) RETURN ARRAY_LENGTH(ARRAY_AGG(DISTINCT n)) AS result
+=> "2"
+GRAPH scalar_graph.HiddenKeys MATCH (n:Person) RETURN ARRAY_LENGTH(ARRAY_AGG(DISTINCT n)) AS result
+=> "3"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN ARRAY_AGG(n ORDER BY n.id) AS nodes NEXT RETURN ARRAY_CONCAT_AGG(nodes)[OFFSET(2)].name AS result
+=> "Lee"
+GRAPH scalar_graph.FinGraph MATCH (n:Person WHERE n.id = 3) OPTIONAL MATCH (m:Person WHERE m.id = 999) RETURN ANY_VALUE(m) IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph MATCH (n:Person WHERE n.id = 3) OPTIONAL MATCH (m:Person WHERE m.id = 999) RETURN ARRAY_AGG(m IGNORE NULLS) IS NULL AS result
+=> "true"
+GRAPH scalar_graph.FinGraph MATCH p = (n:Person)-[e:Knows]->(m:Person) RETURN PATH_LENGTH(ANY_VALUE(p HAVING MAX e.id)) AS result
+=> "1"
+GRAPH scalar_graph.FinGraph MATCH p = (n:Person)-[e:Knows]->(m:Person) RETURN PATH_LENGTH(ARRAY_AGG(p ORDER BY e.id)[OFFSET(0)]) AS result
+=> "1"
+
+# A scalar aggregate after NEXT makes each window case independent of output row order.
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN FIRST_VALUE(n) OVER (ORDER BY n.id) AS first NEXT RETURN MAX(first.id) AS result
+=> "1"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN LAST_VALUE(n) OVER (ORDER BY n.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last NEXT RETURN MIN(last.id) AS result
+=> "3"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN NTH_VALUE(n, 2) OVER (ORDER BY n.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS second NEXT RETURN MIN(second.id) AS result
+=> "2"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN LAG(n) OVER (ORDER BY n.id) AS previous NEXT RETURN SUM(previous.id) AS result
+=> "3"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN LEAD(n) OVER (ORDER BY n.id) AS successor NEXT RETURN SUM(successor.id) AS result
+=> "5"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN ARRAY_AGG(n) OVER () AS nodes NEXT RETURN MAX(ARRAY_LENGTH(nodes)) AS result
+=> "3"
+GRAPH scalar_graph.FinGraph MATCH (n:Person)-[e:Knows]->(m:Person) RETURN COUNT(*) OVER (PARTITION BY n) AS c NEXT RETURN MAX(c) AS result
+=> "3"
+GRAPH scalar_graph.HiddenKeys MATCH (n:Person), (m:Person) RETURN COUNT(*) OVER (PARTITION BY n) AS c NEXT RETURN MAX(c) AS result
+=> "3"
+GRAPH scalar_graph.CompoundGraph MATCH (n:Compound), (m:Compound) RETURN COUNT(*) OVER (PARTITION BY n) AS c NEXT RETURN MAX(c) AS result
+=> "3"
+GRAPH scalar_graph.FinGraph MATCH (n:Person)-[e:Knows]->(m:Person) RETURN FIRST_VALUE(e) OVER (PARTITION BY n ORDER BY e.id) AS first NEXT RETURN COUNT(DISTINCT first) AS result
+=> "2"
+GRAPH scalar_graph.FinGraph MATCH p = (n:Person)-[e:Knows]->(m:Person) RETURN FIRST_VALUE(p) OVER (ORDER BY e.id) AS first NEXT RETURN MAX(PATH_LENGTH(first)) AS result
+=> "1"
+
+# NULL handling applies to the whole graph element, not its properties.
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN FIRST_VALUE(IF(n.id = 1, NULL, n) IGNORE NULLS) OVER (ORDER BY n.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS first NEXT RETURN MAX(first.id) AS result
+=> "2"
+GRAPH scalar_graph.FinGraph MATCH (n:Person) RETURN FIRST_VALUE(IF(n.id = 1, NULL, n) RESPECT NULLS) OVER (ORDER BY n.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS first NEXT RETURN COUNT(first) AS result
+=> "0"

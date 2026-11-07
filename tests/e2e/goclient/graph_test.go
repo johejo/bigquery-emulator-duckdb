@@ -77,7 +77,6 @@ func TestPropertyGraph(t *testing.T) {
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN SAFE.SAME(p, p))",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN SAFE.ALL_DIFFERENT(p, p))",
 		"GRAPH go_graph.FinGraph MATCH path = (p:Person)-[:Owns]->(a:Account) RETURN COUNT(DISTINCT path) AS n",
-		"GRAPH go_graph.FinGraph MATCH (p:Person)-[:Owns]->(a:Account) RETURN COUNT(*) OVER (PARTITION BY p) AS n",
 	} {
 		if _, err := client.Query(sql).Read(ctx); err == nil {
 			t.Fatalf("unsupported form succeeded: %s", sql)
