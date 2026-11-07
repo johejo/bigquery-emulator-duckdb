@@ -35,6 +35,7 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/multi_catalog.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/parse_location.h"
 #include "googlesql/public/parse_resume_location.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/sql_function.h"
@@ -166,6 +167,11 @@ bool IsProjectId(const std::vector<std::string>& path) {
   return path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "project_id");
 }
 
+// Whether `path` names the read-only @@row_count, which the emulator knows only after DML.
+bool IsRowCount(const std::vector<std::string>& path) {
+  return path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "row_count");
+}
+
 // The statements of a script that the emulator does not run, with what to call them.
 std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
   if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT) {
@@ -173,9 +179,9 @@ std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) 
                           ->system_variable()
                           ->path()
                           ->ToIdentifierVector();
-    if (path.size() != 1 ||
-        (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
-         !absl::EqualsIgnoreCase(path.front(), "dataset_project_id") && !IsProjectId(path))) {
+    if (path.size() != 1 || (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
+                             !absl::EqualsIgnoreCase(path.front(), "dataset_project_id") &&
+                             !IsProjectId(path) && !IsRowCount(path))) {
       return "assignment to system variables other than @@dataset_id and @@dataset_project_id";
     }
   }
@@ -287,7 +293,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                     const googlesql::ASTSystemVariableAssignment* assignment,
                                     const googlesql::Value& value) override {
     const auto path = assignment->system_variable()->path()->ToIdentifierVector();
-    if (IsProjectId(path)) {
+    if (IsProjectId(path) || IsRowCount(path)) {
       return googlesql::AssignmentToReadOnlySystemVariable(assignment);
     }
     const auto variable = system_variables_.find(path);
@@ -302,17 +308,24 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
 
   absl::Status ExecuteStatement(const googlesql::ScriptExecutor& executor,
                                 const googlesql::ScriptSegment& segment) override {
-    return Evaluate([&]() -> absl::Status {
+    // The statement may read the count of the DML before it; afterwards, its own count applies.
+    std::optional<int64_t> row_count;
+    const absl::Status status = Evaluate([&]() -> absl::Status {
       GOOGLESQL_ASSIGN_OR_RETURN(QueryResult result, RunStatement(executor, segment, false));
+      if (result.affected_rows >= 0) {
+        row_count = result.affected_rows;
+      }
       last_result_ = std::move(result);
       return absl::OkStatus();
     });
+    row_count_ = row_count;
+    return status;
   }
 
   absl::StatusOr<std::unique_ptr<googlesql::EvaluatorTableIterator>> ExecuteQueryWithResult(
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
     std::unique_ptr<googlesql::EvaluatorTableIterator> iterator;
-    GOOGLESQL_RETURN_IF_ERROR(Evaluate([&]() -> absl::Status {
+    const absl::Status status = Evaluate([&]() -> absl::Status {
       std::vector<std::string> names;
       std::vector<const googlesql::Type*> types;
       GOOGLESQL_ASSIGN_OR_RETURN(
@@ -341,7 +354,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       }
       iterator = std::make_unique<RowIterator>(std::move(names), std::move(types), std::move(rows));
       return absl::OkStatus();
-    }));
+    });
+    row_count_.reset();
+    GOOGLESQL_RETURN_IF_ERROR(status);
     return iterator;
   }
 
@@ -349,11 +364,14 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment,
       const googlesql::Type* target_type) override {
     googlesql::Value value;
-    GOOGLESQL_RETURN_IF_ERROR(Evaluate([&]() -> absl::Status {
+    const absl::Status status = Evaluate([&]() -> absl::Status {
       GOOGLESQL_ASSIGN_OR_RETURN(
           value, EvaluateExpression(executor, segment.GetSegmentText(), &segment, target_type));
       return absl::OkStatus();
-    }));
+    });
+    // The expression may read the count of the DML before it, but is not DML itself.
+    row_count_.reset();
+    GOOGLESQL_RETURN_IF_ERROR(status);
     return value;
   }
 
@@ -368,10 +386,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     absl::StrAppend(&sql, " ELSE -1 END");
     googlesql::Value value;
-    GOOGLESQL_RETURN_IF_ERROR(Evaluate([&]() -> absl::Status {
+    const absl::Status status = Evaluate([&]() -> absl::Status {
       GOOGLESQL_ASSIGN_OR_RETURN(value, EvaluateExpression(executor, sql, nullptr, nullptr));
       return absl::OkStatus();
-    }));
+    });
+    row_count_.reset();
+    GOOGLESQL_RETURN_IF_ERROR(status);
     return static_cast<int>(value.int64_value());
   }
 
@@ -571,6 +591,22 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return googlesql_base::StatusBuilder(status).AttachPayload(googlesql::ScriptException());
   }
 
+  // BigQuery reports an error in a statement's options, which the emulator checks as it translates
+  // the statement, with the statement's location. Errors of execution keep their message.
+  static ApiError StatementError(const ApiError& error, const googlesql::ScriptSegment& statement) {
+    if (error.reason() != "invalidQuery" ||
+        std::string_view(error.what()).starts_with(kUnsupported)) {
+      return error;
+    }
+    const googlesql::ParseLocationTranslator translator(statement.script());
+    const auto position = translator.GetLineAndColumnAfterTabExpansion(statement.range().start());
+    if (!position.ok()) {
+      return error;
+    }
+    return error.WithMessage(absl::StrCat("Query error: ", error.what(), " at [", position->first,
+                                          ":", position->second, "]"));
+  }
+
   AnalyzerSettings Settings(const googlesql::ScriptExecutor& executor) const {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
@@ -593,8 +629,14 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     // until checked against BigQuery. Without a request default, both are confirmed to start as
     // NULL. @@project_id is read-only and known from the start.
     for (const auto& [path, value] : system_variables_) {
-      if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path) ||
-          IsProjectId(path)) {
+      if (IsRowCount(path)) {
+        // BigQuery documents the value only right after a DML statement; other reads remain
+        // unsupported until checked.
+        if (row_count_) {
+          variables.emplace(path, googlesql::Value::Int64(*row_count_));
+        }
+      } else if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path) ||
+                 IsProjectId(path)) {
         variables.emplace(path, value);
       }
     }
@@ -850,25 +892,30 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     std::string unsupported;
     const auto variables = SystemVariables(executor);
-    const std::optional<TranslatedStatement> translation =
-        TranslateStatement(host_.functions(), analyzed.statement(), parameters,
-                           DefaultDataset{
-                               .project = settings.default_project,
-                               .dataset = settings.default_dataset,
-                               .temporary = catalog.temporary.get(),
-                               .source = catalog.source.get(),
-                               .resources = std::make_shared<StatementResources>(
-                                   StatementResources::Mode::kExecute,
-                                   [this](const std::string& sql) {
-                                     return backend_->Execute(sql, setup_, true).TextRows();
-                                   }),
-                               .has_session_user = host_.has_session_user(),
-                               .evaluate =
-                                   [this](const std::string& sql, const googlesql::Type* type) {
-                                     return ResultValue(backend_->Execute(sql, setup_, true), type);
-                                   },
-                           },
-                           &unsupported, &variables);
+    std::optional<TranslatedStatement> translation;
+    try {
+      translation = TranslateStatement(
+          host_.functions(), analyzed.statement(), parameters,
+          DefaultDataset{
+              .project = settings.default_project,
+              .dataset = settings.default_dataset,
+              .temporary = catalog.temporary.get(),
+              .source = catalog.source.get(),
+              .resources = std::make_shared<StatementResources>(
+                  StatementResources::Mode::kExecute,
+                  [this](const std::string& sql) {
+                    return backend_->Execute(sql, setup_, true).TextRows();
+                  }),
+              .has_session_user = host_.has_session_user(),
+              .evaluate =
+                  [this](const std::string& sql, const googlesql::Type* type) {
+                    return ResultValue(backend_->Execute(sql, setup_, true), type);
+                  },
+          },
+          &unsupported, &variables);
+    } catch (const ApiError& error) {
+      throw StatementError(error, segment);
+    }
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }
@@ -900,17 +947,21 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const auto resources = std::make_shared<StatementResources>(
         StatementResources::Mode::kExecute,
         [this](const std::string& sql) { return backend_->Execute(sql, setup_, true).TextRows(); });
-    const std::optional<std::string> query =
-        TranslateExpression(host_.functions(), analyzed.expression(), parameters,
-                            DefaultDataset{
-                                .project = settings.default_project,
-                                .dataset = settings.default_dataset,
-                                .temporary = catalog.temporary.get(),
-                                .source = catalog.source.get(),
-                                .resources = resources,
-                                .has_session_user = host_.has_session_user(),
-                            },
-                            &unsupported, &variables);
+    const std::optional<std::string> query = TranslateExpression(
+        host_.functions(), analyzed.expression(), parameters,
+        DefaultDataset{
+            .project = settings.default_project,
+            .dataset = settings.default_dataset,
+            .temporary = catalog.temporary.get(),
+            .source = catalog.source.get(),
+            .resources = resources,
+            .has_session_user = host_.has_session_user(),
+            .evaluate =
+                [this](const std::string& sql, const googlesql::Type* type) {
+                  return ResultValue(backend_->Execute(sql, setup_, true), type);
+                },
+        },
+        &unsupported, &variables);
     if (!query.has_value()) {
       return Unsupported(unsupported);
     }
@@ -942,6 +993,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   std::unique_ptr<Backend> backend_;
   bool in_transaction_ = false;
   bool transaction_failed_ = false;
+  // Rows the previous statement inserted, updated or deleted, when it was DML.
+  std::optional<int64_t> row_count_;
   std::optional<QueryResult> last_result_;
   std::optional<ApiError> error_;
   // The frames the script runs in, the innermost last.
@@ -982,6 +1035,7 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
                                   : googlesql::Value::String(default_dataset),
       },
       {{"project_id"}, googlesql::Value::String(query_project)},
+      {{"row_count"}, googlesql::Value::NullInt64()},
   };
   AnalyzerSettings settings{
       .default_project = default_project,

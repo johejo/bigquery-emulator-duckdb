@@ -1554,6 +1554,7 @@ cc_library(
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:multi_catalog",
         "@googlesql//googlesql/public:options_cc_proto",
+        "@googlesql//googlesql/public:parse_location",
         "@googlesql//googlesql/public:parse_resume_location",
         "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:sql_function",

@@ -322,6 +322,35 @@ CREATE TEMP TABLE t AS SELECT 10 AS a;
 SELECT MAX(a) FROM scalars.t
 => "3"
 
+## @@row_count
+# After DML, @@row_count counts the rows it inserted, updated or deleted, and for MERGE their
+# total, following third_party/bigquery_docs/reference/system-variables.md.
+
+CREATE TEMP TABLE n (x INT64);
+INSERT n (x) VALUES (1), (2), (3);
+SELECT @@row_count
+=> "3"
+
+CREATE TEMP TABLE n (x INT64);
+INSERT n (x) VALUES (1), (2), (3);
+UPDATE n SET x = x * 10 WHERE x > 1;
+SELECT @@row_count
+=> "2"
+
+CREATE TEMP TABLE n (x INT64);
+INSERT n (x) VALUES (1), (2), (3);
+DELETE FROM n WHERE x = 3;
+SELECT @@row_count
+=> "1"
+
+CREATE TEMP TABLE n (x INT64);
+INSERT n (x) VALUES (1), (2);
+MERGE n USING (SELECT 2 AS x UNION ALL SELECT 4) AS s ON n.x = s.x
+WHEN MATCHED THEN UPDATE SET x = 20
+WHEN NOT MATCHED THEN INSERT (x) VALUES (s.x);
+SELECT @@row_count
+=> "2"
+
 ## Transactions
 # Expected behavior follows third_party/bigquery_docs/transactions.md:
 # DML changes commit or roll back together; temporary-table DDL is permitted.
