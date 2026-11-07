@@ -18,6 +18,7 @@
 #include "src/backend_error.h"
 #include "src/column_metadata.h"
 #include "src/duckdb_sql.h"
+#include "src/expiration_mutex.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_comments.h"

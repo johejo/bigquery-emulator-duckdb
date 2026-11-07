@@ -1,7 +1,11 @@
 #include "src/catalog_functions.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -13,13 +17,24 @@
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
+#include "duckdb/common/enums/catalog_type.hpp"
+#include "duckdb/common/enums/on_entry_not_found.hpp"
+#include "duckdb/common/exception.hpp"
+#include "duckdb/common/helper.hpp"
 #include "duckdb/common/identifier.hpp"
+#include "duckdb/common/typedefs.hpp"
+#include "duckdb/common/types.hpp"
+#include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/common/types/value.hpp"
+#include "duckdb/common/unique_ptr.hpp"
+#include "duckdb/common/vector.hpp"
+#include "duckdb/common/vector_size.hpp"
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/main/capi/capi_internal.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/main/extension/extension_loader.hpp"
+#include "duckdb/parser/qualified_name.hpp"
 #include "src/backend_error.h"
 
 namespace bigquery_emulator_duckdb {
@@ -74,11 +89,9 @@ std::vector<std::reference_wrapper<SchemaCatalogEntry>> FindSchemas(ClientContex
                                                                     const RelationFilter& filter) {
   std::vector<std::reference_wrapper<SchemaCatalogEntry>> schemas;
   if (!filter.database.has_value()) {
-    for (SchemaCatalogEntry& schema : duckdb::Catalog::GetAllSchemas(context)) {
-      if (Matches(filter.schema, schema.name)) {
-        schemas.emplace_back(schema);
-      }
-    }
+    std::ranges::copy_if(
+        duckdb::Catalog::GetAllSchemas(context), std::back_inserter(schemas),
+        [&](const SchemaCatalogEntry& schema) { return Matches(filter.schema, schema.name); });
     return schemas;
   }
   auto catalog = duckdb::Catalog::GetCatalogEntry(context, Identifier(*filter.database));
@@ -155,9 +168,9 @@ void SchemasScan(ClientContext& /*context*/, TableFunctionInput& input, DataChun
   auto& state = input.global_state->Cast<SchemasState>();
   duckdb::idx_t count = 0;
   while (state.offset < state.schemas.size() && count < STANDARD_VECTOR_SIZE) {
-    const SchemaCatalogEntry& schema = state.schemas[state.offset++];
-    output.data[0].Append(Value(schema.ParentCatalog().GetName()));
-    output.data[1].Append(Value(schema.name));
+    const SchemaCatalogEntry& schema = state.schemas.at(state.offset++);
+    output.data.at(0).Append(Value(schema.ParentCatalog().GetName()));
+    output.data.at(1).Append(Value(schema.name));
     ++count;
   }
 }
@@ -195,14 +208,14 @@ void RelationsScan(ClientContext& /*context*/, TableFunctionInput& input, DataCh
   auto& state = input.global_state->Cast<EntriesState>();
   duckdb::idx_t count = 0;
   while (state.offset < state.entries.size() && count < STANDARD_VECTOR_SIZE) {
-    const CatalogEntry& entry = state.entries[state.offset++];
+    const CatalogEntry& entry = state.entries.at(state.offset++);
     const auto& standard = entry.Cast<duckdb::StandardEntry>();
-    output.data[0].Append(Value(standard.ParentCatalog().GetName()));
-    output.data[1].Append(Value(standard.schema.name));
-    output.data[2].Append(Value(entry.name));
-    output.data[3].Append(Value(entry.type == CatalogType::VIEW_ENTRY ? "VIEW" : "TABLE"));
-    output.data[4].Append(entry.comment.IsNull() ? Value() : Value(entry.comment.ToString()));
-    output.data[5].Append(Value::BIGINT(static_cast<int64_t>(entry.oid)));
+    output.data.at(0).Append(Value(standard.ParentCatalog().GetName()));
+    output.data.at(1).Append(Value(standard.schema.name));
+    output.data.at(2).Append(Value(entry.name));
+    output.data.at(3).Append(Value(entry.type == CatalogType::VIEW_ENTRY ? "VIEW" : "TABLE"));
+    output.data.at(4).Append(entry.comment.IsNull() ? Value() : Value(entry.comment.ToString()));
+    output.data.at(5).Append(Value::BIGINT(static_cast<int64_t>(entry.oid)));
     ++count;
   }
 }
@@ -262,9 +275,9 @@ void ColumnCommentsScan(ClientContext& /*context*/, TableFunctionInput& input, D
   auto& state = input.global_state->Cast<ColumnCommentsState>();
   duckdb::idx_t count = 0;
   while (state.offset < state.comments.size() && count < STANDARD_VECTOR_SIZE) {
-    const Value& comment = state.comments[state.offset];
-    output.data[0].Append(Value::BIGINT(static_cast<int64_t>(++state.offset)));
-    output.data[1].Append(comment.IsNull() ? Value() : Value(comment.ToString()));
+    const Value& comment = state.comments.at(state.offset);
+    output.data.at(0).Append(Value::BIGINT(static_cast<int64_t>(++state.offset)));
+    output.data.at(1).Append(comment.IsNull() ? Value() : Value(comment.ToString()));
     ++count;
   }
 }

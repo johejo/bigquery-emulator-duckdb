@@ -39,6 +39,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_table_source.h"
+#include "src/expiration_mutex.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/location.h"

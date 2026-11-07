@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "src/expiration_mutex.h"
@@ -42,7 +42,7 @@ std::string TablesQuery(const DatasetReference& dataset);
 void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
                   const std::optional<DatasetReference>& dataset = std::nullopt);
 
-enum class RelationType { kTable, kView };
+enum class RelationType : std::uint8_t { kTable, kView };
 
 // The comment of `table`, a table or view as `type` says. An absent relation returns nullopt; a
 // relation without a comment returns an empty comment.

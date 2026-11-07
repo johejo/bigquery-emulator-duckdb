@@ -1,7 +1,6 @@
 #include "src/partition_policy_read.h"
 
 #include <cstdint>
-#include <format>
 #include <string>
 
 #include "absl/status/status.h"
