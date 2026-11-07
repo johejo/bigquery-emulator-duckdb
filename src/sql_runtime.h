@@ -230,7 +230,15 @@ class SqlRuntime {
   std::vector<InsertError> InsertTableData(TableReference table, const nlohmann::json& rows,
                                            bool skip_invalid_rows, bool ignore_unknown_values);
 
+ protected:
+  // The time a read evaluates partition policies at, taken once its snapshot is open. A test
+  // overrides it to commit a policy change between the two.
+  [[nodiscard]] virtual int64_t PolicyEvaluationMicros();
+
  private:
+  // Opens `session`'s snapshot of every project, then returns PolicyEvaluationMicros, so that
+  // a policy whose rows the snapshot sees is dated no later than the returned time.
+  int64_t OpenPolicySnapshot(Backend& session);
   TableReference ResolveTableReference(TableReference table, bool create = false);
   // The application uses native writes and location checks for load/copy/extract; friendship
   // keeps those orchestration-only operations out of the public client-facing catalog API.

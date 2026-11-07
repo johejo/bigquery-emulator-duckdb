@@ -11,8 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "googlesql/public/strings.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -115,7 +113,7 @@ SqlRuntime::TableReadSnapshot SqlRuntime::BeginTableRead(TableReference table, b
   TableReadSnapshot read{.session = backend_.NewSession()};
   Backend& session = *read.session;
   session.Transaction("BEGIN TRANSACTION");
-  read.evaluation_time_micros = absl::ToUnixMicros(absl::Now());
+  read.evaluation_time_micros = OpenPolicySnapshot(session);
   const auto location = LocationOf(session, dataset);
   if (!location) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);

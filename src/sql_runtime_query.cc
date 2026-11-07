@@ -362,19 +362,28 @@ std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool e
   }
   // Only a caller-owned execution transaction can keep discovery, row-version resolution
   // and policy evaluation in one snapshot. Ordinary analysis is not such a boundary.
-  std::optional<int64_t> partition_cutoff;
-  if (backend.InTransaction() && policy_reads) {
-    if (!projects_.empty()) {
-      std::vector<std::string> projects;
-      std::ranges::transform(projects_, std::back_inserter(projects),
-                             [](const Project& project) { return project.project_id; });
-      backend.Execute(OpenPartitionPolicySnapshotsStatement(projects));
-    }
-    partition_cutoff = absl::ToUnixMicros(absl::Now());
-  }
+  const std::optional<int64_t> partition_cutoff = backend.InTransaction() && policy_reads
+                                                      ? std::optional(OpenPolicySnapshot(backend))
+                                                      : std::nullopt;
   return NewDuckDbTableSource(backend, project_ids_, location,
                               external_tables_ ? external_tables_(backend_) : nullptr,
                               partition_cutoff);
+}
+
+int64_t SqlRuntime::PolicyEvaluationMicros() { return absl::ToUnixMicros(absl::Now()); }
+
+int64_t SqlRuntime::OpenPolicySnapshot(Backend& session) {
+  if (!projects_.empty()) {
+    std::vector<std::string> projects;
+    std::ranges::transform(projects_, std::back_inserter(projects),
+                           [](const Project& project) { return project.project_id; });
+    try {
+      session.Execute(OpenPartitionPolicySnapshotsStatement(projects));
+    } catch (const BackendError& error) {
+      throw ApiError::QueryFailure(error.what());
+    }
+  }
+  return PolicyEvaluationMicros();
 }
 
 QueryResult SqlRuntime::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }
