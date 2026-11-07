@@ -43,6 +43,7 @@
 #include "src/language_options.h"
 #include "src/location.h"
 #include "src/partition_policy_history.h"
+#include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/result_value.h"
@@ -361,9 +362,16 @@ std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool e
   }
   // Only a caller-owned execution transaction can keep discovery, row-version resolution
   // and policy evaluation in one snapshot. Ordinary analysis is not such a boundary.
-  const std::optional<int64_t> partition_cutoff =
-      backend.InTransaction() && policy_reads ? std::optional(absl::ToUnixMicros(absl::Now()))
-                                              : std::nullopt;
+  std::optional<int64_t> partition_cutoff;
+  if (backend.InTransaction() && policy_reads) {
+    if (!projects_.empty()) {
+      std::vector<std::string> projects;
+      std::ranges::transform(projects_, std::back_inserter(projects),
+                             [](const Project& project) { return project.project_id; });
+      backend.Execute(OpenPartitionPolicySnapshotsStatement(projects));
+    }
+    partition_cutoff = absl::ToUnixMicros(absl::Now());
+  }
   return NewDuckDbTableSource(backend, project_ids_, location,
                               external_tables_ ? external_tables_(backend_) : nullptr,
                               partition_cutoff);
