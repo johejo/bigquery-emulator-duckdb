@@ -598,8 +598,6 @@ known_errors {
   label: "aggregation_queries_test:aggregation_min_max_array_null_nan_vs_negative_inf"
   label: "aggregation_queries_test:aggregation_min_max_array_null_nan_vs_positive_inf"
   label: "aggregation_queries_test:aggregation_min_max_array_null_vs_nan"
-  label: "aggregation_queries_test:aggregation_string_agg_error_1_null_string_param"
-  label: "aggregation_queries_test:aggregation_string_agg_error_2_null_bytes_param"
 }
 
 known_errors {
