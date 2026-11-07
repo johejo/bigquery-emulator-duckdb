@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -338,12 +339,13 @@ class SqlRuntime {
   // Keeps the rows `table`, as `backend` sees it, has before a write to it on `backend`, for FOR
   // SYSTEM_TIME AS OF. Outside a transaction, the returned lock keeps other writes from reaching
   // the table until the caller's write is done; in one, the rows are kept until it commits.
-  [[nodiscard]] std::unique_lock<std::mutex> KeepVersion(Backend& backend,
-                                                         const TableReference& table);
+  // unique_lock supplies movable ownership over Abseil's standard-compatible mutex interface.
+  [[nodiscard]] std::unique_lock<absl::Mutex> KeepVersion(Backend& backend,
+                                                          const TableReference& table);
   // The mutex that writes to `table` outside a transaction hold while they keep its rows and change
   // them, so that each kept version is the rows the previous write committed. Writes to other
   // tables do not wait for it. Drops forgotten history of `table`'s project first.
-  std::mutex& HistoryMutex(const TableReference& table);
+  absl::Mutex& HistoryMutex(const TableReference& table);
   // The creation time of `table`, a table the emulator keeps the history of, or 0 for one it does
   // not, such as a temporary table or one created before tables recorded their creation time.
   [[nodiscard]] int64_t HistoryCreationTime(const TableReference& table,
@@ -373,11 +375,11 @@ class SqlRuntime {
   std::function<std::unique_ptr<ExternalTableProvider>(Backend&)> external_tables_;
   std::string data_dir_;
   // DuckPGQ updates the graph registry of every connection when a graph changes.
-  std::mutex graph_mutex_;
+  absl::Mutex graph_mutex_;
   // Keeps each table's rows and the write that changes them together, by the table's DuckDB name;
   // see HistoryMutex.
-  std::mutex history_mutexes_mutex_;
-  std::unordered_map<std::string, std::unique_ptr<std::mutex>> history_mutexes_;
+  absl::Mutex history_mutexes_mutex_;
+  std::unordered_map<std::string, std::unique_ptr<absl::Mutex>> history_mutexes_;
   std::vector<Project> projects_;
   std::unordered_map<std::string, std::string> project_ids_;
   // Names the database of each multi-statement query's temporary tables.

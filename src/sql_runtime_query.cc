@@ -19,6 +19,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "googlesql/parser/parse_tree.h"
@@ -759,9 +760,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     result.rows.KeepResources(translation.resources);
   } else if (!AlterationStatements(translation).has_value()) {
     // A dry run checks an alteration against the table or dataset without running it.
-    std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
+    std::optional<absl::MutexLock> graph_lock;
     if (translation.property_graph || translation.reads_property_graph) {
-      graph_lock.lock();
+      graph_lock.emplace(graph_mutex_);
     }
     result = Prepare(translation.sql, setup);
   }
@@ -784,9 +785,9 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
   if (translation.ddl_target_dataset || translation.ddl_target_table) {
     expiration_lock.lock();
   }
-  std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
+  std::optional<absl::MutexLock> graph_lock;
   if (translation.property_graph || translation.reads_property_graph) {
-    graph_lock.lock();
+    graph_lock.emplace(graph_mutex_);
   }
   CheckDdlTarget(translation);
   if (const auto& target = translation.ddl_target_dataset) {
@@ -967,7 +968,7 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       throw;
     }
   } else {
-    std::unique_lock<std::mutex> kept;
+    std::unique_lock<absl::Mutex> kept;
     if (translation.written_table.has_value()) {
       kept = KeepVersion(backend, *translation.written_table);
     }

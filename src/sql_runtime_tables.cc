@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "googlesql/public/strings.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -448,21 +449,21 @@ int64_t SqlRuntime::HistoryCreationTime(const TableReference& table,
   return project_ids_.contains(table.project_id) ? metadata.creation_time : 0;
 }
 
-std::mutex& SqlRuntime::HistoryMutex(const TableReference& table) {
+absl::Mutex& SqlRuntime::HistoryMutex(const TableReference& table) {
   if (project_ids_.contains(table.project_id)) {
     SweepHistory(backend_, table.project_id);
   }
-  const std::scoped_lock lock(history_mutexes_mutex_);
-  std::unique_ptr<std::mutex>& mutex = history_mutexes_[ToLowerAscii(QualifiedName(table))];
+  const absl::MutexLock lock(history_mutexes_mutex_);
+  std::unique_ptr<absl::Mutex>& mutex = history_mutexes_[ToLowerAscii(QualifiedName(table))];
   if (!mutex) {
-    mutex = std::make_unique<std::mutex>();
+    mutex = std::make_unique<absl::Mutex>();
   }
   return *mutex;
 }
 
-std::unique_lock<std::mutex> SqlRuntime::KeepVersion(Backend& backend,
-                                                     const TableReference& table) {
-  std::unique_lock<std::mutex> lock;
+std::unique_lock<absl::Mutex> SqlRuntime::KeepVersion(Backend& backend,
+                                                      const TableReference& table) {
+  std::unique_lock<absl::Mutex> lock;
   if (!backend.InTransaction()) {
     lock = std::unique_lock(HistoryMutex(table));
   }

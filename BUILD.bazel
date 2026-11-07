@@ -1490,6 +1490,7 @@ cc_library(
         "//src/googlesql_functions_duckdb:objectref_options",
         "//src/googlesql_functions_duckdb:options",
         "//src/googlesql_geography",
+        "@abseil-cpp//absl/synchronization",
         "@nlohmann_json//:json",
     ],
 )
