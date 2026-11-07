@@ -50,11 +50,27 @@ class DuckDbTableSource : public TableSource {
         partition_cutoff_micros_(partition_cutoff_micros) {}
 
   DatasetReference ResolveDatasetReference(const DatasetReference& dataset) override {
-    return FindDatasetReference(backend_, dataset).value_or(dataset);
+    const std::vector<std::string> key{dataset.project_id, dataset.dataset_id};
+    if (const auto it = datasets_.find(key); it != datasets_.end()) {
+      return it->second;
+    }
+    if (const auto found = FindDatasetReference(backend_, dataset)) {
+      datasets_.emplace(key, *found);
+      datasets_.emplace(std::vector<std::string>{found->project_id, found->dataset_id}, *found);
+      return *found;
+    }
+    return dataset;
   }
 
   TableReference ResolveTableReference(const TableReference& table) override {
+    const std::vector<std::string> key{table.project_id, table.dataset_id, table.table_id};
+    if (const auto it = tables_.find(key); it != tables_.end()) {
+      return it->second;
+    }
     if (const auto found = FindTableReference(backend_, table)) {
+      tables_.emplace(key, *found);
+      tables_.emplace(
+          std::vector<std::string>{found->project_id, found->dataset_id, found->table_id}, *found);
       return *found;
     }
     const auto dataset =
@@ -72,9 +88,9 @@ class DuckDbTableSource : public TableSource {
       return std::nullopt;
     }
     try {
-      std::vector<FieldSchema> schema = TableSchema(
+      std::vector<FieldSchema> schema = ResolvedTableSchema(
           backend_,
-          TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
+          ResolveTableReference({.project_id = project, .dataset_id = dataset, .table_id = table}));
       Use(project, dataset);
       return schema;
     } catch (const BackendError&) {
@@ -175,7 +191,7 @@ class DuckDbTableSource : public TableSource {
         return std::nullopt;
       }
       TableDescription description{
-          .schema = TableSchema(backend_, reference),
+          .schema = ResolvedTableSchema(backend_, reference),
           .metadata = CommentMetadata(*comment),
       };
       Use(project, dataset);
@@ -391,6 +407,11 @@ class DuckDbTableSource : public TableSource {
   const std::unordered_map<std::string, std::string>& project_ids_;
   JobLocation* location_;
   std::optional<int64_t> partition_cutoff_micros_;
+  // Successful name resolutions, shared by analysis and translation of this statement.
+  // A new source for each statement keeps DDL and dataset option changes visible; do not
+  // cache misses, since temporary relations can be introduced during translation.
+  std::map<std::vector<std::string>, DatasetReference> datasets_;
+  std::map<std::vector<std::string>, TableReference> tables_;
   // DatasetLocation's answers, by project:dataset.
   std::map<std::string, std::string> locations_;
 };

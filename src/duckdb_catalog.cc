@@ -117,6 +117,16 @@ bool CaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset) {
 
 std::optional<DatasetReference> FindDatasetReference(Backend& backend,
                                                      const DatasetReference& dataset) {
+  // Match stored identifiers directly before decoding the catalog for case-insensitive
+  // aliases. Ordinary exact references need neither a catalog-wide decode nor sorting.
+  if (!backend
+           .Execute(std::format("SELECT 1 FROM information_schema.schemata WHERE catalog_name = {}"
+                                " AND schema_name = {}",
+                                QuoteLiteral(dataset.project_id),
+                                QuoteLiteral(DatasetCatalogName(dataset.dataset_id))))
+           .rows.empty()) {
+    return dataset;
+  }
   const QueryResult result = backend.Execute(
       std::format("SELECT schema_name FROM {} WHERE catalog_name = {}"
                   " AND lower(schema_name) = lower({}) ORDER BY schema_name = {} DESC",
@@ -139,6 +149,20 @@ std::optional<TableReference> FindTableReference(Backend& backend, const TableRe
       backend, {.project_id = table.project_id, .dataset_id = table.dataset_id});
   if (!dataset) {
     return std::nullopt;
+  }
+  if (!backend
+           .Execute(
+               std::format("SELECT 1 FROM information_schema.tables WHERE table_catalog = {}"
+                           " AND table_schema = {} AND table_name = {}",
+                           QuoteLiteral(dataset->project_id),
+                           QuoteLiteral(DatasetCatalogName(dataset->dataset_id)),
+                           QuoteLiteral(TableCatalogName(dataset->dataset_id, table.table_id))))
+           .rows.empty()) {
+    return TableReference{
+        .project_id = dataset->project_id,
+        .dataset_id = dataset->dataset_id,
+        .table_id = table.table_id,
+    };
   }
   const QueryResult result = backend.Execute(
       std::format("SELECT table_name FROM {} WHERE table_catalog = {}"
@@ -268,9 +292,9 @@ std::optional<std::optional<std::string>> RelationComment(Backend& backend,
                                                           std::string_view name,
                                                           const TableReference& table) {
   const QueryResult result = backend.Execute(std::format(
-      "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {} AND {} = {}",
-      LogicalCatalog(relations), QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
-      name, QuoteLiteral(table.table_id)));
+      "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {} AND {} = {}", relations,
+      QuoteLiteral(table.project_id), QuoteLiteral(DatasetCatalogName(table.dataset_id)), name,
+      QuoteLiteral(TableCatalogName(table.dataset_id, table.table_id))));
   if (result.rows.empty()) {
     return std::nullopt;
   }
@@ -291,7 +315,10 @@ std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& req
   if (!resolved) {
     throw BackendError("Table not found: " + TableName(requested));
   }
-  const TableReference& table = *resolved;
+  return ResolvedTableSchema(backend, *resolved);
+}
+
+std::vector<FieldSchema> ResolvedTableSchema(Backend& backend, const TableReference& table) {
   // Reading a view's schema must not require its execution identity to be configured.
   if (const auto comment = ViewComment(backend, table); comment.has_value()) {
     if (const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);

@@ -14,6 +14,8 @@
 namespace bigquery_emulator_duckdb {
 
 // The backend, project aliases and optional job location must outlive the source.
+// Use one source per statement: successful name resolutions are cached through analysis and
+// translation, and a later statement must see DDL and dataset case-sensitivity changes.
 // The caller sweeps expired relations before creating the source when needed. External operations
 // are rejected without a provider; native external-table placeholders are never read as data.
 // With a partition cutoff, discovery, translation and execution must share the backend's active
