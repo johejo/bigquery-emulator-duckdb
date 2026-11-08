@@ -128,6 +128,17 @@ note GQL queries | [Graph limits](compatibility.md#graphs).
 
 section Queries
 
+query BYTES `LIKE` | SELECT CAST(name AS BYTES) LIKE b'a%' FROM t
+query BYTES `LIKE` | SELECT CAST(name AS BYTES) NOT LIKE b'a%' FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) LIKE ANY (b'a%', b'b%') FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) LIKE ALL (b'_%', b'%') FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) NOT LIKE ANY (b'a%', b'b%') FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) NOT LIKE ALL (b'a%', b'b%') FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) LIKE ANY UNNEST([b'a%', b'b%']) FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) LIKE ALL UNNEST([b'_%', b'%']) FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) NOT LIKE ANY UNNEST([b'a%', b'b%']) FROM t
+query BYTES quantified `LIKE` | SELECT CAST(name AS BYTES) NOT LIKE ALL UNNEST([b'a%', b'b%']) FROM t
+
 query `SELECT` without `FROM` | SELECT 1 AS x, 'a' AS y
 query Table reads, `WHERE`, `ORDER BY`, `LIMIT` | SELECT id, name FROM t WHERE id > 0 ORDER BY id DESC LIMIT 1 OFFSET 0
 query Fully qualified table names | SELECT id FROM `test.d.t`

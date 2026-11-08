@@ -21,7 +21,7 @@ rejected.
 | Section | Supported | Partial |
 | --- | --- | --- |
 | [Graphs](#graphs) | 2 | 3 |
-| [Queries](#queries) | 34 | 2 |
+| [Queries](#queries) | 36 | 2 |
 | [DML](#dml) | 9 | 0 |
 | [DDL](#ddl) | 25 | 8 |
 | [Collation](#collation) | 15 | 0 |
@@ -42,6 +42,8 @@ rejected.
 
 | Feature | Status | Notes |
 | --- | --- | --- |
+| BYTES `LIKE` | Supported |  |
+| BYTES quantified `LIKE` | Supported |  |
 | `SELECT` without `FROM` | Supported |  |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` | Supported |  |
 | Fully qualified table names | Supported |  |

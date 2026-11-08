@@ -190,6 +190,7 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
   static constexpr auto kLogBinary =
       Numbers(2, "CAST(bq_bignumeric_log(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR)) AS BIGNUM)",
               "bq_log($1, $2)", "bq_log_numeric($1, $2)");
+  static constexpr std::string_view kLikeErrors[] = {"'LIKE pattern ends with a backslash'"};
   static constexpr auto kRulesBacking = std::tuple{
       // DuckDB returns infinities where BigQuery raises errors, such as EXP(1000).
 
@@ -340,6 +341,23 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("EUCLIDEAN_DISTANCE",
              {
                  {.arity = 2, .spelling = "bq_euclidean_distance($1, $2)"},
+             }),
+      // STRING retains DuckDB's LIKE with escape validation; BYTES matches through GoogleSQL.
+      Define("$LIKE",
+             {
+                 {
+                     .arity = 2,
+                     .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
+                                 "THEN !1 ELSE ($1 LIKE $2 ESCAPE '\\') END",
+                     .collated_spelling = "bq_collation_like($3, $1, $2)",
+                     .conditions = ArgumentType<TYPE_STRING>::kFirst,
+                     .errors = kLikeErrors,
+                 },
+                 {
+                     .arity = 2,
+                     .spelling = "bq_like_bytes($1, $2)",
+                     .conditions = ArgumentType<TYPE_BYTES>::kFirst,
+                 },
              }),
       Define("CHR", {{.arity = 1, .spelling = "bq_chr($1)"}}),
       // DuckDB's BLOB has almost no functions; its Unicode and error semantics differ too.
