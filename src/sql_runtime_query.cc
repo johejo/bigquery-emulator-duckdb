@@ -722,10 +722,13 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   // Keep identity discovery, raw row-version resolution and execution in one snapshot. A statement
   // that may write acquires expiration coordination before opening that snapshot, not while
   // waiting with an already stale transaction. Destination publication has a separate
-  // transaction boundary.
-  const StatementLock statement_lock = LockStatement(writes, /*expire=*/true);
-  const auto session =
-      !request.dry_run && !request.destination_table ? backend_.NewSession() : nullptr;
+  // transaction boundary. Without a session, DML writes no rows, and translation expires tables,
+  // which it must not do while holding off drops.
+  const bool runs_in_session = !request.dry_run && !request.destination_table;
+  const StatementLock statement_lock = LockStatement(
+      writes == StatementWrites::kRows && !runs_in_session ? StatementWrites::kNothing : writes,
+      /*expire=*/true);
+  const auto session = runs_in_session ? backend_.NewSession() : nullptr;
   const auto transaction = session ? std::make_unique<StatementTransaction>(*session) : nullptr;
   const googlesql::SystemVariableValuesMap variables{
       {{"project_id"}, googlesql::Value::String(request.project_id)},
