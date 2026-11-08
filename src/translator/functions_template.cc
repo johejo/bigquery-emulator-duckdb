@@ -532,8 +532,8 @@ std::vector<Rule> Extract() {
   return rules;
 }
 
-// Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return an
-// empty array for a zero step.
+// Generate epoch microseconds so the session time zone plays no part. A step larger than the
+// entire TIMESTAMP range can only include the start; cap its magnitude before narrowing to INT64.
 std::vector<Rule> GenerateTimestampArray() {
   std::vector<Rule> rules;
   for (const auto& [part, micros] : std::initializer_list<std::pair<std::string_view, std::string>>{
@@ -546,9 +546,12 @@ std::vector<Rule> GenerateTimestampArray() {
        }) {
     rules.push_back({
         .arity = 4,
-        .spelling = "list_transform([struct_pack(a := $1, b := $2, s := $3 * " + micros +
-                    ")], lambda _g: CASE WHEN _g.s = 0 THEN !1 "
-                    "ELSE generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]",
+        .spelling =
+            "CASE WHEN $1 IS NULL OR $2 IS NULL OR $3 IS NULL THEN NULL WHEN $3 = 0 THEN !1 "
+            "ELSE list_transform(generate_series(epoch_us($1), epoch_us($2), "
+            "CAST(sign($3) * least(abs(CAST($3 AS HUGEINT) * " +
+            micros +
+            "), 315537897600000000::HUGEINT) AS BIGINT)), lambda _t: make_timestamptz(_t)) END",
         .conditions = {Part(4, {part})},
         .defaults = {},
         .errors = {"'Sequence step cannot be 0.'"},

@@ -132,13 +132,18 @@ std::optional<std::string> Call(const Catalog& functions,
       return std::nullopt;
     }
   }
-  if (HasTimestamp(resolved.type(), /*range_bounds=*/false) && !resolved.type()->IsTimestamp()) {
+  const bool timestamp_array =
+      resolved.type()->IsArray() && resolved.type()->AsArray()->element_type()->IsTimestamp();
+  if (HasTimestamp(resolved.type(), /*range_bounds=*/false) && !resolved.type()->IsTimestamp() &&
+      !timestamp_array) {
     return std::nullopt;
   }
   auto sql = LegacyCall(functions, resolved, name, converted, safe, project, collation,
                         TimestampPrecision::kMicroseconds);
   if (sql && resolved.type()->IsTimestamp()) {
     *sql = "bq_timestamp_nanos_from_micros(" + *sql + ")";
+  } else if (sql && timestamp_array) {
+    *sql = "list_transform(" + *sql + ", lambda _t: bq_timestamp_nanos_from_micros(_t))";
   }
   return sql;
 }
