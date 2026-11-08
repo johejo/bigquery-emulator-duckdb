@@ -9,7 +9,10 @@
 #include "src/statement_resources.h"
 #include "src/storage_read_codec.h"
 
-struct duckdb_result;
+namespace duckdb {
+// Storage clients must not parse DuckDB's C++ query-result and vector headers.
+class QueryResult;
+}  // namespace duckdb
 
 namespace bigquery_emulator_duckdb {
 
@@ -23,7 +26,7 @@ class StorageSnapshot {
  public:
   // Fetches every row of `result`, whose columns are the fields of `schema`. The session keeps
   // the connection that Arrow export options name alive.
-  StorageSnapshot(duckdb_result& result, std::vector<FieldSchema> schema,
+  StorageSnapshot(duckdb::QueryResult& result, std::vector<FieldSchema> schema,
                   std::shared_ptr<Backend> session,
                   std::shared_ptr<const StatementResources> resources = {});
   ~StorageSnapshot();
