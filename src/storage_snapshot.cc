@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <limits>
 #include <memory>
 #include <stdexcept>
@@ -14,6 +15,14 @@
 #include "absl/status/status.h"
 #include "absl/time/time.h"
 #include "duckdb.h"
+#include "duckdb/common/allocator.hpp"
+#include "duckdb/common/arrow/arrow_converter.hpp"
+#include "duckdb/common/types.hpp"
+#include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/vector.hpp"
+#include "duckdb/function/table/arrow/arrow_duck_schema.hpp"
+#include "duckdb/main/client_properties.hpp"
+#include "duckdb/main/query_result.hpp"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/numeric_value.h"
@@ -23,6 +32,7 @@
 #include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/bignumeric.h"
+#include "src/duckdb_capi.h"
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 #include "src/result_chunks.h"
@@ -36,13 +46,6 @@ namespace {
 void Check(int code, const ArrowError& error) {
   if (code != NANOARROW_OK) {
     throw BackendError("Arrow IPC operation failed: " + std::string(error.message));
-  }
-}
-
-void Check(duckdb_error_data error) {
-  const Handle<duckdb_error_data, duckdb_destroy_error_data> owned(error);
-  if (error != nullptr && duckdb_error_data_has_error(error)) {
-    throw BackendError(duckdb_error_data_message(error));
   }
 }
 
@@ -439,27 +442,27 @@ class StorageSnapshot::Impl {
   std::shared_ptr<const StatementResources> resources;
   // Destroy options and chunks before the session, whose connection their properties name.
   std::shared_ptr<Backend> session;
-  Handle<duckdb_arrow_options, duckdb_destroy_arrow_options> options;
+  duckdb::ClientProperties options;
   std::vector<FieldSchema> fields;
   // Whether DuckDB exports each column in the layout Storage Read gives it.
   std::vector<bool> direct;
-  std::vector<duckdb_logical_type> direct_types;
+  duckdb::vector<duckdb::LogicalType> direct_types;
   nanoarrow::UniqueSchema wire;
   std::unique_ptr<const ResultChunks> chunks;
 };
 
-StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema> schema,
+StorageSnapshot::StorageSnapshot(duckdb::QueryResult& result, std::vector<FieldSchema> schema,
                                  std::shared_ptr<Backend> session,
                                  std::shared_ptr<const StatementResources> resources)
     : impl_(std::make_unique<Impl>()) {
   auto& state = *impl_;
-  if (schema.size() != duckdb_column_count(&result)) {
+  if (schema.size() != result.ColumnCount()) {
     throw ApiError::Invalid("Table changed while creating the Storage Read snapshot");
   }
   state.resources = std::move(resources);
   state.session = std::move(session);
   state.fields = std::move(schema);
-  *state.options.out() = duckdb_result_get_arrow_options(&result);
+  state.options = result.client_properties;
   StorageReadArraySchema(state.wire.get(), state.fields, false);
   state.chunks = std::make_unique<const ResultChunks>(result, state.session);
   for (idx_t i = 0; i < state.fields.size(); ++i) {
@@ -468,16 +471,19 @@ StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema>
     if (direct) {
       // Some DuckDB types have no Arrow representation; their export fails and they use vector
       // conversion.
-      const char* name = duckdb_column_name(&result, i);
       nanoarrow::UniqueSchema exported;
-      const Handle<duckdb_error_data, duckdb_destroy_error_data> error(
-          duckdb_to_arrow_schema(state.options.get(), &type, &name, 1, exported.get()));
-      direct = (error.get() == nullptr || !duckdb_error_data_has_error(error.get())) &&
-               Matches(*exported->children[0], state.fields.at(i));
+      try {
+        duckdb::ArrowConverter::ToArrowSchema(exported.get(), {result.GetTypes().at(i)},
+                                              {result.GetNames().at(i).GetIdentifierName()},
+                                              state.options);
+        direct = Matches(*exported->children[0], state.fields.at(i));
+      } catch (const std::exception&) {
+        direct = false;
+      }
     }
     state.direct.push_back(direct);
     if (direct) {
-      state.direct_types.push_back(type);
+      state.direct_types.push_back(result.GetTypes().at(i));
     }
   }
 }
@@ -516,8 +522,8 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
   if (!state.direct_types.empty()) {
     // nanoarrow 0.7 cannot encode nonzero array offsets. Copy the selected rows in DuckDB,
     // including ranges crossing chunk boundaries, before exporting offset-zero Arrow arrays.
-    const Chunk selected(
-        duckdb_create_data_chunk(state.direct_types.data(), state.direct_types.size()));
+    duckdb::DataChunk selected;
+    selected.Initialize(duckdb::Allocator::DefaultAllocator(), state.direct_types);
     const Handle<duckdb_selection_vector, DestroySelection> selection(
         duckdb_create_selection_vector(count));
     auto* indices = duckdb_selection_vector_get_data_ptr(selection.get());
@@ -529,14 +535,21 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
           for (size_t column = 0, target = 0; column < state.fields.size(); ++column) {
             if (state.direct.at(column)) {
               duckdb_vector_copy_sel(duckdb_data_chunk_get_vector(chunk, column),
-                                     duckdb_data_chunk_get_vector(selected.get(), target++),
+                                     duckdb_data_chunk_get_vector(BorrowCChunk(selected), target++),
                                      selection.get(), take, 0, copied);
             }
           }
         });
-    duckdb_data_chunk_set_size(selected.get(), count);
+    selected.SetChildCardinality(count);
     nanoarrow::UniqueArray exported;
-    Check(duckdb_data_chunk_to_arrow(state.options.get(), selected.get(), exported.get()));
+    try {
+      const auto extension_types = duckdb::ArrowTypeExtensionData::GetExtensionTypes(
+          *state.options.client_context, selected.GetTypes());
+      duckdb::ArrowConverter::ToArrowArray(selected, exported.get(), state.options,
+                                           extension_types);
+    } catch (const std::exception& exception) {
+      throw BackendError(exception.what());
+    }
     for (size_t column = 0, source = 0; column < state.fields.size(); ++column) {
       if (!state.direct.at(column)) {
         continue;

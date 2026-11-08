@@ -19,7 +19,7 @@ BackendInitializer ServiceBackendInitializer(BackendInitializer initialize) {
   };
 }
 
-void InitializeServiceDatabase(duckdb_database database) {
+void InitializeServiceDatabase(duckdb::DuckDB& database) {
   RegisterPostgresScanner(database);
   RegisterMySqlScanner(database);
 }

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -14,13 +15,24 @@
 #include "absl/log/absl_log.h"
 #include "absl/synchronization/mutex.h"
 #include "duckdb.h"
+#include "duckdb/common/enums/statement_type.hpp"
+#include "duckdb/common/identifier.hpp"
+#include "duckdb/common/types.hpp"
+#include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/types/value.hpp"
+#include "duckdb/common/unique_ptr.hpp"
+#include "duckdb/main/config.hpp"
+#include "duckdb/main/connection.hpp"
+#include "duckdb/main/database.hpp"
+#include "duckdb/main/prepared_statement.hpp"
+#include "duckdb/main/query_result.hpp"
 #include "duckdb_static_extension.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
 #include "src/backend_initializer.h"
 #include "src/catalog_functions.h"
-#include "src/duckdb_handle.h"
+#include "src/duckdb_capi.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_types.h"
 #include "src/duckpgq.h"
@@ -35,7 +47,7 @@
 #include "src/timestamp_precision.h"
 
 // DuckDB v2 requires explicit registration of statically linked extensions before opening a
-// database. Keep using duckdb.h's V1 C API for database access.
+// database, including when the database and connections are owned through the C++ API.
 extern "C" {
 int32_t duckdb_extension_autocomplete_describe(duckdb_extension_descriptor*);
 int32_t duckdb_extension_core_functions_describe(duckdb_extension_descriptor*);
@@ -49,25 +61,24 @@ namespace {
 
 using nlohmann::json;
 
-struct Result {
-  duckdb_result result{};
-  ~Result() { duckdb_destroy_result(&result); }
-  Result() = default;
-  Result(const Result&) = delete;
-  Result& operator=(const Result&) = delete;
-};
+using Result = duckdb::unique_ptr<duckdb::QueryResult>;
+using Prepared = duckdb::unique_ptr<duckdb::PreparedStatement>;
 
 // Statements that produce a result set. Everything else (DDL, DML, SET, ...) yields a
 // single "Count" or "Success" column that is not part of the BigQuery result.
-bool ProducesResultSet(duckdb_statement_type type) {
-  return type == DUCKDB_STATEMENT_TYPE_SELECT || type == DUCKDB_STATEMENT_TYPE_EXPLAIN ||
-         type == DUCKDB_STATEMENT_TYPE_PRAGMA || type == DUCKDB_STATEMENT_TYPE_CALL ||
-         type == DUCKDB_STATEMENT_TYPE_EXECUTE;
+bool ProducesResultSet(duckdb::StatementType type) {
+  return type == duckdb::StatementType::SELECT_STATEMENT ||
+         type == duckdb::StatementType::EXPLAIN_STATEMENT ||
+         type == duckdb::StatementType::PRAGMA_STATEMENT ||
+         type == duckdb::StatementType::CALL_STATEMENT ||
+         type == duckdb::StatementType::EXECUTE_STATEMENT;
 }
 
-bool IsDml(duckdb_statement_type type) {
-  return type == DUCKDB_STATEMENT_TYPE_INSERT || type == DUCKDB_STATEMENT_TYPE_UPDATE ||
-         type == DUCKDB_STATEMENT_TYPE_DELETE || type == DUCKDB_STATEMENT_TYPE_MERGE_INTO;
+bool IsDml(duckdb::StatementType type) {
+  return type == duckdb::StatementType::INSERT_STATEMENT ||
+         type == duckdb::StatementType::UPDATE_STATEMENT ||
+         type == duckdb::StatementType::DELETE_STATEMENT ||
+         type == duckdb::StatementType::MERGE_INTO_STATEMENT;
 }
 
 // DuckDB's message for a failed statement. DuckDB's error() raises the messages the translation
@@ -82,82 +93,98 @@ std::string ErrorMessage(const char* error, std::string_view fallback) {
   return std::string(message);
 }
 
-void Execute(duckdb_connection connection, const std::string& sql, Result& result) {
-  if (duckdb_query(connection, sql.c_str(), &result.result) == DuckDBError) {
-    throw BackendError(ErrorMessage(duckdb_result_error(&result.result), "DuckDB query failed"));
+void Execute(duckdb::Connection& connection, const std::string& sql, Result& result) {
+  try {
+    result = connection.Query(sql);
+  } catch (...) {
+    // Match the V1 C API's fallback when submission fails without a result.
+    throw BackendError("DuckDB query failed");
+  }
+  if (result->HasError()) {
+    throw BackendError(ErrorMessage(result->GetError().c_str(), "DuckDB query failed"));
   }
 }
 
-void Query(duckdb_connection connection, const std::string& sql, Result& result) {
+void Query(duckdb::Connection& connection, const std::string& sql, Result& result) {
   ABSL_VLOG(1) << "DuckDB: " << sql;
   Execute(connection, sql, result);
 }
 
 // Runs a setting that every connection gets, which the log leaves out.
-void Configure(duckdb_connection connection, const std::string& sql) {
+void Configure(duckdb::Connection& connection, const std::string& sql) {
   Result result;
   Execute(connection, sql, result);
 }
 
-void Query(duckdb_connection connection, const std::string& sql) {
+void Query(duckdb::Connection& connection, const std::string& sql) {
   Result result;
   Query(connection, sql, result);
 }
 
 QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const void> owner) {
-  const auto statement_type = duckdb_result_statement_type(result.result);
+  const auto statement_type = result->GetStatementType();
   QueryResult query_result;
   // DML with RETURNING exposes rows too, used to freeze Storage Write defaults at append.
-  const bool returning = IsDml(statement_type) && duckdb_result_return_type(result.result) ==
-                                                      DUCKDB_RESULT_TYPE_QUERY_RESULT;
+  const bool returning = IsDml(statement_type) && result->GetStatementProperties().return_type ==
+                                                      duckdb::StatementReturnType::QUERY_RESULT;
   if (!ProducesResultSet(statement_type) && !returning) {
     if (IsDml(statement_type)) {
-      query_result.affected_rows = static_cast<int64_t>(duckdb_rows_changed(&result.result));
+      query_result.affected_rows = 0;
+      if (result->GetStatementProperties().return_type ==
+              duckdb::StatementReturnType::CHANGED_ROWS &&
+          result->RowCount() == 1 && result->ColumnCount() == 1) {
+        auto chunk = result->Fetch();
+        query_result.affected_rows = chunk->GetValue(0, 0).GetValue<int64_t>();
+      }
     }
     return query_result;
   }
   query_result.has_rows = true;
-  for (idx_t i = 0; i < duckdb_column_count(&result.result); ++i) {
-    LogicalType const type(duckdb_column_logical_type(&result.result, i));
-    query_result.schema.push_back(
-        ResultFieldSchema(duckdb_column_name(&result.result, i), type.get()));
+  for (idx_t i = 0; i < result->ColumnCount(); ++i) {
+    query_result.schema.push_back(ResultFieldSchema(result->GetNames().at(i).GetIdentifierName(),
+                                                    BorrowCLogicalType(result->GetTypes().at(i))));
   }
-  query_result.rows = ResultRows(
-      std::make_shared<const ResultChunks>(result.result, std::move(owner)), null_arrays);
+  query_result.rows =
+      ResultRows(std::make_shared<const ResultChunks>(*result, std::move(owner)), null_arrays);
   return query_result;
 }
 
 // Prepares `sql`, which binds names and types without running the statement.
-Prepared PrepareStatement(duckdb_connection connection, const std::string& sql) {
+Prepared PrepareStatement(duckdb::Connection& connection, const std::string& sql) {
   ABSL_VLOG(1) << "DuckDB prepare: " << sql;
   Prepared prepared;
-  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
+  try {
+    prepared = connection.Prepare(sql);
+  } catch (...) {
+    throw BackendError("DuckDB failed to prepare the query");
+  }
+  if (prepared->HasError()) {
     throw BackendError(
-        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
+        ErrorMessage(prepared->GetError().c_str(), "DuckDB failed to prepare the query"));
   }
   return prepared;
 }
 
 struct Column {
   std::string name;
-  LogicalType type;
+  duckdb::LogicalType type;
 };
 
 // The result columns of a prepared statement.
 std::vector<Column> Columns(const Prepared& prepared) {
   std::vector<Column> columns;
-  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
-    DuckString const name(duckdb_prepared_statement_column_name(prepared.get(), i));
+  columns.reserve(prepared->ColumnCount());
+  for (idx_t i = 0; i < prepared->ColumnCount(); ++i) {
     columns.push_back({
-        .name = name.get(),
-        .type = LogicalType(duckdb_prepared_statement_column_logical_type(prepared.get(), i)),
+        .name = prepared->GetNames().at(i).GetIdentifierName(),
+        .type = prepared->GetTypes().at(i),
     });
   }
   return columns;
 }
 
 // BigQuery evaluates timestamps in UTC; setup must run on the same connection.
-void RunSetup(duckdb_connection connection, const std::vector<std::string>& setup) {
+void RunSetup(duckdb::Connection& connection, const std::vector<std::string>& setup) {
   Configure(connection, "SET TimeZone = 'UTC'");
   for (const std::string& statement : setup) {
     Query(connection, statement);
@@ -186,7 +213,7 @@ std::vector<std::vector<std::optional<std::string>>> QueryResult::TextRows() con
 }
 
 struct Backend::Database {
-  Handle<duckdb_database, duckdb_close> handle;
+  std::unique_ptr<duckdb::DuckDB> instance;
   absl::Mutex ddl_mutex;
   TimestampPrecision timestamp_precision;
   Database(const std::optional<std::string>& session_user,
@@ -213,46 +240,43 @@ struct Backend::Database {
       return true;
     }();
     (void)registered;
-    Handle<duckdb_config, duckdb_destroy_config> config;
-    // Catalog discovery can encounter missing objects while a script transaction is open.
-    // Preserve the pre-v2 policy: binding errors must not abort that transaction.
-    if (duckdb_create_config(config.out()) == DuckDBError ||
-        duckdb_set_config(config.get(), "default_transaction_invalidation_policy",
-                          "SYNTACTIC_ERRORS_DO_NOT_INVALIDATE") == DuckDBError) {
-      throw BackendError("DuckDB failed to configure transaction invalidation");
+    try {
+      duckdb::DBConfig config;
+      // Catalog discovery can encounter missing objects while a script transaction is open.
+      // Preserve the pre-v2 policy: binding errors must not abort that transaction.
+      config.SetOptionByName("default_transaction_invalidation_policy",
+                             duckdb::Value("SYNTACTIC_ERRORS_DO_NOT_INVALIDATE"));
+      instance = std::make_unique<duckdb::DuckDB>(nullptr, &config);
+    } catch (const std::exception& error) {
+      throw BackendError(error.what());
     }
-    char* error = nullptr;
-    const duckdb_state state = duckdb_open_ext(nullptr, handle.out(), config.get(), &error);
-    DuckString const message(error);
-    if (state == DuckDBError) {
-      throw BackendError(message ? message.get() : "DuckDB failed to open database");
-    }
-    RegisterBackendFunctions(handle.get(), session_user, storage, geography, functions, initialize);
-    RegisterDuckPGQ(handle.get());
-    RegisterCatalogFunctions(handle.get());
+    RegisterBackendFunctions(*instance, session_user, storage, geography, functions, initialize);
+    RegisterDuckPGQ(*instance);
+    RegisterCatalogFunctions(*instance);
     {
       // Extension options can be set once for every connection; the grammar is per connection.
-      const Connection connection = Connect();
-      Configure(connection.get(), "SET GLOBAL duckpgq_vertex_join_elimination = false");
-      Configure(connection.get(), "SET GLOBAL duckpgq_factorized_joins = false");
+      const auto connection = Connect();
+      Configure(*connection, "SET GLOBAL duckpgq_vertex_join_elimination = false");
+      Configure(*connection, "SET GLOBAL duckpgq_factorized_joins = false");
     }
     if (initialize_database) {
-      initialize_database(handle.get());
+      initialize_database(*instance);
     }
   }
 
-  [[nodiscard]] Connection Connect() const {
-    Connection connection;
-    if (duckdb_connect(handle.get(), connection.out()) == DuckDBError) {
-      throw BackendError("DuckDB failed to connect");
+  [[nodiscard]] std::unique_ptr<duckdb::Connection> Connect() const {
+    try {
+      auto connection = std::make_unique<duckdb::Connection>(*instance);
+      Configure(*connection, "SET active_grammar_extensions = ['duckpgq']");
+      return connection;
+    } catch (const std::exception& error) {
+      throw BackendError(error.what());
     }
-    Configure(connection.get(), "SET active_grammar_extensions = ['duckpgq']");
-    return Connection(connection.release());
   }
 };
 
 struct Backend::Session {
-  Connection connection;
+  std::unique_ptr<duckdb::Connection> connection;
   bool in_transaction = false;
   std::vector<std::string> before_commit;
   explicit Session(Database& database) : connection(database.Connect()) {}
@@ -260,18 +284,19 @@ struct Backend::Session {
 
 class Backend::CallConnection {
  public:
-  explicit CallConnection(duckdb_connection session) : connection_(session) {}
-  explicit CallConnection(Connection owned) : owned_(std::move(owned)), connection_(owned_.get()) {}
+  explicit CallConnection(duckdb::Connection& session) : connection_(&session) {}
+  explicit CallConnection(std::unique_ptr<duckdb::Connection> owned)
+      : owned_(std::move(owned)), connection_(owned_.get()) {}
 
-  [[nodiscard]] duckdb_connection get() const { return connection_; }
+  [[nodiscard]] duckdb::Connection& get() const { return *connection_; }
 
  private:
-  Connection owned_;
-  duckdb_connection connection_;
+  std::unique_ptr<duckdb::Connection> owned_;
+  duckdb::Connection* connection_;
 };
 
 Backend::CallConnection Backend::Connect() const {
-  return session_ ? CallConnection(session_->connection.get()) : CallConnection(db_->Connect());
+  return session_ ? CallConnection(*session_->connection) : CallConnection(db_->Connect());
 }
 
 Backend::Backend(const std::optional<std::string>& session_user,
@@ -321,10 +346,10 @@ void Backend::Transaction(const std::string& statement) {
   const std::vector<std::string> before_commit = std::exchange(session_->before_commit, {});
   if (statement == "COMMIT") {
     for (const std::string& pending : before_commit) {
-      Query(session_->connection.get(), pending);
+      Query(*session_->connection, pending);
     }
   }
-  Query(session_->connection.get(), statement);
+  Query(*session_->connection, statement);
   session_->in_transaction = statement == "BEGIN TRANSACTION";
 }
 
@@ -369,7 +394,7 @@ std::shared_ptr<const StorageSnapshot> Backend::ExecuteStorageRead(
   RunSetup(connection.get(), {});
   Result result;
   Query(connection.get(), sql, result);
-  return std::make_shared<const StorageSnapshot>(result.result, std::move(schema), session,
+  return std::make_shared<const StorageSnapshot>(*result, std::move(schema), session,
                                                  std::move(resources));
 }
 
@@ -389,7 +414,7 @@ void Backend::ExecuteDdl(const std::string& sql,
     if (!skip_query.empty()) {
       Result existing;
       Query(connection.get(), skip_query, existing);
-      if (duckdb_row_count(&existing.result) != 0) {
+      if (existing->RowCount() != 0) {
         if (own_transaction) {
           Query(connection.get(), "COMMIT");
         }
@@ -417,12 +442,12 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
   // A dry run is validated and knows its result schema, but reads and writes nothing.
   const Prepared prepared = PrepareStatement(connection.get(), sql);
   QueryResult query_result;
-  if (!ProducesResultSet(duckdb_prepared_statement_type(prepared.get()))) {
+  if (!ProducesResultSet(prepared->GetStatementType())) {
     return query_result;
   }
   query_result.has_rows = true;
   for (const Column& column : Columns(prepared)) {
-    query_result.schema.push_back(ResultFieldSchema(column.name, column.type.get()));
+    query_result.schema.push_back(ResultFieldSchema(column.name, BorrowCLogicalType(column.type)));
   }
   return query_result;
 }
@@ -431,11 +456,12 @@ std::optional<std::string> Backend::UnreadableColumnError(const std::string& rel
   const CallConnection connection = Connect();
   for (const Column& column :
        Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
-    if (const std::string type = UnsupportedDuckDbType(column.type.get()); !type.empty()) {
+    if (const std::string type = UnsupportedDuckDbType(BorrowCLogicalType(column.type));
+        !type.empty()) {
       return "Column " + column.name + " has the DuckDB type " + type +
              ", which the emulator does not support; change the column's type to read the table";
     }
-    if (HasOtherTimestampPrecision(column.type.get(), db_->timestamp_precision)) {
+    if (HasOtherTimestampPrecision(BorrowCLogicalType(column.type), db_->timestamp_precision)) {
       return "Column " + column.name +
              (db_->timestamp_precision == TimestampPrecision::kNanoseconds
                   ? " holds microsecond TIMESTAMP values, which shell --semantics=googlesql does "
@@ -454,7 +480,7 @@ std::optional<std::string> Backend::NumericReadQuery(const std::string& relation
   for (const Column& column :
        Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
     const std::string name = QuoteIdentifier(column.name);
-    const auto converted = ReadNumericStorage(name, column.type.get());
+    const auto converted = ReadNumericStorage(name, BorrowCLogicalType(column.type));
     changed |= converted.has_value();
     columns.push_back(converted.value_or(name) + " AS " + name);
   }
@@ -471,15 +497,24 @@ std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
     Query(connection.get(), "BEGIN TRANSACTION");
   }
   for (size_t i = 0; i < statements.size(); ++i) {
-    Result result;
     ABSL_VLOG(1) << "DuckDB: " << statements.at(i);
-    if (duckdb_query(connection.get(), statements.at(i).c_str(), &result.result) == DuckDBError) {
-      const char* error = duckdb_result_error(&result.result);
-      errors.emplace_back(i, error != nullptr ? error : "DuckDB insert failed");
-      if (!skip_invalid_rows) {
-        Query(connection.get(), "ROLLBACK");
-        return errors;
+    std::optional<std::string> error;
+    try {
+      const auto result = connection.get().Query(statements.at(i));
+      if (result->HasError()) {
+        error = result->GetError();
       }
+    } catch (...) {
+      // As with the V1 C API, submission may fail without producing an error result.
+      error = "DuckDB insert failed";
+    }
+    if (!error) {
+      continue;
+    }
+    errors.emplace_back(i, *error);
+    if (!skip_invalid_rows) {
+      Query(connection.get(), "ROLLBACK");
+      return errors;
     }
   }
   if (!skip_invalid_rows) {

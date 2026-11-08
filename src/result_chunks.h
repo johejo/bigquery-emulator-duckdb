@@ -3,11 +3,14 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "duckdb.h"
-#include "src/duckdb_handle.h"
+
+namespace duckdb {
+// Keep DuckDB's C++ result and vector headers out of REST and GoogleSQL result readers.
+class QueryResult;
+}  // namespace duckdb
 
 namespace bigquery_emulator_duckdb {
 
@@ -17,31 +20,16 @@ class ResultChunks {
  public:
   // Fetches every chunk of `result`. `owner`, which holds the database whose buffers the chunks
   // may pin, outlives them.
-  ResultChunks(duckdb_result& result, std::shared_ptr<const void> owner)
-      : owner_(std::move(owner)) {
-    for (idx_t i = 0; i < duckdb_column_count(&result); ++i) {
-      types_.emplace_back(duckdb_column_logical_type(&result, i));
-    }
-    size_t count = 0;
-    while (true) {
-      Chunk chunk(duckdb_fetch_chunk(result));
-      if (chunk.get() == nullptr) {
-        break;
-      }
-      count += duckdb_data_chunk_get_size(chunk.get());
-      chunks_.push_back(std::move(chunk));
-      ends_.push_back(count);
-    }
-  }
-  ~ResultChunks() = default;
+  ResultChunks(duckdb::QueryResult& result, std::shared_ptr<const void> owner);
+  ~ResultChunks();
   ResultChunks(const ResultChunks&) = delete;
   ResultChunks& operator=(const ResultChunks&) = delete;
   ResultChunks(ResultChunks&&) = delete;
   ResultChunks& operator=(ResultChunks&&) = delete;
 
   [[nodiscard]] size_t row_count() const { return ends_.empty() ? 0 : ends_.back(); }
-  [[nodiscard]] size_t column_count() const { return types_.size(); }
-  [[nodiscard]] duckdb_logical_type type(size_t column) const { return types_.at(column).get(); }
+  [[nodiscard]] size_t column_count() const;
+  [[nodiscard]] duckdb_logical_type type(size_t column) const;
 
   // Calls visit(chunk, begin, take, copied) for each run of rows [offset, offset + count) in
   // one chunk, where `copied` rows precede it.
@@ -52,7 +40,7 @@ class ResultChunks {
     while (copied < count) {
       const size_t begin = index == 0 ? 0 : ends_.at(index - 1);
       const size_t take = std::min(count - copied, ends_.at(index) - offset);
-      visit(chunks_.at(index).get(), offset - begin, take, copied);
+      visit(ChunkAt(index), offset - begin, take, copied);
       copied += take;
       offset += take;
       ++index;
@@ -62,9 +50,10 @@ class ResultChunks {
  private:
   // Declared first, so that it is destroyed after the chunks.
   std::shared_ptr<const void> owner_;
-  std::vector<LogicalType> types_;
-  std::vector<Chunk> chunks_;
+  class Impl;
+  std::unique_ptr<Impl> impl_;
   std::vector<size_t> ends_;
+  [[nodiscard]] duckdb_data_chunk ChunkAt(size_t index) const;
 };
 
 }  // namespace bigquery_emulator_duckdb

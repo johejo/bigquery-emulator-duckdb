@@ -31,7 +31,6 @@ class Handle {
 using LogicalType = Handle<duckdb_logical_type, duckdb_destroy_logical_type>;
 using Value = Handle<duckdb_value, duckdb_destroy_value>;
 using Connection = Handle<duckdb_connection, duckdb_disconnect>;
-using Prepared = Handle<duckdb_prepared_statement, duckdb_destroy_prepare>;
 using Chunk = Handle<duckdb_data_chunk, duckdb_destroy_data_chunk>;
 struct DuckFree {
   void operator()(const void* pointer) const { duckdb_free(const_cast<void*>(pointer)); }
