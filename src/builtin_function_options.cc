@@ -31,10 +31,15 @@ ExcludedFunctionIds BigQueryExcludedFunctionIds() {
 googlesql::BuiltinFunctionOptions AnalyzerBuiltinFunctionOptions(
     const ExcludedFunctionIds& excluded_function_ids) {
   googlesql::BuiltinFunctionOptions options(GoogleSqlLanguageOptions());
-  // Use the backend implementation, not SQL expansion (which needs nanosecond arithmetic).
   options.rewrite_enabled = {
+      // Use the backend implementation, not SQL expansion (which needs nanosecond arithmetic).
       {googlesql::FN_MONTHS_BETWEEN_DATE, false},
       {googlesql::FN_MONTHS_BETWEEN_DATETIME, false},
+      // The SQL function inliner does not support SAFE calls. Translate these array
+      // operations directly so SAFE uses the same argument/error handling as other functions.
+      {googlesql::FN_ARRAY_FIRST, false},
+      {googlesql::FN_ARRAY_LAST, false},
+      {googlesql::FN_ARRAY_SLICE, false},
   };
   for (const int64_t id : excluded_function_ids) {
     options.exclude_function_ids.insert(static_cast<googlesql::FunctionSignatureId>(id));

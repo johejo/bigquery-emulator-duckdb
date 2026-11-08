@@ -1,0 +1,115 @@
+# Sources: third_party/bigquery_docs/reference/standard-sql/array_functions.md and
+# GoogleSQL's array function compliance test data. SAFE suppresses errors of the
+# function, not errors evaluating its arguments.
+
+SELECT SAFE.ARRAY_FIRST([4, 5])
+=> "4"
+
+SELECT SAFE.ARRAY_LAST([4, 5])
+=> "5"
+
+SELECT SAFE.ARRAY_FIRST(ARRAY<INT64>[])
+=> null
+
+SELECT SAFE.ARRAY_LAST(a) FROM UNNEST([STRUCT(ARRAY<INT64>[] AS a)])
+=> null
+
+SELECT SAFE.ARRAY_FIRST(CAST(NULL AS ARRAY<INT64>))
+=> null
+
+SELECT SAFE.ARRAY_LAST(CAST(NULL AS ARRAY<INT64>))
+=> null
+
+SELECT SAFE.ARRAY_FIRST([CAST(NULL AS INT64), 5])
+=> null
+
+SELECT SAFE.ARRAY_LAST([4, CAST(NULL AS INT64)])
+=> null
+
+SELECT SAFE.ARRAY_FIRST([ERROR('argument error'), 5])
+=> error contains: argument error
+
+SELECT SAFE.ARRAY_LAST(IF(TRUE, ERROR('argument error'), [4, 5]))
+=> error contains: argument error
+
+SELECT ARRAY_LAST(ARRAY<INT64>[])
+=> error contains: ARRAY_LAST cannot get the last element of an empty array
+
+SELECT SAFE.ARRAY_FIRST([STRUCT(4 AS n), STRUCT(5 AS n)]).n
+=> "4"
+
+SELECT SAFE.ARRAY_LAST([BIGNUMERIC '1.5', BIGNUMERIC '2.5']) = BIGNUMERIC '2.5'
+=> "true"
+
+SELECT SAFE.ARRAY_FIRST([b'abc']) = b'abc'
+=> "true"
+
+# Selecting and slicing preserve element collations without comparing the strings.
+SELECT SAFE.ARRAY_FIRST([COLLATE('A', 'und:ci')]) = 'a'
+=> "true"
+
+SELECT SAFE.ARRAY_LAST([COLLATE('A', 'und:ci')]) = 'a'
+=> "true"
+
+SELECT SAFE.ARRAY_SLICE([COLLATE('A', 'und:ci')], 0, 0)[OFFSET(0)] = 'a'
+=> "true"
+
+SELECT ST_EQUALS(SAFE.ARRAY_LAST([ST_GEOGPOINT(10, 20)]), ST_GEOGPOINT(10, 20))
+=> "true"
+
+SELECT TO_JSON_STRING(SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], 1, 3))
+=> "[\"b\",\"c\",\"d\"]"
+
+SELECT TO_JSON_STRING(SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], -3, -1))
+=> "[\"c\",\"d\",\"e\"]"
+
+SELECT TO_JSON_STRING(SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], 1, -3))
+=> "[\"b\",\"c\"]"
+
+SELECT SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], -1, -3)
+=> []
+
+SELECT SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], 5, 30)
+=> []
+
+SELECT SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], 1, -30)
+=> []
+
+SELECT TO_JSON_STRING(SAFE.ARRAY_SLICE(['a', 'b', 'c', 'd', 'e'], -30, 30))
+=> "[\"a\",\"b\",\"c\",\"d\",\"e\"]"
+
+SELECT SAFE.ARRAY_SLICE(ARRAY<INT64>[], 0, 1)
+=> []
+
+SELECT SAFE.ARRAY_SLICE(CAST(NULL AS ARRAY<INT64>), 0, 1) IS NULL
+=> "true"
+
+SELECT SAFE.ARRAY_SLICE([1, 2], NULL, 1) IS NULL
+=> "true"
+
+SELECT SAFE.ARRAY_SLICE([1, 2], 0, NULL) IS NULL
+=> "true"
+
+SELECT TO_JSON_STRING(SAFE.ARRAY_SLICE([1, 2], -9223372036854775808, 9223372036854775807))
+=> "[1,2]"
+
+SELECT SAFE.ARRAY_SLICE([1, 2], 9223372036854775807, 9223372036854775807)
+=> []
+
+SELECT SAFE.ARRAY_SLICE([1, 2], 0, -9223372036854775808)
+=> []
+
+SELECT TO_JSON_STRING(SAFE.ARRAY_SLICE([1, NULL, 3], 0, 1))
+=> "[1,null]"
+
+SELECT SAFE.ARRAY_SLICE([STRUCT(1 AS n), STRUCT(2 AS n)], 1, 1)[OFFSET(0)].n
+=> "2"
+
+SELECT SAFE.ARRAY_SLICE([BIGNUMERIC '1.5', BIGNUMERIC '2.5'], 1, 1)[OFFSET(0)] = BIGNUMERIC '2.5'
+=> "true"
+
+SELECT SAFE.ARRAY_SLICE([1, 2], CAST(ERROR('offset error') AS INT64), 1)
+=> error contains: offset error
+
+SELECT SAFE.ARRAY_SLICE(IF(TRUE, ERROR('array error'), [1, 2]), 0, 1)
+=> error contains: array error
