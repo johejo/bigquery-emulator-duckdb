@@ -231,6 +231,69 @@ TEST(SqlRuntimeTest, ConcurrentExpirationDoesNotFailCreateResponses) {
   }
 }
 
+// DML that runs without a session, as a dry run or with a destination table it rejects,
+// translates against a catalog it expires itself. Relations that expire meanwhile must not
+// make it wait for drops that wait for it.
+TEST(SqlRuntimeTest, SessionlessDmlExpiresConcurrentlyCreatedTables) {
+  constexpr std::size_t kCreators = 2;
+  constexpr std::size_t kWriters = 4;
+  constexpr std::size_t kIterations = 64;
+  SqlRuntime runtime("", std::vector<Project>{{.project_id = "runtime"}});
+  runtime.CreateDataset({.project_id = "runtime", .dataset_id = "dml"});
+  runtime.CreateTable({.project_id = "runtime", .dataset_id = "dml", .table_id = "t"},
+                      {{.name = "value", .type = FieldType::kInteger}}, TableMetadata());
+  for (std::size_t i = 0; i < kCreators; ++i) {
+    runtime.CreateDataset({.project_id = "runtime", .dataset_id = "expiring_" + std::to_string(i)});
+  }
+  std::barrier ready(static_cast<std::ptrdiff_t>(kCreators + kWriters));
+  std::vector<std::future<void>> pending;
+  pending.reserve(kCreators + kWriters);
+  for (std::size_t i = 0; i < kCreators; ++i) {
+    pending.push_back(std::async(std::launch::async, [&, i] {
+      ready.arrive_and_wait();
+      for (std::size_t n = 0; n < kIterations; ++n) {
+        TableMetadata metadata;
+        metadata.expiration_time = 978307200000;  // 2001-01-01, already expired.
+        runtime.CreateTable(
+            {
+                .project_id = "runtime",
+                .dataset_id = "expiring_" + std::to_string(i),
+                .table_id = "t" + std::to_string(n),
+            },
+            {{.name = "value", .type = FieldType::kInteger}}, metadata);
+      }
+    }));
+  }
+  for (std::size_t i = 0; i < kWriters; ++i) {
+    pending.push_back(std::async(std::launch::async, [&, i] {
+      ready.arrive_and_wait();
+      for (std::size_t n = 0; n < kIterations; ++n) {
+        QueryRequest request;
+        request.project_id = "runtime";
+        request.query = "INSERT INTO dml.t VALUES (1)";
+        QueryJob metadata;
+        JobLocation location;
+        if (i % 2 == 0) {
+          request.dry_run = true;
+          runtime.ExecuteQuery(std::move(request), metadata, location);
+        } else {
+          request.destination_table =
+              TableReference{.project_id = "runtime", .dataset_id = "dml", .table_id = "out"};
+          EXPECT_THROW(runtime.ExecuteQuery(std::move(request), metadata, location), ApiError);
+        }
+      }
+    }));
+  }
+  for (auto& future : pending) {
+    EXPECT_NO_THROW(future.get());
+  }
+  for (std::size_t i = 0; i < kCreators; ++i) {
+    EXPECT_TRUE(
+        runtime.ListTables({.project_id = "runtime", .dataset_id = "expiring_" + std::to_string(i)})
+            .empty());
+  }
+}
+
 // A replacement can commit between metadata discovery and row execution. API readers must
 // neither bind the previous schema against the replacement nor report its row count with the
 // previous metadata. Alternating partitioned schemas also exercises reads with no policy yet.
