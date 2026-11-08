@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/ddl_write.h"
@@ -211,7 +212,7 @@ QueryResult SqlRuntime::WriteDestination(
       "BEGIN TRANSACTION",
   };
   // Holds other writes to the destination until this one, which keeps its rows first, commits.
-  std::unique_lock<std::mutex> kept;
+  std::unique_lock<absl::Mutex> kept;
   if (!existing.has_value() || write == WriteDisposition::kWriteTruncate) {
     if (existing.has_value()) {
       statements.push_back("DROP TABLE " + target);

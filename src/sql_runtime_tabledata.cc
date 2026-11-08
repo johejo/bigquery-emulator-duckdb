@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -127,7 +128,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
   }
   RejectReadOnlyWrite(info);
   // Held until the transaction that keeps the table's rows and appends to it commits.
-  std::unique_lock<std::mutex> kept;
+  std::unique_lock<absl::Mutex> kept;
   try {
     const auto session = backend_.NewSession();
     session->Transaction("BEGIN TRANSACTION");
@@ -250,8 +251,8 @@ std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const
     return errors;
   }
   try {
-    const std::unique_lock<std::mutex> kept =
-        statements.empty() ? std::unique_lock<std::mutex>() : KeepVersion(backend_, table);
+    const std::unique_lock<absl::Mutex> kept =
+        statements.empty() ? std::unique_lock<absl::Mutex>() : KeepVersion(backend_, table);
     for (const auto& [index, message] : backend_.InsertRows(statements, skip_invalid_rows)) {
       errors.push_back({.index = indexes.at(index), .message = message});
     }
