@@ -1,5 +1,4 @@
 #include <cstddef>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -69,7 +68,7 @@ DatasetMetadata SqlRuntime::GetDataset(DatasetReference dataset) {
 }
 
 void SqlRuntime::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   dataset.project_id = ResolveProject(dataset.project_id);
   if (FindDatasetReference(backend_, dataset)) {
     throw ApiError::Duplicate("Already Exists: Dataset " + dataset.project_id + ":" +
@@ -90,7 +89,7 @@ void SqlRuntime::CreateDataset(DatasetReference dataset, const DatasetMetadata& 
 }
 
 void SqlRuntime::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
   CheckCaseInsensitiveDataset(backend_, dataset, metadata);
@@ -104,11 +103,11 @@ void SqlRuntime::UpdateDataset(DatasetReference dataset, const DatasetMetadata& 
 
 void SqlRuntime::DeleteDataset(DatasetReference dataset, bool delete_contents) {
   // CASCADE drops expired relations too, and must not race the lazy expiration sweep.
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
   if (!delete_contents &&
-      (!ListTables(dataset).empty() || !Execute(RoutinesQuery(dataset)).rows.empty())) {
+      (!ListTables(dataset, &lock).empty() || !Execute(RoutinesQuery(dataset)).rows.empty())) {
     throw ApiError::Invalid("Dataset " + dataset.project_id + ":" + dataset.dataset_id +
                             " is still in use");
   }

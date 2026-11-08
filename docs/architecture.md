@@ -349,7 +349,9 @@ handles query DDL metadata.
 Mutations and their response reads share the expiration mutex
 ([expiration_mutex.h](../src/expiration_mutex.h)); DML only keeps the drops of expired relations
 out while it runs, so DML statements run concurrently. Expiration drops recheck metadata within
-their transaction.
+their transaction. The catalog and row-write locks use non-recursive Abseil mutexes. SQL and
+script entry points acquire statement coordination before opening a transaction snapshot;
+mutations pass their held catalog lock to nested reads and expiration sweeps.
 
 Table and column comments store BigQuery metadata. Dataset metadata lives in
 `main.emulator_datasets` because DuckDB cannot comment on schemas. Catalog changes and their

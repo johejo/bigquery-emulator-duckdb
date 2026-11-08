@@ -21,6 +21,7 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/expiration_mutex.h"
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
 #include "src/location.h"
@@ -39,9 +40,14 @@ namespace bigquery_emulator_duckdb {
 using nlohmann::json;
 
 std::vector<std::string> SqlRuntime::ListTables(DatasetReference dataset) {
+  return ListTables(std::move(dataset), nullptr);
+}
+
+std::vector<std::string> SqlRuntime::ListTables(DatasetReference dataset,
+                                                const ExpirationMutex::CatalogLock* catalog_lock) {
   dataset = ResolveDatasetReference(std::move(dataset));
   GetDataset(dataset);
-  ExpireTables(backend_, expiration_mutex_, dataset);
+  ExpireTables(backend_, expiration_mutex_, dataset, catalog_lock);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
@@ -86,7 +92,12 @@ std::string SqlRuntime::TableReadSnapshot::Relation() const {
 }
 
 TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, bool expire) {
-  auto read = BeginTableRead(std::move(table), expire);
+  return GetTable(std::move(table), include_row_count, expire, nullptr);
+}
+
+TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, bool expire,
+                               const ExpirationMutex::CatalogLock* catalog_lock) {
+  auto read = BeginTableRead(std::move(table), expire, catalog_lock);
   if (include_row_count && !read.info.view_query && !read.info.metadata.external_data) {
     try {
       const QueryResult count = read.session->Execute("SELECT count(*) FROM " + read.Relation());
@@ -99,14 +110,15 @@ TableInfo SqlRuntime::GetTable(TableReference table, bool include_row_count, boo
   return std::move(read.info);
 }
 
-SqlRuntime::TableReadSnapshot SqlRuntime::BeginTableRead(TableReference table, bool expire) {
+SqlRuntime::TableReadSnapshot SqlRuntime::BeginTableRead(
+    TableReference table, bool expire, const ExpirationMutex::CatalogLock* catalog_lock) {
   table = ResolveTableReference(std::move(table));
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   GetDataset(dataset);
   // Relation expiration may mutate the catalog. Finish it before starting the read snapshot;
   // a read never takes a history mutex or writes retained rows/policies.
   if (expire) {
-    ExpireTables(backend_, expiration_mutex_, dataset);
+    ExpireTables(backend_, expiration_mutex_, dataset, catalog_lock);
   }
   TableReadSnapshot read{.session = backend_.NewSession()};
   Backend& session = *read.session;
@@ -208,12 +220,13 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
     }
     schema = ExternalSchema(*metadata.external_data, std::move(schema), {}, table.table_id);
   }
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   table = ResolveTableReference(std::move(table), /*create=*/true);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   ExpireTables(backend_, expiration_mutex_,
-               DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+               DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id},
+               &lock);
   std::vector<std::string> columns;
   std::ranges::transform(schema, std::back_inserter(columns), [&](const FieldSchema& field) {
     return ColumnDefinition(field, functions_.timestamp_precision(),
@@ -242,9 +255,9 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
 
 TableInfo SqlRuntime::CreateView(TableReference table, const json& definition,
                                  const TableMetadata& metadata, bool materialized) {
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   table = ResolveTableReference(std::move(table), /*create=*/true);
-  WriteView(table, definition, metadata, /*replace=*/false, materialized);
+  WriteView(table, definition, metadata, /*replace=*/false, materialized, lock);
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
@@ -253,9 +266,9 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
                                   const std::optional<json>& view,
                                   const std::optional<TableMetadata>& metadata,
                                   bool rounding_mode_unspecified) {
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   table = ResolveTableReference(std::move(table));
-  const TableInfo info = GetTable(table, /*include_row_count=*/false);
+  const TableInfo info = GetTable(table, /*include_row_count=*/false, /*expire=*/true, &lock);
   if (info.view_query.has_value()) {
     if (metadata.has_value() && metadata->default_collation.has_value()) {
       throw ApiError::Unsupported("defaultCollation on a view");
@@ -272,7 +285,7 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
       definition.update(*view);
       TableMetadata updated = metadata.value_or(info.metadata);
       updated.creation_time = info.metadata.creation_time;
-      WriteView(table, definition, updated, /*replace=*/true);
+      WriteView(table, definition, updated, /*replace=*/true, /*materialized=*/false, lock);
     } else if (metadata.has_value()) {
       TableMetadata updated = *metadata;
       updated.creation_time = info.metadata.creation_time;
@@ -381,7 +394,8 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
 }
 
 void SqlRuntime::WriteView(TableReference table, const json& definition,
-                           const TableMetadata& metadata, bool replace, bool materialized) {
+                           const TableMetadata& metadata, bool replace, bool materialized,
+                           const ExpirationMutex::CatalogLock& catalog_lock) {
   table = ResolveTableReference(std::move(table), /*create=*/true);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
@@ -422,7 +436,8 @@ void SqlRuntime::WriteView(TableReference table, const json& definition,
                       googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
                                                      "." + table.table_id) +
                       " AS " + query,
-                  {}, table.project_id, "", &location);
+                  {}, table.project_id, "", &location, nullptr, /*stores_result=*/false,
+                  /*dry_run=*/false, nullptr, &catalog_lock);
     if (!translation.view.has_value()) {
       throw ApiError::Internal("CREATE VIEW was not translated to a view");
     }
@@ -498,16 +513,17 @@ void RejectReadOnlyWrite(const TableInfo& table) {
 }
 
 void SqlRuntime::DeleteTable(TableReference table) {
-  std::scoped_lock const lock(expiration_mutex_);
+  const auto lock = expiration_mutex_.LockCatalog();
   table = ResolveTableReference(std::move(table));
   ExpireTables(backend_, expiration_mutex_,
-               DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+               DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id},
+               &lock);
   // Views the emulator did not create have no metadata for GetTable, but can still be dropped.
   if (ViewComment(backend_, table).has_value()) {
     Execute("DROP VIEW " + QualifiedName(table));
     return;
   }
-  GetTable(table, false);
+  GetTable(table, /*include_row_count=*/false, /*expire=*/true, &lock);
   Execute("DROP TABLE " + QualifiedName(table));
 }
 

@@ -258,7 +258,8 @@ class SqlRuntime {
       const std::string& default_project, const std::string& default_dataset,
       JobLocation* location = nullptr,
       const googlesql::SystemVariableValuesMap* system_variables = nullptr,
-      bool stores_result = false, bool dry_run = false, Backend* session = nullptr);
+      bool stores_result = false, bool dry_run = false, Backend* session = nullptr,
+      const ExpirationMutex::CatalogLock* catalog_lock = nullptr);
   // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
   static std::optional<std::string> DatasetLocation(Backend& backend,
                                                     const DatasetReference& dataset);
@@ -283,7 +284,8 @@ class SqlRuntime {
                       bool null_arrays = false);
   // Runs `translation` as a query job without a destination table does, recording the metadata
   // of a DDL statement, and returns its result with the schema the translation gives it.
-  // A dataset that CREATE SCHEMA creates without a location is created in the job's.
+  // A dataset that CREATE SCHEMA creates without a location is created in the job's. The caller
+  // holds LockStatement's coordination through the response read; this never reacquires it.
   QueryResult RunStatement(const TranslatedStatement& translation,
                            const std::vector<std::string>& setup, bool null_arrays = false,
                            Backend* session = nullptr, JobLocation* location = nullptr);
@@ -306,9 +308,14 @@ class SqlRuntime {
   StatementLock LockStatement(StatementWrites writes, bool expire);
   // A catalog source for the tables, views and datasets the emulator holds; what it finds counts
   // toward `location` when it is set.
-  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true,
-                                              JobLocation* location = nullptr,
-                                              bool policy_reads = true);
+  std::unique_ptr<TableSource> NewTableSource(
+      Backend* session = nullptr, bool expire = true, JobLocation* location = nullptr,
+      bool policy_reads = true, const ExpirationMutex::CatalogLock* catalog_lock = nullptr);
+  // Nested reads reuse a mutation's catalog lock when expiring relations.
+  std::vector<std::string> ListTables(DatasetReference dataset,
+                                      const ExpirationMutex::CatalogLock* catalog_lock);
+  TableInfo GetTable(TableReference table, bool include_row_count, bool expire,
+                     const ExpirationMutex::CatalogLock* catalog_lock);
   // Metadata discovery and row execution for one API read share a backend snapshot and cutoff.
   // The session must stay alive until the result is materialized; destroying it rolls back the
   // read-only transaction, including on an exception.
@@ -319,7 +326,8 @@ class SqlRuntime {
 
     [[nodiscard]] std::string Relation() const;
   };
-  TableReadSnapshot BeginTableRead(TableReference table, bool expire = true);
+  TableReadSnapshot BeginTableRead(TableReference table, bool expire = true,
+                                   const ExpirationMutex::CatalogLock* catalog_lock = nullptr);
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // The schema BigQuery detects from the sources of an external table created without one, with
   // the mode of each field given. Throws ApiError::Unsupported without an external table provider.
@@ -335,7 +343,8 @@ class SqlRuntime {
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,
-                 const TableMetadata& metadata, bool replace, bool materialized = false);
+                 const TableMetadata& metadata, bool replace, bool materialized,
+                 const ExpirationMutex::CatalogLock& catalog_lock);
   // Keeps the rows `table`, as `backend` sees it, has before a write to it on `backend`, for FOR
   // SYSTEM_TIME AS OF. Outside a transaction, the returned lock keeps other writes from reaching
   // the table until the caller's write is done; in one, the rows are kept until it commits.
@@ -361,10 +370,11 @@ class SqlRuntime {
       WriteDisposition write, const std::string& sql, const std::vector<FieldSchema>& schema,
       const std::vector<std::string>& setup, bool count_only = false,
       const TableMetadata& metadata = TableMetadata(), bool copy = false, bool restore = false,
-      const std::optional<DestinationTableProperties>& load_properties = std::nullopt);
+      const std::optional<DestinationTableProperties>& load_properties = std::nullopt,
+      const ExpirationMutex::CatalogLock* catalog_lock = nullptr);
 
-  // Mutations also hold this while reading their response. Recursive because their catalog
-  // lookups may expire other relations on the same thread.
+  // Mutations also hold the catalog lock while reading their response, passing it to nested
+  // catalog reads and expiration sweeps instead of acquiring it recursively.
   ExpirationMutex expiration_mutex_;
   Backend backend_;
   // The translator's functions, chosen by the same options as the backend's.
