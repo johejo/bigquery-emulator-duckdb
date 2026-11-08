@@ -718,7 +718,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       {.argument = 2, .types = kInt64Types},
       {.argument = 3, .types = kInt64Types},
   };
-  static constexpr std::string_view kLikeErrors[] = {"'LIKE pattern ends with a backslash'"};
   static constexpr function_catalog::TypeRejection kDistinctRejections[] = {
       {
           .types = kStructTypes,
@@ -811,22 +810,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
   };
   static constexpr std::string_view kDivErrors[] = {"'division by zero: ' || $1 || ' / ' || $2"};
   static constexpr auto kRulesBacking = std::tuple{
-      // A backslash escapes the character after it, and must not end the pattern. BYTES are
-      // unsupported, since DuckDB's LIKE takes only VARCHAR.
-
-      Define("$LIKE",
-             {
-                 {
-                     .arity = 2,
-                     .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
-                                 "THEN !1 ELSE "
-                                 "($1 LIKE $2 ESCAPE '\\') END",
-                     .collated_spelling = "bq_collation_like($3, $1, $2)",
-                     .conditions = kString,
-                     .errors = kLikeErrors,
-                 },
-             }),
-
       Define("$IS_DISTINCT_FROM",
              {
                  {.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"},

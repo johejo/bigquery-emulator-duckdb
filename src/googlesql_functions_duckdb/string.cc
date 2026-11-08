@@ -21,8 +21,11 @@
 #include "googlesql/public/functions/bitwise.h"
 #include "googlesql/public/functions/distance.h"
 #include "googlesql/public/functions/hash.h"
+#include "googlesql/public/functions/like.h"
 #include "googlesql/public/functions/net.h"
 #include "googlesql/public/functions/regexp.h"
+#include "googlesql/public/type.pb.h"
+#include "re2/re2.h"
 #include "src/duckdb_functions/apply.h"
 #include "src/duckdb_functions/register.h"
 #include "src/duckdb_functions/scalar.h"
@@ -101,6 +104,18 @@ void WithStringState(duckdb_function_info info, duckdb_data_chunk input, duckdb_
     }
     return compute(*state, arguments);
   });
+}
+
+void LikeBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithStringState<std::unique_ptr<RE2>, 1>(
+      info, input, output,
+      [](auto& regexp, const auto& parameters) {
+        return googlesql::functions::CreateLikeRegexp(parameters.at(0), googlesql::TYPE_BYTES,
+                                                      &regexp);
+      },
+      [](const auto& regexp, const Arguments& arguments) -> absl::StatusOr<bool> {
+        return RE2::FullMatch(arguments.StringView(0), *regexp);
+      });
 }
 
 template <auto kTrim>
@@ -303,6 +318,7 @@ void RegisterStringFunctions(duckdb_connection connection, const Options& option
            {"bq_replace_bytes", {kBlob, kBlob, kBlob}, kBlob, Apply<fn::ReplaceBytes>},
            {"bq_translate", {kVarchar, kVarchar, kVarchar}, kVarchar, Translate<false>},
            {"bq_translate_bytes", {kBlob, kBlob, kBlob}, kBlob, Translate<true>},
+           {"bq_like_bytes", {kBlob, kBlob}, kBoolean, LikeBytes},
            {"bq_starts_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::StartsWithBytes>},
            {"bq_ends_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::EndsWithBytes>},
            {"bq_ascii", {kVarchar}, kBigint, Apply<fn::FirstCharOfStringToASCII>},

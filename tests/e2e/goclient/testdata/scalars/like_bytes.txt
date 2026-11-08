@@ -1,0 +1,90 @@
+# BYTES LIKE matches bytes, not UTF-8 characters, including NUL and non-UTF-8 data.
+# Source: third_party/bigquery_docs/reference/standard-sql/operators.md
+
+SELECT b'\xc3\xa9' LIKE b'_'
+=> "false"
+
+SELECT b'\xc3\xa9' LIKE b'__'
+=> "true"
+
+SELECT b'\xff\x00\n' LIKE b'___'
+=> "true"
+
+SELECT b'\xff\x00\n' LIKE b'%'
+=> "true"
+
+SELECT b'\xffabc' LIKE b'\xff%'
+=> "true"
+
+SELECT b'\xffabc' NOT LIKE b'\xfe%'
+=> "true"
+
+SELECT b'' LIKE b''
+=> "true"
+
+SELECT b'' LIKE b'_'
+=> "false"
+
+SELECT b'a%b_c\\' LIKE br'a\%b\_c\\'
+=> "true"
+
+SELECT STRING_AGG(CAST(b'\xff' LIKE pattern AS STRING), ',' ORDER BY offset) FROM UNNEST([b'_', b'_', b'a', b'', b'\xff']) AS pattern WITH OFFSET AS offset
+=> "true,true,false,false,true"
+
+# GoogleSQL compliance: like_any.test, like_any_bytes_invalid.
+SELECT value LIKE ANY (b'\\') FROM UNNEST([b'abc']) AS value
+=> error: LIKE pattern ends with a backslash
+
+SELECT value LIKE b'\\' FROM UNNEST([b'abc']) AS value
+=> error: LIKE pattern ends with a backslash
+
+# Quantified forms use the same byte matching with three-valued logic.
+# Source: third_party/bigquery_docs/reference/standard-sql/operators.md
+
+SELECT b'\xff' LIKE ANY (b'_', b'a')
+=> "true"
+
+SELECT b'\xff' LIKE SOME (b'a', b'\xff')
+=> "true"
+
+SELECT b'\xff' LIKE ALL (b'_', b'%')
+=> "true"
+
+SELECT b'\xff' NOT LIKE ANY (b'_', b'a')
+=> "true"
+
+SELECT b'\xff' NOT LIKE ALL (b'a', b'b')
+=> "true"
+
+SELECT b'\xff' LIKE ANY (b'_', CAST(NULL AS BYTES))
+=> "true"
+
+SELECT b'\xff' LIKE ANY (b'a', CAST(NULL AS BYTES))
+=> null
+
+SELECT b'\xff' LIKE ALL (b'_', CAST(NULL AS BYTES))
+=> null
+
+SELECT b'\xff' LIKE ALL (b'a', CAST(NULL AS BYTES))
+=> "false"
+
+SELECT CAST(NULL AS BYTES) LIKE ANY (b'%')
+=> null
+
+SELECT b'\xff' LIKE ANY UNNEST([b'a', b'_'])
+=> "true"
+
+SELECT b'\xff' LIKE ALL UNNEST([b'_', b'%'])
+=> "true"
+
+SELECT CAST(NULL AS BYTES) LIKE ANY UNNEST(ARRAY<BYTES>[])
+=> "false"
+
+SELECT CAST(NULL AS BYTES) LIKE ALL UNNEST(ARRAY<BYTES>[])
+=> "true"
+
+SELECT b'\xff' NOT LIKE ANY UNNEST(ARRAY<BYTES>[])
+=> "false"
+
+SELECT b'\xff' NOT LIKE ALL UNNEST(ARRAY<BYTES>[])
+=> "true"
