@@ -23,17 +23,13 @@ ExpirationPolicy Policy(std::optional<int64_t> deadline, std::optional<int64_t> 
 // The creation matrix in docs/partition-expiration-design.md is sourced from the dataset
 // specification and the recorded partition_expiration_policy/ddl API answers. Runtime entry
 // points still reject positive partition TTLs; these checks do not establish runtime support.
-TEST(ExpirationPolicyTest, OrdinaryCreationWithoutExplicitSettings) {
-  EXPECT_EQ(ResolveCreationExpiration(false, kCreated, {}, kWeekMs, std::nullopt),
-            Policy(kCreated + kWeekMs, std::nullopt));
+// Creation without partition defaults is covered through the public API and DDL in
+// tests/e2e/goclient/dataset_default_expiration_test.go.
+TEST(ExpirationPolicyTest, CreationWithPartitionDefaults) {
   EXPECT_EQ(ResolveCreationExpiration(false, kCreated, {}, kWeekMs, kDayMs),
             Policy(kCreated + kWeekMs, std::nullopt));
   EXPECT_EQ(ResolveCreationExpiration(false, kCreated, {}, std::nullopt, kDayMs),
             Policy(std::nullopt, std::nullopt));
-  EXPECT_EQ(ResolveCreationExpiration(true, kCreated, {}, std::nullopt, std::nullopt),
-            Policy(std::nullopt, std::nullopt));
-  EXPECT_EQ(ResolveCreationExpiration(true, kCreated, {}, kWeekMs, std::nullopt),
-            Policy(kCreated + kWeekMs, std::nullopt));
   EXPECT_EQ(ResolveCreationExpiration(true, kCreated, {}, std::nullopt, kDayMs),
             Policy(std::nullopt, kDayMs));
   EXPECT_EQ(ResolveCreationExpiration(true, kCreated, {}, kWeekMs, kDayMs),

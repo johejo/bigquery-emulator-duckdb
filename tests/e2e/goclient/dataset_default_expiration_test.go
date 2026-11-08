@@ -93,6 +93,19 @@ func TestDatasetDefaultTableExpiration(t *testing.T) {
 	expiresAfter(api, "ddl", 2*time.Hour)
 	mustRun(api.DatasetID, "CREATE TABLE ctas AS SELECT 1 AS id")
 	expiresAfter(api, "ctas", 2*time.Hour)
+	// Without a partition expiration default, time-partitioned tables inherit the same
+	// table deadline. Check the SDK's timestamps against creationTime, not the wall clock.
+	partitionSchema := bigquery.Schema{{Name: "d", Type: bigquery.DateFieldType}}
+	if err := api.Table("partitioned_rest").Create(ctx, &bigquery.TableMetadata{
+		Schema:           partitionSchema,
+		TimePartitioning: &bigquery.TimePartitioning{Field: "d"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(api.DatasetID, "CREATE TABLE partitioned_ddl (d DATE) PARTITION BY d")
+	for _, table := range []string{"partitioned_rest", "partitioned_ddl"} {
+		expiresAfter(api, table, 2*time.Hour)
+	}
 	mustRun(api.DatasetID, "CREATE TABLE ddl_explicit (id INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2099-01-01 00:00:00 UTC')")
 	if got := expiration(api, "ddl_explicit"); !got.Equal(explicit) {
 		t.Errorf("ddl_explicit: expiration = %v, want %v", got, explicit)
@@ -134,9 +147,14 @@ func TestDatasetDefaultTableExpiration(t *testing.T) {
 	if got := defaultOf(api); got != 3*time.Hour {
 		t.Fatalf("patched default table expiration = %v, want 3h", got)
 	}
-	expiresAfter(api, "rest", 2*time.Hour)
+	for _, table := range []string{"rest", "partitioned_rest", "partitioned_ddl"} {
+		expiresAfter(api, table, 2*time.Hour)
+	}
 	mustRun(api.DatasetID, "CREATE TABLE later (id INT64)")
-	expiresAfter(api, "later", 3*time.Hour)
+	mustRun(api.DatasetID, "CREATE TABLE partitioned_later (d DATE) PARTITION BY d")
+	for _, table := range []string{"later", "partitioned_later"} {
+		expiresAfter(api, table, 3*time.Hour)
+	}
 	// The Go client sends a zero default as null, which clears it.
 	update.DefaultTableExpiration = time.Duration(0)
 	if _, err := api.Update(ctx, update, ""); err != nil {
@@ -146,10 +164,21 @@ func TestDatasetDefaultTableExpiration(t *testing.T) {
 		t.Fatalf("cleared default table expiration = %v", got)
 	}
 	mustRun(api.DatasetID, "CREATE TABLE never (id INT64)")
-	if got := expiration(api, "never"); !got.IsZero() {
-		t.Errorf("never: expiration = %v after the default was cleared", got)
+	mustRun(api.DatasetID, "CREATE TABLE partitioned_never (d DATE) PARTITION BY d")
+	if err := api.Table("partitioned_rest_never").Create(ctx, &bigquery.TableMetadata{
+		Schema:           partitionSchema,
+		TimePartitioning: &bigquery.TimePartitioning{Field: "d"},
+	}); err != nil {
+		t.Fatal(err)
 	}
-	expiresAfter(api, "later", 3*time.Hour)
+	for _, table := range []string{"never", "partitioned_never", "partitioned_rest_never"} {
+		if got := expiration(api, table); !got.IsZero() {
+			t.Errorf("%s: expiration = %v after the default was cleared", table, got)
+		}
+	}
+	for _, table := range []string{"later", "partitioned_later"} {
+		expiresAfter(api, table, 3*time.Hour)
+	}
 
 	// DDL sets the same default in days, which may be fractional.
 	ddl := client.Dataset("go_default_expiration_ddl")
