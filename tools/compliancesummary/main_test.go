@@ -86,6 +86,7 @@ func TestSummarize(t *testing.T) {
 		"**Shards that did not finish:** [2 3] of 3.",
 		"| Pass | 3 |", "| Fail | 1 |", "| Known failure | 1 |", "| Unsupported | 1 |",
 		"| Total | 6 |", "| `code:Least` | 1 |", "| `code:GE` | 1 |",
+		"Tests with the most unsupported statements, top 1 of 1:", "| `graph_test` | 1 |",
 		"**Failures:** 1. Fix them", "- `code:Least_ARRAY<INT64>_<1, NULL>`",
 		"**Known failures that pass:** 1. Remove them", "- `code:GT_INT64_<1>_INT64_<2>`",
 	} {
@@ -105,6 +106,65 @@ func TestSummarize(t *testing.T) {
 		"code:safe_error_mode__safe_generate_array_INT64_<1>\tpass\n"+
 		"graph_test:match\tunsupported\n"; got != want {
 		t.Errorf("results = %q, want %q", got, want)
+	}
+}
+
+func TestComparison(t *testing.T) {
+	baseline := "regressed\tpass\nimproved\tunsupported\nunchanged\tpass\nmissing\tpass\nfailed\tpass\nknown\tknown\n"
+	previous, err := readResults(strings.NewReader(baseline))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := summary{outcomes: map[string]string{
+		"regressed": unsupported, "improved": pass, "unchanged": pass,
+		"new": unsupported, "failed": fail, "known": unsupported,
+	}}
+	var markdown strings.Builder
+	s.writeComparison(&markdown, previous)
+	for _, want := range []string{
+		"Report only", "| Pass → Unsupported | 1 |", "| Unsupported → Pass | 1 |",
+		"| New | 1 |", "| Missing | 1 |", "- `regressed`", "- `improved`",
+	} {
+		if !strings.Contains(markdown.String(), want) {
+			t.Errorf("Markdown lacks %q:\n%s", want, markdown.String())
+		}
+	}
+}
+
+func TestReadResults(t *testing.T) {
+	for _, input := range []string{
+		"statement", "\tpass\n", "statement\tunknown\n", "statement\tpass\textra\n",
+		"statement\tpass\nstatement\tunsupported\n",
+	} {
+		if _, err := readResults(strings.NewReader(input)); err == nil {
+			t.Errorf("readResults(%q) succeeded", input)
+		}
+	}
+	s := summary{outcomes: map[string]string{"a": pass, "b": unsupported, "c": known, "d": fail}}
+	var results strings.Builder
+	if err := s.writeResults(&results); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readResults(strings.NewReader(results.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, s.outcomes) {
+		t.Errorf("round trip = %v, want %v", got, s.outcomes)
+	}
+}
+
+func TestUnsupportedGroups(t *testing.T) {
+	s := summary{outcomes: map[string]string{
+		"b_test:first": unsupported, "b_test:second": unsupported,
+		"a_test:first": unsupported, "c_test:first": unsupported,
+		"a_test:passes": pass, "a_test:fails": fail,
+	}}
+	var markdown strings.Builder
+	s.writeMarkdown(&markdown)
+	_, table, ok := strings.Cut(markdown.String(), "Tests with the most unsupported statements")
+	if !ok || !strings.Contains(table, "| `b_test` | 2 |\n| `a_test` | 1 |\n| `c_test` | 1 |") {
+		t.Errorf("unexpected unsupported ranking:\n%s", markdown.String())
 	}
 }
 

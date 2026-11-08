@@ -135,6 +135,9 @@ jobs:
   compliance:
     # Keep the required check's name stable, and fail it if any preceding job failed.
     name: Compliance
+    permissions:
+      actions: read
+      contents: read
     needs: [build, shards]
     if: always()
     runs-on: ubuntu-26.04-arm
@@ -153,12 +156,36 @@ jobs:
           pattern: compliance-logs-*
           merge-multiple: true
           path: ${{ runner.temp }}/compliance-logs
+      # Compare only with a successful push run for the PR's exact base commit, never an
+      # unrelated or newer main run. Missing/expired artifacts leave the report unbased.
+      - name: Download baseline results
+        if: needs.build.result == 'success' && github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          run_id=$(gh run list --workflow compliance.yml --event push --commit "$BASE_SHA" \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [[ -z "$run_id" ]]; then
+            echo 'Baseline comparison unavailable: no successful Compliance push run for the base commit.' >> "$GITHUB_STEP_SUMMARY"
+          elif gh run download "$run_id" --name compliance-results --dir "$RUNNER_TEMP/compliance-baseline"; then
+            echo "Baseline: [$BASE_SHA]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            rm -rf "$RUNNER_TEMP/compliance-baseline"
+            echo 'Baseline comparison unavailable: results artifact could not be downloaded.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       # An explicit shard count detects missing artifacts, even when no shard left a log.
       - name: Summary
         if: (success() || failure()) && needs.build.result == 'success'
         run: |
           chmod +x "$RUNNER_TEMP/compliance-summary/compliance-summary"
-          "$RUNNER_TEMP/compliance-summary/compliance-summary" \
+          baseline=()
+          if [[ -f "$RUNNER_TEMP/compliance-baseline/compliance-results.tsv" ]]; then
+            baseline=(-baseline "$RUNNER_TEMP/compliance-baseline/compliance-results.tsv")
+          fi
+          "$RUNNER_TEMP/compliance-summary/compliance-summary" "${baseline[@]}" \
             -shards "$(cat "$RUNNER_TEMP/compliance-summary/shard-count")" \
             -results compliance-results.tsv "$RUNNER_TEMP/compliance-logs" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload results

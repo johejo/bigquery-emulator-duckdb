@@ -5,7 +5,7 @@
 // statements are then missing, and when a statement that a known error lists as failing passes,
 // since the entry would then hide the statement failing again.
 //
-//	compliancesummary [-results FILE] [-shards N] LOGDIR
+//	compliancesummary [-results FILE] [-baseline FILE] [-shards N] LOGDIR
 //
 // LOGDIR is the test's log directory, bazel-testlogs/compliance_test. With -shards, it may also
 // contain downloaded CI logs; missing logs are counted even when the directory does not exist.
@@ -196,12 +196,8 @@ func summarize(paths []string) (summary, error) {
 
 func (s summary) writeMarkdown(w io.Writer) {
 	counts := map[string]int{}
-	groups := map[string]int{}
-	for name, outcome := range s.outcomes {
+	for _, outcome := range s.outcomes {
 		counts[outcome]++
-		if outcome == fail || outcome == known {
-			groups[group(name)]++
-		}
 	}
 	fmt.Fprintln(w, "## GoogleSQL compliance")
 	fmt.Fprintln(w)
@@ -220,6 +216,17 @@ func (s summary) writeMarkdown(w io.Writer) {
 		"the reason", s.names(fail))
 	writeNames(w, "Known failures that pass", "Remove them from "+
 		"tests/compliance/known_errors.textproto", s.removable)
+	s.writeGroups(w, "failures", "Failures", fail, known)
+	s.writeGroups(w, "unsupported statements", "Unsupported", unsupported)
+}
+
+func (s summary) writeGroups(w io.Writer, heading, column string, outcomes ...string) {
+	groups := map[string]int{}
+	for name, outcome := range s.outcomes {
+		if slices.Contains(outcomes, outcome) {
+			groups[group(name)]++
+		}
+	}
 	if len(groups) == 0 {
 		return
 	}
@@ -232,8 +239,8 @@ func (s summary) writeMarkdown(w io.Writer) {
 	})
 	const top = 20
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Tests with the most failures, top %d of %d:\n\n", min(top, len(names)), len(names))
-	fmt.Fprintln(w, "| Test | Failures |")
+	fmt.Fprintf(w, "Tests with the most %s, top %d of %d:\n\n", heading, min(top, len(names)), len(names))
+	fmt.Fprintf(w, "| Test | %s |\n", column)
 	fmt.Fprintln(w, "|---|---:|")
 	for _, name := range names[:min(top, len(names))] {
 		fmt.Fprintf(w, "| `%s` | %d |\n", name, groups[name])
@@ -282,12 +289,62 @@ func (s summary) writeResults(w io.Writer) error {
 	return buffered.Flush()
 }
 
+// readResults reads the artifact written by writeResults. Reject malformed baselines rather
+// than reporting missing or invalid statements as genuine changes in coverage.
+func readResults(r io.Reader) (map[string]string, error) {
+	results := map[string]string{}
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, 64<<20)
+	for line := 1; scanner.Scan(); line++ {
+		name, outcome, ok := strings.Cut(scanner.Text(), "\t")
+		if !ok || name == "" || !slices.Contains([]string{pass, fail, known, unsupported}, outcome) {
+			return nil, fmt.Errorf("invalid baseline result on line %d", line)
+		}
+		if _, exists := results[name]; exists {
+			return nil, fmt.Errorf("duplicate baseline statement on line %d", line)
+		}
+		results[name] = outcome
+	}
+	return results, scanner.Err()
+}
+
+// Only compare statements present in both runs. Missing statements may reflect a changed
+// GoogleSQL suite or unfinished shards, not a change in emulator support.
+func (s summary) writeComparison(w io.Writer, baseline map[string]string) {
+	var regressions, improvements, added, removed []string
+	for name, outcome := range s.outcomes {
+		before, exists := baseline[name]
+		switch {
+		case !exists:
+			added = append(added, name)
+		case before == pass && outcome == unsupported:
+			regressions = append(regressions, name)
+		case before == unsupported && outcome == pass:
+			improvements = append(improvements, name)
+		}
+	}
+	for name := range baseline {
+		if _, exists := s.outcomes[name]; !exists {
+			removed = append(removed, name)
+		}
+	}
+	fmt.Fprintln(w, "\n### Baseline comparison")
+	fmt.Fprintln(w, "\nReport only; coverage changes do not affect CI status. New and missing statements are not support transitions.")
+	fmt.Fprintf(w, "\n| Change | Statements |\n|---|---:|\n| Pass → Unsupported | %d |\n| Unsupported → Pass | %d |\n| New | %d |\n| Missing | %d |\n",
+		len(regressions), len(improvements), len(added), len(removed))
+	slices.Sort(regressions)
+	slices.Sort(improvements)
+	writeNames(w, "Pass → Unsupported", "Review possible support regressions", regressions)
+	writeNames(w, "Unsupported → Pass", "Newly passing statements", improvements)
+}
+
 func main() {
+	baseline := flag.String("baseline", "", "compare with a previous results TSV (report only)")
 	results := flag.String("results", "", "write each statement's outcome to this file")
 	shards := flag.Int("shards", 0, "expected shard count; 0 detects the latest local run")
 	flag.Parse()
 	if flag.NArg() != 1 || *shards < 0 {
-		fmt.Fprintln(os.Stderr, "usage: compliancesummary [-results FILE] [-shards N] LOGDIR")
+		fmt.Fprintln(os.Stderr, "usage: compliancesummary [-results FILE] [-baseline FILE] [-shards N] LOGDIR")
 		os.Exit(2)
 	}
 	paths, err := latestShards(flag.Arg(0), *shards)
@@ -301,6 +358,20 @@ func main() {
 		os.Exit(1)
 	}
 	s.writeMarkdown(os.Stdout)
+	if *baseline != "" {
+		file, err := os.Open(*baseline)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		previous, err := readResults(file)
+		file.Close()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		s.writeComparison(os.Stdout, previous)
+	}
 	if *results != "" {
 		file, err := os.Create(*results)
 		if err == nil {
