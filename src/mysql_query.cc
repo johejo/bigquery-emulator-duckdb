@@ -10,8 +10,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
-#include "duckdb.h"
-#include "duckdb/main/capi/capi_internal.hpp"
 #include "duckdb/main/connection.hpp"
 #include "duckdb/main/database.hpp"
 #include "mysql.h"
@@ -70,11 +68,10 @@ absl::StatusOr<FieldType> ColumnType(const MYSQL_FIELD& field, FieldType decimal
 
 }  // namespace
 
-void RegisterMySqlScanner(duckdb_database database) {
+void RegisterMySqlScanner(duckdb::DuckDB& database) {
   try {
-    duckdb::DuckDB& instance = *reinterpret_cast<duckdb::DatabaseWrapper*>(database)->database;
-    instance.LoadStaticExtension<MysqlScannerExtension>();
-    duckdb::Connection connection(instance);
+    database.LoadStaticExtension<MysqlScannerExtension>();
+    duckdb::Connection connection(database);
     for (const char* setting : {
              "SET GLOBAL mysql_tinyint1_as_boolean = false",
              "SET GLOBAL mysql_bit1_as_boolean = false",

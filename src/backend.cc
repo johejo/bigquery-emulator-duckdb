@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -14,12 +15,17 @@
 #include "absl/log/absl_log.h"
 #include "absl/synchronization/mutex.h"
 #include "duckdb.h"
+#include "duckdb/common/types/value.hpp"
+#include "duckdb/main/config.hpp"
+#include "duckdb/main/connection.hpp"
+#include "duckdb/main/database.hpp"
 #include "duckdb_static_extension.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
 #include "src/backend_initializer.h"
 #include "src/catalog_functions.h"
+#include "src/duckdb_capi.h"
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_types.h"
@@ -35,7 +41,7 @@
 #include "src/timestamp_precision.h"
 
 // DuckDB v2 requires explicit registration of statically linked extensions before opening a
-// database. Keep using duckdb.h's V1 C API for database access.
+// database, including when the database and connections are owned through the C++ API.
 extern "C" {
 int32_t duckdb_extension_autocomplete_describe(duckdb_extension_descriptor*);
 int32_t duckdb_extension_core_functions_describe(duckdb_extension_descriptor*);
@@ -186,7 +192,7 @@ std::vector<std::vector<std::optional<std::string>>> QueryResult::TextRows() con
 }
 
 struct Backend::Database {
-  Handle<duckdb_database, duckdb_close> handle;
+  std::unique_ptr<duckdb::DuckDB> instance;
   absl::Mutex ddl_mutex;
   TimestampPrecision timestamp_precision;
   Database(const std::optional<std::string>& session_user,
@@ -213,46 +219,44 @@ struct Backend::Database {
       return true;
     }();
     (void)registered;
-    Handle<duckdb_config, duckdb_destroy_config> config;
-    // Catalog discovery can encounter missing objects while a script transaction is open.
-    // Preserve the pre-v2 policy: binding errors must not abort that transaction.
-    if (duckdb_create_config(config.out()) == DuckDBError ||
-        duckdb_set_config(config.get(), "default_transaction_invalidation_policy",
-                          "SYNTACTIC_ERRORS_DO_NOT_INVALIDATE") == DuckDBError) {
-      throw BackendError("DuckDB failed to configure transaction invalidation");
+    try {
+      duckdb::DBConfig config;
+      // Catalog discovery can encounter missing objects while a script transaction is open.
+      // Preserve the pre-v2 policy: binding errors must not abort that transaction.
+      config.SetOptionByName("default_transaction_invalidation_policy",
+                             duckdb::Value("SYNTACTIC_ERRORS_DO_NOT_INVALIDATE"));
+      instance = std::make_unique<duckdb::DuckDB>(nullptr, &config);
+    } catch (const std::exception& error) {
+      throw BackendError(error.what());
     }
-    char* error = nullptr;
-    const duckdb_state state = duckdb_open_ext(nullptr, handle.out(), config.get(), &error);
-    DuckString const message(error);
-    if (state == DuckDBError) {
-      throw BackendError(message ? message.get() : "DuckDB failed to open database");
-    }
-    RegisterBackendFunctions(handle.get(), session_user, storage, geography, functions, initialize);
-    RegisterDuckPGQ(handle.get());
-    RegisterCatalogFunctions(handle.get());
+    RegisterBackendFunctions(*instance, session_user, storage, geography, functions, initialize);
+    RegisterDuckPGQ(*instance);
+    RegisterCatalogFunctions(*instance);
     {
       // Extension options can be set once for every connection; the grammar is per connection.
-      const Connection connection = Connect();
-      Configure(connection.get(), "SET GLOBAL duckpgq_vertex_join_elimination = false");
-      Configure(connection.get(), "SET GLOBAL duckpgq_factorized_joins = false");
+      const auto connection = Connect();
+      Configure(BorrowCConnection(*connection),
+                "SET GLOBAL duckpgq_vertex_join_elimination = false");
+      Configure(BorrowCConnection(*connection), "SET GLOBAL duckpgq_factorized_joins = false");
     }
     if (initialize_database) {
-      initialize_database(handle.get());
+      initialize_database(*instance);
     }
   }
 
-  [[nodiscard]] Connection Connect() const {
-    Connection connection;
-    if (duckdb_connect(handle.get(), connection.out()) == DuckDBError) {
-      throw BackendError("DuckDB failed to connect");
+  [[nodiscard]] std::unique_ptr<duckdb::Connection> Connect() const {
+    try {
+      auto connection = std::make_unique<duckdb::Connection>(*instance);
+      Configure(BorrowCConnection(*connection), "SET active_grammar_extensions = ['duckpgq']");
+      return connection;
+    } catch (const std::exception& error) {
+      throw BackendError(error.what());
     }
-    Configure(connection.get(), "SET active_grammar_extensions = ['duckpgq']");
-    return Connection(connection.release());
   }
 };
 
 struct Backend::Session {
-  Connection connection;
+  std::unique_ptr<duckdb::Connection> connection;
   bool in_transaction = false;
   std::vector<std::string> before_commit;
   explicit Session(Database& database) : connection(database.Connect()) {}
@@ -260,18 +264,19 @@ struct Backend::Session {
 
 class Backend::CallConnection {
  public:
-  explicit CallConnection(duckdb_connection session) : connection_(session) {}
-  explicit CallConnection(Connection owned) : owned_(std::move(owned)), connection_(owned_.get()) {}
+  explicit CallConnection(duckdb::Connection& session) : connection_(&session) {}
+  explicit CallConnection(std::unique_ptr<duckdb::Connection> owned)
+      : owned_(std::move(owned)), connection_(owned_.get()) {}
 
-  [[nodiscard]] duckdb_connection get() const { return connection_; }
+  [[nodiscard]] duckdb_connection get() const { return BorrowCConnection(*connection_); }
 
  private:
-  Connection owned_;
-  duckdb_connection connection_;
+  std::unique_ptr<duckdb::Connection> owned_;
+  duckdb::Connection* connection_;
 };
 
 Backend::CallConnection Backend::Connect() const {
-  return session_ ? CallConnection(session_->connection.get()) : CallConnection(db_->Connect());
+  return session_ ? CallConnection(*session_->connection) : CallConnection(db_->Connect());
 }
 
 Backend::Backend(const std::optional<std::string>& session_user,
@@ -321,10 +326,10 @@ void Backend::Transaction(const std::string& statement) {
   const std::vector<std::string> before_commit = std::exchange(session_->before_commit, {});
   if (statement == "COMMIT") {
     for (const std::string& pending : before_commit) {
-      Query(session_->connection.get(), pending);
+      Query(BorrowCConnection(*session_->connection), pending);
     }
   }
-  Query(session_->connection.get(), statement);
+  Query(BorrowCConnection(*session_->connection), statement);
   session_->in_transaction = statement == "BEGIN TRANSACTION";
 }
 

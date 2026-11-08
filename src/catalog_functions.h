@@ -1,6 +1,9 @@
 #pragma once
 
-#include "duckdb.h"
+namespace duckdb {
+// Catalog registration must not expose DuckDB's C++ headers to its callers.
+class DuckDB;
+}  // namespace duckdb
 
 namespace bigquery_emulator_duckdb {
 
@@ -16,6 +19,6 @@ namespace bigquery_emulator_duckdb {
 //   schema, with the same optional arguments.
 // - bq_column_comments(database, schema, name) returns column_index, from 1, and comment for each
 //   column of that table or view, or no rows when there is none.
-void RegisterCatalogFunctions(duckdb_database database);
+void RegisterCatalogFunctions(const duckdb::DuckDB& database);
 
 }  // namespace bigquery_emulator_duckdb

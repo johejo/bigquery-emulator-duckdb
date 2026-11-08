@@ -4,8 +4,10 @@
 #include <string>
 
 #include "duckdb.h"
+#include "duckdb/main/connection.hpp"
 #include "src/backend_error.h"
 #include "src/backend_initializer.h"
+#include "src/duckdb_capi.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_aead_duckdb/aead.h"
 #include "src/googlesql_collation_duckdb/collation.h"
@@ -77,39 +79,37 @@ void RegisterSessionUser(duckdb_connection connection,
 
 }  // namespace
 
-void RegisterBackendFunctions(duckdb_database database,
+void RegisterBackendFunctions(duckdb::DuckDB& database,
                               const std::optional<std::string>& session_user,
                               const functions_duckdb::ObjectStorage& storage,
                               const googlesql_geography::Options& geography,
                               const functions_duckdb::Options& functions,
                               const BackendInitializer& initialize) {
-  Connection connection;
-  if (duckdb_connect(database, connection.out()) == DuckDBError) {
-    throw BackendError("DuckDB failed to connect");
-  }
-  RegisterSessionUser(connection.get(), session_user);
-  functions_duckdb::RegisterBigNumericFunctions(connection.get(), functions);
-  functions_duckdb::RegisterMathFunctions(connection.get(), functions);
-  functions_duckdb::RegisterStringFunctions(connection.get(), functions);
-  text_analysis_duckdb::RegisterTextAnalysisFunctions(connection.get());
-  hll_duckdb::RegisterHllCountFunctions(connection.get());
-  kll_duckdb::RegisterKllFunctions(connection.get());
-  differential_privacy_duckdb::RegisterDifferentialPrivacyFunctions(connection.get());
-  functions_duckdb::RegisterTimestampNanosFunctions(connection.get());
-  functions_duckdb::RegisterDatetimeFunctions(connection.get(), functions);
-  functions_duckdb::RegisterCastFunctions(connection.get());
-  functions_duckdb::RegisterJsonFunctions(connection.get(), functions);
-  functions_duckdb::RegisterContainsSubstr(connection.get());
-  collation_duckdb::RegisterCollationFunctions(connection.get(), functions.collation);
-  functions_duckdb::RegisterIntervalFunctions(connection.get());
-  functions_duckdb::RegisterRangeFunctions(connection.get());
+  duckdb::Connection owned(database);
+  auto* const connection = BorrowCConnection(owned);
+  RegisterSessionUser(connection, session_user);
+  functions_duckdb::RegisterBigNumericFunctions(connection, functions);
+  functions_duckdb::RegisterMathFunctions(connection, functions);
+  functions_duckdb::RegisterStringFunctions(connection, functions);
+  text_analysis_duckdb::RegisterTextAnalysisFunctions(connection);
+  hll_duckdb::RegisterHllCountFunctions(connection);
+  kll_duckdb::RegisterKllFunctions(connection);
+  differential_privacy_duckdb::RegisterDifferentialPrivacyFunctions(connection);
+  functions_duckdb::RegisterTimestampNanosFunctions(connection);
+  functions_duckdb::RegisterDatetimeFunctions(connection, functions);
+  functions_duckdb::RegisterCastFunctions(connection);
+  functions_duckdb::RegisterJsonFunctions(connection, functions);
+  functions_duckdb::RegisterContainsSubstr(connection);
+  collation_duckdb::RegisterCollationFunctions(connection, functions.collation);
+  functions_duckdb::RegisterIntervalFunctions(connection);
+  functions_duckdb::RegisterRangeFunctions(connection);
   // GEOGRAPHY behavior is selected by the caller, above the DuckDB adapter.
-  geography_duckdb::RegisterGeographyFunctions(connection.get(), geography);
-  aead_duckdb::RegisterAeadFunctions(connection.get());
-  functions_duckdb::RegisterPercentileFunctions(connection.get());
-  functions_duckdb::RegisterObjectRefFunctions(connection.get(), storage);
+  geography_duckdb::RegisterGeographyFunctions(connection, geography);
+  aead_duckdb::RegisterAeadFunctions(connection);
+  functions_duckdb::RegisterPercentileFunctions(connection);
+  functions_duckdb::RegisterObjectRefFunctions(connection, storage);
   if (initialize) {
-    initialize(connection.get());
+    initialize(connection);
   }
 }
 

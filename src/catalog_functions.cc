@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "duckdb.h"
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/catalog/catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
@@ -30,7 +29,6 @@
 #include "duckdb/common/vector.hpp"
 #include "duckdb/common/vector_size.hpp"
 #include "duckdb/function/table_function.hpp"
-#include "duckdb/main/capi/capi_internal.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/main/extension/extension_loader.hpp"
@@ -284,11 +282,9 @@ void ColumnCommentsScan(ClientContext& /*context*/, TableFunctionInput& input, D
 
 }  // namespace
 
-void RegisterCatalogFunctions(duckdb_database database) {
+void RegisterCatalogFunctions(const duckdb::DuckDB& database) {
   try {
-    duckdb::DatabaseInstance& instance =
-        *reinterpret_cast<duckdb::DatabaseWrapper*>(database)->database->instance;
-    duckdb::ExtensionLoader loader(instance, "bigquery_emulator_catalog");
+    duckdb::ExtensionLoader loader(*database.instance, "bigquery_emulator_catalog");
     loader.RegisterFunction(TableFunction("bq_relations",
                                           duckdb::FunctionSignature().AddTypedKwargs(
                                               "filter", duckdb::TypedKwargs()

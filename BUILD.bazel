@@ -840,6 +840,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":backend_error",
+        ":duckdb_capi",
         ":duckdb_handle",
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_collation_duckdb",
@@ -860,6 +861,7 @@ cc_library(
         "//src/googlesql_hll_duckdb",
         "//src/googlesql_text_analysis_duckdb",
         "//src/kll_duckdb",
+        "@duckdb_source//:headers",
     ],
     linkstatic = True,
     deps = [
@@ -1094,6 +1096,7 @@ cc_library(
         ":backend_functions",
         ":bignumeric",
         ":catalog_functions",
+        ":duckdb_capi",
         ":duckdb_handle",
         ":duckdb_sql",
         ":duckdb_types",
@@ -1106,6 +1109,7 @@ cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
+        "@duckdb_source//:headers",
         "@googlesql//googlesql/public:civil_time",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:date_time_util",
@@ -1979,6 +1983,15 @@ cc_test(
 )
 
 cc_library(
+    name = "duckdb_capi",
+    srcs = ["src/duckdb_capi.cc"],
+    hdrs = ["src/duckdb_capi.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = ["@duckdb_source//:headers"],
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
     name = "duckdb_handle",
     hdrs = ["src/duckdb_handle.h"],
     deps = ["//third_party/duckdb"],
@@ -2295,6 +2308,19 @@ cc_library(
     deps = [
         ":timestamp_precision",
         "//src/googlesql_functions_duckdb:options",
+    ],
+)
+
+cc_test(
+    name = "backend_test",
+    srcs = ["tests/backend_test.cc"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        ":backend",
+        ":result_rows",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

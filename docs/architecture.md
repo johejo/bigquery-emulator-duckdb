@@ -221,8 +221,12 @@ key function and COLLATE's check of its specification.
 
 ## Backend
 
-DuckDB executes translated SQL through its C++ API. Each project is a catalog and each dataset a
-schema. Results are encoded in BigQuery's REST row format.
+The backend owns DuckDB databases and connections through the C++ API, which also loads static
+extensions and registers catalog functions. SQL execution, scalar and aggregate registration,
+and result conversion use the V1 C API. [`duckdb_capi`](../src/duckdb_capi.cc) borrows connection
+handles without transferring ownership; this boundary depends on the pinned DuckDB version's
+handle representation. Each project is a catalog and each dataset a schema. Results are encoded
+in BigQuery's REST row format.
 [googlesql_functions](../src/googlesql_functions/) owns scalar function compatibility logic,
 including string validation, casts, date and time parsing and formatting, without depending on
 DuckDB. [googlesql_functions_duckdb](../src/googlesql_functions_duckdb/) registers those functions
