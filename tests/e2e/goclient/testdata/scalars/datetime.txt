@@ -518,3 +518,17 @@ SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 0 HOUR)
 # DATE_BUCKET takes a single interval with date parts.
 SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL '1 2' DAY TO HOUR)
 => error:
+
+# Observed on BigQuery: DATETIME_BUCKET takes a MONTH part, while TIMESTAMP_BUCKET rejects one
+# although the documentation allows date and time parts for both
+# (third_party/bigquery_docs/reference/standard-sql/time-series-functions.md).
+SELECT CAST(DATETIME_BUCKET(DATETIME '2020-03-15 10:00:00', INTERVAL 3 MONTH) AS STRING)
+=> "2020-01-01 00:00:00"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(TIMESTAMP '2020-03-15 10:00:00',
+  INTERVAL 1 MONTH))
+=> error: Bucket width INTERVAL with non-zero MONTH part is not allowed; error in TIMESTAMP_BUCKET expression
+
+# Observed on BigQuery: the width need not be a literal.
+SELECT CAST(DATE_BUCKET(DATE '2020-03-15', w) AS STRING) FROM UNNEST([INTERVAL 7 DAY]) AS w
+=> "2020-03-15"
