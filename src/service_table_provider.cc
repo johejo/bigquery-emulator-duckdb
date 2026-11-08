@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -10,6 +9,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/synchronization/mutex.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/bigtable_external.h"
@@ -106,7 +106,7 @@ class ServiceTableProvider : public ExternalTableProvider {
     }
     // Register once, on first use rather than startup when the database may not be up yet.
     // The shared backend registers outside any session's transaction.
-    const std::scoped_lock lock(connections_.mutex);
+    const absl::MutexLock lock(connections_.mutex);
     if (!connections_.attached.contains(key)) {
       try {
         const std::string name = QuoteIdentifier(ExternalDatabaseName(key));

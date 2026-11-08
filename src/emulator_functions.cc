@@ -2,13 +2,14 @@
 
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
+#include "absl/base/const_init.h"
 #include "absl/status/status.h"
+#include "absl/synchronization/mutex.h"
 #include "src/function_catalog/catalog.h"
 #include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
@@ -51,11 +52,11 @@ std::optional<std::string> Collate(const function_catalog::ScalarCall& call) {
 // Assembly is expensive; cache each choice of options. Lookups are thread-safe.
 const function_catalog::Catalog& EmulatorFunctionCatalog(const functions_duckdb::Options& options,
                                                          bool fetch_object_metadata) {
-  static std::mutex mutex;
+  static absl::Mutex mutex(absl::kConstInit);
   static std::map<std::pair<functions_duckdb::Options, bool>,
                   std::unique_ptr<function_catalog::Catalog>>
       catalogs;
-  const std::scoped_lock lock(mutex);
+  const absl::MutexLock lock(mutex);
   auto& functions = catalogs[{options, fetch_object_metadata}];
   if (functions != nullptr) {
     return *functions;

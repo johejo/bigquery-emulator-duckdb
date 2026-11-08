@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <mutex>
 #include <optional>
 #include <ostream>
 #include <stdexcept>
@@ -17,6 +16,7 @@
 #include "absl/log/log_entry.h"
 #include "absl/log/log_sink.h"
 #include "absl/log/log_sink_registry.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
 
 namespace bigquery_emulator_duckdb {
@@ -69,13 +69,13 @@ class LineSink final : public absl::LogSink {
     line += ' ';
     line += entry.text_message();
     line += '\n';
-    const std::scoped_lock lock(mutex_);
+    const absl::MutexLock lock(mutex_);
     std::ostream& out = file_.is_open() ? static_cast<std::ostream&>(file_) : std::cerr;
     out << line << std::flush;
   }
 
  private:
-  std::mutex mutex_;
+  absl::Mutex mutex_;
   std::ofstream file_;
 };
 

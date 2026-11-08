@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -8,6 +7,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/synchronization/mutex.h"
 #include "src/field_schema.h"
 
 // EXTERNAL_QUERY reads from PostgreSQL, MySQL or Spanner databases that --connection names.
@@ -21,7 +21,7 @@ class Backend;
 struct ExternalConnections {
   Backend& backend;
   std::unordered_map<std::string, std::string> conninfo = {};
-  std::mutex mutex = {};
+  absl::Mutex mutex = {};
   std::unordered_set<std::string> attached = {};
 };
 
