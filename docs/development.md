@@ -28,6 +28,23 @@ scenarios locally without authentication or requests.
 Clang-tidy runs through the repository's [Bazel aspect](../tools/clang_tidy/README.md).
 `just heavy-includes` checks [expensive GoogleSQL includes](../tools/heavy_includes/README.md) separately.
 
+## Compliance reports
+
+`just compliance-summary` summarizes the last local compliance run, including separate rankings
+for failures and unsupported statements by test file or function. Unsupported includes explicit
+emulator rejections and test-driver limits: the driver compares query results only, so it rejects
+non-query statements without executing them. It is not a count of missing BigQuery features.
+
+Use `just compliance-summary -results results.tsv` to save statement outcomes, and
+`just compliance-summary -baseline results.tsv` to compare a later run. The comparison reports
+Pass → Unsupported and Unsupported → Pass transitions, with new and missing statements counted
+separately. Coverage changes are report-only; unfinished shards and known failures that pass still
+fail the summary command.
+
+Pull-request CI downloads the `compliance-results` artifact from a successful Compliance push run
+for the exact base commit when available, and links that run in the summary. Missing runs or
+unavailable artifacts do not prevent the current run's report or affect its status.
+
 ## Debugging shells
 
 For comparing results with GoogleSQL's reference implementation (`just reference`),
