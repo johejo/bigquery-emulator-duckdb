@@ -2,7 +2,6 @@
 
 #include "duckdb.h"
 #include "duckdb/common/types.hpp"
-#include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/main/connection.hpp"
 
 namespace bigquery_emulator_duckdb {
@@ -14,13 +13,9 @@ duckdb_connection BorrowCConnection(duckdb::Connection& connection) {
   return reinterpret_cast<duckdb_connection>(&connection);
 }
 
-duckdb_logical_type BorrowCLogicalType(const duckdb::LogicalType& type) {
-  // V1's logical type accessors take non-const handles even when they only read the type.
-  return reinterpret_cast<duckdb_logical_type>(const_cast<duckdb::LogicalType*>(&type));
-}
-
-duckdb_data_chunk BorrowCChunk(duckdb::DataChunk& chunk) {
-  return reinterpret_cast<duckdb_data_chunk>(&chunk);
+const duckdb::LogicalType& BorrowCppLogicalType(duckdb_logical_type type) {
+  // V1 logical type handles point directly to LogicalType; ownership stays with the callback.
+  return *reinterpret_cast<const duckdb::LogicalType*>(type);
 }
 
 }  // namespace bigquery_emulator_duckdb

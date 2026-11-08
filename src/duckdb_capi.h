@@ -5,8 +5,7 @@
 namespace duckdb {
 // Callers of the C adapter need not parse DuckDB's C++ connection headers.
 class Connection;
-// Result readers keep their C API interface without importing C++ vector and type headers.
-class DataChunk;
+// Keep C++ type definitions out of C callback interfaces.
 struct LogicalType;
 }  // namespace duckdb
 
@@ -16,8 +15,7 @@ namespace bigquery_emulator_duckdb {
 // must not be disconnected or retained beyond the C++ connection's lifetime.
 duckdb_connection BorrowCConnection(duckdb::Connection& connection);
 
-// Read-only views for C API result readers. Do not destroy or mutate the borrowed objects.
-duckdb_logical_type BorrowCLogicalType(const duckdb::LogicalType& type);
-duckdb_data_chunk BorrowCChunk(duckdb::DataChunk& chunk);
+// Read-only access to a V1 callback's type. The C handle retains ownership.
+const duckdb::LogicalType& BorrowCppLogicalType(duckdb_logical_type type);
 
 }  // namespace bigquery_emulator_duckdb

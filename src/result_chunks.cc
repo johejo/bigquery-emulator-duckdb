@@ -5,14 +5,12 @@
 #include <utility>
 #include <vector>
 
-#include "duckdb.h"
 #include "duckdb/common/types.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/common/unique_ptr.hpp"
 #include "duckdb/common/vector.hpp"
 #include "duckdb/main/query_result.hpp"
 #include "src/backend_error.h"
-#include "src/duckdb_capi.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -27,6 +25,9 @@ ResultChunks::ResultChunks(duckdb::QueryResult& result, std::shared_ptr<const vo
   impl_->types = result.GetTypes();
   size_t count = 0;
   while (auto chunk = result.Fetch()) {
+    // Normalize recursively before readers share the buffers. Reading a shared result must
+    // never lazily flatten a constant, dictionary or nested child vector.
+    chunk->Flatten();
     count += chunk->size();
     impl_->chunks.push_back(std::move(chunk));
     ends_.push_back(count);
@@ -40,12 +41,12 @@ ResultChunks::~ResultChunks() = default;
 
 size_t ResultChunks::column_count() const { return impl_->types.size(); }
 
-duckdb_logical_type ResultChunks::type(size_t column) const {
-  return BorrowCLogicalType(impl_->types.at(column));
+const duckdb::LogicalType& ResultChunks::type(size_t column) const {
+  return impl_->types.at(column);
 }
 
-duckdb_data_chunk ResultChunks::ChunkAt(size_t index) const {
-  return BorrowCChunk(*impl_->chunks.at(index));
+const duckdb::DataChunk& ResultChunks::ChunkAt(size_t index) const {
+  return *impl_->chunks.at(index);
 }
 
 }  // namespace bigquery_emulator_duckdb

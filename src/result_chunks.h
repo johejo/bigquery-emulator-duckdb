@@ -5,11 +5,11 @@
 #include <memory>
 #include <vector>
 
-#include "duckdb.h"
-
 namespace duckdb {
-// Keep DuckDB's C++ result and vector headers out of REST and GoogleSQL result readers.
+// Keep DuckDB's C++ result and vector headers out of the public result interface.
 class QueryResult;
+class DataChunk;
+struct LogicalType;
 }  // namespace duckdb
 
 namespace bigquery_emulator_duckdb {
@@ -29,7 +29,7 @@ class ResultChunks {
 
   [[nodiscard]] size_t row_count() const { return ends_.empty() ? 0 : ends_.back(); }
   [[nodiscard]] size_t column_count() const;
-  [[nodiscard]] duckdb_logical_type type(size_t column) const;
+  [[nodiscard]] const duckdb::LogicalType& type(size_t column) const;
 
   // Calls visit(chunk, begin, take, copied) for each run of rows [offset, offset + count) in
   // one chunk, where `copied` rows precede it.
@@ -53,7 +53,7 @@ class ResultChunks {
   class Impl;
   std::unique_ptr<Impl> impl_;
   std::vector<size_t> ends_;
-  [[nodiscard]] duckdb_data_chunk ChunkAt(size_t index) const;
+  [[nodiscard]] const duckdb::DataChunk& ChunkAt(size_t index) const;
 };
 
 }  // namespace bigquery_emulator_duckdb

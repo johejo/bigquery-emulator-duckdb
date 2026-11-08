@@ -15,12 +15,18 @@
 #include <string_view>
 #include <utility>
 
-#include "duckdb.h"
+#include "duckdb/common/hugeint.hpp"
+#include "duckdb/common/types.hpp"
+#include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/types/interval.hpp"
+#include "duckdb/common/types/timestamp_base.hpp"
+#include "duckdb/common/types/value.hpp"
+#include "duckdb/common/types/vector.hpp"
+#include "duckdb/common/vector/struct_vector.hpp"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_error.h"
 #include "src/bignumeric.h"
-#include "src/duckdb_handle.h"
 #include "src/duckdb_types.h"
 #include "src/interval.h"
 #include "src/result_chunks.h"
@@ -30,6 +36,7 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
+using duckdb::LogicalTypeId;
 using nlohmann::json;
 
 // The bounds of a RANGE<TIMESTAMP> in BigQuery's default encoding: a decimal string of seconds
@@ -78,7 +85,7 @@ std::string EpochSecondsDouble(int64_t micros) {
 // BigQuery writes a FLOAT64 outside [1e-3, 1e7) with an exponent, as 2.001511821194711E7, in the
 // shortest digits that round-trip, infinities as Infinity and -Infinity, NaN as NaN, and others as
 // DuckDB does, such as 20.0 and -0.0.
-std::string DoubleText(double number, duckdb_value value) {
+std::string DoubleText(double number, const duckdb::Value& value) {
   if (std::isnan(number)) {
     return "NaN";
   }
@@ -145,39 +152,39 @@ std::string SixDigitFraction(std::string text) {
   return text;
 }
 
-json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
+json ToCell(const duckdb::Vector& vector, const duckdb::LogicalType& type, size_t row,
             const CellEncoding& encoding);
 
 // A RANGE as BigQuery writes it, "[start, end)", with each bound as its own cell would be, or
 // UNBOUNDED for an infinite or NULL one. A TIMESTAMP bound in seconds keeps all six digits of
 // the fraction, unlike a TIMESTAMP cell.
-std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row,
+std::string RangeText(const duckdb::Vector& vector, const duckdb::LogicalType& type, size_t row,
                       TimestampEncoding timestamps) {
   std::string text = "[";
-  for (idx_t i = 0; i < 2; ++i) {
-    duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
-    LogicalType const bound(duckdb_struct_type_child_type(type, i));
+  for (size_t i = 0; i < 2; ++i) {
+    const auto& child = duckdb::StructVector::GetEntries(vector).at(i);
+    const auto& bound = duckdb::StructType::GetChildType(type, i);
     text += i == 0 ? "" : ", ";
-    if (!IsFiniteBound(child, bound.get(), row)) {
+    if (!IsFiniteBound(child, bound, row)) {
       text += "UNBOUNDED";
-    } else if (duckdb_get_type_id(bound.get()) == DUCKDB_TYPE_TIMESTAMP_TZ &&
+    } else if (bound.id() == LogicalTypeId::TIMESTAMP_TZ &&
                timestamps == TimestampEncoding::kSeconds) {
-      text += EpochSecondsString(VectorElement<duckdb_timestamp>(child, row).micros);
+      text += EpochSecondsString(VectorElement<duckdb::timestamp_t>(child, row).value);
     } else {
-      text += ToCell(child, bound.get(), row, {}).at("v").get<std::string>();
+      text += ToCell(child, bound, row, {}).at("v").get<std::string>();
     }
   }
   return text + ")";
 }
 
-json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
+json ToCell(const duckdb::Vector& vector, const duckdb::LogicalType& type, size_t row,
             const CellEncoding& encoding) {
   const bool is_null = IsNull(vector, row);
   if (IsListLike(type) && !(is_null && encoding.null_arrays)) {
     json elements = json::array();
     if (!is_null) {
       const ListElements list(vector, type, row);
-      for (idx_t i = 0; i < list.size(); ++i) {
+      for (size_t i = 0; i < list.size(); ++i) {
         elements.push_back(ToCell(list.child(), list.type(), list.row(i), encoding));
       }
     }
@@ -190,8 +197,9 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
     return json{{"v", RangeText(vector, type, row, encoding.timestamps)}};
   }
   if (IsTimestampNanos(type)) {
+    const auto nanos = VectorElement<duckdb::hugeint_t>(vector, row);
     const auto text =
-        TimestampNanosText(TimestampNanosInteger(VectorElement<duckdb_hugeint>(vector, row)));
+        TimestampNanosText(TimestampNanosInteger({.lower = nanos.lower, .upper = nanos.upper}));
     if (!text.ok()) {
       throw BackendError(std::string(text.status().message()));
     }
@@ -201,46 +209,45 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
     return json{{"v", {{"f", json::array()}}}};
   }
   json value;
-  switch (duckdb_get_type_id(type)) {
-    case DUCKDB_TYPE_STRUCT: {
+  switch (type.id()) {
+    case LogicalTypeId::STRUCT: {
       json fields = json::array();
-      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
-        LogicalType const child_type(duckdb_struct_type_child_type(type, i));
-        fields.push_back(
-            ToCell(duckdb_struct_vector_get_child(vector, i), child_type.get(), row, encoding));
+      for (size_t i = 0; i < duckdb::StructType::GetChildCount(type); ++i) {
+        fields.push_back(ToCell(duckdb::StructVector::GetEntries(vector).at(i),
+                                duckdb::StructType::GetChildType(type, i), row, encoding));
       }
       value = json{{"f", std::move(fields)}};
       break;
     }
-    case DUCKDB_TYPE_VARCHAR:
+    case LogicalTypeId::VARCHAR:
       value = VectorString(vector, row);
       break;
-    case DUCKDB_TYPE_BLOB:
+    case LogicalTypeId::BLOB:
       value = Base64(VectorString(vector, row));
       break;
-    case DUCKDB_TYPE_DOUBLE:
-      value = DoubleText(VectorElement<double>(vector, row), VectorValue(vector, type, row).get());
+    case LogicalTypeId::DOUBLE:
+      value = DoubleText(VectorElement<double>(vector, row), VectorValue(vector, type, row));
       break;
-    case DUCKDB_TYPE_TIMESTAMP_TZ: {
-      const int64_t micros = VectorElement<duckdb_timestamp>(vector, row).micros;
+    case LogicalTypeId::TIMESTAMP_TZ: {
+      const int64_t micros = VectorElement<duckdb::timestamp_t>(vector, row).value;
       value = encoding.timestamps == TimestampEncoding::kSeconds ? EpochSecondsDouble(micros)
                                                                  : std::to_string(micros);
       break;
     }
-    case DUCKDB_TYPE_TIMESTAMP:
-    case DUCKDB_TYPE_TIMESTAMP_S:
-    case DUCKDB_TYPE_TIMESTAMP_MS:
-    case DUCKDB_TYPE_TIMESTAMP_NS: {
+    case LogicalTypeId::TIMESTAMP:
+    case LogicalTypeId::TIMESTAMP_SEC:
+    case LogicalTypeId::TIMESTAMP_MS:
+    case LogicalTypeId::TIMESTAMP_NS: {
       std::string text;
-      if (duckdb_get_type_id(type) == DUCKDB_TYPE_TIMESTAMP_NS) {
+      if (type.id() == LogicalTypeId::TIMESTAMP_NS) {
         // Match a cast to microsecond TIMESTAMP, including truncation before the epoch.
-        const int64_t nanos = VectorElement<duckdb_timestamp_ns>(vector, row).nanos;
+        const int64_t nanos = VectorElement<duckdb::timestamp_ns_t>(vector, row).value;
         const bool infinite = nanos == std::numeric_limits<int64_t>::max() ||
                               nanos == -std::numeric_limits<int64_t>::max();
-        Value const timestamp(duckdb_create_timestamp({infinite ? nanos : nanos / 1000}));
-        text = ValueString(timestamp.get());
+        text = ValueString(
+            duckdb::Value::TIMESTAMP(duckdb::timestamp_t(infinite ? nanos : nanos / 1000)));
       } else {
-        text = ValueString(VectorValue(vector, type, row).get());
+        text = ValueString(VectorValue(vector, type, row));
       }
       if (text.size() > 10 && text.at(10) == ' ') {
         text.at(10) = 'T';
@@ -248,11 +255,13 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
       value = SixDigitFraction(std::move(text));
       break;
     }
-    case DUCKDB_TYPE_TIME:
-      value = SixDigitFraction(ValueString(VectorValue(vector, type, row).get()));
+    case LogicalTypeId::TIME:
+      value = SixDigitFraction(ValueString(VectorValue(vector, type, row)));
       break;
-    case DUCKDB_TYPE_INTERVAL: {
-      const auto interval = IntervalFromDuckDb(VectorElement<duckdb_interval>(vector, row));
+    case LogicalTypeId::INTERVAL: {
+      const auto stored = VectorElement<duckdb::interval_t>(vector, row);
+      const auto interval = IntervalFromDuckDb(
+          {.months = stored.months, .days = stored.days, .micros = stored.micros});
       if (!interval.ok()) {
         throw BackendError("DuckDB returned an invalid INTERVAL: " +
                            std::string(interval.status().message()));
@@ -260,8 +269,8 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
       value = interval->ToString();
       break;
     }
-    case DUCKDB_TYPE_BIGNUM: {
-      const auto number = BigNumericFromUnits(ValueString(VectorValue(vector, type, row).get()));
+    case LogicalTypeId::BIGNUM: {
+      const auto number = BigNumericFromUnits(ValueString(VectorValue(vector, type, row)));
       if (!number.ok()) {
         throw BackendError("DuckDB returned an invalid BIGNUMERIC: " +
                            std::string(number.status().message()));
@@ -269,11 +278,11 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
       value = number->ToString();
       break;
     }
-    case DUCKDB_TYPE_DECIMAL: {
+    case LogicalTypeId::DECIMAL: {
       // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out. Every DECIMAL
       // fits a BIGNUMERIC.
       const auto number =
-          googlesql::BigNumericValue::FromString(ValueString(VectorValue(vector, type, row).get()));
+          googlesql::BigNumericValue::FromString(ValueString(VectorValue(vector, type, row)));
       if (!number.ok()) {
         throw BackendError("DuckDB returned an invalid DECIMAL: " +
                            std::string(number.status().message()));
@@ -282,53 +291,48 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
       break;
     }
     default:
-      value = ValueString(VectorValue(vector, type, row).get());
+      value = ValueString(VectorValue(vector, type, row));
   }
   return json{{"v", std::move(value)}};
 }
 
 // Whether encoding a value of `type` as a cell can fail, such as a BIGNUMERIC out of range.
-bool MayFailToEncode(duckdb_logical_type type) {
-  switch (duckdb_get_type_id(type)) {
-    case DUCKDB_TYPE_BOOLEAN:
-    case DUCKDB_TYPE_TINYINT:
-    case DUCKDB_TYPE_SMALLINT:
-    case DUCKDB_TYPE_INTEGER:
-    case DUCKDB_TYPE_BIGINT:
-    case DUCKDB_TYPE_UTINYINT:
-    case DUCKDB_TYPE_USMALLINT:
-    case DUCKDB_TYPE_UINTEGER:
-    case DUCKDB_TYPE_UBIGINT:
-    case DUCKDB_TYPE_HUGEINT:
-    case DUCKDB_TYPE_UHUGEINT:
-    case DUCKDB_TYPE_FLOAT:
-    case DUCKDB_TYPE_DOUBLE:
-    case DUCKDB_TYPE_DATE:
-    case DUCKDB_TYPE_TIME:
-    case DUCKDB_TYPE_TIME_NS:
-    case DUCKDB_TYPE_TIME_TZ:
-    case DUCKDB_TYPE_TIMESTAMP:
-    case DUCKDB_TYPE_TIMESTAMP_S:
-    case DUCKDB_TYPE_TIMESTAMP_MS:
-    case DUCKDB_TYPE_TIMESTAMP_NS:
-    case DUCKDB_TYPE_TIMESTAMP_TZ:
-    case DUCKDB_TYPE_VARCHAR:
-    case DUCKDB_TYPE_BLOB:
-    case DUCKDB_TYPE_UUID:
-    case DUCKDB_TYPE_ENUM:
-    case DUCKDB_TYPE_BIT:
+bool MayFailToEncode(const duckdb::LogicalType& type) {
+  switch (type.id()) {
+    case LogicalTypeId::BOOLEAN:
+    case LogicalTypeId::TINYINT:
+    case LogicalTypeId::SMALLINT:
+    case LogicalTypeId::INTEGER:
+    case LogicalTypeId::BIGINT:
+    case LogicalTypeId::UTINYINT:
+    case LogicalTypeId::USMALLINT:
+    case LogicalTypeId::UINTEGER:
+    case LogicalTypeId::UBIGINT:
+    case LogicalTypeId::HUGEINT:
+    case LogicalTypeId::UHUGEINT:
+    case LogicalTypeId::FLOAT:
+    case LogicalTypeId::DOUBLE:
+    case LogicalTypeId::DATE:
+    case LogicalTypeId::TIME:
+    case LogicalTypeId::TIME_NS:
+    case LogicalTypeId::TIME_TZ:
+    case LogicalTypeId::TIMESTAMP:
+    case LogicalTypeId::TIMESTAMP_SEC:
+    case LogicalTypeId::TIMESTAMP_MS:
+    case LogicalTypeId::TIMESTAMP_NS:
+    case LogicalTypeId::TIMESTAMP_TZ:
+    case LogicalTypeId::VARCHAR:
+    case LogicalTypeId::BLOB:
+    case LogicalTypeId::UUID:
+    case LogicalTypeId::ENUM:
+    case LogicalTypeId::BIT:
       return false;
-    case DUCKDB_TYPE_LIST:
-    case DUCKDB_TYPE_ARRAY:
-      return MayFailToEncode(ElementType(type).get());
-    case DUCKDB_TYPE_STRUCT:
-      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
-        LogicalType const child(duckdb_struct_type_child_type(type, i));
-        if (MayFailToEncode(child.get())) {
-          return true;
-        }
-      }
-      return false;
+    case LogicalTypeId::LIST:
+    case LogicalTypeId::ARRAY:
+      return MayFailToEncode(ElementType(type));
+    case LogicalTypeId::STRUCT:
+      return std::ranges::any_of(duckdb::StructType::GetChildTypes(type),
+                                 [](const auto& child) { return MayFailToEncode(child.second); });
     default:
       return true;
   }
@@ -343,10 +347,10 @@ ResultRows::ResultRows(std::shared_ptr<const ResultChunks> chunks, bool null_arr
       continue;
     }
     chunks_->Runs(0, chunks_->row_count(),
-                  [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
+                  [&](const duckdb::DataChunk& chunk, size_t begin, size_t take, size_t) {
                     for (size_t row = begin; row < begin + take; ++row) {
-                      (void)ToCell(duckdb_data_chunk_get_vector(chunk, column),
-                                   chunks_->type(column), row, {.null_arrays = null_arrays_});
+                      (void)ToCell(chunk.data.at(column), chunks_->type(column), row,
+                                   {.null_arrays = null_arrays_});
                     }
                   });
   }
@@ -359,10 +363,10 @@ json ResultRows::at(size_t row, TimestampEncoding timestamps) const {
     throw std::out_of_range("Query result row is out of range");
   }
   json cells = json::array();
-  chunks_->Runs(row, 1, [&](duckdb_data_chunk chunk, size_t index, size_t, size_t) {
+  chunks_->Runs(row, 1, [&](const duckdb::DataChunk& chunk, size_t index, size_t, size_t) {
     for (size_t column = 0; column < chunks_->column_count(); ++column) {
-      cells.push_back(ToCell(duckdb_data_chunk_get_vector(chunk, column), chunks_->type(column),
-                             index, {.null_arrays = null_arrays_, .timestamps = timestamps}));
+      cells.push_back(ToCell(chunk.data.at(column), chunks_->type(column), index,
+                             {.null_arrays = null_arrays_, .timestamps = timestamps}));
     }
   });
   return json{{"f", std::move(cells)}};
@@ -373,19 +377,19 @@ namespace {
 // The value of `column` in row `row` of `chunks`, as `read` reads it from the column's vector, or
 // nullopt for NULL. The column's type must be `type`.
 template <typename T, typename F>
-std::optional<T> ReadValue(const ResultChunks& chunks, size_t row, size_t column, duckdb_type type,
-                           const F& read) {
+std::optional<T> ReadValue(const ResultChunks& chunks, size_t row, size_t column,
+                           LogicalTypeId type, const F& read) {
   if (row >= chunks.row_count() || column >= chunks.column_count()) {
     throw std::out_of_range("Query result value is out of range");
   }
-  if (duckdb_get_type_id(chunks.type(column)) != type) {
+  if (chunks.type(column).id() != type) {
     throw BackendError("Query result column " + std::to_string(column) + " has DuckDB type " +
-                       std::to_string(duckdb_get_type_id(chunks.type(column))) + ", not " +
-                       std::to_string(type));
+                       chunks.type(column).ToString() + ", not " +
+                       duckdb::LogicalType(type).ToString());
   }
   std::optional<T> value;
-  chunks.Runs(row, 1, [&](duckdb_data_chunk chunk, size_t index, size_t, size_t) {
-    duckdb_vector vector = duckdb_data_chunk_get_vector(chunk, column);
+  chunks.Runs(row, 1, [&](const duckdb::DataChunk& chunk, size_t index, size_t, size_t) {
+    const auto& vector = chunk.data.at(column);
     if (!IsNull(vector, index)) {
       value = read(vector, index);
     }
@@ -409,7 +413,7 @@ std::optional<std::string> ResultRows::OptionalString(size_t row, size_t column)
   if (!chunks_) {
     throw std::out_of_range("Query result value is out of range");
   }
-  return ReadValue<std::string>(*chunks_, row, column, DUCKDB_TYPE_VARCHAR, VectorString);
+  return ReadValue<std::string>(*chunks_, row, column, LogicalTypeId::VARCHAR, VectorString);
 }
 
 std::string ResultRows::String(size_t row, size_t column) const {
@@ -421,7 +425,7 @@ int64_t ResultRows::Int64(size_t row, size_t column) const {
     throw std::out_of_range("Query result value is out of range");
   }
   return NotNull(
-      ReadValue<int64_t>(*chunks_, row, column, DUCKDB_TYPE_BIGINT, VectorElement<int64_t>), row,
+      ReadValue<int64_t>(*chunks_, row, column, LogicalTypeId::BIGINT, VectorElement<int64_t>), row,
       column);
 }
 

@@ -32,7 +32,6 @@
 #include "src/backend_functions.h"
 #include "src/backend_initializer.h"
 #include "src/catalog_functions.h"
-#include "src/duckdb_capi.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_types.h"
 #include "src/duckpgq.h"
@@ -141,8 +140,8 @@ QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const 
   }
   query_result.has_rows = true;
   for (idx_t i = 0; i < result->ColumnCount(); ++i) {
-    query_result.schema.push_back(ResultFieldSchema(result->GetNames().at(i).GetIdentifierName(),
-                                                    BorrowCLogicalType(result->GetTypes().at(i))));
+    query_result.schema.push_back(
+        ResultFieldSchema(result->GetNames().at(i).GetIdentifierName(), result->GetTypes().at(i)));
   }
   query_result.rows =
       ResultRows(std::make_shared<const ResultChunks>(*result, std::move(owner)), null_arrays);
@@ -447,7 +446,7 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
   }
   query_result.has_rows = true;
   for (const Column& column : Columns(prepared)) {
-    query_result.schema.push_back(ResultFieldSchema(column.name, BorrowCLogicalType(column.type)));
+    query_result.schema.push_back(ResultFieldSchema(column.name, column.type));
   }
   return query_result;
 }
@@ -456,12 +455,11 @@ std::optional<std::string> Backend::UnreadableColumnError(const std::string& rel
   const CallConnection connection = Connect();
   for (const Column& column :
        Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
-    if (const std::string type = UnsupportedDuckDbType(BorrowCLogicalType(column.type));
-        !type.empty()) {
+    if (const std::string type = UnsupportedDuckDbType(column.type); !type.empty()) {
       return "Column " + column.name + " has the DuckDB type " + type +
              ", which the emulator does not support; change the column's type to read the table";
     }
-    if (HasOtherTimestampPrecision(BorrowCLogicalType(column.type), db_->timestamp_precision)) {
+    if (HasOtherTimestampPrecision(column.type, db_->timestamp_precision)) {
       return "Column " + column.name +
              (db_->timestamp_precision == TimestampPrecision::kNanoseconds
                   ? " holds microsecond TIMESTAMP values, which shell --semantics=googlesql does "
@@ -480,7 +478,7 @@ std::optional<std::string> Backend::NumericReadQuery(const std::string& relation
   for (const Column& column :
        Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
     const std::string name = QuoteIdentifier(column.name);
-    const auto converted = ReadNumericStorage(name, BorrowCLogicalType(column.type));
+    const auto converted = ReadNumericStorage(name, column.type);
     changed |= converted.has_value();
     columns.push_back(converted.value_or(name) + " AS " + name);
   }
