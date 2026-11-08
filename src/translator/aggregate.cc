@@ -759,11 +759,37 @@ Scope WithCorrelatedColumns(const googlesql::ResolvedAggregateScan& aggregate, c
 }
 
 // What a GROUP BY key groups by: INTERVAL values by their lengths, graph elements by identity
-// and strings by their keys under the key's `collation`.
+// and strings by their keys under the key's `collation`, also inside containers.
 std::string GroupKey(const googlesql::Type* type, const std::string& sql,
-                     const Collation& collation) {
-  return type->IsGraphElement() ? "struct_extract(" + sql + ", '$id')"
-                                : CollationKey(IntervalKey(type, sql), collation, type);
+                     const Collation& collation, int depth = 0) {
+  if (type->IsGraphElement()) {
+    return "struct_extract(" + sql + ", '$id')";
+  }
+  if (!HasGraph(type)) {
+    return CollationKey(IntervalKey(type, sql), collation, type);
+  }
+  // Graph paths are not groupable, even inside containers. The resolver normally rejects them.
+  if (type->IsGraphPath()) {
+    throw std::invalid_argument("Grouping by expressions of type GRAPH_PATH is unsupported");
+  }
+  const std::string element = "_gk" + std::to_string(depth);
+  const auto child_collation = [&](int i) {
+    return collation.children.empty() ? Collation{} : collation.children.at(i);
+  };
+  if (type->IsArray()) {
+    return "list_transform(" + sql + ", lambda " + element + ": " +
+           GroupKey(type->AsArray()->element_type(), element, child_collation(0), depth + 1) + ")";
+  }
+  std::vector<std::string> fields;
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    fields.push_back(GroupKey(type->AsStruct()->field(i).type,
+                              "struct_extract_at(" + element + ", " + std::to_string(i + 1) + ")",
+                              child_collation(i), depth + 1));
+  }
+  // Bind the container once, and distinguish a NULL STRUCT from a STRUCT of NULL fields.
+  // Positional fields preserve anonymous and duplicate field names.
+  return "list_transform([" + sql + "], lambda " + element + ": CASE WHEN " + element +
+         " IS NULL THEN NULL ELSE row(" + Join(fields, ", ") + ") END)[1]";
 }
 
 }  // namespace
@@ -863,12 +889,6 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
   // identity, as SAME compares them.
   const bool grouping_sets =
       !aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty();
-  if (std::ranges::any_of(aggregate.group_by_list(), [](const auto& key) {
-        const googlesql::Type* type = key->expr()->type();
-        return HasGraph(type) && !type->IsGraphElement();
-      })) {
-    return Unsupported(scope, "GROUP BY with nested graph values");
-  }
   // The collation of each key, which SELECT DISTINCT records as GROUP BY does.
   for (int i = static_cast<int>(collations.size()); i < aggregate.group_by_list_size(); ++i) {
     const auto collation = aggregate.collation_list().empty()
@@ -925,7 +945,7 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
       const std::string column = "q." + ColumnName(id);
       if (HasInterval(key->expr()->type())) {
         firsts.push_back("first_value(" + column + ") OVER (PARTITION BY " +
-                         IntervalKey(key->expr()->type(), column) + " ORDER BY q._rn) AS " +
+                         GroupKey(key->expr()->type(), column, {}) + " ORDER BY q._rn) AS " +
                          ColumnName(id));
       }
       const auto type = DuckDbType(key->expr()->type(), scope.context.timestamp_precision);
@@ -933,7 +953,7 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
         return std::nullopt;
       }
       key_projections.emplace_back(id, *type);
-      if (collations.at(i).empty() && !key->expr()->type()->IsGraphElement()) {
+      if (collations.at(i).empty() && !HasGraph(key->expr()->type())) {
         key_columns.emplace(id, column);
         projections.push_back(column + " AS " + ColumnName(id));
       } else {
@@ -1071,7 +1091,7 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
       }
       const int id = key->column().column_id();
       if (const googlesql::Type* type = key->expr()->type();
-          HasInterval(type) || type->IsGraphElement() || !collations.at(i).empty()) {
+          HasInterval(type) || HasGraph(type) || !collations.at(i).empty()) {
         projections.push_back("first(" + *sql + ") AS " + ColumnName(id));
         keys.push_back(GroupKey(type, *sql, collations.at(i)));
       } else {
