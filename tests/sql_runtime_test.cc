@@ -14,12 +14,14 @@
 #include <utility>
 #include <vector>
 
+#include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/field_schema.h"
 #include "src/location.h"
 #include "src/project.h"
 #include "src/references.h"
+#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -159,7 +161,8 @@ TEST(SqlRuntimeTest, PolicyCommittedAtEvaluationTimeIsOutsideTheReadSnapshot) {
 }
 
 // Catalog reads in another dataset may expire a newly committed relation while its CREATE
-// response is still being assembled. Exercise that overlap without relying on wall-clock waits.
+// response is still being assembled. Exercise SQL and API mutations, including nested view
+// analysis and table reads, without relying on wall-clock waits.
 TEST(SqlRuntimeTest, ConcurrentExpirationDoesNotFailCreateResponses) {
   constexpr std::size_t kClients = 8;
   constexpr std::size_t kCreates = 64;
@@ -175,18 +178,45 @@ TEST(SqlRuntimeTest, ConcurrentExpirationDoesNotFailCreateResponses) {
       const std::string dataset = "expiration_" + std::to_string(i);
       ready.arrive_and_wait();
       for (std::size_t n = 0; n < kCreates; ++n) {
-        QueryRequest request;
-        request.project_id = "runtime";
-        request.query = "CREATE " + std::string(n % 2 == 0 ? "VIEW " : "TABLE ") + dataset +
-                        ".expired_" + std::to_string(n) +
-                        " OPTIONS (expiration_timestamp = TIMESTAMP '2001-01-01 00:00:00 UTC')"
-                        " AS SELECT CAST(7 AS INT64) AS value";
-        QueryJob metadata;
-        JobLocation location;
-        const QueryResult result = runtime.ExecuteQuery(std::move(request), metadata, location);
-        ASSERT_EQ(result.schema.size(), 1);
-        EXPECT_EQ(result.schema.front().name, "value");
-        EXPECT_EQ(result.schema.front().type, FieldType::kInteger);
+        std::vector<FieldSchema> schema;
+        if (n % 4 < 2) {
+          QueryRequest request;
+          request.project_id = "runtime";
+          request.query = "CREATE " + std::string(n % 2 == 0 ? "VIEW " : "TABLE ") + dataset +
+                          ".expired_" + std::to_string(n) +
+                          " OPTIONS (expiration_timestamp = TIMESTAMP '2001-01-01 00:00:00 UTC')"
+                          " AS SELECT CAST(7 AS INT64) AS value";
+          QueryJob metadata;
+          JobLocation location;
+          schema = runtime.ExecuteQuery(std::move(request), metadata, location).schema;
+        } else {
+          const TableReference table{
+              .project_id = "runtime",
+              .dataset_id = dataset,
+              .table_id = "expired_" + std::to_string(n),
+          };
+          // The same fixed, already-expired deadline as the SQL form, in epoch milliseconds.
+          TableMetadata metadata;
+          metadata.expiration_time = 978307200000;
+          if (n % 4 == 2) {
+            schema =
+                runtime
+                    .CreateTable(table, {{.name = "value", .type = FieldType::kInteger}}, metadata)
+                    .schema;
+          } else {
+            schema = runtime
+                         .CreateView(table,
+                                     nlohmann::json{
+                                         {"query", "SELECT CAST(7 AS INT64) AS value"},
+                                         {"useLegacySql", false},
+                                     },
+                                     metadata)
+                         .schema;
+          }
+        }
+        ASSERT_EQ(schema.size(), 1);
+        EXPECT_EQ(schema.front().name, "value");
+        EXPECT_EQ(schema.front().type, FieldType::kInteger);
       }
     });
   }

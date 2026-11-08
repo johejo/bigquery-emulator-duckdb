@@ -358,10 +358,10 @@ StatementLock SqlRuntime::LockStatement(StatementWrites writes, bool expire) {
   // lock, nothing it runs may expire tables, which translation and execution with a session do
   // not. Other statements change the catalog, and are serialized with catalog mutations and drops.
   if (writes == StatementWrites::kCatalog) {
-    lock.catalog = std::unique_lock(expiration_mutex_);
+    lock.catalog = expiration_mutex_.LockCatalog();
   }
   if (expire) {
-    ExpireTables(backend_, expiration_mutex_);
+    ExpireTables(backend_, expiration_mutex_, std::nullopt, &lock.catalog);
   }
   if (writes == StatementWrites::kRows) {
     lock.rows = expiration_mutex_.LockRowWrites();
@@ -369,11 +369,12 @@ StatementLock SqlRuntime::LockStatement(StatementWrites writes, bool expire) {
   return lock;
 }
 
-std::unique_ptr<TableSource> SqlRuntime::NewTableSource(Backend* session, bool expire,
-                                                        JobLocation* location, bool policy_reads) {
+std::unique_ptr<TableSource> SqlRuntime::NewTableSource(
+    Backend* session, bool expire, JobLocation* location, bool policy_reads,
+    const ExpirationMutex::CatalogLock* catalog_lock) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
-    ExpireTables(backend, expiration_mutex_);
+    ExpireTables(backend, expiration_mutex_, std::nullopt, catalog_lock);
   }
   // Only a caller-owned execution transaction can keep discovery, row-version resolution
   // and policy evaluation in one snapshot. Ordinary analysis is not such a boundary.
@@ -488,7 +489,7 @@ TranslatedStatement SqlRuntime::Translate(
     const std::string& query, const QueryParameters& parameters, const std::string& default_project,
     const std::string& default_dataset, JobLocation* location,
     const googlesql::SystemVariableValuesMap* system_variables, bool stores_result, bool dry_run,
-    Backend* session) {
+    Backend* session, const ExpirationMutex::CatalogLock* catalog_lock) {
   Backend& backend = session != nullptr ? *session : backend_;
   AnalyzerSettings settings{
       .default_project = default_project,
@@ -509,7 +510,8 @@ TranslatedStatement SqlRuntime::Translate(
   for (const FieldSchema& field : parameters.positional_types()) {
     settings.positional_parameters.push_back(ParameterType(field, type_factory));
   }
-  const auto source = NewTableSource(session, session == nullptr, location);
+  const auto source = NewTableSource(session, session == nullptr, location,
+                                     /*policy_reads=*/true, catalog_lock);
   RoutineCatalog catalog(*source, &type_factory, settings.default_project, settings.default_dataset,
                          functions_.timestamp_precision(), nullptr, excluded_function_ids_,
                          declarations_);
@@ -730,7 +732,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   };
   const TranslatedStatement translation = Translate(
       request.query, request.parameters, settings.default_project, settings.default_dataset,
-      &location, &variables, request.destination_table.has_value(), request.dry_run, session.get());
+      &location, &variables, request.destination_table.has_value(), request.dry_run, session.get(),
+      &statement_lock.catalog);
   query.statement_type = translation.statement_type;
   query.ddl_target_table = translation.ddl_target_table;
   query.ddl_target_dataset = translation.ddl_target_dataset;
@@ -754,9 +757,10 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     // A destination table reports the mode of each field, as a query result does.
     std::vector<FieldSchema> written = *translation.result_schema;
     SetModesGiven(written);
-    result =
-        WriteDestination(request.project_id, *request.destination_table, request.create_disposition,
-                         request.write_disposition, translation.sql, written, setup);
+    result = WriteDestination(
+        request.project_id, *request.destination_table, request.create_disposition,
+        request.write_disposition, translation.sql, written, setup, /*count_only=*/false,
+        TableMetadata(), /*copy=*/false, /*restore=*/false, std::nullopt, &statement_lock.catalog);
     result.rows.KeepResources(translation.resources);
   } else if (!AlterationStatements(translation).has_value()) {
     // A dry run checks an alteration against the table or dataset without running it.
@@ -779,11 +783,10 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
                                      const std::vector<std::string>& setup, bool null_arrays,
                                      Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
-  std::unique_lock<ExpirationMutex> expiration_lock(expiration_mutex_, std::defer_lock);
-  // CREATE responses read the stored schema after committing the DDL. Keep another
-  // request's expiration sweep from dropping the relation before that read completes.
+  // LockStatement at the SQL or script entry point keeps CREATE's stored schema from being
+  // expired before its response is read. Recursive execution below uses that same coordination.
   if (translation.ddl_target_dataset || translation.ddl_target_table) {
-    expiration_lock.lock();
+    expiration_mutex_.AssertCatalogHeld();
   }
   std::optional<absl::MutexLock> graph_lock;
   if (translation.property_graph || translation.reads_property_graph) {

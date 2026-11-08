@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -229,7 +228,8 @@ std::string TablesQuery(const DatasetReference& dataset) {
 // Expiration is lazy: catalog reads remove expired relations before exposing them. Sweep
 // before analysis too, so DDL targets, wildcards and INFORMATION_SCHEMA see the same catalog.
 void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
-                  const std::optional<DatasetReference>& dataset) {
+                  const std::optional<DatasetReference>& dataset,
+                  const ExpirationMutex::CatalogLock* catalog_lock) {
   // Only relations whose comment records an expiration need parsing; bq_relations() reads
   // names and comments without computing the rest of duckdb_tables() for every relation.
   const QueryResult relations = backend.Execute(std::format(
@@ -264,7 +264,10 @@ void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
     // Multiple HTTP requests can discover the same expired relation concurrently. Serialize
     // drops so that their transactions do not conflict with each other, nor with statements
     // that write rows.
-    std::scoped_lock const lock(expiration_mutex);
+    const auto lock = catalog_lock != nullptr && catalog_lock->owns_lock()
+                          ? ExpirationMutex::CatalogLock()
+                          : expiration_mutex.LockCatalog();
+    expiration_mutex.AssertCatalogHeld();
     const auto drop = expiration_mutex.LockDrop();
     backend.ExecuteDdl(
         std::string(view ? "DROP VIEW IF EXISTS " : "DROP TABLE IF EXISTS ") + QualifiedName(table),

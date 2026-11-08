@@ -38,9 +38,11 @@ void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& datas
 std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment
-// in its transaction so a concurrent replacement or extended expiration is preserved.
+// in its transaction so a concurrent replacement or extended expiration is preserved. A caller
+// already holding the catalog lock passes it so drops do not acquire it again.
 void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
-                  const std::optional<DatasetReference>& dataset = std::nullopt);
+                  const std::optional<DatasetReference>& dataset = std::nullopt,
+                  const ExpirationMutex::CatalogLock* catalog_lock = nullptr);
 
 enum class RelationType : std::uint8_t { kTable, kView };
 

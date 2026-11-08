@@ -8,7 +8,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -506,7 +505,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
                                   " of several source tables");
     }
     std::vector<FieldSchema> schema;
-    const std::scoped_lock expiration_lock(expiration_mutex_);
+    const auto expiration_lock = expiration_mutex_.LockCatalog();
     TableReference first_source;
     TableMetadata source_metadata;
     std::string sql;
@@ -515,7 +514,8 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         source.project_id = job.project_id;
       }
       source.project_id = ResolveProject(source.project_id);
-      const TableInfo table = GetTable(source);
+      const TableInfo table =
+          GetTable(source, /*include_row_count=*/true, /*expire=*/true, &expiration_lock);
       source = table.reference;
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
@@ -542,7 +542,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     if (copy.write_disposition == WriteDisposition::kWriteAppend) {
       std::vector<FieldSchema> destination;
       try {
-        destination = GetTable(copy.destination_table).schema;
+        destination = GetTable(copy.destination_table, /*include_row_count=*/true,
+                               /*expire=*/true, &expiration_lock)
+                          .schema;
       } catch (const ApiError& error) {
         if (error.http_status() != 404) {
           throw;
@@ -571,7 +573,8 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     if (copy.operation != CopyOperation::kCopy || keyed) {
       bool exists = true;
       try {
-        GetTable(copy.destination_table, /*include_row_count=*/false);
+        GetTable(copy.destination_table, /*include_row_count=*/false, /*expire=*/true,
+                 &expiration_lock);
       } catch (const ApiError& error) {
         if (error.http_status() != 404) {
           throw;
@@ -585,10 +588,10 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       }
     }
     metadata.expiration_time = copy.destination_expiration_time;
-    const QueryResult result =
-        WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
-                         copy.write_disposition, sql, schema, {}, true, metadata, /*copy=*/true,
-                         /*restore=*/copy.operation == CopyOperation::kRestore);
+    const QueryResult result = WriteDestination(
+        job.project_id, copy.destination_table, copy.create_disposition, copy.write_disposition,
+        sql, schema, {}, true, metadata, /*copy=*/true,
+        /*restore=*/copy.operation == CopyOperation::kRestore, std::nullopt, &expiration_lock);
     job.output_rows = result.rows.Int64(0, 0);
     job.result = QueryResult{};
   });
@@ -631,13 +634,14 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       throw ApiError::Invalid("Unsupported destination URI: " + uri);
     }
 
-    const std::scoped_lock expiration_lock(expiration_mutex_);
+    const auto expiration_lock = expiration_mutex_.LockCatalog();
     TableReference source = extract.source_table;
     if (source.project_id.empty()) {
       source.project_id = job.project_id;
     }
     source.project_id = ResolveProject(source.project_id);
-    const TableInfo table = GetTable(source);
+    const TableInfo table =
+        GetTable(source, /*include_row_count=*/true, /*expire=*/true, &expiration_lock);
     source = table.reference;
     if (table.view_query) {
       throw ApiError::Invalid("Cannot extract a view: " + TableName(source));

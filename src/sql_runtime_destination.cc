@@ -18,6 +18,7 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/expiration_mutex.h"
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
 #include "src/location.h"
@@ -103,7 +104,8 @@ QueryResult SqlRuntime::WriteDestination(
     const std::string& project_id, TableReference destination, CreateDisposition create,
     WriteDisposition write, const std::string& sql, const std::vector<FieldSchema>& schema,
     const std::vector<std::string>& setup, bool count_only, const TableMetadata& metadata,
-    bool copy, bool restore, const std::optional<DestinationTableProperties>& load_properties) {
+    bool copy, bool restore, const std::optional<DestinationTableProperties>& load_properties,
+    const ExpirationMutex::CatalogLock* catalog_lock) {
   std::set<std::string> names;
   std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
@@ -122,13 +124,19 @@ QueryResult SqlRuntime::WriteDestination(
   if (destination.project_id.empty()) {
     destination.project_id = project_id;
   }
-  std::scoped_lock const namespace_lock(expiration_mutex_);
+  const auto namespace_lock = catalog_lock != nullptr && catalog_lock->owns_lock()
+                                  ? ExpirationMutex::CatalogLock()
+                                  : expiration_mutex_.LockCatalog();
+  if (namespace_lock.owns_lock()) {
+    catalog_lock = &namespace_lock;
+  }
+  expiration_mutex_.AssertCatalogHeld();
   destination = ResolveTableReference(std::move(destination), /*create=*/true);
   const DatasetMetadata dataset = GetDataset(
       DatasetReference{.project_id = destination.project_id, .dataset_id = destination.dataset_id});
   std::optional<TableInfo> existing;
   try {
-    existing = GetTable(destination);
+    existing = GetTable(destination, /*include_row_count=*/true, /*expire=*/true, catalog_lock);
   } catch (const ApiError& error) {
     if (error.http_status() != 404) {
       throw;
