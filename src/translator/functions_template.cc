@@ -1739,6 +1739,61 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           },
       },
 
+      {
+          "ARRAY_FIRST",
+          {
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "CASE WHEN len($1) = 0 THEN !1 ELSE $1[1] END",
+                          .conditions = {},
+                          .defaults = {},
+                          .errors =
+                              {"'ARRAY_FIRST cannot get the first element of an empty array'"},
+                      },
+                  },
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "ARRAY_LAST",
+          {
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "CASE WHEN len($1) = 0 THEN !1 ELSE $1[-1] END",
+                          .conditions = {},
+                          .defaults = {},
+                          .errors = {"'ARRAY_LAST cannot get the last element of an empty array'"},
+                      },
+                  },
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "ARRAY_SLICE",
+          {
+              // DuckDB uses one-based inclusive bounds. Normalize negative offsets explicitly:
+              // list_slice would otherwise count a negative normalized end from the end again.
+              // Cap positive offsets before adding one to avoid overflowing INT64_MAX.
+              .rules =
+                  {
+                      {
+                          .arity = 3,
+                          .spelling =
+                              "CASE WHEN $1 IS NULL OR $2 IS NULL OR $3 IS NULL THEN NULL ELSE "
+                              "list_slice($1, CASE WHEN $2 < 0 THEN greatest($2 + len($1), 0) + 1 "
+                              "ELSE least($2, len($1)) + 1 END, CASE WHEN $3 < 0 THEN "
+                              "greatest($3 + len($1) + 1, 0) ELSE least($3, len($1) - 1) + 1 END) "
+                              "END",
+                      },
+                  },
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+
       // Only NUMERIC and BIGNUMERIC take a rounding mode.
       {
           "ROUND",
