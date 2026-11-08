@@ -31,7 +31,6 @@
 namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::ArgumentMode;
-using function_catalog::BucketWidthOf;
 using function_catalog::Catalog;
 using function_catalog::DatePart;
 using function_catalog::FunctionEntry;
@@ -473,20 +472,9 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   const bool selects_intervals = functions.HasTypeUse(function, TypeUse::kSelectsComparedValues) &&
                                  !call.argument_list().empty() &&
                                  call.argument_list(0)->type()->IsInterval();
-  // A declared conversion permits INTERVAL only in the argument it converts, not in the
-  // result or nested inside another argument's ARRAY or STRUCT.
-  bool converts_intervals = !HasInterval(call.type());
-  for (size_t i = 0; i < call.argument_list().size(); ++i) {
-    const auto* type = call.argument_list(static_cast<int>(i))->type();
-    if (HasInterval(type) &&
-        (!type->IsInterval() || argument_mode(i) != ArgumentMode::kBucketWidth)) {
-      converts_intervals = false;
-    }
-  }
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   if (interval && !compares_intervals && !compares_structs && !carries_results &&
-      !selects_intervals && !converts_intervals &&
-      !functions.HasTypeUse(function, TypeUse::kCarries) &&
+      !selects_intervals && !functions.HasTypeUse(function, TypeUse::kCarries) &&
       !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
@@ -519,24 +507,6 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   std::vector<std::string> args;
   for (size_t i = 0; i < call.argument_list().size(); ++i) {
     const auto& argument = call.argument_list(static_cast<int>(i));
-    // The bucket width INTERVAL becomes a plain count, since DuckDB intervals keep no single
-    // part to count in.
-    if (argument_mode(i) == ArgumentMode::kBucketWidth) {
-      const auto width = BucketWidthOf(*argument);
-      if (!width) {
-        return Unsupported(scope, "function " + name + " bucket width");
-      }
-      if (width->count == nullptr) {
-        args.push_back(std::to_string(width->factor));
-        continue;
-      }
-      const auto count = Expression(*width->count, scope, columns);
-      if (!count) {
-        return std::nullopt;
-      }
-      args.push_back("(" + *count + " * " + std::to_string(width->factor) + ")");
-      continue;
-    }
     if (argument->type()->IsEnum()) {
       if (const auto mode = RoundingModeOf(*argument)) {
         args.push_back(QuoteLiteral(*mode));

@@ -1,7 +1,0 @@
-# Date and time function forms whose semantics are not implemented.
-
-SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 1 MONTH)
-=> error contains: The emulator does not support function TIMESTAMP_BUCKET
-
-SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL '1 2' DAY TO HOUR)
-=> error contains: The emulator does not support function DATE_BUCKET bucket width

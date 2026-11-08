@@ -1,0 +1,20 @@
+# DATE_BUCKET, DATETIME_BUCKET and TIMESTAMP_BUCKET
+# third_party/bigquery_docs/reference/standard-sql/time-series-functions.md
+#
+# The documentation allows a single interval with date and time parts for DATETIME_BUCKET and
+# TIMESTAMP_BUCKET, while GoogleSQL rejects a MONTH part for TIMESTAMP_BUCKET.
+
+SELECT CAST(DATETIME_BUCKET(DATETIME '2020-03-15 10:00:00', INTERVAL 3 MONTH) AS STRING)
+?>
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(TIMESTAMP '2020-03-15 10:00:00', INTERVAL 1 MONTH))
+?>
+
+# Whether a width that is not a literal, such as a parameter or a column, is accepted.
+
+SELECT CAST(DATE_BUCKET(DATE '2020-03-15', @width) AS STRING)
+param> {"name": "width", "parameterType": {"type": "INTERVAL"}, "parameterValue": {"value": "0-2 0 0:0:0"}}
+?>
+
+SELECT CAST(DATE_BUCKET(DATE '2020-03-15', w) AS STRING) FROM UNNEST([INTERVAL 7 DAY]) AS w
+?>

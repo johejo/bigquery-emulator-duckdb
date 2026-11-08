@@ -148,6 +148,31 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
   static constexpr StaticCondition kTimestampValue[] = {
       {.argument = 2, .types = ArgumentType<TYPE_TIMESTAMP>::kTypes},
   };
+  // DATE_BUCKET, DATETIME_BUCKET and TIMESTAMP_BUCKET each also take a DATE. The default origin
+  // is 1950-01-01.
+  static constexpr std::string_view kDateOrigin[] = {"DATE '1950-01-01'"};
+  static constexpr std::string_view kDatetimeOrigin[] = {"TIMESTAMP '1950-01-01 00:00:00'"};
+  static constexpr std::string_view kTimestampOrigin[] = {"TIMESTAMPTZ '1950-01-01 00:00:00+00'"};
+  static constexpr StaticRule kBucket[] = {
+      {
+          .arity = {2, 3},
+          .spelling = "bq_date_bucket($1, $2, $3)",
+          .conditions = ArgumentType<TYPE_DATE>::kFirst,
+          .defaults = kDateOrigin,
+      },
+      {
+          .arity = {2, 3},
+          .spelling = "bq_datetime_bucket($1, $2, $3)",
+          .conditions = ArgumentType<TYPE_DATETIME>::kFirst,
+          .defaults = kDatetimeOrigin,
+      },
+      {
+          .arity = {2, 3},
+          .spelling = "bq_timestamp_bucket($1, $2, $3)",
+          .conditions = ArgumentType<TYPE_TIMESTAMP>::kFirst,
+          .defaults = kTimestampOrigin,
+      },
+  };
   static constexpr StaticRule kFormatDateTime[] = {
       {.arity = 2, .spelling = "bq_format_date($1, $2)", .conditions = kDateValue},
       {.arity = 2, .spelling = "bq_format_datetime($1, $2)", .conditions = kDateTimeValue},
@@ -439,6 +464,9 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("FORMAT_DATETIME", kFormatDateTime),
       Define("FORMAT_TIMESTAMP", kFormatDateTime),
       Define("FORMAT_TIME", {{.arity = 2, .spelling = "bq_format_time($1, $2)"}}),
+      Define("DATE_BUCKET", kBucket, {.uses = {TypeUse::kBuildsOrReadsInterval}}),
+      Define("DATETIME_BUCKET", kBucket, {.uses = {TypeUse::kBuildsOrReadsInterval}}),
+      Define("TIMESTAMP_BUCKET", kBucket, {.uses = {TypeUse::kBuildsOrReadsInterval}}),
       Define("MONTHS_BETWEEN",
              {
                  {

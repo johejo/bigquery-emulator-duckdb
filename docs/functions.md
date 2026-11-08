@@ -625,10 +625,10 @@ functions.
 | --- | --- | --- | --- |
 | [`APPENDS`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Unsupported |  |  |
 | [`CHANGES`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Unsupported |  |  |
-| [`DATETIME_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | DuckDB SQL, in code |  |
-| [`DATE_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | DuckDB SQL, in code |  |
+| [`DATETIME_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | GoogleSQL function |  |
+| [`DATE_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | GoogleSQL function |  |
 | [`GAP_FILL`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Unsupported |  |  |
-| [`TIMESTAMP_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | DuckDB SQL, in code |  |
+| [`TIMESTAMP_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | GoogleSQL function |  |
 
 ## Timestamp functions
 
