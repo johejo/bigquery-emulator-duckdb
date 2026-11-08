@@ -3,14 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
-#include <vector>
 
 #include "googlesql/analyzer/expr_resolver_helper.h"
 #include "googlesql/public/function.h"
@@ -118,65 +115,6 @@ std::optional<std::string> NormalizeMode(const googlesql::ResolvedExpr& expr) {
     return std::nullopt;
   }
   return value.EnumDisplayName();
-}
-
-std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
-  if (expr.Is<googlesql::ResolvedFunctionCall>()) {
-    const auto* call = expr.GetAs<googlesql::ResolvedFunctionCall>();
-    if (call->function()->Name() != "$interval" || call->argument_list_size() != 2) {
-      return std::nullopt;
-    }
-    struct Unit {
-      std::string_view part;
-      std::string_view unit;
-      int64_t factor;
-    };
-    static constexpr auto units = std::to_array<Unit>({
-        {.part = "year", .unit = "months", .factor = 12},
-        {.part = "quarter", .unit = "months", .factor = 3},
-        {.part = "month", .unit = "months", .factor = 1},
-        {.part = "week", .unit = "days", .factor = 7},
-        {.part = "day", .unit = "days", .factor = 1},
-        {.part = "hour", .unit = "micros", .factor = 3600000000},
-        {.part = "minute", .unit = "micros", .factor = 60000000},
-        {.part = "second", .unit = "micros", .factor = 1000000},
-        {.part = "millisecond", .unit = "micros", .factor = 1000},
-        {.part = "microsecond", .unit = "micros", .factor = 1},
-    });
-    const auto part = DatePart(*call->argument_list(1));
-    const auto* unit = part ? std::ranges::find(units, *part, &Unit::part) : units.end();
-    if (unit == units.end()) {
-      return std::nullopt;
-    }
-    return BucketWidth{
-        .unit = std::string(unit->unit),
-        .count = call->argument_list(0),
-        .factor = unit->factor,
-    };
-  }
-  if (!expr.Is<googlesql::ResolvedLiteral>()) {
-    return std::nullopt;
-  }
-  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
-  if (value.is_null() || !value.type()->IsInterval() ||
-      value.interval_value().get_nano_fractions() != 0) {
-    return std::nullopt;
-  }
-  // A zero width counts as days, which raises the error BigQuery raises for every input type.
-  std::vector<BucketWidth> parts;
-  for (const auto& [unit, count] : {
-           std::pair<std::string, int64_t>{"months", value.interval_value().get_months()},
-           {"days", value.interval_value().get_days()},
-           {"micros", value.interval_value().get_micros()},
-       }) {
-    if (count != 0) {
-      parts.push_back({.unit = unit, .factor = count});
-    }
-  }
-  if (parts.size() > 1) {
-    return std::nullopt;
-  }
-  return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts.at(0);
 }
 
 const googlesql::ResolvedExpr& ScalarCall::Argument(size_t i) const {

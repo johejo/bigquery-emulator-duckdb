@@ -22,7 +22,6 @@ namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::BindComparison;
 using function_catalog::BoundComparison;
-using function_catalog::BucketWidthOf;
 using function_catalog::Equal;
 using function_catalog::FunctionArgument;
 using function_catalog::InArray;
@@ -154,51 +153,6 @@ std::optional<std::string> StructComparison(const ScalarCall& call) {
            results + "ELSE " + args.back() + " END)";
   }
   return std::nullopt;
-}
-
-// The width is already a count of months, days or microseconds, see BucketWidthOf. Months count
-// from the origin in the calendar, while days and microseconds are fixed lengths; TIMESTAMP and
-// DATETIME take a day as 24 hours.
-std::optional<std::string> Bucket(const ScalarCall& call) {
-  const std::vector<std::string> args = Sqls(call);
-  const size_t n = args.size();
-  if (n != 2 && n != 3) {
-    return std::nullopt;
-  }
-  const auto width = BucketWidthOf(call.Argument(1));
-  const googlesql::Type* input = call.ArgumentType(0);
-  if (!width || (input->IsDate() && width->unit == "micros") ||
-      (!input->IsDate() && width->unit == "months")) {
-    return std::nullopt;
-  }
-  std::string bucket;
-  if (input->IsDate() && width->unit == "days") {
-    bucket = "_bk.x - CAST((((_bk.x - _bk.o) % _bk.w) + _bk.w) % _bk.w AS INTEGER)";
-  } else if (input->IsDate()) {
-    // A day past the origin's day of the month starts the next bucket, and last days of the
-    // month count as the same day.
-    bucket =
-        "list_transform([(year(_bk.x) - year(_bk.o)) * 12 + month(_bk.x) - month(_bk.o)], lambda "
-        "_m: "
-        "CAST(_bk.o + to_months(CAST(_m - _m % _bk.w - CASE WHEN _m % _bk.w < 0 OR (_m % _bk.w = "
-        "0 AND NOT (_bk.o = last_day(_bk.o) AND _bk.x = last_day(_bk.x)) AND day(_bk.x) < "
-        "day(_bk.o)) THEN _bk.w ELSE 0 END AS INTEGER)) AS DATE))[1]";
-  } else {
-    const std::string w = width->unit == "days" ? "(_bk.w * 86400000000)" : "_bk.w";
-    bucket = "_bk.x - to_microseconds((((epoch_us(_bk.x) - epoch_us(_bk.o)) % " + w + ") + " + w +
-             ") % " + w + ")";
-  }
-  const std::string origin = n == 3                ? args.at(2)
-                             : input->IsDate()     ? "DATE '1950-01-01'"
-                             : input->IsDatetime() ? "TIMESTAMP '1950-01-01 00:00:00'"
-                                                   : "TIMESTAMPTZ '1950-01-01 00:00:00+00'";
-  const std::string zero = input->IsTimestamp()
-                               ? "'Zero bucket width INTERVAL is not allowed'"
-                               : "'Exactly one non-zero INTERVAL part in bucket width is required'";
-  return "list_transform([struct_pack(x := " + args.at(0) + ", w := " + args.at(1) +
-         ", o := " + origin + ")], lambda _bk: CASE WHEN _bk.w < 0 THEN " +
-         call.Raise("'Negative bucket width INTERVAL is not allowed'") + " WHEN _bk.w = 0 THEN " +
-         call.Raise(zero) + " ELSE " + bucket + " END)[1]";
 }
 
 namespace {

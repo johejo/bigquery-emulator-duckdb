@@ -16,7 +16,6 @@
 
 namespace bigquery_emulator_duckdb::translator {
 
-using function_catalog::ArgumentMode;
 using function_catalog::Handler;
 using function_catalog::Implementation;
 using function_catalog::Translation;
@@ -72,13 +71,9 @@ struct HandledFunction {
   Handler handler;
   Implementation implementation = Implementation::kSQLInCode;
   TypeUses uses = {};
-  std::span<const ArgumentMode> argument_modes = {};
   Handler struct_handler = nullptr;
   std::span<const TypeRejection> type_rejections = {};
 };
-
-constexpr auto kBucketArgumentModes =
-    std::to_array<ArgumentMode>({ArgumentMode::kExpression, ArgumentMode::kBucketWidth});
 
 constexpr std::array kIntervalTypes = {googlesql::TYPE_INTERVAL};
 
@@ -156,9 +151,6 @@ constexpr auto kHandlers =
             },
             {"SAME", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
             {"ALL_DIFFERENT", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
-            {"DATE_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
-            {"DATETIME_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
-            {"TIMESTAMP_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
             {
                 "CONTAINS_SUBSTR",
                 {
@@ -435,11 +427,6 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                       .uses = function.uses,
                       .implementations = {function.implementation},
                       .handler = function.handler,
-                      .argument_modes =
-                          {
-                              function.argument_modes.begin(),
-                              function.argument_modes.end(),
-                          },
                       .struct_handler = function.struct_handler,
                       .type_rejections =
                           rejects ? std::vector<TypeRejection>{function.type_rejections.begin(),

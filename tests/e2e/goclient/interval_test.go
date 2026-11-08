@@ -78,6 +78,26 @@ func TestIntervalParameters(t *testing.T) {
 	}
 }
 
+// Observed on BigQuery: a bucket width can be an INTERVAL query parameter.
+func TestBucketWidthParameter(t *testing.T) {
+	t.Parallel()
+	query := newClient(t).Query(`SELECT CAST(DATE_BUCKET(DATE '2020-03-15', @width) AS STRING)`)
+	query.Parameters = []bigquery.QueryParameter{
+		{Name: "width", Value: &bigquery.IntervalValue{Months: 2}},
+	}
+	rows, err := query.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []bigquery.Value
+	if err := rows.Next(&got); err != nil {
+		t.Fatal(err)
+	}
+	if want := []bigquery.Value{"2020-03-01"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("values = %#v, want %#v", got, want)
+	}
+}
+
 // A table with INTERVAL columns, also REPEATED and in a RECORD, keeps its schema, takes
 // tabledata.insertAll rows in the canonical form, and reads back each value's month, day and time
 // parts.

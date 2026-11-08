@@ -52,9 +52,10 @@ void RegisterTimestampNanosFunctions(duckdb_connection connection) {
         EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
           const __int128 nanos = arguments.Decimal(0);
           GOOGLESQL_ASSIGN_OR_RETURN(const absl::Time time, TimestampFromNanos(nanos));
+          // An emulator limitation, which clients and the compliance driver tell from errors.
           if (nanos % 1000 != 0) {
             return absl::UnimplementedError(
-                "This operation does not support nanosecond TIMESTAMP precision");
+                "The emulator does not support nanosecond TIMESTAMP precision in this operation");
           }
           return absl::ToUnixMicros(time);
         });

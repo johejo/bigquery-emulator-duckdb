@@ -127,6 +127,44 @@ absl::StatusOr<IntervalValue> SubtractTimestamps(int64_t left, int64_t right) {
   return fn::IntervalDiffTimestamps(absl::FromUnixMicros(left), absl::FromUnixMicros(right));
 }
 
+// DATE_BUCKET, DATETIME_BUCKET and TIMESTAMP_BUCKET, which validate any INTERVAL width as BigQuery
+// does. TIMESTAMP buckets take a day as 24 hours, and name the time zone only in their errors,
+// where BigQuery's default is UTC. BigQuery names the function, `name`, after GoogleSQL's errors.
+absl::Status InBucketExpression(const absl::Status& status, std::string_view name) {
+  if (status.ok()) {
+    return status;
+  }
+  return {status.code(), absl::StrCat(status.message(), "; error in ", name, " expression")};
+}
+
+absl::StatusOr<int32_t> DateBucket(int32_t date, const IntervalValue& width, int32_t origin,
+                                   std::string_view name) {
+  int32_t result = 0;
+  GOOGLESQL_RETURN_IF_ERROR(InBucketExpression(fn::DateBucket(date, width, origin, &result), name));
+  return result;
+}
+
+absl::StatusOr<int64_t> DatetimeBucket(int64_t micros, const IntervalValue& width, int64_t origin,
+                                       std::string_view name) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto origin_datetime, DatetimeFromMicros(origin));
+  googlesql::DatetimeValue result;
+  GOOGLESQL_RETURN_IF_ERROR(InBucketExpression(
+      fn::DatetimeBucket(datetime, width, origin_datetime, fn::kMicroseconds, &result), name));
+  return MicrosFromDatetime(result);
+}
+
+absl::StatusOr<int64_t> TimestampBucket(int64_t micros, const IntervalValue& width, int64_t origin,
+                                        std::string_view name) {
+  const auto bucketizer = fn::TimestampBucketizer::Create(width, absl::FromUnixMicros(origin),
+                                                          absl::UTCTimeZone(), fn::kMicroseconds);
+  GOOGLESQL_RETURN_IF_ERROR(InBucketExpression(bucketizer.status(), name));
+  absl::Time result;
+  GOOGLESQL_RETURN_IF_ERROR(
+      InBucketExpression(bucketizer->Compute(absl::FromUnixMicros(micros), &result), name));
+  return absl::ToUnixMicros(result);
+}
+
 // SUM, or with `kAverage` AVG, of the non-NULL INTERVAL values the translator collects with list().
 // GoogleSQL sums months, days and time apart and fails only when the result is out of range.
 // BigQuery keeps microseconds, so the average truncates the nanoseconds the division leaves.
@@ -258,6 +296,12 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            Apply<AddTimestampInterval<false>>);
   Register(connection, "bq_subtract_timestamp_interval", {kTimestamp, kInterval}, kTimestamp,
            Apply<AddTimestampInterval<true>>);
+  Register(connection, "bq_date_bucket", {kDate, kInterval, kDate, kVarchar}, kDate,
+           Apply<DateBucket>);
+  Register(connection, "bq_datetime_bucket", {kDatetime, kInterval, kDatetime, kVarchar}, kDatetime,
+           Apply<DatetimeBucket>);
+  Register(connection, "bq_timestamp_bucket", {kTimestamp, kInterval, kTimestamp, kVarchar},
+           kTimestamp, Apply<TimestampBucket>);
   Register(connection, "bq_subtract_dates", {kDate, kDate}, kInterval,
            Apply<fn::IntervalDiffDates>);
   Register(connection, "bq_subtract_datetimes", {kDatetime, kDatetime}, kInterval,

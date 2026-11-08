@@ -283,8 +283,6 @@ class TypeUses {
 // How an argument is translated before the function's implementation receives it.
 enum class ArgumentMode : std::uint8_t {
   kExpression,
-  // Accept a single-part INTERVAL width and pass its count of months, days or microseconds.
-  kBucketWidth,
   // Compare INTERVAL array elements by their keys, leaving other element types unchanged.
   kIntervalArrayKeys,
 };

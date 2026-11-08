@@ -124,6 +124,38 @@ constexpr std::array<StaticRule, 2> Pad(std::string_view text, std::string_view 
   return rules;
 }
 
+// DATE_BUCKET, DATETIME_BUCKET and TIMESTAMP_BUCKET each also take a DATE, and pass their name for
+// errors. The default origin is 1950-01-01.
+constexpr std::string_view kDateOrigin[] = {"DATE '1950-01-01'"};
+constexpr std::string_view kDatetimeOrigin[] = {"TIMESTAMP '1950-01-01 00:00:00'"};
+constexpr std::string_view kTimestampOrigin[] = {"TIMESTAMPTZ '1950-01-01 00:00:00+00'"};
+
+constexpr std::array<StaticRule, 3> Bucket(std::string_view date, std::string_view datetime,
+                                           std::string_view timestamp) {
+  return {
+      {
+          {
+              .arity = {2, 3},
+              .spelling = date,
+              .conditions = ArgumentType<TYPE_DATE>::kFirst,
+              .defaults = kDateOrigin,
+          },
+          {
+              .arity = {2, 3},
+              .spelling = datetime,
+              .conditions = ArgumentType<TYPE_DATETIME>::kFirst,
+              .defaults = kDatetimeOrigin,
+          },
+          {
+              .arity = {2, 3},
+              .spelling = timestamp,
+              .conditions = ArgumentType<TYPE_TIMESTAMP>::kFirst,
+              .defaults = kTimestampOrigin,
+          },
+      },
+  };
+}
+
 }  // namespace
 
 // Literal spellings and metadata backing arrays have static storage.
@@ -457,6 +489,21 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("FORMAT_DATETIME", kFormatDateTime),
       Define("FORMAT_TIMESTAMP", kFormatDateTime),
       Define("FORMAT_TIME", {{.arity = 2, .spelling = "bq_format_time($1, $2)"}}),
+      Define("DATE_BUCKET",
+             Bucket("bq_date_bucket($1, $2, $3, 'DATE_BUCKET')",
+                    "bq_datetime_bucket($1, $2, $3, 'DATE_BUCKET')",
+                    "bq_timestamp_bucket($1, $2, $3, 'DATE_BUCKET')"),
+             {.uses = {TypeUse::kBuildsOrReadsInterval}}),
+      Define("DATETIME_BUCKET",
+             Bucket("bq_date_bucket($1, $2, $3, 'DATETIME_BUCKET')",
+                    "bq_datetime_bucket($1, $2, $3, 'DATETIME_BUCKET')",
+                    "bq_timestamp_bucket($1, $2, $3, 'DATETIME_BUCKET')"),
+             {.uses = {TypeUse::kBuildsOrReadsInterval}}),
+      Define("TIMESTAMP_BUCKET",
+             Bucket("bq_date_bucket($1, $2, $3, 'TIMESTAMP_BUCKET')",
+                    "bq_datetime_bucket($1, $2, $3, 'TIMESTAMP_BUCKET')",
+                    "bq_timestamp_bucket($1, $2, $3, 'TIMESTAMP_BUCKET')"),
+             {.uses = {TypeUse::kBuildsOrReadsInterval}}),
       Define("MONTHS_BETWEEN",
              {
                  {

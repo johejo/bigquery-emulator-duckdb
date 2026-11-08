@@ -5,7 +5,6 @@
 // only place they reach the AST from.
 
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
@@ -49,16 +48,5 @@ std::optional<std::string> RoundingModeOf(const googlesql::ResolvedExpr& expr);
 
 // The name of a NORMALIZE mode, such as NFKC.
 std::optional<std::string> NormalizeMode(const googlesql::ResolvedExpr& expr);
-
-// A bucket width INTERVAL of a single part, as a count of months, days or microseconds.
-// INTERVAL n PART resolves to $interval(n, PART), and an INTERVAL string to a literal.
-struct BucketWidth {
-  std::string unit;
-  // The n of INTERVAL n PART, or null for a literal, whose count is all in `factor`.
-  const googlesql::ResolvedExpr* count = nullptr;
-  int64_t factor = 1;
-};
-
-std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr);
 
 }  // namespace bigquery_emulator_duckdb::function_catalog
