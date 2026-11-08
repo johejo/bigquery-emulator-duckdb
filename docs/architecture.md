@@ -223,10 +223,14 @@ key function and COLLATE's check of its specification.
 
 The backend owns DuckDB databases, connections, prepared statements and result chunks through
 the C++ API, which executes SQL, loads static extensions, registers catalog functions and exports
-Arrow arrays. Scalar and aggregate registration and typed result readers use the V1 C API.
-[`duckdb_capi`](../src/duckdb_capi.cc) borrows connection, type and chunk handles without
-transferring ownership; this boundary depends on the pinned DuckDB version's handle
-representation. DuckDB's C++ headers stay in implementation files. Each project is a catalog and
+Arrow arrays. Typed result readers use C++ vectors and logical types; chunks are recursively
+flattened before being shared, so concurrent readers never normalize shared buffers. Generic
+value restoration and formatting use DuckDB's `Vector::GetValue` and `Value::ToString`.
+Scalar and aggregate registration still use the V1 C API.
+[`duckdb_capi`](../src/duckdb_capi.cc) borrows connections for registration and C callback types
+for shared type predicates without transferring ownership; this boundary depends on the pinned
+DuckDB version's handle representation. DuckDB's C++ headers stay in implementation and internal
+vector helper files. Each project is a catalog and
 each dataset a schema. Results are encoded in BigQuery's REST row format.
 [googlesql_functions](../src/googlesql_functions/) owns scalar function compatibility logic,
 including string validation, casts, date and time parsing and formatting, without depending on

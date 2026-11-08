@@ -14,12 +14,18 @@
 
 #include "absl/status/status.h"
 #include "absl/time/time.h"
-#include "duckdb.h"
 #include "duckdb/common/allocator.hpp"
 #include "duckdb/common/arrow/arrow_converter.hpp"
+#include "duckdb/common/typedefs.hpp"
 #include "duckdb/common/types.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/types/selection_vector.hpp"
+#include "duckdb/common/types/timestamp.hpp"
+#include "duckdb/common/types/timestamp_base.hpp"
 #include "duckdb/common/vector.hpp"
+#include "duckdb/common/vector/struct_vector.hpp"
+#include "duckdb/common/vector_operations/vector_operations.hpp"
+#include "duckdb/common/vector_size.hpp"
 #include "duckdb/function/table/arrow/arrow_duck_schema.hpp"
 #include "duckdb/main/client_properties.hpp"
 #include "duckdb/main/query_result.hpp"
@@ -32,8 +38,6 @@
 #include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/bignumeric.h"
-#include "src/duckdb_capi.h"
-#include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 #include "src/result_chunks.h"
 #include "src/statement_resources.h"
@@ -49,11 +53,7 @@ void Check(int code, const ArrowError& error) {
   }
 }
 
-void DestroySelection(duckdb_selection_vector* selection) {
-  if (*selection != nullptr) {
-    duckdb_destroy_selection_vector(*selection);
-  }
-}
+using duckdb::LogicalTypeId;
 
 std::string_view Format(FieldType type) {
   switch (type) {
@@ -99,35 +99,28 @@ FieldSchema Item(const FieldSchema& field) {
   return item;
 }
 
-bool NativeStorage(duckdb_logical_type type) {
+bool NativeStorage(const duckdb::LogicalType& type) {
   // Arrow export can also convert values, such as discarding a TIME_TZ offset. Restrict the
   // direct path to the physical types used for BigQuery storage, then check their Arrow layout.
-  switch (duckdb_get_type_id(type)) {
-    case DUCKDB_TYPE_BOOLEAN:
-    case DUCKDB_TYPE_BIGINT:
-    case DUCKDB_TYPE_DOUBLE:
-    case DUCKDB_TYPE_VARCHAR:
-    case DUCKDB_TYPE_BLOB:
-    case DUCKDB_TYPE_DATE:
-    case DUCKDB_TYPE_TIME:
-    case DUCKDB_TYPE_TIMESTAMP:
-    case DUCKDB_TYPE_TIMESTAMP_TZ:
-    case DUCKDB_TYPE_DECIMAL:
+  switch (type.id()) {
+    case LogicalTypeId::BOOLEAN:
+    case LogicalTypeId::BIGINT:
+    case LogicalTypeId::DOUBLE:
+    case LogicalTypeId::VARCHAR:
+    case LogicalTypeId::BLOB:
+    case LogicalTypeId::DATE:
+    case LogicalTypeId::TIME:
+    case LogicalTypeId::TIMESTAMP:
+    case LogicalTypeId::TIMESTAMP_TZ:
+    case LogicalTypeId::DECIMAL:
     // Query results keep a BIGNUMERIC as its units of 10^-38, with or without the storage alias.
-    case DUCKDB_TYPE_BIGNUM:
+    case LogicalTypeId::BIGNUM:
       return true;
-    case DUCKDB_TYPE_LIST: {
-      const LogicalType child(duckdb_list_type_child_type(type));
-      return NativeStorage(child.get());
-    }
-    case DUCKDB_TYPE_STRUCT:
-      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
-        const LogicalType child(duckdb_struct_type_child_type(type, i));
-        if (!NativeStorage(child.get())) {
-          return false;
-        }
-      }
-      return true;
+    case LogicalTypeId::LIST:
+      return NativeStorage(duckdb::ListType::GetChildType(type));
+    case LogicalTypeId::STRUCT:
+      return std::ranges::all_of(duckdb::StructType::GetChildTypes(type),
+                                 [](const auto& child) { return NativeStorage(child.second); });
     default:
       return false;
   }
@@ -191,8 +184,8 @@ void Normalize(ArrowArray* array, const ArrowSchema& wire, const FieldSchema& fi
         }
         const int64_t value = ArrowArrayViewGetIntUnsafe(stored.get(), row);
         const bool finite = field.range_element_type == FieldType::kDate
-                                ? duckdb_is_finite_date({static_cast<int32_t>(value)})
-                                : duckdb_is_finite_timestamp({value});
+                                ? duckdb::date_t(static_cast<int32_t>(value)).IsFinite()
+                                : duckdb::timestamp_t(value).IsFinite();
         if (!finite) {
           Check(ArrowArrayAppendNull(normalized.get(), 1), error);
         } else {
@@ -294,8 +287,8 @@ void ValidateCivilTime(const ArrowArrayView& view, const FieldSchema& field, int
 }
 
 // Appends `row` of a vector in Storage Read wire layout, without encoding a query cell.
-void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vector vector,
-                       duckdb_logical_type type, idx_t row) {
+void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb::Vector& vector,
+                       const duckdb::LogicalType& type, size_t row) {
   const auto append = [](int code) {
     if (code != NANOARROW_OK) {
       throw ApiError::Internal("Arrow IPC operation failed: " + std::to_string(code));
@@ -312,7 +305,7 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
       const ListElements elements(vector, type, row);
       FieldSchema item = field;
       item.mode = FieldMode::kRequired;
-      for (idx_t i = 0; i < elements.size(); ++i) {
+      for (size_t i = 0; i < elements.size(); ++i) {
         AppendArrowVector(array->children[0], item, elements.child(), elements.type(),
                           elements.row(i));
       }
@@ -328,14 +321,14 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
     const bool range = field.type == FieldType::kRange;
     const size_t count = range ? 2 : field.fields.size();
     for (size_t i = 0; i < count; ++i) {
-      duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
-      const LogicalType child_type(duckdb_struct_type_child_type(type, i));
-      if (range && !IsFiniteBound(child, child_type.get(), row)) {
+      const auto& child = duckdb::StructVector::GetEntries(vector).at(i);
+      const auto& child_type = duckdb::StructType::GetChildType(type, i);
+      if (range && !IsFiniteBound(child, child_type, row)) {
         append(ArrowArrayAppendNull(array->children[i], 1));
       } else {
         AppendArrowVector(array->children[i],
                           range ? RangeBoundField(field, "") : field.fields.at(i), child,
-                          child_type.get(), row);
+                          child_type, row);
       }
     }
     append(ArrowArrayFinishElement(array));
@@ -343,33 +336,30 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
   }
   switch (field.type) {
     case FieldType::kInteger:
-      append(ArrowArrayAppendInt(array, duckdb_get_int64(VectorValue(vector, type, row).get())));
+      append(ArrowArrayAppendInt(array, VectorValue(vector, type, row).GetValue<int64_t>()));
       return;
     case FieldType::kBoolean:
       append(ArrowArrayAppendInt(array, static_cast<int64_t>(VectorElement<bool>(vector, row))));
       return;
     case FieldType::kFloat:
-      append(
-          ArrowArrayAppendDouble(array, duckdb_get_double(VectorValue(vector, type, row).get())));
+      append(ArrowArrayAppendDouble(array, VectorValue(vector, type, row).GetValue<double>()));
       return;
     case FieldType::kTimestamp:
-      append(ArrowArrayAppendInt(array, VectorElement<duckdb_timestamp>(vector, row).micros));
+      append(ArrowArrayAppendInt(array, VectorElement<duckdb::timestamp_t>(vector, row).value));
       return;
     case FieldType::kDate:
     case FieldType::kTime:
     case FieldType::kDatetime: {
       // Preserve the civil-time parser's validation for external physical types (TIME_TZ,
       // TIMESTAMP_S/MS/NS, and temporal infinities). NS truncates toward zero, as ToCell does.
-      const Value value = VectorValue(vector, type, row);
-      Value truncated;
-      if (duckdb_get_type_id(type) == DUCKDB_TYPE_TIMESTAMP_NS) {
-        const int64_t nanos = VectorElement<duckdb_timestamp_ns>(vector, row).nanos;
+      auto value = VectorValue(vector, type, row);
+      if (type.id() == LogicalTypeId::TIMESTAMP_NS) {
+        const int64_t nanos = VectorElement<duckdb::timestamp_ns_t>(vector, row).value;
         const bool infinite = nanos == std::numeric_limits<int64_t>::max() ||
                               nanos == -std::numeric_limits<int64_t>::max();
-        *truncated.out() = duckdb_create_timestamp({infinite ? nanos : nanos / 1000});
+        value = duckdb::Value::TIMESTAMP(duckdb::timestamp_t(infinite ? nanos : nanos / 1000));
       }
-      const std::string text =
-          ValueString(truncated.get() != nullptr ? truncated.get() : value.get());
+      const std::string text = ValueString(value);
       int64_t micros = 0;
       if (field.type == FieldType::kDate) {
         int32_t days = 0;
@@ -397,15 +387,15 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
     case FieldType::kBigNumeric: {
       std::string packed;
       if (field.type == FieldType::kNumeric) {
-        const auto number = googlesql::NumericValue::FromStringStrict(
-            ValueString(VectorValue(vector, type, row).get()));
+        const auto number =
+            googlesql::NumericValue::FromStringStrict(ValueString(VectorValue(vector, type, row)));
         check(number.status());
         packed = number->SerializeAsProtoBytes();
       } else {
-        const auto number = duckdb_get_type_id(type) == DUCKDB_TYPE_BIGNUM
+        const auto number = type.id() == LogicalTypeId::BIGNUM
                                 ? BigNumericFromBignum(VectorString(vector, row))
                                 : googlesql::BigNumericValue::FromStringStrict(
-                                      ValueString(VectorValue(vector, type, row).get()));
+                                      ValueString(VectorValue(vector, type, row)));
         check(number.status());
         packed = number->SerializeAsProtoBytes();
       }
@@ -422,10 +412,10 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
       return;
     }
     default: {
-      const auto id = duckdb_get_type_id(type);
-      const std::string bytes = id == DUCKDB_TYPE_VARCHAR || id == DUCKDB_TYPE_BLOB
+      const auto id = type.id();
+      const std::string bytes = id == LogicalTypeId::VARCHAR || id == LogicalTypeId::BLOB
                                     ? VectorString(vector, row)
-                                    : ValueString(VectorValue(vector, type, row).get());
+                                    : ValueString(VectorValue(vector, type, row));
       ArrowBufferView view{};
       view.data.data = bytes.data();  // NOLINT(cppcoreguidelines-pro-type-union-access)
       view.size_bytes = static_cast<int64_t>(bytes.size());
@@ -465,8 +455,8 @@ StorageSnapshot::StorageSnapshot(duckdb::QueryResult& result, std::vector<FieldS
   state.options = result.client_properties;
   StorageReadArraySchema(state.wire.get(), state.fields, false);
   state.chunks = std::make_unique<const ResultChunks>(result, state.session);
-  for (idx_t i = 0; i < state.fields.size(); ++i) {
-    duckdb_logical_type type = state.chunks->type(i);
+  for (size_t i = 0; i < state.fields.size(); ++i) {
+    const auto& type = state.chunks->type(i);
     bool direct = Eligible(state.fields.at(i)) && NativeStorage(type);
     if (direct) {
       // Some DuckDB types have no Arrow representation; their export fails and they use vector
@@ -497,7 +487,7 @@ size_t StorageSnapshot::row_count() const { return impl_->chunks->row_count(); }
 std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
                                       StorageReadCompression compression) const {
   auto& state = *impl_;
-  if (offset > row_count() || count > row_count() - offset || count > duckdb_vector_size()) {
+  if (offset > row_count() || count > row_count() - offset || count > STANDARD_VECTOR_SIZE) {
     throw std::out_of_range("Storage Read row range is outside the snapshot or vector capacity");
   }
   nanoarrow::UniqueArray root;
@@ -510,10 +500,9 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
     ArrowArray* child = root->children[column];
     Check(ArrowArrayStartAppending(child), error);
     state.chunks->Runs(offset, count,
-                       [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
+                       [&](const duckdb::DataChunk& chunk, size_t begin, size_t take, size_t) {
                          for (size_t row = begin; row < begin + take; ++row) {
-                           AppendArrowVector(child, state.fields.at(column),
-                                             duckdb_data_chunk_get_vector(chunk, column),
+                           AppendArrowVector(child, state.fields.at(column), chunk.data.at(column),
                                              state.chunks->type(column), row);
                          }
                        });
@@ -524,19 +513,17 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
     // including ranges crossing chunk boundaries, before exporting offset-zero Arrow arrays.
     duckdb::DataChunk selected;
     selected.Initialize(duckdb::Allocator::DefaultAllocator(), state.direct_types);
-    const Handle<duckdb_selection_vector, DestroySelection> selection(
-        duckdb_create_selection_vector(count));
-    auto* indices = duckdb_selection_vector_get_data_ptr(selection.get());
+    duckdb::SelectionVector selection(count);
     state.chunks->Runs(
-        offset, count, [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t copied) {
+        offset, count,
+        [&](const duckdb::DataChunk& chunk, size_t begin, size_t take, size_t copied) {
           for (size_t i = 0; i < take; ++i) {
-            indices[i] = static_cast<sel_t>(begin + i);
+            selection.set_index(i, static_cast<duckdb::sel_t>(begin + i));
           }
           for (size_t column = 0, target = 0; column < state.fields.size(); ++column) {
             if (state.direct.at(column)) {
-              duckdb_vector_copy_sel(duckdb_data_chunk_get_vector(chunk, column),
-                                     duckdb_data_chunk_get_vector(BorrowCChunk(selected), target++),
-                                     selection.get(), take, 0, copied);
+              duckdb::VectorOperations::Copy(chunk.data.at(column), selected.data.at(target++),
+                                             selection, take, 0, copied);
             }
           }
         });

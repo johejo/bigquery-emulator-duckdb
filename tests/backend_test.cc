@@ -1,11 +1,13 @@
 #include "src/backend.h"
 
+#include <cstddef>
 #include <future>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 
@@ -47,6 +49,40 @@ TEST(BackendTest, RowsOutliveBackendAndSessionAndCanBeReadConcurrently) {
       for (const auto row : {0, 2048, 4096}) {
         EXPECT_EQ(rows.Int64(row, 0), row);
         EXPECT_EQ(rows.String(row, 1), std::string(100, 'x'));
+      }
+    }));
+  }
+  rows = {};
+  for (auto& reader : readers) {
+    reader.get();
+  }
+}
+
+TEST(BackendTest, NestedRowsCanBeReadConcurrentlyAfterTheirSessionIsDestroyed) {
+  ResultRows rows;
+  {
+    Backend backend;
+    // Exercise inline and heap-backed strings, NULL children and constant nested values,
+    // including values whose generic DuckDB formatting is needed by the REST encoder.
+    rows = backend
+               .Execute(
+                   "SELECT struct_pack(short := 'inline', long := repeat('x', 100), "
+                   "items := [i::BIGINT, NULL::BIGINT], amount := 1.25::DECIMAL(38, 9)) AS nested "
+                   "FROM range(4097) t(i) WHERE i % 2 = 0 ORDER BY i")
+               .rows;
+  }
+  ASSERT_EQ(rows.size(), 2049);
+  std::vector<std::future<void>> readers;
+  readers.reserve(4);
+  for (int reader = 0; reader < 4; ++reader) {
+    readers.push_back(std::async(std::launch::async, [rows] {
+      for (const size_t row : {0, 1024, 2048}) {
+        const auto fields = rows.at(row).at("f").at(0).at("v").at("f");
+        EXPECT_EQ(fields.at(0).at("v"), "inline");
+        EXPECT_EQ(fields.at(1).at("v"), std::string(100, 'x'));
+        EXPECT_EQ(fields.at(2).at("v").at(0).at("v"), std::to_string(row * 2));
+        EXPECT_TRUE(fields.at(2).at("v").at(1).at("v").is_null());
+        EXPECT_EQ(fields.at(3).at("v"), "1.25");
       }
     }));
   }
