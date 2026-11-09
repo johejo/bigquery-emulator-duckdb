@@ -76,11 +76,12 @@ bool AdjustedToUtc(const ThriftValue& element) {
 // The type BigQuery detects for the Parquet leaf `column`, whose SchemaElement is `element`, as
 // the Parquet conversions of
 // [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
-// list them, or none for other combinations, which BigQuery does not convert, and for ENUM and
+// list them, or none for other combinations, which BigQuery does not convert, and for
 // GeoParquet, whose types depend on options the emulator does not take. A DECIMAL takes the
 // default decimalTargetTypes, NUMERIC; DetectGcsExternalSchema detects a top-level one that NUMERIC
 // does not hold.
-std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetColumn& column) {
+std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetColumn& column,
+                                      bool enum_as_string) {
   if (column.kind != ParquetColumn::Kind::kLeaf || column.edges != ParquetColumn::Edges::kNone) {
     return std::nullopt;
   }
@@ -141,6 +142,9 @@ std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetC
     case parquet::kDouble:
       return plain ? std::optional(FieldType::kFloat) : std::nullopt;
     case parquet::kByteArray:
+      if (logical == parquet::kLogicalEnum || column.converted == parquet::kConvertedEnum) {
+        return enum_as_string ? FieldType::kString : FieldType::kBytes;
+      }
       if (plain) {
         return FieldType::kBytes;
       }
@@ -204,7 +208,8 @@ std::string Folded(std::string_view name) {
 // ParquetColumns. A group is a RECORD, a MAP the RECORD of its repeated key_value group, a repeated
 // field REPEATED, and another field REQUIRED or NULLABLE as the file declares it. None for a field
 // of a type or name the emulator does not detect.
-std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const ParquetColumn& column) {
+std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const ParquetColumn& column,
+                                         bool enum_as_string) {
   if (!StandardColumnName(column.name)) {
     return std::nullopt;
   }
@@ -223,7 +228,7 @@ std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const Parq
     field.type = FieldType::kRecord;
     std::set<std::string> names;
     for (const ParquetColumn& child : value->children) {
-      auto detected = DetectedField(metadata, child);
+      auto detected = DetectedField(metadata, child, enum_as_string);
       if (!detected || !names.insert(Folded(child.name)).second) {
         return std::nullopt;
       }
@@ -231,7 +236,7 @@ std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const Parq
     }
     return field;
   }
-  const auto type = DetectedType(Element(metadata, *value), *value);
+  const auto type = DetectedType(Element(metadata, *value), *value, enum_as_string);
   if (!type) {
     return std::nullopt;
   }
@@ -377,6 +382,14 @@ std::string ParquetConversion(const FieldSchema& field, const ThriftValue& eleme
     if (const auto conversion = UnheldDecimal(field, column, uri)) {
       return *conversion;
     }
+  }
+  const bool enumeration =
+      column.logical == parquet::kLogicalEnum || column.converted == parquet::kConvertedEnum;
+  if (enumeration && field.type == FieldType::kString) {
+    return "";
+  }
+  if (enumeration && field.type == FieldType::kBytes) {
+    return "encode({})";
   }
   if (field.type == detected) {
     return nanos ? "epoch_ns({})" : "";
@@ -785,7 +798,7 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
     if (!StandardColumnName(column.name) || !names.insert(Folded(column.name)).second) {
       throw ApiError::Unsupported("detecting external table column name " + column.name);
     }
-    auto field = DetectedField(metadata, column);
+    auto field = DetectedField(metadata, column, definition.enum_as_string.value_or(false));
     // BigQuery detects a DECIMAL that NUMERIC does not hold as NUMERIC too, as its answers in
     // external_table_parquet_types.api.answers.json show.
     if (!field && StandardColumnName(column.name) && column.IsDecimal() &&
@@ -986,7 +999,10 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       std::map<std::string, std::string> conversions;
       for (const auto& field : file_schema) {
         const auto* column = columns.Child(field.name);
-        const auto detected = column == nullptr ? std::nullopt : DetectedField(metadata, *column);
+        const auto detected =
+            column == nullptr
+                ? std::nullopt
+                : DetectedField(metadata, *column, definition.enum_as_string.value_or(false));
         if (detected && detected->mode == FieldMode::kRepeated &&
             field.mode != FieldMode::kRepeated) {
           throw ApiError::Invalid(std::format(

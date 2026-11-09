@@ -48,13 +48,14 @@ BigtableSource ParseBigtableSource(const GcsExternalData& definition) {
 
 void ValidateBigtableExternal(const GcsExternalData& definition) {
   ParseBigtableSource(definition);
-  if (definition.autodetect || definition.enable_list_inference || definition.skip_leading_rows ||
-      definition.field_delimiter || definition.quote || definition.allow_quoted_newlines ||
-      definition.allow_jagged_rows || definition.null_marker || definition.null_markers ||
-      definition.preserve_ascii_control_characters || definition.ignore_unknown_values ||
-      definition.compression || definition.max_bad_records || definition.encoding ||
-      definition.hive_partitioning || definition.time_zone || definition.date_format ||
-      definition.datetime_format || definition.time_format || definition.timestamp_format) {
+  if (definition.autodetect || definition.enable_list_inference || definition.enum_as_string ||
+      definition.skip_leading_rows || definition.field_delimiter || definition.quote ||
+      definition.allow_quoted_newlines || definition.allow_jagged_rows || definition.null_marker ||
+      definition.null_markers || definition.preserve_ascii_control_characters ||
+      definition.ignore_unknown_values || definition.compression || definition.max_bad_records ||
+      definition.encoding || definition.hive_partitioning || definition.time_zone ||
+      definition.date_format || definition.datetime_format || definition.time_format ||
+      definition.timestamp_format) {
     throw ApiError::Unsupported("GCS read options on Bigtable external tables");
   }
   if (definition.bigtable_options) {

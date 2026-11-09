@@ -127,6 +127,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
     if (external.max_bad_records && *external.max_bad_records > std::numeric_limits<int>::max()) {
       throw ApiError::Unsupported("external table max_bad_records out of range");
     }
+    if (external.format != "PARQUET" && external.enum_as_string.has_value()) {
+      throw ApiError::Unsupported("enum_as_string on a non-Parquet external table");
+    }
     if (external.format == "NEWLINE_DELIMITED_JSON" && external.enable_list_inference) {
       throw ApiError::Unsupported("enable_list_inference on JSON external tables");
     }

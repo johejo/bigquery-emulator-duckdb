@@ -50,6 +50,7 @@ enum class DdlOptionId : uint8_t {
   kBigtableOptions,
   kUris,
   kEnableListInference,
+  kEnumAsString,
   kSkipLeadingRows,
   kFieldDelimiter,
   kQuote,

@@ -465,6 +465,10 @@ json TableMetadata::ToJson() const {
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
     }
+    if (external_data->enum_as_string.has_value()) {
+      fields["externalDataConfiguration"]["parquetOptions"]["enumAsString"] =
+          *external_data->enum_as_string;
+    }
     if (external_data->enable_list_inference.has_value()) {
       fields["externalDataConfiguration"]["parquetOptions"]["enableListInference"] =
           *external_data->enable_list_inference;
@@ -880,14 +884,16 @@ TableMetadata TableMetadataFromJson(const json& table) {
         throw ApiError::Invalid("externalDataConfiguration.parquetOptions must be an object");
       }
       for (const auto& [name, value] : options.items()) {
-        if (name != "enableListInference") {
+        if (name != "enableListInference" && name != "enumAsString") {
           throw ApiError::Unsupported("externalDataConfiguration.parquetOptions." + name);
         }
         if (!value.is_boolean()) {
-          throw ApiError::Invalid(
-              "externalDataConfiguration.parquetOptions.enableListInference must be a boolean");
+          throw ApiError::Invalid("externalDataConfiguration.parquetOptions." + name +
+                                  " must be a boolean");
         }
-        metadata.external_data->enable_list_inference = value.get<bool>();
+        auto& option = name == "enumAsString" ? metadata.external_data->enum_as_string
+                                              : metadata.external_data->enable_list_inference;
+        option = value.get<bool>();
       }
     }
     for (const auto& [name, value] : {

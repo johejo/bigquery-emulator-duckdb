@@ -608,9 +608,14 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
-    if (decoded && external && decoded->id == DdlOptionId::kEnableListInference) {
+    if (decoded && external &&
+        (decoded->id == DdlOptionId::kEnableListInference ||
+         decoded->id == DdlOptionId::kEnumAsString)) {
       if (!decoded->value.is_null()) {
-        metadata.external_data->enable_list_inference = decoded->value.bool_value();
+        auto& flag_value = decoded->id == DdlOptionId::kEnumAsString
+                               ? metadata.external_data->enum_as_string
+                               : metadata.external_data->enable_list_inference;
+        flag_value = decoded->value.bool_value();
       }
       continue;
     }

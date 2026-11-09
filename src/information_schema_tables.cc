@@ -142,6 +142,10 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     };
     flag("allow_jagged_rows", external->allow_jagged_rows);
     flag("allow_quoted_newlines", external->allow_quoted_newlines);
+    if (external->enum_as_string.has_value()) {
+      ddl +=
+          std::string("  enum_as_string=") + (*external->enum_as_string ? "true" : "false") + ",\n";
+    }
     if (external->enable_list_inference.has_value()) {
       ddl += std::string("  enable_list_inference=") +
              (*external->enable_list_inference ? "true" : "false") + ",\n";
@@ -442,6 +446,13 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
         std::vector<std::string> uris;
         std::ranges::transform(metadata->external_data->uris, std::back_inserter(uris),
                                StringOptionValue);
+        if (metadata->external_data->enum_as_string.has_value()) {
+          options.push_back({
+              .name = "enum_as_string",
+              .type = "BOOL",
+              .value = *metadata->external_data->enum_as_string ? "true" : "false",
+          });
+        }
         if (metadata->external_data->enable_list_inference.has_value()) {
           options.push_back({
               .name = "enable_list_inference",

@@ -49,6 +49,7 @@ struct GcsExternalData {
   std::vector<std::string> uris;
   std::optional<bool> autodetect;
   std::optional<bool> enable_list_inference = std::nullopt;
+  std::optional<bool> enum_as_string = std::nullopt;
   std::string format = "PARQUET";
   std::optional<BigtableOptions> bigtable_options = std::nullopt;
   std::optional<int64_t> skip_leading_rows = std::nullopt;

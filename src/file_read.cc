@@ -276,6 +276,7 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
       (field.type != FieldType::kGeography && !HasType(field.fields, FieldType::kGeography) &&
        field.type != FieldType::kBigNumeric && !HasType(field.fields, FieldType::kBigNumeric) &&
        field.type != FieldType::kString && !HasType(field.fields, FieldType::kString) &&
+       field.type != FieldType::kBytes && !HasType(field.fields, FieldType::kBytes) &&
        field.type != FieldType::kNumeric && !HasType(field.fields, FieldType::kNumeric) &&
        !column->HasWideDecimal())) {
     return cast;
@@ -306,6 +307,11 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
                          column->edges == ParquetColumn::Edges::kPlanar ? "true" : "false");
     }
     return std::format("bq_geography_input(CAST({} AS VARCHAR))", sql);
+  }
+  // DuckDB reads ENUM as VARCHAR, including when BigQuery infers BYTES.
+  if (field.type == FieldType::kBytes &&
+      (column->logical == parquet::kLogicalEnum || column->converted == parquet::kConvertedEnum)) {
+    return std::format("encode({})", sql);
   }
   if (column->IsDecimal() && field.type == FieldType::kString) {
     if (column->IsWideDecimal()) {
