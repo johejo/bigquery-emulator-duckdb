@@ -1743,6 +1743,21 @@ std::span<const function_catalog::NamedDefinition<Rule>> TemplateRules() {
           },
       },
       {
+          "ARRAY_FIRST_N",
+          {
+              .rules =
+                  {
+                      {
+                          .arity = 2,
+                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL "
+                                      "WHEN $2 < 0 THEN !1 ELSE list_slice($1, 1, $2) END",
+                          .errors = {"'The n argument to ARRAY_FIRST_N must not be negative.'"},
+                      },
+                  },
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {
           "ARRAY_LAST",
           {
               .rules =
