@@ -781,6 +781,7 @@ std::string GroupKey(const googlesql::Type* type, const std::string& sql,
            GroupKey(type->AsArray()->element_type(), element, child_collation(0), depth + 1) + ")";
   }
   std::vector<std::string> fields;
+  fields.reserve(type->AsStruct()->num_fields());
   for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
     fields.push_back(GroupKey(type->AsStruct()->field(i).type,
                               "struct_extract_at(" + element + ", " + std::to_string(i + 1) + ")",
