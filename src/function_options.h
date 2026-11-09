@@ -25,7 +25,7 @@ constexpr functions_duckdb::Options BigQueryFunctionOptions() {
       .query =
           {
               .json_keys_rejects_safe = true,
-              .array_first_n_bigquery = true,
+              .array_first_n_rejects_safe = true,
               .intersect_except_distinct_only = true,
               .scalar_window_partition_keys_only = true,
               .distinct_set_operations_without_structs = true,

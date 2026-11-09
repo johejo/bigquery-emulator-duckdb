@@ -399,9 +399,8 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
     if (name == "NULLIF" && selects_intervals) {
       selected.type_rejections = {};
     }
-    if (name == "ARRAY_FIRST_N" && functions.restrictions().array_first_n_bigquery) {
+    if (name == "ARRAY_FIRST_N" && functions.restrictions().array_first_n_rejects_safe) {
       selected.uses |= {TypeUse::kRejectsSafe};
-      selected.rules.front().errors = {"'ARRAY_FIRST_N second argument must be non-negative'"};
     }
     functions.AddRules(name, selected, Implementation::kSQL);
   }

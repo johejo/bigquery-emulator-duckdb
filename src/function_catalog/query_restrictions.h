@@ -9,8 +9,8 @@ namespace bigquery_emulator_duckdb::function_catalog {
 struct QueryRestrictions {
   // JSON_KEYS takes no SAFE. prefix.
   bool json_keys_rejects_safe = false;
-  // ARRAY_FIRST_N rejects SAFE. and uses BigQuery's negative-count error.
-  bool array_first_n_bigquery = false;
+  // ARRAY_FIRST_N takes no SAFE. prefix.
+  bool array_first_n_rejects_safe = false;
   // INTERSECT and EXCEPT take only DISTINCT.
   bool intersect_except_distinct_only = false;
   // Window PARTITION BY takes no STRUCT or ARRAY keys.
