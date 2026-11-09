@@ -94,7 +94,7 @@ integer by its value and a DOUBLE by its bits as microseconds of a TIMESTAMP, an
 or a BYTE_ARRAY of WKB as GEOGRAPHY; other combinations, such as a FLOAT as TIMESTAMP, fail as
 BigQuery's do or are unsupported. A DECIMAL that NUMERIC does not hold fails on a value NUMERIC does not hold, as
 BigQuery's does for one of bytes, and is unsupported for an INT32 or INT64 one, of both too many
-integer and fractional digits, and of more than 38 integer digits; a nested one, ENUM,
+integer and fractional digits, and of more than 38 integer digits; a nested one,
 GeoParquet, column name conversions and the options that select other types are unsupported. Every source file must
 have each REQUIRED and REPEATED column and field of the schema.
 

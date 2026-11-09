@@ -328,7 +328,8 @@
       },
       {
         "name": "enum_as_string",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["true", "false", "NULL"]
       },
       {
         "name": "expiration_timestamp",
