@@ -732,6 +732,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   const auto transaction = session ? std::make_unique<StatementTransaction>(*session) : nullptr;
   const googlesql::SystemVariableValuesMap variables{
       {{"project_id"}, googlesql::Value::String(request.project_id)},
+      // Outside a multi-statement query, BigQuery defines @@row_count as NULL.
+      {{"row_count"}, googlesql::Value::NullInt64()},
   };
   const TranslatedStatement translation = Translate(
       request.query, request.parameters, settings.default_project, settings.default_dataset,

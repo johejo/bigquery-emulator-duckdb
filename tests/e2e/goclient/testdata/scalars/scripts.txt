@@ -334,6 +334,10 @@ SELECT CONCAT(CAST(previous AS STRING), ':', y) FROM _SESSION.n
 ## @@row_count
 # After DML, @@row_count counts the rows it inserted, updated or deleted, and for MERGE their
 # total, following third_party/bigquery_docs/reference/system-variables.md.
+# Outside a multi-statement query, it is NULL.
+
+SELECT @@row_count IS NULL
+=> "true"
 
 CREATE TEMP TABLE n (x INT64);
 INSERT n (x) VALUES (1), (2), (3);
@@ -358,6 +362,67 @@ MERGE n USING (SELECT 2 AS x UNION ALL SELECT 4) AS s ON n.x = s.x
 WHEN MATCHED THEN UPDATE SET x = 20
 WHEN NOT MATCHED THEN INSERT (x) VALUES (s.x);
 SELECT @@row_count
+=> "2"
+
+# Answers collected from BigQuery with bqanswers: @@row_count between statements.
+
+# The first statement in a multi-statement query reads @@row_count.
+SELECT @@row_count;
+SELECT @@row_count
+=> null
+
+# A non-DML statement before the first read.
+DECLARE x INT64 DEFAULT 1;
+SELECT @@row_count
+=> null
+
+CREATE TEMP TABLE n (x INT64);
+SELECT @@row_count
+=> null
+
+# A SELECT between DML and the read.
+CREATE TEMP TABLE n (x INT64);
+INSERT n VALUES (1), (2);
+SELECT 1;
+SELECT @@row_count
+=> null
+
+# A procedural assignment between DML and the read.
+DECLARE x INT64;
+CREATE TEMP TABLE n (x INT64);
+INSERT n VALUES (1), (2);
+SET x = 1;
+SELECT @@row_count
+=> "2"
+
+# Whether reading @@row_count consumes the preceding DML's count.
+CREATE TEMP TABLE n (x INT64);
+INSERT n VALUES (1), (2);
+SELECT @@row_count;
+SELECT @@row_count
+=> null
+
+# DML inside dynamic SQL and after leaving a nested block.
+CREATE TEMP TABLE n (x INT64);
+EXECUTE IMMEDIATE 'INSERT n VALUES (1), (2)';
+SELECT @@row_count
+=> "2"
+
+CREATE TEMP TABLE n (x INT64);
+BEGIN
+  INSERT n VALUES (1), (2);
+END;
+SELECT @@row_count
+=> "2"
+
+# The value seen in an exception handler after a failed DML statement.
+CREATE TEMP TABLE n (x INT64);
+INSERT n VALUES (1), (2);
+BEGIN
+  INSERT n VALUES (CAST('not an integer' AS INT64));
+EXCEPTION WHEN ERROR THEN
+  SELECT @@row_count;
+END
 => "2"
 
 ## Transactions
