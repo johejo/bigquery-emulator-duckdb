@@ -1,0 +1,104 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run sekw35nji45hayi63jydi2zl74; the answers
+# sidecar keeps the observations, including the empty schema returned by tables.insert.
+description: >-
+  tables.insert without a schema, with unknown fields, numbers for strings and null fields.
+vars:
+  dataset: e2e_${run}_${case}
+templates:
+  insert:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${body}
+        observe:
+          status: /status
+          description: /body/description
+          labels: /body/labels
+          expirationTime: /body/expirationTime
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: insert_unknown_field
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        unknownField: 1
+    expect:
+      insert: {status: 200, schema: {}}
+  - name: insert_unknown_reference_field
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t, unknownField: 1}
+    expect:
+      insert: {status: 200, schema: {}}
+  - name: insert_number_description
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        description: 1
+    expect:
+      insert: {status: 200, description: '1', schema: {}}
+  - name: insert_number_table_id
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: 1}
+    expect:
+      insert: {status: 200, schema: {}}
+  - name: insert_number_label_value
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        labels: {a: 1}
+    expect:
+      insert: {status: 200, labels: {a: '1'}, schema: {}}
+  - name: insert_number_expiration_time
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        expirationTime: 4102444800000
+    expect:
+      insert: {status: 200, expirationTime: '4102444800000', schema: {}}
+  - name: insert_string_require_partition_filter
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        requirePartitionFilter: 'false'
+    expect:
+      insert: {status: 200, schema: {}}
+  - name: insert_null_description
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        description: null
+    expect:
+      insert: {status: 200, schema: {}}
+  - name: insert_invalid_type
+    template: insert
+    vars:
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        type: NOPE
+    expect:
+      insert: {status: 200, schema: {}}

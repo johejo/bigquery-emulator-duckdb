@@ -1,0 +1,158 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run xqze5jno4hxknj7uzgjes5jdyv.
+# The answers sidecar records the differences between tables.insert and tables.get,
+# row access, SQL operations, and schema initialization with tables.patch.
+description: Row access and schema initialization after tables.insert without a schema.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  empty_table:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        observe: {status: /status, schema: /body/schema}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {status: /status, schema: /body/schema, numRows: /body/numRows}
+      - name: operation
+        rest:
+          method: '${method}'
+          path: /bigquery/v2/projects/${project}/${path}
+          body: '${body}'
+        observe:
+          status: /status
+          schema: /body/schema
+          rows: /body/rows
+          totalRows: /body/totalRows
+          errors: /body/errors
+          insertErrors: /body/insertErrors
+          error: /body/error
+      - name: get_after
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {status: /status, schema: /body/schema, numRows: /body/numRows}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: insert
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        observe: {status: /status, schema: /body/schema}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {status: /status, schema: /body/schema, numRows: /body/numRows}
+      - name: operation
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/${path}
+          body: '${body}'
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: list_rows
+    template: empty_table
+    vars:
+      method: GET
+      path: datasets/${dataset}/tables/t/data
+      body: null
+    expect:
+      insert: {status: 200, schema: {}}
+      get: {status: 200, numRows: '0'}
+      operation: {status: 200, totalRows: '0'}
+      get_after: {status: 200, numRows: '0'}
+  - name: insert_empty_row
+    template: rejected
+    vars:
+      method: POST
+      path: datasets/${dataset}/tables/t/insertAll
+      body: {rows: [{json: {}}]}
+    expect:
+      insert: {status: 200, schema: {}}
+      get: {status: 200, numRows: '0'}
+      operation: {status: 400, reason: invalid, message: 'The destination table has no schema.'}
+  - name: select_count
+    template: rejected
+    vars:
+      method: POST
+      path: queries
+      body:
+        query: SELECT COUNT(*) FROM `${project}.${dataset}.t`
+        useLegacySql: false
+    expect:
+      insert: {status: 200, schema: {}}
+      get: {status: 200, numRows: '0'}
+      operation:
+        status: 400
+        reason: invalid
+        message: 'Table ${project}.${dataset}.t does not have a schema.'
+  - name: patch_schema
+    template: empty_table
+    vars:
+      method: PATCH
+      path: datasets/${dataset}/tables/t
+      body: {schema: {fields: [{name: x, type: INT64}]}}
+    expect:
+      insert: {status: 200, schema: {}}
+      get: {status: 200, numRows: '0'}
+      operation: {status: 200, schema: {fields: [{name: x, type: INTEGER}]}}
+      get_after: {status: 200, numRows: '0', schema: {fields: [{name: x, type: INTEGER}]}}
+  - name: patch_required_schema
+    template: empty_table
+    vars:
+      method: PATCH
+      path: datasets/${dataset}/tables/t
+      body: {schema: {fields: [{name: x, type: INT64, mode: REQUIRED}]}}
+    expect:
+      insert: {status: 200, schema: {}}
+      get: {status: 200, numRows: '0'}
+      operation: {status: 200, schema: {fields: [{name: x, type: INTEGER, mode: REQUIRED}]}}
+      get_after: {status: 200, numRows: '0', schema: {fields: [{name: x, type: INTEGER, mode: REQUIRED}]}}
+  - name: alter_add_column
+    template: rejected
+    vars:
+      method: POST
+      path: queries
+      body:
+        query: ALTER TABLE `${project}.${dataset}.t` ADD COLUMN x INT64
+        useLegacySql: false
+    expect:
+      insert: {status: 200, schema: {}}
+      get: {status: 200, numRows: '0'}
+      operation:
+        status: 400
+        reason: invalid
+        message: 'Table ${project}.${dataset}.t does not have a schema.'

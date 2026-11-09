@@ -88,9 +88,14 @@ class DuckDbTableSource : public TableSource {
       return std::nullopt;
     }
     try {
-      std::vector<FieldSchema> schema = ResolvedTableSchema(
-          backend_,
-          ResolveTableReference({.project_id = project, .dataset_id = dataset, .table_id = table}));
+      const TableReference reference =
+          ResolveTableReference({.project_id = project, .dataset_id = dataset, .table_id = table});
+      std::vector<FieldSchema> schema = ResolvedTableSchema(backend_, reference);
+      if (schema.empty()) {
+        throw ApiError::Invalid(std::format("Table {}.{}.{} does not have a schema.",
+                                            reference.project_id, reference.dataset_id,
+                                            reference.table_id));
+      }
       Use(project, dataset);
       return schema;
     } catch (const BackendError&) {

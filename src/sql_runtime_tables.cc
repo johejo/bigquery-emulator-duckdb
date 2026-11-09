@@ -234,6 +234,12 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
   });
   DdlWrite write = CreateTableWrite(
       TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);
+  if (schema.empty()) {
+    columns.push_back(QuoteIdentifier(kSchemaPlaceholderColumn) + " BOOLEAN");
+    write.metadata_statements.push_back(std::format(
+        "COMMENT ON COLUMN {}.{} IS {}", QualifiedName(table),
+        QuoteIdentifier(kSchemaPlaceholderColumn), QuoteLiteral(kSchemaPlaceholderComment)));
+  }
   auto defaults = schema;
   ApplyDefaultRoundingMode(defaults, metadata.default_rounding_mode == RoundingMode::kUnspecified
                                          ? dataset.default_rounding_mode
@@ -329,6 +335,10 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
                           metadata.value_or(info.metadata).default_collation);
     ValidatePartitioning(metadata.value_or(info.metadata), *updated_schema);
     statements = SchemaUpdateStatements(table, info.schema, *updated_schema);
+    if (info.schema.empty() && !updated_schema->empty()) {
+      statements.push_back(std::format("ALTER TABLE {} DROP COLUMN {}", QualifiedName(table),
+                                       QuoteIdentifier(kSchemaPlaceholderColumn)));
+    }
     // The rows kept from before the table had these columns are not those it has now.
     if (const int64_t creation_time = HistoryCreationTime(table, info.metadata);
         !statements.empty() && creation_time != 0) {

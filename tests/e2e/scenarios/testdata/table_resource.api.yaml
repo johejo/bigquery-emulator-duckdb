@@ -13,8 +13,7 @@ version: 1
 # tables.insert takes protocol buffer names such as table_reference. A patch that sets a field to
 # null clears it, but for the schema, which it keeps.
 #
-# The cases the emulator answers otherwise for other reasons are in
-# known_bugs/table_resource.api.yaml.
+# Inserts without a schema are covered in table_without_schema.api.yaml.
 description: >-
   tables.insert, patch and update with fields the Table schema lacks, protocol buffer field names,
   values of the wrong JSON type, unknown enum values and null fields.

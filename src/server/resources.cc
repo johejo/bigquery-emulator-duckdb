@@ -521,7 +521,7 @@ json TableResource(const TableInfo& info) {
       {"etag", kEtag},
       {"id", TableId(info.reference)},
       {"tableReference", TableReferenceJson(info.reference)},
-      {"schema", SchemaToJson(info.schema)},
+      {"schema", info.schema.empty() ? json::object() : SchemaToJson(info.schema)},
       {"type", TableTypeName(type)},
       {"numRows", std::to_string(info.num_rows)},
       {"numBytes", "0"},
@@ -549,6 +549,9 @@ json TableResource(const TableInfo& info) {
 
 json TableGetResource(const TableInfo& info, const TableGetRequest& request) {
   json resource = TableResource(info);
+  if (info.schema.empty()) {
+    resource.erase("schema");
+  }
   if (!request.storage_stats) {
     resource.erase("numRows");
     resource.erase("numBytes");
@@ -600,6 +603,9 @@ json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPa
       {"totalRows", std::to_string(total_rows)},
       {"rows", RowsForResponse(result, 0, size, page.int64_timestamps)},
   };
+  if (result.schema.empty()) {
+    response.erase("rows");
+  }
   if (page.start_index + size < total_rows) {
     response["pageToken"] = std::to_string(page.start_index + size);
   }
