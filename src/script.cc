@@ -319,7 +319,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       last_result_ = std::move(result);
       return absl::OkStatus();
     });
-    row_count_ = row_count;
+    // A failed statement leaves the last successful statement's count visible to its handler.
+    if (status.ok()) {
+      row_count_ = row_count;
+    }
     return status;
   }
 
@@ -356,7 +359,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       iterator = std::make_unique<RowIterator>(std::move(names), std::move(types), std::move(rows));
       return absl::OkStatus();
     });
-    row_count_.reset();
+    if (status.ok()) {
+      row_count_.reset();
+    }
     GOOGLESQL_RETURN_IF_ERROR(status);
     return iterator;
   }
@@ -370,8 +375,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
           value, EvaluateExpression(executor, segment.GetSegmentText(), &segment, target_type));
       return absl::OkStatus();
     });
-    // The expression may read the count of the DML before it, but is not DML itself.
-    row_count_.reset();
+    // Procedural expressions, including SET, do not replace the last SQL statement's count.
     GOOGLESQL_RETURN_IF_ERROR(status);
     return value;
   }
@@ -633,11 +637,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     // NULL. @@project_id is read-only and known from the start.
     for (const auto& [path, value] : system_variables_) {
       if (IsRowCount(path)) {
-        // BigQuery documents the value only right after a DML statement; other reads remain
-        // unsupported until checked.
-        if (row_count_) {
-          variables.emplace(path, googlesql::Value::Int64(*row_count_));
-        }
+        variables.emplace(path, row_count_ ? googlesql::Value::Int64(*row_count_)
+                                           : googlesql::Value::NullInt64());
       } else if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path) ||
                  IsProjectId(path)) {
         variables.emplace(path, value);
