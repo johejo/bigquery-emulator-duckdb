@@ -12,7 +12,7 @@ import (
 )
 
 // The enum_as_string option infers ENUM as STRING instead of the default BYTES:
-// [CREATE EXTERNAL TABLE](third_party/bigquery_docs/reference/standard-sql/data-definition-language.md#external_table_option_list).
+// [CREATE EXTERNAL TABLE](third_party/bigquery_docs/reference/standard-sql/data-definition-language.md).
 func TestExternalParquetEnumAsString(t *testing.T) {
 	configure(t)
 	enum := func(name string) schema.Node {
