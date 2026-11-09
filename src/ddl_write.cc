@@ -319,7 +319,20 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
   // The columns whose comments the actions change, which are written once the schema is final.
   std::vector<std::string> commented;
   bool set_options = false;
+  const auto foreign_key_column = [&](const std::string& name) {
+    return std::ranges::any_of(metadata.foreign_keys, [&](const ForeignKey& key) {
+      return std::ranges::any_of(key.columns, [&](const ForeignKeyColumn& column) {
+        return ToLowerAscii(column.referencing_column) == ToLowerAscii(name);
+      });
+    });
+  };
   for (const TableAlterAction& action : alteration.actions) {
+    if (!metadata.foreign_keys.empty() && !std::holds_alternative<OptionUpdates>(action) &&
+        !std::holds_alternative<DropColumnAction>(action) &&
+        !std::holds_alternative<ColumnDefaultAction>(action)) {
+      throw ApiError::Unsupported(
+          "ALTER TABLE actions other than SET OPTIONS on a table with foreign keys");
+    }
     if (const auto* add = std::get_if<AddColumnAction>(&action)) {
       if (FindColumn(schema, add->field.name) != schema.end()) {
         if (add->if_not_exists) {
@@ -355,7 +368,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       if (std::ranges::any_of(metadata.clustering, names)) {
         throw ApiError::Invalid("Cannot drop clustering column " + column->name);
       }
-      if (std::ranges::any_of(metadata.primary_key, names)) {
+      if (std::ranges::any_of(metadata.primary_key, names) || foreign_key_column(column->name)) {
         throw ApiError::Invalid(std::format(
             "Column `{}` cannot be dropped in table `{}`. Columns used in table partitioning or "
             "clustering or as part of key constraints cannot be dropped.",
@@ -365,6 +378,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                        QuoteIdentifier(column->name)));
       schema.erase(column);
     } else if (const auto* rename = std::get_if<RenameTableAction>(&action)) {
+      if (!metadata.primary_key.empty()) {
+        throw ApiError::Invalid("Cannot rename a table with Primary Key constraints.");
+      }
       statements.push_back(
           std::format("ALTER TABLE {} RENAME TO {}", QualifiedName(table),
                       QuoteIdentifier(TableCatalogName(table.dataset_id, rename->table_id))));
@@ -392,9 +408,11 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
         }
         throw ApiError::Invalid("Column not found: " + value->name);
       }
-      if (std::ranges::any_of(metadata.primary_key, [&](const std::string& name) {
-            return ToLowerAscii(name) == ToLowerAscii(column->name);
-          })) {
+      if (std::ranges::any_of(metadata.primary_key,
+                              [&](const std::string& name) {
+                                return ToLowerAscii(name) == ToLowerAscii(column->name);
+                              }) ||
+          foreign_key_column(column->name)) {
         throw ApiError::Invalid(std::format(
             "Key column {} cannot be modified or removed. column's default_value_expression "
             "changed: {} -> {}",

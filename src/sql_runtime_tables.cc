@@ -227,6 +227,18 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id},
                &lock);
+  AssignForeignKeyNames(metadata.foreign_keys);
+  for (const ForeignKey& key : metadata.foreign_keys) {
+    const TableInfo referenced = GetTable(key.referenced_table, /*include_row_count=*/false,
+                                          /*expire=*/true, &lock);
+    if (referenced.view_query) {
+      throw ApiError::Unsupported("foreign keys referencing views");
+    }
+    if (TableName(referenced.reference) != TableName(key.referenced_table)) {
+      throw ApiError::Unsupported("non-canonical foreign key table references");
+    }
+    ValidateForeignKey(key, schema, {.schema = referenced.schema, .metadata = referenced.metadata});
+  }
   std::vector<std::string> columns;
   std::ranges::transform(schema, std::back_inserter(columns), [&](const FieldSchema& field) {
     return ColumnDefinition(field, functions_.timestamp_precision(),
@@ -307,6 +319,19 @@ TableInfo SqlRuntime::UpdateTable(TableReference table,
   }
   if (view.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
+  }
+  if (metadata && !metadata->foreign_keys.empty() &&
+      metadata->foreign_keys != info.metadata.foreign_keys) {
+    throw ApiError::Unsupported("changing foreign keys through tables.patch or tables.update");
+  }
+  if (!info.metadata.foreign_keys.empty() && schema &&
+      SchemaToJson(*schema) != SchemaToJson(info.schema)) {
+    throw ApiError::Unsupported("changing the schema of a table with foreign keys");
+  }
+  if (((schema && SchemaToJson(*schema) != SchemaToJson(info.schema)) ||
+       (metadata && metadata->primary_key != info.metadata.primary_key)) &&
+      HasForeignKeyReferences(backend_, table)) {
+    throw ApiError::Unsupported("changing the schema or primary key of a referenced table");
   }
   std::optional<std::vector<FieldSchema>> updated_schema = schema;
   // An external table keeps the schema it was created with, which a client may send back.
@@ -534,7 +559,8 @@ void SqlRuntime::DeleteTable(TableReference table) {
     return;
   }
   GetTable(table, /*include_row_count=*/false, /*expire=*/true, &lock);
-  Execute("DROP TABLE " + QualifiedName(table));
+  backend_.ExecuteDdl("DROP TABLE " + QualifiedName(table),
+                      DropForeignKeyReferenceStatements(backend_, table), "");
 }
 
 }  // namespace bigquery_emulator_duckdb

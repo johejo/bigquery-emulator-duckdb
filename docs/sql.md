@@ -108,7 +108,7 @@ rejected.
 | Column rounding modes | Supported |  |
 | Default rounding modes | Supported |  |
 | Partitioning and clustering | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
-| Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: ALTER TABLE action AddConstraintAction; ALTER TABLE action DropConstraintAction. |
+| Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: ALTER TABLE action AddConstraintAction; ALTER TABLE action DropConstraintAction; generated names for mixed named and unnamed foreign keys. |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `CREATE TABLE LIKE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
@@ -177,7 +177,7 @@ rejected.
 | --- | --- | --- |
 | `SCHEMATA` | Supported | See [Datasets](compatibility.md#datasets). |
 | `SCHEMATA_OPTIONS` | Supported |  |
-| `TABLES` | Supported |  |
+| `TABLES` | Supported | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). |
 | `TABLE_SNAPSHOTS` | Supported |  |
 | `TABLE_OPTIONS` | Supported |  |
 | `TABLE_CONSTRAINTS` | Supported | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). |

@@ -1,0 +1,136 @@
+version: 1
+description: Foreign key names and DDL observed in BigQuery; provenance is the adjacent answers sidecar.
+vars:
+  dataset: bqa_${run}_${case}
+  reference: {projectId: '${project}', datasetId: '${dataset}', tableId: parent}
+  constraints:
+    foreignKeys:
+      - name: fk$1
+        referencedTable: '${reference}'
+        columnReferences: [{referencingColumn: id, referencedColumn: id}]
+  expected_ddl: |-
+    CREATE TABLE `${project}.${dataset}.child`
+    (
+      id INT64,
+      FOREIGN KEY (id) REFERENCES `${project}.${dataset}.parent`(id) NOT ENFORCED
+    );
+templates:
+  names:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: parent
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.parent` (id INT64, PRIMARY KEY (id) NOT ENFORCED)
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: child
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/${endpoint}
+          body: '${body}'
+        observe: {tableConstraints: /body/tableConstraints, error: /body/error, jobComplete: /body/jobComplete}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/child
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 'child'
+            useLegacySql: false
+            timeoutMs: 200000
+        observe: {rows: /body/rows, error: /body/error, jobComplete: /body/jobComplete}
+    cleanup:
+      - name: cleanup
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: unnamed_rest
+    template: names
+    expect:
+      parent: {jobComplete: true}
+      child: {tableConstraints: '${constraints}'}
+      table: {tableConstraints: '${constraints}'}
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      endpoint: datasets/${dataset}/tables
+      body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: child}
+        schema: {fields: [{name: id, type: INTEGER}]}
+        tableConstraints:
+          foreignKeys:
+            - referencedTable: {projectId: '${project}', datasetId: '${dataset}', tableId: parent}
+              columnReferences: [{referencingColumn: id, referencedColumn: id}]
+  - name: multiple_unnamed
+    template: names
+    expect:
+      parent: {jobComplete: true}
+      child: {jobComplete: true}
+      table: {tableConstraints: '${constraints}'}
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      constraints:
+        foreignKeys:
+          - name: fk$1
+            referencedTable: '${reference}'
+            columnReferences: [{referencingColumn: a, referencedColumn: id}]
+          - name: fk$2
+            referencedTable: '${reference}'
+            columnReferences: [{referencingColumn: b, referencedColumn: id}]
+      expected_ddl: |-
+        CREATE TABLE `${project}.${dataset}.child`
+        (
+          a INT64,
+          b INT64,
+          FOREIGN KEY (a) REFERENCES `${project}.${dataset}.parent`(id) NOT ENFORCED,
+          FOREIGN KEY (b) REFERENCES `${project}.${dataset}.parent`(id) NOT ENFORCED
+        );
+      endpoint: queries
+      body:
+        query: >-
+          CREATE TABLE `${project}.${dataset}.child`
+          (a INT64 REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED,
+           b INT64 REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED)
+        useLegacySql: false
+        timeoutMs: 200000
+  - name: primary_and_foreign
+    template: names
+    expect:
+      parent: {jobComplete: true}
+      child: {jobComplete: true}
+      table: {tableConstraints: '${constraints}'}
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      constraints:
+        primaryKey: {columns: [id]}
+        foreignKeys:
+          - name: fk
+            referencedTable: '${reference}'
+            columnReferences: [{referencingColumn: id, referencedColumn: id}]
+      expected_ddl: |-
+        CREATE TABLE `${project}.${dataset}.child`
+        (
+          id INT64,
+          PRIMARY KEY (id) NOT ENFORCED,
+          CONSTRAINT fk FOREIGN KEY (id) REFERENCES `${project}.${dataset}.parent`(id) NOT ENFORCED
+        );
+      endpoint: queries
+      body:
+        query: >-
+          CREATE TABLE `${project}.${dataset}.child`
+          (id INT64, PRIMARY KEY (id) NOT ENFORCED,
+           CONSTRAINT fk FOREIGN KEY (id) REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED)
+        useLegacySql: false
+        timeoutMs: 200000

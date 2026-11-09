@@ -111,6 +111,9 @@ void SqlRuntime::DeleteDataset(DatasetReference dataset, bool delete_contents) {
     throw ApiError::Invalid("Dataset " + dataset.project_id + ":" + dataset.dataset_id +
                             " is still in use");
   }
+  if (HasOutsideForeignKeyReferences(backend_, dataset)) {
+    throw ApiError::Unsupported("deleting a dataset referenced by foreign keys outside it");
+  }
   try {
     backend_.ExecuteDdl(
         "DROP SCHEMA " + QualifiedName(dataset) + (delete_contents ? " CASCADE" : ""),

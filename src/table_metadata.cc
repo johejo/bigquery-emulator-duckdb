@@ -168,8 +168,7 @@ std::vector<std::string> ParseClustering(const json& value) {
 // The member `key` of `body`, or null when it has none.
 json Member(const json& body, const char* key) { return body.value(key, json()); }
 
-// TableConstraints.primaryKey.columns of `value`, a TableConstraints object or null; its
-// foreignKeys are dropped.
+// TableConstraints.primaryKey.columns of `value`, a TableConstraints object or null.
 std::vector<std::string> ParsePrimaryKey(const json& value) {
   const json primary_key = value.is_object() ? Member(value, "primaryKey") : json();
   const json columns = primary_key.is_object() ? Member(primary_key, "columns") : json();
@@ -184,6 +183,47 @@ std::vector<std::string> ParsePrimaryKey(const json& value) {
                            return StringValue(column, "tableConstraints.primaryKey.columns");
                          });
   return names;
+}
+
+std::vector<ForeignKey> ParseForeignKeys(const json& value) {
+  const json keys = value.is_object() ? Member(value, "foreignKeys") : json();
+  if (keys.is_null()) {
+    return {};
+  }
+  if (!keys.is_array()) {
+    throw ApiError::Invalid("Field tableConstraints.foreignKeys must be an array");
+  }
+  std::vector<ForeignKey> result;
+  for (const json& key : keys) {
+    if (!key.is_object() || !Member(key, "referencedTable").is_object() ||
+        !Member(key, "columnReferences").is_array()) {
+      throw ApiError::Unsupported("incomplete foreign key definition");
+    }
+    const json& table = key.at("referencedTable");
+    ForeignKey parsed{
+        .name = key.contains("name") ? StringValue(key.at("name"), "foreignKeys.name") : "",
+        .referenced_table =
+            {
+                .project_id = StringValue(Member(table, "projectId"), "referencedTable.projectId"),
+                .dataset_id = StringValue(Member(table, "datasetId"), "referencedTable.datasetId"),
+                .table_id = StringValue(Member(table, "tableId"), "referencedTable.tableId"),
+            },
+        .columns = {},
+    };
+    for (const json& column : key.at("columnReferences")) {
+      if (!column.is_object()) {
+        throw ApiError::Unsupported("incomplete foreign key column reference");
+      }
+      parsed.columns.push_back({
+          .referencing_column = StringValue(Member(column, "referencingColumn"),
+                                            "foreignKeys.columnReferences.referencingColumn"),
+          .referenced_column = StringValue(Member(column, "referencedColumn"),
+                                           "foreignKeys.columnReferences.referencedColumn"),
+      });
+    }
+    result.push_back(std::move(parsed));
+  }
+  return result;
 }
 
 // Reads the partitioning of a Table resource `table` into `metadata`.
@@ -538,6 +578,30 @@ json TableMetadata::ToJson() const {
   }
   if (!primary_key.empty()) {
     fields["tableConstraints"] = {{"primaryKey", {{"columns", primary_key}}}};
+  }
+  for (const ForeignKey& key : foreign_keys) {
+    json columns = json::array();
+    for (const ForeignKeyColumn& column : key.columns) {
+      columns.push_back({
+          {"referencingColumn", column.referencing_column},
+          {"referencedColumn", column.referenced_column},
+      });
+    }
+    json value = {
+        {
+            "referencedTable",
+            {
+                {"projectId", key.referenced_table.project_id},
+                {"datasetId", key.referenced_table.dataset_id},
+                {"tableId", key.referenced_table.table_id},
+            },
+        },
+        {"columnReferences", std::move(columns)},
+    };
+    if (!key.name.empty()) {
+      value["name"] = key.name;
+    }
+    fields["tableConstraints"]["foreignKeys"].push_back(std::move(value));
   }
   if (default_rounding_mode != RoundingMode::kUnspecified) {
     fields["defaultRoundingMode"] = RoundingModeName(default_rounding_mode);
@@ -1032,6 +1096,19 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
   } else if (!patch) {
     metadata.primary_key.clear();
   }
+  if (const auto it = body.find("tableConstraints");
+      it != body.end() && (!patch || !it->is_object() || it->contains("foreignKeys"))) {
+    auto keys = ParseForeignKeys(*it);
+    for (ForeignKey& key : keys) {
+      const auto existing = std::ranges::find(metadata.foreign_keys, key);
+      if (existing != metadata.foreign_keys.end()) {
+        key.generated_name = existing->generated_name;
+      }
+    }
+    metadata.foreign_keys = std::move(keys);
+  } else if (!patch) {
+    metadata.foreign_keys.clear();
+  }
 }
 
 DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
@@ -1181,6 +1258,53 @@ std::vector<std::string> PrimaryKeyColumns(const std::vector<std::string>& prima
     columns.push_back(field->name);
   }
   return columns;
+}
+
+void AssignForeignKeyNames(std::vector<ForeignKey>& keys) {
+  const auto unnamed = [](const ForeignKey& key) { return key.name.empty(); };
+  if (!std::ranges::any_of(keys, unnamed)) {
+    return;
+  }
+  if (!std::ranges::all_of(keys, unnamed)) {
+    throw ApiError::Unsupported("generated names for mixed named and unnamed foreign keys");
+  }
+  size_t ordinal = 0;
+  for (ForeignKey& key : keys) {
+    key.name = "fk$" + std::to_string(++ordinal);
+    key.generated_name = true;
+  }
+}
+
+void ValidateForeignKey(const ForeignKey& key, const std::vector<FieldSchema>& schema,
+                        const TableDescription& referenced) {
+  if (referenced.metadata.primary_key.empty()) {
+    const TableReference& table = key.referenced_table;
+    throw ApiError::InvalidQuery("Table " + table.project_id + "." + table.dataset_id + "." +
+                                 table.table_id + " does not have Primary Key constraints");
+  }
+  if (referenced.metadata.external_data || referenced.metadata.snapshot || key.columns.empty() ||
+      key.columns.size() != referenced.metadata.primary_key.size()) {
+    throw ApiError::Unsupported(
+        "foreign keys not referencing a managed table's complete primary key");
+  }
+  std::vector<std::string> local_columns;
+  std::vector<std::string> referenced_columns;
+  for (const ForeignKeyColumn& column : key.columns) {
+    const FieldSchema* local = FindField(schema, column.referencing_column);
+    const FieldSchema* remote = FindField(referenced.schema, column.referenced_column);
+    if (local == nullptr || remote == nullptr || local->type != remote->type ||
+        local->mode == FieldMode::kRepeated || local->precision || local->max_length ||
+        local->collation || remote->precision || remote->max_length || remote->collation ||
+        local->name != column.referencing_column || remote->name != column.referenced_column ||
+        std::ranges::find(referenced.metadata.primary_key, remote->name) ==
+            referenced.metadata.primary_key.end() ||
+        std::ranges::find(local_columns, local->name) != local_columns.end() ||
+        std::ranges::find(referenced_columns, remote->name) != referenced_columns.end()) {
+      throw ApiError::Unsupported("this foreign key column mapping");
+    }
+    local_columns.push_back(local->name);
+    referenced_columns.push_back(remote->name);
+  }
 }
 
 void ValidatePartitioning(const TableMetadata& metadata, const std::vector<FieldSchema>& schema) {

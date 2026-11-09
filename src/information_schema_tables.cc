@@ -14,7 +14,9 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "googlesql/public/strings.h"
 #include "nlohmann/json.hpp"
+#include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/information_schema_options.h"
@@ -94,12 +96,11 @@ std::optional<std::string> HivePrefixOption(const HivePartitioning& hive) {
                                      : hive.source_uri_prefix.substr(0, schema + 1);
 }
 
-absl::StatusOr<std::string> TableDdl(const std::string& project, const std::string& dataset,
-                                     const std::string& table,
-                                     const std::vector<FieldSchema>& schema,
-                                     const std::optional<std::string>& default_collation,
-                                     const std::optional<GcsExternalData>& external,
-                                     googlesql::TypeFactory* type_factory) {
+absl::StatusOr<std::string> TableDdl(
+    const std::string& project, const std::string& dataset, const std::string& table,
+    const std::vector<FieldSchema>& schema, const std::optional<std::string>& default_collation,
+    const std::optional<GcsExternalData>& external, const std::vector<std::string>& primary_key,
+    const std::vector<ForeignKey>& foreign_keys, googlesql::TypeFactory* type_factory) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
     absl::StatusOr<std::string> type = ColumnTypeDdl(field, default_collation, type_factory);
@@ -108,6 +109,28 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
     }
     columns.push_back("  " + field.name + " " + *type +
                       (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
+  }
+  if (!primary_key.empty()) {
+    std::vector<std::string> keys;
+    std::ranges::transform(primary_key, std::back_inserter(keys), [](const std::string& name) {
+      return googlesql::ToIdentifierLiteral(name);
+    });
+    columns.push_back("  PRIMARY KEY (" + absl::StrJoin(keys, ", ") + ") NOT ENFORCED");
+  }
+  for (const ForeignKey& key : foreign_keys) {
+    std::vector<std::string> local;
+    std::vector<std::string> remote;
+    for (const ForeignKeyColumn& column : key.columns) {
+      local.push_back(googlesql::ToIdentifierLiteral(column.referencing_column));
+      remote.push_back(googlesql::ToIdentifierLiteral(column.referenced_column));
+    }
+    const TableReference& target = key.referenced_table;
+    columns.push_back(
+        "  " +
+        (key.generated_name ? "" : "CONSTRAINT " + googlesql::ToIdentifierLiteral(key.name) + " ") +
+        "FOREIGN KEY (" + absl::StrJoin(local, ", ") + ") REFERENCES `" + target.project_id + "." +
+        target.dataset_id + "." + target.table_id + "`(" + absl::StrJoin(remote, ", ") +
+        ") NOT ENFORCED");
   }
   std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
                     "." + dataset + "." + table + "`";
@@ -300,8 +323,12 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
       int64_t creation_time =
           view_description.has_value() ? view_description->metadata.creation_time : 0;
       if (!view_query.has_value()) {
+        std::vector<std::string> primary_key;
+        std::vector<ForeignKey> foreign_keys;
         if (std::optional<TableDescription> description =
                 context.source.DescribeTable(project, dataset.dataset_id, table)) {
+          foreign_keys = description->metadata.foreign_keys;
+          primary_key = description->metadata.primary_key;
           snapshot = description->metadata.snapshot.has_value();
           external = description->metadata.external_data;
           base = snapshot ? std::move(description->metadata.snapshot)
@@ -314,13 +341,21 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
             HivePrefixOption(*external->hive_partitioning)) {
           absl::StatusOr<std::string> table_ddl =
               TableDdl(project, dataset.dataset_id, table, *schema, default_collation, external,
-                       context.type_factory);
+                       primary_key, foreign_keys, context.type_factory);
           if (!table_ddl.ok()) {
             return table_ddl.status();
           }
           if (default_collation.has_value()) {
             table_ddl->pop_back();
             *table_ddl += "\nDEFAULT COLLATE " + QuoteLiteral(*default_collation) + ";";
+          }
+          if (snapshot && base.has_value() && !foreign_keys.empty()) {
+            const TableReference& source = base->base_table;
+            *table_ddl = std::format(
+                "CREATE SNAPSHOT TABLE `{}.{}.{}`\nCLONE `{}.{}.{}`\n"
+                "FOR SYSTEM_TIME AS OF TIMESTAMP \"{}\";",
+                project, dataset.dataset_id, table, source.project_id, source.dataset_id,
+                source.table_id, base->time);
           }
           ddl = String(*table_ddl);
         }
@@ -391,11 +426,21 @@ absl::StatusOr<std::vector<Row>> TableConstraintsRows(const ViewContext& context
          context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
       const std::optional<TableDescription> description =
           context.source.DescribeTable(dataset.project_id, dataset.dataset_id, table);
-      if (!description.has_value() || description->metadata.primary_key.empty()) {
+      if (!description.has_value()) {
         continue;
       }
-      rows.push_back(Concat(Concat(Identity(dataset, table + ".pk$"), Identity(dataset, table)),
-                            {String("PRIMARY KEY"), String("NO"), String("NO"), String("NO")}));
+      if (!description->metadata.primary_key.empty()) {
+        rows.push_back(Concat(Concat(Identity(dataset, table + ".pk$"), Identity(dataset, table)),
+                              {String("PRIMARY KEY"), String("NO"), String("NO"), String("NO")}));
+      }
+      for (const ForeignKey& key : description->metadata.foreign_keys) {
+        if (key.name.empty()) {
+          throw ApiError::Unsupported("INFORMATION_SCHEMA constraints for unnamed foreign keys");
+        }
+        rows.push_back(
+            Concat(Concat(Identity(dataset, table + "." + key.name), Identity(dataset, table)),
+                   {String("FOREIGN KEY"), String("NO"), String("NO"), String("NO")}));
+      }
     }
   }
   return rows;
@@ -418,6 +463,32 @@ absl::StatusOr<std::vector<Row>> KeyColumnUsageRows(const ViewContext& context) 
             return Concat(Concat(Identity(dataset, table + ".pk$"), Identity(dataset, table)),
                           {String(column), Int(++ordinal), kNull});
           });
+      for (const ForeignKey& key : description->metadata.foreign_keys) {
+        if (key.name.empty()) {
+          throw ApiError::Unsupported("INFORMATION_SCHEMA constraints for unnamed foreign keys");
+        }
+        const TableReference& target = key.referenced_table;
+        const auto referenced =
+            context.source.DescribeTable(target.project_id, target.dataset_id, target.table_id);
+        if (!referenced) {
+          throw ApiError::Unsupported("KEY_COLUMN_USAGE after a referenced table was removed");
+        }
+        ordinal = 0;
+        for (const ForeignKeyColumn& column : key.columns) {
+          const auto& primary = referenced->metadata.primary_key;
+          const auto position = std::ranges::find(primary, column.referenced_column);
+          if (position == primary.end()) {
+            throw ApiError::Unsupported("KEY_COLUMN_USAGE after a referenced primary key changed");
+          }
+          rows.push_back(
+              Concat(Concat(Identity(dataset, table + "." + key.name), Identity(dataset, table)),
+                     {
+                         String(column.referencing_column),
+                         Int(++ordinal),
+                         Int(static_cast<int64_t>(position - primary.begin()) + 1),
+                     }));
+        }
+      }
     }
   }
   return rows;

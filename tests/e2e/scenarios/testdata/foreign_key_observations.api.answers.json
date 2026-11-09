@@ -1,0 +1,753 @@
+{
+  "version": 1,
+  "cases": {
+    "clone": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_clone.copied`\n(\n  id INT64,\n  CONSTRAINT fk FOREIGN KEY (id) REFERENCES `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_clone.parent`(id) NOT ENFORCED\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "copied.fk"
+                },
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_clone",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "column_case": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_column_case.child`\n(\n  ID INT64,\n  CONSTRAINT MixedCase FOREIGN KEY (ID) REFERENCES `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_column_case.parent`(Id) NOT ENFORCED\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.MixedCase"
+                },
+                {
+                  "v": "ID"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "Id",
+                    "referencingColumn": "ID"
+                  }
+                ],
+                "name": "MixedCase",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_column_case",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "copy": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_copy.copied`\n(\n  id INT64,\n  CONSTRAINT fk FOREIGN KEY (id) REFERENCES `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_copy.parent`(id) NOT ENFORCED\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "copied.fk"
+                },
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_copy",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "drop_parent": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_drop_parent.child`\n(\n  id INT64\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {}
+      }
+    },
+    "drop_referenced_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_drop_referenced_primary_key.child`\n(\n  id INT64\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {}
+      }
+    },
+    "drop_referencing_column": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Column `id` cannot be dropped in table `child`. Columns used in table partitioning or clustering or as part of key constraints cannot be dropped.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Column `id` cannot be dropped in table `child`. Columns used in table partitioning or clustering or as part of key constraints cannot be dropped.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "like": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_like.copied`\n(\n  id INT64,\n  CONSTRAINT fk FOREIGN KEY (id) REFERENCES `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_like.parent`(id) NOT ENFORCED\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "copied.fk"
+                },
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_like",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "mismatched_column_type": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Referenced column id from johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_mismatched_column_type.parent is not compatible with the referencing column id at [1:224]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Referenced column id from johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_mismatched_column_type.parent is not compatible with the referencing column id at [1:224]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "missing_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Table johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_missing_primary_key.parent does not have Primary Key constraints",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Table johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_missing_primary_key.parent does not have Primary Key constraints",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "patch_empty_constraints": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_patch_empty_constraints",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        },
+        "update": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_patch_empty_constraints",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "patch_empty_foreign_keys": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "patch_null_constraints": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "patch_null_foreign_keys": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "put_without_constraints": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "table": {},
+        "update": {}
+      }
+    },
+    "rename_parent": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Cannot rename a table with Primary Key constraints.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Cannot rename a table with Primary Key constraints.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "set_referencing_column_default": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Key column id cannot be modified or removed. column's default_value_expression changed:  -> 1",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Key column id cannot be modified or removed. column's default_value_expression changed:  -> 1",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "snapshot": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE SNAPSHOT TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_snapshot.copied`\nCLONE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_snapshot.child`\nFOR SYSTEM_TIME AS OF TIMESTAMP \"2026-11-09T00:58:39.380Z\";"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "copied.fk"
+                },
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_snapshot",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "unnamed_column_constraint": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_unnamed_column_constraint.child`\n(\n  id INT64,\n  FOREIGN KEY (id) REFERENCES `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_unnamed_column_constraint.parent`(id) NOT ENFORCED\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.fk$1"
+                },
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk$1",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_unnamed_column_constraint",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "unnamed_table_constraint": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "ddl": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE TABLE `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_unnamed_table_constraint.child`\n(\n  id INT64,\n  FOREIGN KEY (id) REFERENCES `johejo-sandbox.bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_unnamed_table_constraint.parent`(id) NOT ENFORCED\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "fixture": {
+          "jobComplete": true
+        },
+        "information_schema": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.fk$1"
+                },
+                {
+                  "v": "id"
+                },
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "statement": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "id"
+                  }
+                ],
+                "name": "fk$1",
+                "referencedTable": {
+                  "datasetId": "bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_unnamed_table_constraint",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

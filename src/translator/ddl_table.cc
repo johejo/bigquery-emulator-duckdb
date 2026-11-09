@@ -475,7 +475,7 @@ bool SupportedPrimaryKey(const googlesql::ResolvedPrimaryKey& key, const Scope& 
   return true;
 }
 
-// Records the primary key of `create` on `metadata`. Foreign keys are dropped.
+// Records the primary key of `create` on `metadata`.
 bool PrimaryKey(const googlesql::ResolvedCreateTableStmtBase& create, TableMetadata& metadata,
                 const Scope& scope) {
   const googlesql::ResolvedPrimaryKey* key = create.primary_key();
@@ -488,6 +488,43 @@ bool PrimaryKey(const googlesql::ResolvedCreateTableStmtBase& create, TableMetad
   for (const int offset : key->column_offset_list()) {
     metadata.primary_key.push_back(create.column_definition_list(offset)->name());
   }
+  return true;
+}
+
+bool ForeignKeys(const googlesql::ResolvedCreateTableStmtBase& create, TableDefinition& table,
+                 const Scope& scope) {
+  for (const auto& key : create.foreign_key_list()) {
+    const auto* referenced = dynamic_cast<const BigQueryTable*>(key->referenced_table());
+    if (table.temporary || referenced == nullptr || key->enforced() ||
+        key->match_mode() != googlesql::ResolvedForeignKey::SIMPLE ||
+        key->update_action() != googlesql::ResolvedForeignKey::NO_ACTION ||
+        key->delete_action() != googlesql::ResolvedForeignKey::NO_ACTION ||
+        !key->option_list().empty()) {
+      Unsupported(scope, "this foreign key definition");
+      return false;
+    }
+    const auto description = referenced->Describe();
+    if (!description) {
+      Unsupported(scope, "foreign keys referencing views");
+      return false;
+    }
+    ForeignKey stored{
+        .name = key->constraint_name(),
+        .referenced_table = referenced->reference(),
+        .columns = {},
+        .generated_name = key->constraint_name().empty(),
+    };
+    for (int i = 0; i < key->referencing_column_offset_list_size(); ++i) {
+      stored.columns.push_back({
+          .referencing_column =
+              create.column_definition_list(key->referencing_column_offset_list(i))->name(),
+          .referenced_column = referenced->GetColumn(key->referenced_column_offset_list(i))->Name(),
+      });
+    }
+    ValidateForeignKey(stored, table.schema, *description);
+    table.metadata.foreign_keys.push_back(std::move(stored));
+  }
+  AssignForeignKeyNames(table.metadata.foreign_keys);
   return true;
 }
 
@@ -581,6 +618,9 @@ std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
                     statement == "CREATE SNAPSHOT TABLE" ? "snapshot" : "clone",
                     reference.project_id, reference.dataset_id, reference.table_id, rejected,
                     takes_snapshots ? "TABLE, SNAPSHOT" : "TABLE"));
+  }
+  if (temporary && description && !description->metadata.foreign_keys.empty()) {
+    return Unsupported(scope, "temporary tables with foreign keys");
   }
   if (description && description->metadata.external_data) {
     return Unsupported(scope, std::string(statement) + " of an external table");
@@ -945,6 +985,9 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   if (columns.empty()) {
     return Unsupported(scope, "CREATE TABLE without columns");
   }
+  if (!ForeignKeys(create, table, scope)) {
+    return std::nullopt;
+  }
   scope.context.statement.table = std::move(table);
   return *head + " (" + Join(columns, ", ") + ")";
 }
@@ -1183,6 +1226,9 @@ std::optional<std::string> CreateTableAsSelect(
     }
     projections.push_back("CAST(" + *value + " AS " + *type + ") AS " +
                           QuoteIdentifier(field.name));
+  }
+  if (!ForeignKeys(create, table, scope)) {
+    return std::nullopt;
   }
   scope.context.statement.table = std::move(table);
   return *head + " AS SELECT " + Join(projections, ", ") + relation->From() + relation->Order();

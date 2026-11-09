@@ -527,6 +527,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       if (!table.metadata.resource_tags.empty()) {
         throw ApiError::Unsupported("copy jobs from tables with tags");
       }
+      if (!table.metadata.foreign_keys.empty()) {
+        throw ApiError::Unsupported("copy jobs from tables with foreign keys");
+      }
       if (sql.empty()) {
         schema = table.schema;
         first_source = source;

@@ -498,6 +498,7 @@ cc_library(
     hdrs = ["src/information_schema.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
         ":duckdb_sql",
         ":field_schema",
         ":location",

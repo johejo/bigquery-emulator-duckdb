@@ -225,6 +225,68 @@ std::string TablesQuery(const DatasetReference& dataset) {
   return std::format("SELECT table_name FROM {} ORDER BY table_name", DatasetRelations(dataset));
 }
 
+bool HasForeignKeyReferences(Backend& backend, const TableReference& table) {
+  const QueryResult relations =
+      backend.Execute("SELECT comment FROM " + LogicalCatalog("bq_relations()") +
+                      " WHERE type = 'TABLE' AND comment LIKE '%\"foreignKeys\"%'");
+  for (size_t row = 0; row < relations.rows.size(); ++row) {
+    const TableMetadata metadata = CommentMetadata(relations.rows.String(row, 0));
+    if (std::ranges::any_of(metadata.foreign_keys, [&](const ForeignKey& key) {
+          return key.referenced_table.project_id == table.project_id &&
+                 key.referenced_table.dataset_id == table.dataset_id &&
+                 key.referenced_table.table_id == table.table_id;
+        })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<std::string> DropForeignKeyReferenceStatements(Backend& backend,
+                                                           const TableReference& table) {
+  const QueryResult relations =
+      backend.Execute("SELECT database_name, schema_name, table_name, comment FROM " +
+                      LogicalCatalog("bq_relations()") +
+                      " WHERE type = 'TABLE' AND comment LIKE '%\"foreignKeys\"%'");
+  std::vector<std::string> statements;
+  for (size_t row = 0; row < relations.rows.size(); ++row) {
+    TableMetadata metadata = CommentMetadata(relations.rows.String(row, 3));
+    const auto removed = std::erase_if(metadata.foreign_keys, [&](const ForeignKey& key) {
+      return key.referenced_table.project_id == table.project_id &&
+             key.referenced_table.dataset_id == table.dataset_id &&
+             key.referenced_table.table_id == table.table_id;
+    });
+    if (removed != 0) {
+      const TableReference child{
+          .project_id = relations.rows.String(row, 0),
+          .dataset_id = relations.rows.String(row, 1),
+          .table_id = relations.rows.String(row, 2),
+      };
+      statements.push_back(
+          TableCommentStatement(child, metadata, ResolvedTableSchema(backend, child)));
+    }
+  }
+  return statements;
+}
+
+bool HasOutsideForeignKeyReferences(Backend& backend, const DatasetReference& dataset) {
+  const QueryResult relations = backend.Execute(
+      "SELECT comment FROM " + LogicalCatalog("bq_relations()") +
+      std::format(" WHERE type = 'TABLE' AND comment LIKE '%\"foreignKeys\"%'"
+                  " AND (database_name <> {} OR schema_name <> {})",
+                  QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id)));
+  for (size_t row = 0; row < relations.rows.size(); ++row) {
+    const TableMetadata metadata = CommentMetadata(relations.rows.String(row, 0));
+    if (std::ranges::any_of(metadata.foreign_keys, [&](const ForeignKey& key) {
+          return key.referenced_table.project_id == dataset.project_id &&
+                 key.referenced_table.dataset_id == dataset.dataset_id;
+        })) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Expiration is lazy: catalog reads remove expired relations before exposing them. Sweep
 // before analysis too, so DDL targets, wildcards and INFORMATION_SCHEMA see the same catalog.
 void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
@@ -269,6 +331,9 @@ void ExpireTables(Backend& backend, ExpirationMutex& expiration_mutex,
                           : expiration_mutex.LockCatalog();
     expiration_mutex.AssertCatalogHeld();
     const auto drop = expiration_mutex.LockDrop();
+    if (!view && HasForeignKeyReferences(backend, table)) {
+      throw ApiError::Unsupported("expiration of a table referenced by foreign keys");
+    }
     backend.ExecuteDdl(
         std::string(view ? "DROP VIEW IF EXISTS " : "DROP TABLE IF EXISTS ") + QualifiedName(table),
         {}, skip);
