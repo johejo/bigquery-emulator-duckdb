@@ -161,6 +161,15 @@ struct TableAlteration {
   bool if_exists = false;
 };
 
+// ALTER VIEW SET OPTIONS preserves the stored query, schema and materialization source.
+struct ViewAlteration {
+  TableReference table;
+  OptionUpdates options = {};
+  std::vector<ColumnOptionsAction> columns = {};
+  bool if_exists = false;
+  bool materialized = false;
+};
+
 // ALTER SCHEMA SET OPTIONS, which the emulator applies to what the dataset has when it runs.
 struct DatasetAlteration {
   DatasetReference dataset;
@@ -194,6 +203,7 @@ struct TranslatedStatement {
   std::optional<TableDefinition> table;
   std::optional<TableAlteration> altered_table;
   std::optional<ViewDefinition> view;
+  std::optional<ViewAlteration> altered_view;
   std::optional<DatasetDefinition> dataset;
   std::optional<DatasetAlteration> altered_dataset;
   std::optional<RoutineDefinition> routine;

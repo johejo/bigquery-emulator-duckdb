@@ -328,7 +328,9 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
     case kTags:
       return TagsOption(value, updates.resource_tags.emplace(), updates.tag_order);
     case kExpirationTimestamp:
-      return table && ExpirationOption(value, updates.expiration_time.emplace());
+      return (table || statement == DdlOptionContext::kAlterView ||
+              statement == DdlOptionContext::kAlterMaterializedView) &&
+             ExpirationOption(value, updates.expiration_time.emplace());
     case kPartitionExpirationDays:
       return table && PartitionExpirationOption(value, updates.partition_expiration_ms.emplace());
     case kDefaultTableExpirationDays:
@@ -372,7 +374,9 @@ std::optional<DecodedDdlOption> DecodeNamedDdlOption(const googlesql::ResolvedOp
     return DecodedDdlOption{.id = definition->name, .value = *std::move(value)};
   };
   const bool incremental_tags =
-      (context == DdlOptionContext::kAlterTable || context == DdlOptionContext::kAlterSchema) &&
+      (context == DdlOptionContext::kAlterTable || context == DdlOptionContext::kAlterSchema ||
+       context == DdlOptionContext::kAlterView ||
+       context == DdlOptionContext::kAlterMaterializedView) &&
       definition->name == DdlOptionId::kTags &&
       (option.assignment_op() == googlesql::ResolvedOption::ADD_ASSIGN ||
        option.assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN);

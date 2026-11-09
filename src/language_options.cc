@@ -75,6 +75,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     options->DisableLanguageFeature(googlesql::FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS);
     options->DisableLanguageFeature(
         googlesql::FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS);
+    // BigQuery supports descriptions on explicitly named view columns.
+    options->EnableLanguageFeature(googlesql::FEATURE_CREATE_VIEWS_WITH_COLUMN_OPTIONS);
     // BigQuery supports incremental tag options; handlers reject unsupported operators.
     options->EnableLanguageFeature(googlesql::FEATURE_ENABLE_ALTER_ARRAY_OPTIONS);
     // BigQuery is the external product: INT64 and FLOAT64 rather than the internal type set.

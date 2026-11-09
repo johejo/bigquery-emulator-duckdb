@@ -71,6 +71,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
       statement.Is<googlesql::ResolvedCreateMaterializedViewStmt>()) {
     return CreateView(*statement.GetAs<googlesql::ResolvedCreateViewBase>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedAlterViewStmt>() ||
+      statement.Is<googlesql::ResolvedAlterMaterializedViewStmt>()) {
+    return AlterView(*statement.GetAs<googlesql::ResolvedAlterObjectStmt>(), scope);
+  }
   if (statement.Is<googlesql::ResolvedCreateSchemaStmt>()) {
     return CreateSchema(*statement.GetAs<googlesql::ResolvedCreateSchemaStmt>(), scope);
   }
@@ -191,6 +195,12 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   if (statement.Is<googlesql::ResolvedAlterTableStmt>() ||
       statement.Is<googlesql::ResolvedAlterTableSetOptionsStmt>()) {
     return "ALTER_TABLE";
+  }
+  if (statement.Is<googlesql::ResolvedAlterViewStmt>()) {
+    return "ALTER_VIEW";
+  }
+  if (statement.Is<googlesql::ResolvedAlterMaterializedViewStmt>()) {
+    return "ALTER_MATERIALIZED_VIEW";
   }
   if (statement.Is<googlesql::ResolvedAlterSchemaStmt>()) {
     return "ALTER_SCHEMA";

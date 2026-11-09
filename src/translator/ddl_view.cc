@@ -27,6 +27,18 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
+bool ViewColumnOptions(const Options& options, const Scope& scope,
+                       std::optional<std::string>& description) {
+  for (const auto& option : options) {
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kViewColumn, scope);
+    if (!decoded || !StringOption(decoded->value, description.emplace())) {
+      Unsupported(scope, "view column option " + option->name());
+      return false;
+    }
+  }
+  return true;
+}
+
 // Whether `query` reads a temporary table, which a view could no longer read once the
 // multi-statement query that created it ends.
 bool ReadsTemporaryTable(const googlesql::ResolvedScan& query, const Scope& scope) {
@@ -43,6 +55,43 @@ bool ReadsTemporaryTable(const googlesql::ResolvedScan& query, const Scope& scop
 }
 
 }  // namespace
+
+std::optional<std::string> AlterView(const googlesql::ResolvedAlterObjectStmt& alter,
+                                     const Scope& scope) {
+  const bool materialized = alter.Is<googlesql::ResolvedAlterMaterializedViewStmt>();
+  const auto context =
+      materialized ? DdlOptionContext::kAlterMaterializedView : DdlOptionContext::kAlterView;
+  const auto path = TargetTable(alter.name_path(), scope);
+  const auto target = scope.context.statement.ddl_target_table;
+  if (!path || !target) {
+    return std::nullopt;
+  }
+  ViewAlteration alteration{
+      .table = *target,
+      .if_exists = alter.is_if_exists(),
+      .materialized = materialized,
+  };
+  for (const auto& action : alter.alter_action_list()) {
+    if (!materialized && action->Is<googlesql::ResolvedAlterColumnOptionsAction>()) {
+      const auto& column = *action->GetAs<googlesql::ResolvedAlterColumnOptionsAction>();
+      ColumnOptionsAction options{.name = column.column(), .if_exists = column.is_if_exists()};
+      if (!ViewColumnOptions(column.option_list(), scope, options.description)) {
+        return std::nullopt;
+      }
+      alteration.columns.push_back(std::move(options));
+      continue;
+    }
+    if (!action->Is<googlesql::ResolvedSetOptionsAction>()) {
+      return Unsupported(scope, std::string(DdlOptionContextName(context)) + " action");
+    }
+    if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(), context,
+                    scope, alteration.options)) {
+      return std::nullopt;
+    }
+  }
+  scope.context.statement.altered_view = std::move(alteration);
+  return "";
+}
 
 std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& create,
                                       const Scope& scope) {
@@ -140,6 +189,19 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& c
     }
     // tables.get and INFORMATION_SCHEMA report the collations of the view's columns.
     SetCollations(*field, annotations);
+    const auto definition =
+        std::ranges::find_if(create.column_definition_list(),
+                             [&](const auto& column) { return column->name() == output->name(); });
+    if (definition != create.column_definition_list().end() &&
+        (*definition)->annotations() != nullptr) {
+      std::optional<std::string> description;
+      if (!ViewColumnOptions((*definition)->annotations()->option_list(), scope, description)) {
+        return std::nullopt;
+      }
+      if (description) {
+        field->description = *std::move(description);
+      }
+    }
     view.schema.push_back(*std::move(field));
     // Preserve GoogleSQL result types when the view is later read through the catalog.
     projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +

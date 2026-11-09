@@ -1725,11 +1725,13 @@
     {
       "name": "CREATE VIEW column",
       "group": "view_column_option_list",
-      "template": "CREATE VIEW n (id OPTIONS ({option})) AS SELECT id FROM t"
+      "template": "CREATE VIEW n (id OPTIONS ({option})) AS SELECT id FROM t",
+      "implementation": "view column"
     },
     {
       "name": "ALTER VIEW SET OPTIONS",
       "group": "view_set_options_list",
+      "implementation": "ALTER VIEW",
       "template": "ALTER VIEW v SET OPTIONS ({option})",
       "setup": [
         "CREATE VIEW d.v AS SELECT id FROM d.t"
@@ -1738,6 +1740,7 @@
     {
       "name": "ALTER VIEW ALTER COLUMN SET OPTIONS",
       "group": "view_column_set_options_list",
+      "implementation": "view column",
       "template": "ALTER VIEW v ALTER COLUMN id SET OPTIONS ({option})",
       "setup": [
         "CREATE VIEW d.v AS SELECT id FROM d.t"
@@ -1752,6 +1755,7 @@
     {
       "name": "ALTER MATERIALIZED VIEW SET OPTIONS",
       "group": "materialized_view_set_options_list",
+      "implementation": "ALTER MATERIALIZED VIEW",
       "template": "ALTER MATERIALIZED VIEW v SET OPTIONS ({option})",
       "setup": [
         "CREATE MATERIALIZED VIEW d.v AS SELECT id, COUNT(*) AS n FROM d.t GROUP BY id"
