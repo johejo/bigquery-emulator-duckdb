@@ -38,6 +38,7 @@
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
+#include "src/api_error.h"
 #include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -568,6 +569,37 @@ absl::Status CheckResultColumns(const googlesql::ResolvedStatement& statement,
   return absl::OkStatus();
 }
 
+// The resolver turns a missing foreign key target into INVALID_ARGUMENT. BigQuery reports
+// notFound instead, including when CREATE TABLE references the table it would create.
+// Recheck only missing-table failures, so other validation errors retain their precedence.
+void CheckMissingForeignKeyTarget(std::string_view sql, const absl::Status& status,
+                                  googlesql::Catalog& catalog) {
+  if (!status.message().starts_with("Table not found:")) {
+    return;
+  }
+  std::unique_ptr<googlesql::ParserOutput> parsed;
+  if (!googlesql::ParseStatement(sql, googlesql::ParserOptions(GoogleSqlLanguageOptions()), &parsed)
+           .ok()) {
+    return;
+  }
+  std::vector<const googlesql::ASTNode*> nodes{parsed->statement()};
+  while (!nodes.empty()) {
+    const auto* node = nodes.back();
+    nodes.pop_back();
+    if (const auto* reference = node->GetAsOrNull<googlesql::ASTForeignKeyReference>()) {
+      const googlesql::Table* table = nullptr;
+      const absl::Status found =
+          catalog.FindTable(reference->table_name()->ToIdentifierVector(), &table);
+      if (absl::IsNotFound(found)) {
+        throw ApiError::NotFound(std::string(found.message()));
+      }
+    }
+    for (int i = 0; i < node->num_children(); ++i) {
+      nodes.push_back(node->child(i));
+    }
+  }
+}
+
 }  // namespace
 
 absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
@@ -619,6 +651,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
   const absl::Status status =
       googlesql::AnalyzeStatement(sql, *options, &catalog, &type_factory, &analyzer_output);
   if (!status.ok()) {
+    CheckMissingForeignKeyTarget(sql, status, catalog);
     // These errors have been checked against BigQuery, including their location format: the
     // first line of the caret message, with " [at 1:29]" written as " at [1:29]".
     const std::string_view message = status.message();
@@ -753,9 +786,12 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
       const googlesql::AnalyzerOptions options,
       AnalyzerOptions(precision, settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
-  GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
-                                                        &type_factory, &analyzer_output))
-      .With(googlesql::ConvertLocalErrorToScriptError(segment));
+  const absl::Status status = googlesql::AnalyzeStatement(
+      segment.GetSegmentText(), options, &catalog, &type_factory, &analyzer_output);
+  if (!status.ok()) {
+    CheckMissingForeignKeyTarget(segment.GetSegmentText(), status, catalog);
+  }
+  GOOGLESQL_RETURN_IF_ERROR(status).With(googlesql::ConvertLocalErrorToScriptError(segment));
   if (settings.cast_without_type_parameters) {
     GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
   }

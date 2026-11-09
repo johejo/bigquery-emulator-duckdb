@@ -1,5 +1,5 @@
 version: 1
-# BigQuery returns 404 for a missing self-referenced table; the analyzer currently returns 400.
+# BigQuery returns 404 for a missing self-referenced table.
 # Provenance: foreign_key_self_reference.api.answers.json.
 vars:
   dataset: bqa_${run}_${case}
