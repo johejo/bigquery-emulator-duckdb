@@ -1,0 +1,63 @@
+# Observed BigQuery answers recorded with tools/bqanswers. ARRAY_FIRST_N is
+# available despite being absent from the saved array function documentation;
+# SAFE. is rejected, and the other three GoogleSQL functions do not exist.
+
+SELECT ARRAY_FIRST_N([33, 22, 11], 2)
+=> [{"v":"33"},{"v":"22"}]
+
+SELECT SAFE.ARRAY_FIRST_N([33, 22, 11], 2)
+=> error contains: SAFE with function array_first_n is not supported.
+
+SELECT ARRAY_FIRST_N([33, 22, 11], 0)
+=> []
+
+SELECT ARRAY_FIRST_N([33, 22, 11], 3)
+=> [{"v":"33"},{"v":"22"},{"v":"11"}]
+
+SELECT ARRAY_FIRST_N([33, 22, 11], 4)
+=> [{"v":"33"},{"v":"22"},{"v":"11"}]
+
+SELECT ARRAY_FIRST_N([33, 22, 11], 9223372036854775807)
+=> [{"v":"33"},{"v":"22"},{"v":"11"}]
+
+SELECT ARRAY_FIRST_N([33, 22, 11], -1)
+=> error contains: ARRAY_FIRST_N second argument must be non-negative
+
+SELECT SAFE.ARRAY_FIRST_N([33, 22, 11], -1)
+=> error contains: SAFE with function array_first_n is not supported.
+
+SELECT ARRAY_FIRST_N(ARRAY<INT64>[], 2)
+=> []
+
+SELECT ARRAY_FIRST_N(CAST(NULL AS ARRAY<INT64>), -1) IS NULL
+=> "true"
+
+SELECT ARRAY_FIRST_N([33, 22, 11], CAST(NULL AS INT64)) IS NULL
+=> "true"
+
+SELECT TO_JSON_STRING(ARRAY_FIRST_N([NULL, 22, 11], 2))
+=> "[null,22]"
+
+SELECT ARRAY_FIRST_N(['a', 'b', 'c'], 2)
+=> [{"v":"a"},{"v":"b"}]
+
+SELECT ARRAY_FIRST_N([STRUCT(1 AS x), STRUCT(2 AS x)], 1)
+=> [{"v":{"f":[{"v":"1"}]}}]
+
+SELECT ARRAY_LAST_N([33, 22, 11], 2)
+=> error contains: Function not found: ARRAY_LAST_N
+
+SELECT SAFE.ARRAY_LAST_N([33, 22, 11], 2)
+=> error contains: Function not found: ARRAY_LAST_N
+
+SELECT ARRAY_REMOVE_FIRST_N([33, 22, 11], 2)
+=> error contains: Function not found: ARRAY_REMOVE_FIRST_N
+
+SELECT SAFE.ARRAY_REMOVE_FIRST_N([33, 22, 11], 2)
+=> error contains: Function not found: ARRAY_REMOVE_FIRST_N
+
+SELECT ARRAY_REMOVE_LAST_N([33, 22, 11], 2)
+=> error contains: Function not found: ARRAY_REMOVE_LAST_N
+
+SELECT SAFE.ARRAY_REMOVE_LAST_N([33, 22, 11], 2)
+=> error contains: Function not found: ARRAY_REMOVE_LAST_N

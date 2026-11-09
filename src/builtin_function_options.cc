@@ -25,6 +25,9 @@ ExcludedFunctionIds BigQueryExcludedFunctionIds() {
       googlesql::FN_ARRAY_AVG_NUMERIC,
       googlesql::FN_ARRAY_AVG_BIGNUMERIC,
       googlesql::FN_ARRAY_AVG_INTERVAL,
+      googlesql::FN_ARRAY_LAST_N,
+      googlesql::FN_ARRAY_REMOVE_FIRST_N,
+      googlesql::FN_ARRAY_REMOVE_LAST_N,
   };
 }
 
@@ -38,6 +41,7 @@ googlesql::BuiltinFunctionOptions AnalyzerBuiltinFunctionOptions(
       // The SQL function inliner does not support SAFE calls. Translate these array
       // operations directly so SAFE uses the same argument/error handling as other functions.
       {googlesql::FN_ARRAY_FIRST, false},
+      {googlesql::FN_ARRAY_FIRST_N, false},
       {googlesql::FN_ARRAY_LAST, false},
       {googlesql::FN_ARRAY_SLICE, false},
   };

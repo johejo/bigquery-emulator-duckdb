@@ -399,6 +399,9 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
     if (name == "NULLIF" && selects_intervals) {
       selected.type_rejections = {};
     }
+    if (name == "ARRAY_FIRST_N" && functions.restrictions().array_first_n_rejects_safe) {
+      selected.uses |= {TypeUse::kRejectsSafe};
+    }
     functions.AddRules(name, selected, Implementation::kSQL);
   }
   for (const auto& [name, definition] : StaticBackendRules()) {
