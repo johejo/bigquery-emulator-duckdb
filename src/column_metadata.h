@@ -14,6 +14,11 @@ namespace bigquery_emulator_duckdb {
 // and have no place for a description. A comment lives and dies with its
 // column, so dropping or replacing a table or adding a column never leaves it stale.
 
+// DuckDB requires a physical column even for a BigQuery table created without a schema.
+// Its marker comment keeps this storage-only column out of the logical schema.
+inline constexpr char kSchemaPlaceholderColumn[] = "$bq_schema_placeholder";
+inline constexpr char kSchemaPlaceholderComment[] = "{\"schemaPlaceholder\":true}";
+
 // The statements that record `schema` on the columns of `table`, which must already exist.
 // Throws ApiError for rounding modes the emulator cannot keep and collations BigQuery does not
 // take; see CheckRoundingModes and CheckCollations.

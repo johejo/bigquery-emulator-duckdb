@@ -101,6 +101,10 @@ TableDataPage SqlRuntime::ListTableData(TableReference table, int64_t start_inde
   const std::string columns = selected_fields.empty()
                                   ? ReadColumns(info.schema)
                                   : ReadColumns(SelectFields(info.schema, selected_fields), true);
+  if (info.schema.empty()) {
+    read.session->Transaction("COMMIT");
+    return {};
+  }
   try {
     const std::string relation = read.Relation();
     QueryResult result = read.session->Execute("SELECT " + columns + " FROM " + relation +
@@ -128,6 +132,9 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
     throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
   }
   RejectReadOnlyWrite(info);
+  if (info.schema.empty()) {
+    throw ApiError::Unsupported("writing rows to a table without a schema");
+  }
   // Held until the transaction that keeps the table's rows and appends to it commits.
   std::unique_lock<absl::Mutex> kept;
   try {
@@ -210,6 +217,9 @@ std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const
     throw ApiError::Invalid("Cannot add rows to a table of type SNAPSHOT.");
   }
   CheckWritableTable(backend_, table);
+  if (info.schema.empty()) {
+    throw ApiError::Invalid("The destination table has no schema.");
+  }
   const std::vector<FieldSchema>& schema = info.schema;
   std::vector<InsertError> errors;
   std::vector<std::string> statements;

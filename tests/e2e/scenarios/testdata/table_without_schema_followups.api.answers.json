@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "cases": {
+    "alter_add_column": {
+      "project": "johejo-sandbox",
+      "run": "xqze5jno4hxknj7uzgjes5jdyv",
+      "steps": {
+        "get": {
+          "numRows": "0",
+          "status": 200
+        },
+        "insert": {
+          "schema": {},
+          "status": 200
+        },
+        "operation": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Table johejo-sandbox.bqa_xqze5jno4hxknj7uzgjes5jdyv_alter_add_column.t does not have a schema.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Table johejo-sandbox.bqa_xqze5jno4hxknj7uzgjes5jdyv_alter_add_column.t does not have a schema.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "insert_empty_row": {
+      "project": "johejo-sandbox",
+      "run": "xqze5jno4hxknj7uzgjes5jdyv",
+      "steps": {
+        "get": {
+          "numRows": "0",
+          "status": 200
+        },
+        "insert": {
+          "schema": {},
+          "status": 200
+        },
+        "operation": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "The destination table has no schema.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "The destination table has no schema.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "list_rows": {
+      "project": "johejo-sandbox",
+      "run": "xqze5jno4hxknj7uzgjes5jdyv",
+      "steps": {
+        "get": {
+          "numRows": "0",
+          "status": 200
+        },
+        "get_after": {
+          "numRows": "0",
+          "status": 200
+        },
+        "insert": {
+          "schema": {},
+          "status": 200
+        },
+        "operation": {
+          "status": 200,
+          "totalRows": "0"
+        }
+      }
+    },
+    "patch_required_schema": {
+      "project": "johejo-sandbox",
+      "run": "xqze5jno4hxknj7uzgjes5jdyv",
+      "steps": {
+        "get": {
+          "numRows": "0",
+          "status": 200
+        },
+        "get_after": {
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "insert": {
+          "schema": {},
+          "status": 200
+        },
+        "operation": {
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "patch_schema": {
+      "project": "johejo-sandbox",
+      "run": "xqze5jno4hxknj7uzgjes5jdyv",
+      "steps": {
+        "get": {
+          "numRows": "0",
+          "status": 200
+        },
+        "get_after": {
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "insert": {
+          "schema": {},
+          "status": 200
+        },
+        "operation": {
+          "schema": {
+            "fields": [
+              {
+                "name": "x",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "select_count": {
+      "project": "johejo-sandbox",
+      "run": "xqze5jno4hxknj7uzgjes5jdyv",
+      "steps": {
+        "get": {
+          "numRows": "0",
+          "status": 200
+        },
+        "insert": {
+          "schema": {},
+          "status": 200
+        },
+        "operation": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Table johejo-sandbox.bqa_xqze5jno4hxknj7uzgjes5jdyv_select_count.t does not have a schema.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Table johejo-sandbox.bqa_xqze5jno4hxknj7uzgjes5jdyv_select_count.t does not have a schema.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

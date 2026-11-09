@@ -191,7 +191,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
   }
   for (size_t i = current.size(); i < updated.size(); ++i) {
     const FieldSchema& added = updated.at(i);
-    if (added.mode == FieldMode::kRequired) {
+    if (added.mode == FieldMode::kRequired && !(path.empty() && current.empty())) {
       throw ApiError::Invalid(
           std::format("{} Cannot add required fields to an existing schema. (field: {}{})",
                       mismatch, prefix, added.name));
@@ -205,6 +205,12 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
     statements.push_back(std::format("ALTER TABLE {} ADD COLUMN {}{} {}{}", QualifiedName(table),
                                      path, QuoteIdentifier(added.name), ToDuckDbType(added),
                                      empty_default ? " DEFAULT []" : ""));
+    // A schema-less table has no rows and may initialize REQUIRED columns. DuckDB cannot
+    // add a NOT NULL column directly, so apply the constraint after adding it.
+    if (added.mode == FieldMode::kRequired) {
+      statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} SET NOT NULL",
+                                       QualifiedName(table), QuoteIdentifier(added.name)));
+    }
   }
 }
 

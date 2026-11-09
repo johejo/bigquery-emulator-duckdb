@@ -74,6 +74,10 @@ bool NumericStorageMismatch(const FieldSchema& recorded, const FieldSchema& stor
 
 std::vector<FieldSchema> ApplyColumnComments(
     std::vector<FieldSchema> derived, const std::vector<std::optional<std::string>>& comments) {
+  if (derived.size() == 1 && derived.front().name == kSchemaPlaceholderColumn &&
+      comments.size() == 1 && comments.front() == kSchemaPlaceholderComment) {
+    return {};
+  }
   for (size_t i = 0; i < derived.size() && i < comments.size(); ++i) {
     const std::optional<std::string>& comment = comments.at(i);
     if (!comment.has_value()) {

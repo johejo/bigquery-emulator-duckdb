@@ -277,6 +277,7 @@ labels, clustering, default rounding mode and expiration; other fields set to ot
 defaults are unsupported. Partitioning and
 a view's schema cannot change. For resource tags, see [Resource tags](#resource-tags).
 `tables.update` keeps a schema or view definition omitted from the request.
+Storage writes require a schema, including for a table created by `tables.insert` without one.
 
 ### Views
 
