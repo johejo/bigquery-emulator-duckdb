@@ -498,6 +498,7 @@ cc_library(
     hdrs = ["src/information_schema.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
         ":duckdb_sql",
         ":field_schema",
         ":location",
@@ -654,6 +655,7 @@ cc_library(
     hdrs = ["src/analyzer.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
         ":ddl_option_types",
         ":duckdb_sql",
         ":language_options",

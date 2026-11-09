@@ -36,6 +36,14 @@ void CheckCaseInsensitiveTableName(Backend& backend, const TableReference& table
 void CheckCaseInsensitiveDataset(Backend& backend, const DatasetReference& dataset,
                                  const DatasetMetadata& metadata);
 std::string TablesQuery(const DatasetReference& dataset);
+// Whether any stored foreign key references this table, across attached projects and datasets.
+// Used to reject destructive metadata changes whose effect on foreign keys is unverified.
+bool HasForeignKeyReferences(Backend& backend, const TableReference& table);
+// Metadata changes to run in the transaction that drops a table or its primary key.
+std::vector<std::string> DropForeignKeyReferenceStatements(Backend& backend,
+                                                           const TableReference& table);
+// References from tables outside a dataset must not be silently changed by deleting it.
+bool HasOutsideForeignKeyReferences(Backend& backend, const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment
 // in its transaction so a concurrent replacement or extended expiration is preserved. A caller

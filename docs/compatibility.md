@@ -234,12 +234,28 @@ add a new column with a default, and the Storage Write API cannot write to a tab
 
 ### Primary and foreign keys
 
-Tables keep their primary keys, which `tables.get`, `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and
-`INFORMATION_SCHEMA.KEY_COLUMN_USAGE` report. Foreign keys in
-`CREATE TABLE` and `tableConstraints` are accepted and dropped, and `ALTER TABLE ADD FOREIGN KEY`
-and `DROP CONSTRAINT` are unsupported.
+Tables keep primary and foreign keys from `CREATE TABLE` and REST `tableConstraints`.
+`tables.get`, `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `INFORMATION_SCHEMA.KEY_COLUMN_USAGE`
+report them. Foreign keys may be all named or all unnamed, in DDL and REST; mixing named and
+unnamed keys is unsupported until its generated names are verified.
 
-`tableConstraints` on materialized views are unsupported until BigQuery's behavior is verified.
+Foreign keys must reference the complete primary key of a managed table, with matching scalar
+column types, canonical table references and column names in their schema's case. Parameterized
+or collated columns, references to views or snapshots, temporary-table foreign keys, and duplicate
+or reserved constraint names are unsupported. `ALTER TABLE ADD FOREIGN KEY` and `DROP CONSTRAINT`
+remain unsupported.
+
+A table with foreign keys supports only `ALTER TABLE SET OPTIONS`, `DROP COLUMN` and
+`ALTER COLUMN SET DEFAULT` or `DROP DEFAULT`, subject to key-column restrictions. REST metadata
+updates can preserve or clear existing foreign keys, but cannot add or replace their definitions;
+REST schema changes are unsupported. Copy jobs from or into tables with foreign keys are
+unsupported; SQL `CREATE TABLE LIKE`, `COPY`, `CLONE` and `CREATE SNAPSHOT TABLE` preserve them.
+Replacing or expiring a referenced table, changing its schema or primary key through REST, and
+deleting a dataset referenced from outside it are unsupported.
+
+Foreign keys on views and `tableConstraints` on materialized views are unsupported until
+BigQuery's behavior is verified. A self-referencing `CREATE TABLE` returns HTTP 400 rather than
+BigQuery's HTTP 404 for the missing referenced table.
 
 ### ALTER TABLE
 

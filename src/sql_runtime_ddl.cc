@@ -41,6 +41,10 @@ void SqlRuntime::CheckDdlTarget(const TranslatedStatement& translation) {
 }
 
 void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement& translation) {
+  if (translation.ddl_target_dataset && translation.statement_type == "DROP_SCHEMA" &&
+      HasOutsideForeignKeyReferences(backend, *translation.ddl_target_dataset)) {
+    throw ApiError::Unsupported("deleting a dataset referenced by foreign keys outside it");
+  }
   const std::optional<TableReference>& target = translation.ddl_target_table;
   if (!target.has_value()) {
     return;
@@ -73,6 +77,16 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
       throw ApiError::NotFound("Not found: External table " + TableName(*target));
     }
     return;
+  }
+  const bool changes_references =
+      translation.replaces ||
+      (translation.altered_table &&
+       std::ranges::any_of(translation.altered_table->actions, [](const TableAlterAction& action) {
+         const auto* key = std::get_if<PrimaryKeyAction>(&action);
+         return key != nullptr && !key->drop;
+       }));
+  if (changes_references && HasForeignKeyReferences(backend, *target)) {
+    throw ApiError::Unsupported("changing or removing a table referenced by foreign keys");
   }
   const bool external = CommentMetadata(*comment).external_data.has_value();
   const bool snapshot = CommentMetadata(*comment).snapshot.has_value();
@@ -232,6 +246,13 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     const TableMetadata metadata = CommentMetadata(*comment);
     auto statements =
         AlterTableStatements(*alteration, schema, metadata, functions_.timestamp_precision());
+    if (std::ranges::any_of(alteration->actions, [](const TableAlterAction& action) {
+          const auto* key = std::get_if<PrimaryKeyAction>(&action);
+          return key != nullptr && key->drop;
+        })) {
+      std::ranges::move(DropForeignKeyReferenceStatements(backend, table),
+                        std::back_inserter(statements));
+    }
     TableReference destination = table;
     bool discards_history = false;
     for (const auto& action : alteration->actions) {
@@ -275,6 +296,11 @@ std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     }
     CheckCaseInsensitiveDataset(backend_, dataset, metadata);
     return AlterDatasetStatements(*alteration, std::move(metadata));
+  }
+  if (translation.statement_type == "DROP_TABLE" && translation.ddl_target_table) {
+    auto statements = DropForeignKeyReferenceStatements(backend, *translation.ddl_target_table);
+    statements.insert(statements.begin(), translation.sql);
+    return statements;
   }
   return std::nullopt;
 }

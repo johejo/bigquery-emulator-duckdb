@@ -98,11 +98,34 @@ struct BaseTableDefinition {
   std::string time = {};
 };
 
+struct ForeignKeyColumn {
+  std::string referencing_column;
+  std::string referenced_column;
+  bool operator==(const ForeignKeyColumn&) const = default;
+};
+
+// TableConstraints.foreignKeys, in declaration order.
+struct ForeignKey {
+  std::string name;
+  TableReference referenced_table;
+  std::vector<ForeignKeyColumn> columns;
+  // Generated DDL names appear in REST but not in INFORMATION_SCHEMA.TABLES.ddl.
+  bool generated_name = false;
+  // Compare the REST-visible definition; a metadata round trip need not retain its origin.
+  bool operator==(const ForeignKey& other) const {
+    return name == other.name && columns == other.columns &&
+           referenced_table.project_id == other.referenced_table.project_id &&
+           referenced_table.dataset_id == other.referenced_table.dataset_id &&
+           referenced_table.table_id == other.referenced_table.table_id;
+  }
+};
+
 // What a table or view carries besides its schema: Table.description, friendlyName, labels and
-// resourceTags, a table's unenforced primary key, its partitioning and clustering, which only
-// shape how BigQuery stores it, the defaultRoundingMode that NUMERIC and BIGNUMERIC fields added
-// to it later take, the cloneDefinition of a clone or snapshotDefinition of a table snapshot, and
-// its expiration. An empty description or friendly name, or kUnspecified rounding mode, is unset.
+// resourceTags, a table's unenforced primary and foreign keys, its partitioning and clustering,
+// which only shape how BigQuery stores it, the defaultRoundingMode that NUMERIC and BIGNUMERIC
+// fields added to it later take, the cloneDefinition of a clone or snapshotDefinition of a table
+// snapshot, and its expiration. An empty description or friendly name, or kUnspecified rounding
+// mode, is unset.
 struct TableMetadata {
   std::optional<GcsExternalData> external_data;
   std::string description;
@@ -119,6 +142,7 @@ struct TableMetadata {
   std::vector<std::string> clustering;  // Clustering.fields.
   // TableConstraints.primaryKey.columns; empty when the table has no primary key.
   std::vector<std::string> primary_key;
+  std::vector<ForeignKey> foreign_keys;
   RoundingMode default_rounding_mode = RoundingMode::kUnspecified;
   std::optional<std::string> default_collation;
   std::optional<BaseTableDefinition> clone;
@@ -133,7 +157,7 @@ struct TableMetadata {
   [[nodiscard]] bool empty() const {
     return !external_data && description.empty() && friendly_name.empty() && labels.empty() &&
            resource_tags.empty() && !partitioned() && !require_partition_filter &&
-           clustering.empty() && primary_key.empty() &&
+           clustering.empty() && primary_key.empty() && foreign_keys.empty() &&
            default_rounding_mode == RoundingMode::kUnspecified && !clone.has_value() &&
            !snapshot.has_value() && !expiration_time.has_value() && !restored_from_snapshot &&
            creation_time == 0 && !default_collation.has_value();
@@ -236,8 +260,8 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // remain unsupported. Full updates replace resourceTags.
 // tables.update replaces the description, friendly name, labels, clustering, primary key, default
 // rounding mode and expiration, including the required partition filter. tables.patch keeps the
-// primary key when tableConstraints has none. Both drop the foreign keys of tableConstraints, as
-// DDL does.
+// primary key when tableConstraints has none. Foreign keys can be preserved or cleared; adding
+// or replacing their definitions through REST updates remains unsupported.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
 // cloneDefinition and snapshotDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
@@ -277,6 +301,15 @@ void ValidateResourceTags(const std::map<std::string, std::string>& tags);
 // since the emulator does not encrypt tables with Cloud KMS keys. Null or {} leaves it unset.
 void RejectEncryptionConfiguration(const nlohmann::json& body, const char* key,
                                    const std::string& what);
+
+// Assigns fk$1, fk$2, ... to an entirely unnamed list, in declaration order.
+// Mixing named and unnamed constraints remains unsupported until its numbering is verified.
+void AssignForeignKeyNames(std::vector<ForeignKey>& keys);
+
+// Validates a foreign key against the local and referenced schema. Forms whose validation
+// behavior is not established are rejected as unsupported rather than approximated.
+void ValidateForeignKey(const ForeignKey& key, const std::vector<FieldSchema>& schema,
+                        const TableDescription& referenced);
 
 // The columns of `primary_key` as `schema` spells them, which BigQuery reports whatever case
 // they are given in. Throws ApiError::Invalid for a column `schema` lacks or of a type BigQuery

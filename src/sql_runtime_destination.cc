@@ -157,6 +157,13 @@ QueryResult SqlRuntime::WriteDestination(
   }
   if (existing.has_value()) {
     RejectReadOnlyWrite(*existing);
+    if (write == WriteDisposition::kWriteTruncate &&
+        HasForeignKeyReferences(backend_, existing->reference)) {
+      throw ApiError::Unsupported("replacing a table referenced by foreign keys");
+    }
+    if (copy && !existing->metadata.foreign_keys.empty()) {
+      throw ApiError::Unsupported("copy jobs into tables with foreign keys");
+    }
   }
   if (!existing.has_value() && create == CreateDisposition::kCreateNever) {
     throw ApiError::NotFound("Not found: Table " + TableName(destination));

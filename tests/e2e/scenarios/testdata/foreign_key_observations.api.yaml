@@ -1,0 +1,375 @@
+version: 1
+description: Foreign key metadata and mutations observed in BigQuery; provenance is the adjacent answers sidecar.
+vars:
+  dataset: bqa_${run}_${case}
+  table: child
+  parent: CREATE TABLE `${project}.${dataset}.parent` (id INT64, PRIMARY KEY (id) NOT ENFORCED)
+  child: >-
+    CREATE TABLE `${project}.${dataset}.child`
+    (id INT64, CONSTRAINT fk FOREIGN KEY (id)
+     REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED)
+  fixture: '${parent}; ${child}'
+  constraint: fk
+  column: id
+  referenced_column: id
+  constraint_clause: 'CONSTRAINT fk '
+  table_constraints:
+    foreignKeys:
+      - name: '${constraint}'
+        referencedTable: {projectId: '${project}', datasetId: '${dataset}', tableId: parent}
+        columnReferences: [{referencingColumn: '${column}', referencedColumn: '${referenced_column}'}]
+  expected_ddl: |-
+    CREATE TABLE `${project}.${dataset}.${table}`
+    (
+      ${column} INT64,
+      ${constraint_clause}FOREIGN KEY (${column}) REFERENCES `${project}.${dataset}.parent`(${referenced_column}) NOT ENFORCED
+    );
+  empty_ddl: |-
+    CREATE TABLE `${project}.${dataset}.child`
+    (
+      id INT64
+    );
+templates:
+  sql:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${statement}', useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.KEY_COLUMN_USAGE`
+              WHERE table_name = '${table}' ORDER BY constraint_name, ordinal_position
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {rows: /body/rows, error: /body/error, jobComplete: /body/jobComplete}
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = '${table}'
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {rows: /body/rows, error: /body/error, jobComplete: /body/jobComplete}
+    cleanup:
+      - name: cleanup
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rejection:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${statement}', useLegacySql: false, location: US, timeoutMs: 200000}
+        expectFailure: true
+        observe: {code: /body/error/code}
+    cleanup:
+      - name: cleanup
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  snapshot:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${statement}', useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}
+        bind: {snapshot_time: /body/snapshotDefinition/snapshotTime}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.KEY_COLUMN_USAGE`
+              WHERE table_name = '${table}' ORDER BY constraint_name, ordinal_position
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {rows: /body/rows, error: /body/error, jobComplete: /body/jobComplete}
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = '${table}'
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {rows: /body/rows, error: /body/error, jobComplete: /body/jobComplete}
+    cleanup:
+      - name: cleanup
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  rest_update:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: '${fixture}', useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: update
+        rest:
+          method: '${method}'
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/child
+          body: '${update}'
+        observe: {tableConstraints: /body/tableConstraints, error: /body/error}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/child
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: cleanup
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: unnamed_table_constraint
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      constraint: fk$1
+      constraint_clause: ''
+      fixture: '${parent}'
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.child`
+        (id INT64, FOREIGN KEY (id) REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED)
+  - name: unnamed_column_constraint
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      constraint: fk$1
+      constraint_clause: ''
+      fixture: '${parent}'
+      statement: CREATE TABLE `${project}.${dataset}.child` (id INT64 REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED)
+  - name: column_case
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      constraint: MixedCase
+      column: ID
+      referenced_column: Id
+      constraint_clause: 'CONSTRAINT MixedCase '
+      fixture: CREATE TABLE `${project}.${dataset}.parent` (Id INT64, PRIMARY KEY (Id) NOT ENFORCED)
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.child`
+        (ID INT64, CONSTRAINT MixedCase FOREIGN KEY (id) REFERENCES `${project}.${dataset}.parent` (ID) NOT ENFORCED)
+  - name: missing_primary_key
+    template: rejection
+    expect: {fixture: {jobComplete: true}, statement: {code: 400}}
+    vars:
+      fixture: CREATE TABLE `${project}.${dataset}.parent` (id INT64)
+      statement: '${child}'
+  - name: mismatched_column_type
+    template: rejection
+    expect: {fixture: {jobComplete: true}, statement: {code: 400}}
+    vars:
+      fixture: '${parent}'
+      statement: >-
+        CREATE TABLE `${project}.${dataset}.child`
+        (id STRING, CONSTRAINT fk FOREIGN KEY (id) REFERENCES `${project}.${dataset}.parent` (id) NOT ENFORCED)
+  - name: like
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      table: copied
+      statement: CREATE TABLE `${project}.${dataset}.copied` LIKE `${project}.${dataset}.child`
+  - name: copy
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      table: copied
+      statement: CREATE TABLE `${project}.${dataset}.copied` COPY `${project}.${dataset}.child`
+  - name: clone
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      table: copied
+      statement: CREATE TABLE `${project}.${dataset}.copied` CLONE `${project}.${dataset}.child`
+  - name: snapshot
+    template: snapshot
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {tableConstraints: '${table_constraints}'}
+      information_schema:
+        jobComplete: true
+        rows: [{f: [{v: '${table}.${constraint}'}, {v: '${column}'}, {v: '1'}, {v: '1'}]}]
+      ddl: {jobComplete: true, rows: [{f: [{v: '${expected_ddl}'}]}]}
+    vars:
+      expected_ddl: |-
+        CREATE SNAPSHOT TABLE `${project}.${dataset}.copied`
+        CLONE `${project}.${dataset}.child`
+        FOR SYSTEM_TIME AS OF TIMESTAMP "${snapshot_time}";
+      table: copied
+      statement: CREATE SNAPSHOT TABLE `${project}.${dataset}.copied` CLONE `${project}.${dataset}.child`
+  - name: drop_parent
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {}
+      information_schema: {jobComplete: true}
+      ddl: {jobComplete: true, rows: [{f: [{v: '${empty_ddl}'}]}]}
+    vars:
+      statement: DROP TABLE `${project}.${dataset}.parent`
+  - name: rename_parent
+    template: rejection
+    expect: {fixture: {jobComplete: true}, statement: {code: 400}}
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.parent` RENAME TO renamed
+  - name: drop_referenced_primary_key
+    template: sql
+    expect:
+      fixture: {jobComplete: true}
+      statement: {jobComplete: true}
+      table: {}
+      information_schema: {jobComplete: true}
+      ddl: {jobComplete: true, rows: [{f: [{v: '${empty_ddl}'}]}]}
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.parent` DROP PRIMARY KEY
+  - name: drop_referencing_column
+    template: rejection
+    expect: {fixture: {jobComplete: true}, statement: {code: 400}}
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.child` DROP COLUMN id
+  - name: set_referencing_column_default
+    template: rejection
+    expect: {fixture: {jobComplete: true}, statement: {code: 400}}
+    vars:
+      statement: ALTER TABLE `${project}.${dataset}.child` ALTER COLUMN id SET DEFAULT 1
+  - name: patch_empty_constraints
+    template: rest_update
+    expect:
+      fixture: {jobComplete: true}
+      update: {tableConstraints: '${table_constraints}'}
+      table: {tableConstraints: '${table_constraints}'}
+    vars: {method: PATCH, update: {tableConstraints: {}}}
+  - name: patch_null_constraints
+    template: rest_update
+    expect: {fixture: {jobComplete: true}, update: {}, table: {}}
+    vars: {method: PATCH, update: {tableConstraints: null}}
+  - name: patch_null_foreign_keys
+    template: rest_update
+    expect: {fixture: {jobComplete: true}, update: {}, table: {}}
+    vars: {method: PATCH, update: {tableConstraints: {foreignKeys: null}}}
+  - name: patch_empty_foreign_keys
+    template: rest_update
+    expect: {fixture: {jobComplete: true}, update: {}, table: {}}
+    vars: {method: PATCH, update: {tableConstraints: {foreignKeys: []}}}
+  - name: put_without_constraints
+    template: rest_update
+    expect: {fixture: {jobComplete: true}, update: {}, table: {}}
+    vars:
+      method: PUT
+      update:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: child}
+        schema: {fields: [{name: id, type: INTEGER}]}

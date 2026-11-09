@@ -1,8 +1,7 @@
 version: 1
 # Recorded on BigQuery in project johejo-sandbox, run ahjpbnimu3gaa5n7mq3w4pvcah; the answers
 # sidecar keeps the observations.
-description: >-
-  Foreign key metadata the emulator drops rather than storing and returning.
+description: Generated foreign key names returned in table metadata.
 vars:
   dataset: e2e_${run}_${case}
 cases:

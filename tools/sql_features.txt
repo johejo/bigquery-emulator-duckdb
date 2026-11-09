@@ -321,7 +321,10 @@ note Partitioning and clustering | See [Partitioning and clustering](compatibili
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
 query Primary and foreign keys | CREATE TABLE n (a INT64 PRIMARY KEY NOT ENFORCED)
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED) AS SELECT 1 AS a
-query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED)
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED, b INT64 REFERENCES u (id) NOT ENFORCED)
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, b INT64, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED, FOREIGN KEY (b) REFERENCES u (id) NOT ENFORCED)
 query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED
 query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE u DROP PRIMARY KEY
 query Primary and foreign keys | ALTER TABLE u DROP PRIMARY KEY IF EXISTS
@@ -597,8 +600,15 @@ query `TABLE_SNAPSHOTS` | CREATE SNAPSHOT TABLE d.n CLONE d.t; SELECT table_name
 query `TABLE_SNAPSHOTS` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLE_SNAPSHOTS
 query `TABLE_OPTIONS` | ALTER TABLE d.t SET OPTIONS (description = 'x'); SELECT table_name, option_name, option_type, option_value FROM d.INFORMATION_SCHEMA.TABLE_OPTIONS
 query `TABLE_OPTIONS` | SELECT table_schema, table_name, option_name FROM `region-us`.INFORMATION_SCHEMA.TABLE_OPTIONS
+query `TABLES` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED); SELECT table_name, ddl FROM d.INFORMATION_SCHEMA.TABLES
+query `TABLES` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED); SELECT table_name, ddl FROM d.INFORMATION_SCHEMA.TABLES
+note `TABLES` | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
 query `TABLE_CONSTRAINTS` | ALTER TABLE d.t ADD PRIMARY KEY (id) NOT ENFORCED; SELECT constraint_name, table_name, constraint_type, enforced FROM d.INFORMATION_SCHEMA.TABLE_CONSTRAINTS
 query `KEY_COLUMN_USAGE` | ALTER TABLE d.t ADD PRIMARY KEY (id) NOT ENFORCED; SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint FROM d.INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+query `TABLE_CONSTRAINTS` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED); SELECT constraint_name, constraint_type FROM d.INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+query `TABLE_CONSTRAINTS` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED); SELECT constraint_name, constraint_type FROM d.INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+query `KEY_COLUMN_USAGE` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED); SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint FROM d.INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+query `KEY_COLUMN_USAGE` | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED); SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint FROM d.INFORMATION_SCHEMA.KEY_COLUMN_USAGE
 note `TABLE_CONSTRAINTS` | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
 note `KEY_COLUMN_USAGE` | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
 query `PARTITIONS` | CREATE TABLE d.p (day DATE) PARTITION BY day; INSERT d.p VALUES (DATE '2021-07-12'); SELECT table_name, partition_id, total_rows FROM d.INFORMATION_SCHEMA.PARTITIONS

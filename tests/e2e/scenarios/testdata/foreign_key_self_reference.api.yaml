@@ -1,0 +1,39 @@
+version: 1
+# BigQuery returns 404 for a missing self-referenced table.
+# Provenance: foreign_key_self_reference.api.answers.json.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: self_reference
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {query: SELECT 1, useLegacySql: false, location: US, timeoutMs: 200000}
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: statement
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CREATE TABLE `${project}.${dataset}.child`
+              (id INT64, parent_id INT64, PRIMARY KEY (id) NOT ENFORCED,
+               CONSTRAINT fk FOREIGN KEY (parent_id) REFERENCES `${project}.${dataset}.child` (id) NOT ENFORCED)
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        expectFailure: true
+        observe: {code: /body/error/code}
+    cleanup:
+      - name: cleanup
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect: {fixture: {jobComplete: true}, statement: {code: 404}}

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "cases": {
+    "self_reference": {
+      "project": "johejo-sandbox",
+      "run": "mxm5hqmrbqr4aokhnqxjd2b4jc",
+      "steps": {
+        "fixture": {
+          "jobComplete": true
+        },
+        "statement": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 404,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Not found: Table johejo-sandbox:bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_self_reference.child was not found in location US",
+                    "reason": "notFound"
+                  }
+                ],
+                "message": "Not found: Table johejo-sandbox:bqa_mxm5hqmrbqr4aokhnqxjd2b4jc_self_reference.child was not found in location US",
+                "status": "NOT_FOUND"
+              }
+            },
+            "status": 404
+          }
+        }
+      }
+    }
+  }
+}

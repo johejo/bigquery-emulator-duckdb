@@ -1,0 +1,154 @@
+version: 1
+# Expectations follow the composite-key example in
+# third_party/bigquery_docs/information-schema-key-column-usage.md, the schema in
+# third_party/bigquery_docs/information-schema-table-constraints.md, and TableConstraints
+# in third_party/bigquery/discovery.json. No constraint is enforced.
+description: Foreign key metadata agrees across DDL, REST and INFORMATION_SCHEMA.
+vars:
+  dataset: e2e_${run}_${case}
+  constraints:
+    primaryKey: {columns: [x, y]}
+    foreignKeys:
+      - name: composite_fk
+        referencedTable: {projectId: '${project}', datasetId: '${dataset}', tableId: composite_pk}
+        columnReferences:
+          - {referencingColumn: z, referencedColumn: y}
+          - {referencingColumn: x, referencedColumn: x}
+  constraint_rows:
+    - {f: [{v: composite_fk.composite_fk}, {v: composite_fk}, {v: FOREIGN KEY}, {v: 'NO'}, {v: 'NO'}, {v: 'NO'}]}
+    - {f: [{v: composite_fk.pk$}, {v: composite_fk}, {v: PRIMARY KEY}, {v: 'NO'}, {v: 'NO'}, {v: 'NO'}]}
+    - {f: [{v: composite_pk.pk$}, {v: composite_pk}, {v: PRIMARY KEY}, {v: 'NO'}, {v: 'NO'}, {v: 'NO'}]}
+  column_rows:
+    - {f: [{v: composite_fk.composite_fk}, {v: z}, {v: '1'}, {v: '2'}]}
+    - {f: [{v: composite_fk.composite_fk}, {v: x}, {v: '2'}, {v: '1'}]}
+    - {f: [{v: composite_fk.pk$}, {v: x}, {v: '1'}, {v: null}]}
+    - {f: [{v: composite_fk.pk$}, {v: y}, {v: '2'}, {v: null}]}
+    - {f: [{v: composite_pk.pk$}, {v: x}, {v: '1'}, {v: null}]}
+    - {f: [{v: composite_pk.pk$}, {v: y}, {v: '2'}, {v: null}]}
+templates:
+  create:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: parent
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.composite_pk` (x INT64, y STRING, PRIMARY KEY (x, y) NOT ENFORCED)
+            useLegacySql: false
+        observe: {error: /body/error}
+      - name: child
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/${child_endpoint}
+          body: '${child_body}'
+        observe: {error: /body/error}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/composite_fk
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: constraints
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT constraint_name, table_name, constraint_type, is_deferrable,
+                     initially_deferred, enforced
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_CONSTRAINTS`
+              ORDER BY constraint_name
+            useLegacySql: false
+        observe: {rows: /body/rows}
+      - name: columns
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT constraint_name, column_name, ordinal_position, position_in_unique_constraint
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.KEY_COLUMN_USAGE`
+              ORDER BY constraint_name, ordinal_position
+            useLegacySql: false
+        observe: {rows: /body/rows}
+      - name: patch_description
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/composite_fk
+          body: {description: child}
+        observe: {tableConstraints: /body/tableConstraints}
+      - name: update_round_trip
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/composite_fk
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: composite_fk}
+            schema: {fields: [{name: x, type: INTEGER}, {name: y, type: STRING}, {name: z, type: STRING}]}
+            tableConstraints: '${constraints}'
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: ddl
+    template: create
+    vars:
+      child_endpoint: queries
+      child_body:
+        query: >-
+          CREATE TABLE `${project}.${dataset}.composite_fk`
+          (x INT64, y STRING, z STRING, PRIMARY KEY (x, y) NOT ENFORCED,
+           CONSTRAINT composite_fk FOREIGN KEY (z, x)
+           REFERENCES `${project}.${dataset}.composite_pk` (y, x) NOT ENFORCED)
+        useLegacySql: false
+    expect:
+      parent: {}
+      child: {}
+      table: {tableConstraints: '${constraints}'}
+      constraints: {rows: '${constraint_rows}'}
+      columns: {rows: '${column_rows}'}
+      patch_description: {tableConstraints: '${constraints}'}
+      update_round_trip: {tableConstraints: '${constraints}'}
+  - name: ddl_as_select
+    template: create
+    vars:
+      child_endpoint: queries
+      child_body:
+        query: >-
+          CREATE TABLE `${project}.${dataset}.composite_fk`
+          (x INT64, y STRING, z STRING, PRIMARY KEY (x, y) NOT ENFORCED,
+           CONSTRAINT composite_fk FOREIGN KEY (z, x)
+           REFERENCES `${project}.${dataset}.composite_pk` (y, x) NOT ENFORCED)
+          AS SELECT 1 AS x, 'duplicate' AS y, 'missing' AS z
+          UNION ALL SELECT 1, 'duplicate', 'missing'
+        useLegacySql: false
+    expect:
+      parent: {}
+      child: {}
+      table: {tableConstraints: '${constraints}'}
+      constraints: {rows: '${constraint_rows}'}
+      columns: {rows: '${column_rows}'}
+      patch_description: {tableConstraints: '${constraints}'}
+      update_round_trip: {tableConstraints: '${constraints}'}
+  - name: rest
+    template: create
+    vars:
+      child_endpoint: datasets/${dataset}/tables
+      child_body:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: composite_fk}
+        schema: {fields: [{name: x, type: INTEGER}, {name: y, type: STRING}, {name: z, type: STRING}]}
+        tableConstraints: '${constraints}'
+    expect:
+      parent: {}
+      child: {}
+      table: {tableConstraints: '${constraints}'}
+      constraints: {rows: '${constraint_rows}'}
+      columns: {rows: '${column_rows}'}
+      patch_description: {tableConstraints: '${constraints}'}
+      update_round_trip: {tableConstraints: '${constraints}'}

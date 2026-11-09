@@ -75,6 +75,10 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
   }
   try {
     TableMetadata metadata = TableMetadataFromJson(object);
+    const auto generated = object.value("generatedForeignKeyNames", std::vector<std::string>{});
+    for (ForeignKey& key : metadata.foreign_keys) {
+      key.generated_name = std::ranges::find(generated, key.name) != generated.end();
+    }
     metadata.label_order = object.value("labelOrder", std::vector<std::string>{});
     metadata.tag_order = object.value("tagOrder", std::vector<std::string>{});
     metadata.restored_from_snapshot = object.value("restoredFromSnapshot", false);
@@ -118,7 +122,7 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
     }
     if (metadata.partitioned() || metadata.require_partition_filter ||
         !metadata.clustering.empty() || !metadata.primary_key.empty() ||
-        metadata.default_collation ||
+        !metadata.foreign_keys.empty() || metadata.default_collation ||
         metadata.default_rounding_mode != RoundingMode::kUnspecified || metadata.clone ||
         metadata.snapshot) {
       throw ApiError::Unsupported("external table storage options");
@@ -196,9 +200,29 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
       throw ApiError::Unsupported("this external table column definition: " + unsupported->name);
     }
   }
+  if (metadata.foreign_keys.size() > 64) {
+    throw ApiError::Unsupported("more than 64 foreign keys");
+  }
+  std::vector<std::string> constraint_names;
+  for (const ForeignKey& key : metadata.foreign_keys) {
+    if (key.name.empty()) {
+      continue;
+    }
+    const std::string name = ToLowerAscii(key.name);
+    if (name == "pk$" || (name.starts_with("fk$") && !key.generated_name) ||
+        std::ranges::find(constraint_names, name) != constraint_names.end()) {
+      throw ApiError::Unsupported("duplicate or reserved foreign key names");
+    }
+    constraint_names.push_back(name);
+  }
   ValidatePartitioning(metadata, schema);
   metadata.primary_key = PrimaryKeyColumns(metadata.primary_key, schema);
   json comment = metadata.ToJson();
+  for (const ForeignKey& key : metadata.foreign_keys) {
+    if (key.generated_name) {
+      comment["generatedForeignKeyNames"].push_back(key.name);
+    }
+  }
   if (!metadata.tag_order.empty()) {
     comment["tagOrder"] = metadata.tag_order;
   }
@@ -218,6 +242,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
   if (view.metadata.external_data) {
     throw ApiError::Invalid("A view cannot have externalDataConfiguration");
+  }
+  if (!view.metadata.foreign_keys.empty()) {
+    throw ApiError::Unsupported("foreign keys on views");
   }
   ValidateLabels(view.metadata.labels);
   ValidateResourceTags(view.metadata.resource_tags);

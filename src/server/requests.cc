@@ -928,6 +928,13 @@ TableUpdateRequest ParseTableUpdate(const json& resource, bool patch) {
       updated.contains("timePartitioning") && updated["timePartitioning"].is_object()) {
     updated["timePartitioning"]["expirationMs"] = nullptr;
   }
+  // An explicit null foreignKeys clears the constraints, unlike an omitted member.
+  if (const auto constraints = resource.find("tableConstraints");
+      constraints != resource.end() && constraints->is_object() &&
+      constraints->contains("foreignKeys") && (*constraints)["foreignKeys"].is_null() &&
+      updated.contains("tableConstraints") && updated["tableConstraints"].is_object()) {
+    updated["tableConstraints"]["foreignKeys"] = nullptr;
+  }
   TableUpdateRequest request{
       .resource = std::move(updated),
       .schema = std::nullopt,
