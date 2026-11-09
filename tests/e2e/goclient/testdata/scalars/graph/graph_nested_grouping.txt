@@ -1,0 +1,144 @@
+# Sources: third_party/bigquery_docs/reference/standard-sql/data-types.md
+# (arrays and structs group recursively; neither is allowed in PARTITION BY)
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+# (graph element identity is its element table and key, not its properties).
+
+# Nodes with identical visible properties still have distinct identities inside containers.
+SELECT COUNT(*) FROM (
+  SELECT [n] AS nodes, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person), (m:Person) RETURN n)
+  GROUP BY nodes
+)
+=> "3"
+SELECT COUNT(*) FROM (
+  SELECT DISTINCT STRUCT([STRUCT(n AS node)] AS nodes) AS s
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person), (m:Person) RETURN n)
+)
+=> "3"
+
+# GQL grouping and WITH DISTINCT keep nested graph values across NEXT.
+GRAPH scalar_graph.FinGraph
+MATCH (n:Person), (m:Person)
+RETURN [STRUCT(n AS node)] AS nodes, COUNT(*) AS c GROUP BY nodes
+NEXT RETURN SUM(nodes[OFFSET(0)].node.id) AS result
+=> "6"
+GRAPH scalar_graph.HiddenKeys
+MATCH (n:Person), (m:Person)
+WITH DISTINCT STRUCT([n] AS nodes) AS s
+RETURN COUNT(*) AS result
+=> "3"
+
+# Array order, length and empty arrays participate in grouping.
+SELECT COUNT(*) FROM (
+  SELECT DISTINCT [n, m] AS nodes
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person), (m:Person) RETURN n, m)
+)
+=> "9"
+SELECT COUNT(*) FROM (
+  SELECT IF(k = 0, [], IF(k = 1, [n], [n, n])) AS nodes, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n), UNNEST([0, 1, 2]) AS k
+  GROUP BY nodes
+)
+=> "7"
+
+# Edge identity and composite node keys survive nested containers too.
+SELECT COUNT(*) FROM (
+  SELECT DISTINCT STRUCT(e AS edge) AS s
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH ()-[e:Knows]->() RETURN e)
+)
+=> "4"
+SELECT COUNT(*) FROM (
+  SELECT DISTINCT [STRUCT(n AS node)] AS nodes
+  FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (n:Compound) RETURN n)
+)
+=> "3"
+
+# NULL arrays, empty arrays and arrays containing NULL elements are distinct internal keys.
+SELECT COUNT(*) FROM (
+  SELECT IF(k = 0, NULL, IF(k = 1, [], [IF(FALSE, n, NULL)])) AS nodes, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n), UNNEST([0, 1, 2]) AS k
+  GROUP BY nodes
+)
+=> "3"
+
+# A NULL STRUCT differs from a non-NULL STRUCT whose graph field is NULL.
+SELECT COUNT(*) FROM (
+  SELECT IF(k = 0, NULL, STRUCT(IF(FALSE, n, NULL) AS node)) AS s, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n), UNNEST([0, 1]) AS k
+  GROUP BY s
+)
+=> "2"
+
+# Representatives retain properties, not just the identity used to group them.
+SELECT SUM(nodes[OFFSET(0)].node.id) FROM (
+  SELECT [STRUCT(n AS node)] AS nodes, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person), (m:Person) RETURN n)
+  GROUP BY nodes
+)
+=> "6"
+
+# Collation of scalar fields and identity of graph fields both apply to the same key.
+SELECT COUNT(*) FROM (
+  SELECT STRUCT(n AS node, COLLATE(v, 'und:ci') AS text) AS s, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n), UNNEST(['a', 'A']) AS v
+  GROUP BY s
+)
+=> "3"
+
+# INTERVAL fields still group by duration alongside graph identity.
+SELECT COUNT(*) FROM (
+  SELECT STRUCT(n AS node, i AS duration) AS s, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n),
+    UNNEST([INTERVAL 1 YEAR, INTERVAL 12 MONTH]) AS i
+  GROUP BY s
+)
+=> "3"
+SELECT COUNT(*) FROM (
+  SELECT STRUCT(n AS node, i AS duration) AS s, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n),
+    UNNEST([INTERVAL 1 YEAR, INTERVAL 12 MONTH]) AS i
+  GROUP BY ROLLUP(s)
+)
+=> "4"
+
+# Positional fields handle anonymous and duplicate STRUCT field names.
+SELECT COUNT(*) FROM (
+  SELECT STRUCT(n, n) AS s, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person) RETURN n)
+  GROUP BY s
+)
+=> "3"
+SELECT COUNT(*) FROM (
+  SELECT STRUCT(n AS node, m AS node) AS s, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (n:Person), (m:Person) RETURN n, m)
+  GROUP BY s
+)
+=> "9"
+
+# GROUPING SETS preserves the original containers and marks subtotal NULLs.
+SELECT FORMAT('%d:%d:%d', COUNT(nodes), SUM(c), SUM(g)) FROM (
+  SELECT nodes, COUNT(*) AS c, GROUPING(nodes) AS g
+  FROM (SELECT [n] AS nodes FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n))
+  GROUP BY ROLLUP(nodes)
+)
+=> "3:6:1"
+SELECT SUM(nodes[OFFSET(0)].id) FROM (
+  SELECT [n] AS nodes, COUNT(*) AS c
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN n)
+  GROUP BY ROLLUP(nodes)
+)
+=> "6"
+
+# HAVING MAX with grouping sets uses the same recursive keys.
+SELECT SUM(last.id) FROM (
+  SELECT [n] AS nodes, ANY_VALUE(n HAVING MAX n.id) AS last
+  FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person), (m:Person) RETURN n)
+  GROUP BY ROLLUP(nodes)
+)
+=> "9"
+
+# ARRAY and STRUCT partition keys stay rejected, including those with graph elements.
+SELECT MAX(c) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN COUNT(*) OVER (PARTITION BY [n]) AS c)
+=> error:
+SELECT MAX(c) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n:Person) RETURN COUNT(*) OVER (PARTITION BY STRUCT(n AS node)) AS c)
+=> error:

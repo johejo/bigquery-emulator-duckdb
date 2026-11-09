@@ -87,6 +87,8 @@ query GQL queries | GRAPH d.g MATCH (p:Person) RETURN p.name ORDER BY p.name
 query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) FILTER WHERE a.id <> b.id LET n = b.id + 1 RETURN a.name, n
 query GQL queries | GRAPH d.g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a, COUNT(*) AS n GROUP BY a NEXT RETURN a.name, n
 query GQL queries | GRAPH d.g MATCH (p:Person) WITH DISTINCT p RETURN p.id
+query GQL queries | GRAPH d.g MATCH (p:Person) RETURN [p] AS nodes, COUNT(*) AS n GROUP BY nodes NEXT RETURN nodes[OFFSET(0)].id AS id, n
+query GQL queries | GRAPH d.g MATCH (p:Person) WITH DISTINCT STRUCT([p] AS nodes) AS s RETURN s.nodes[OFFSET(0)].id AS id
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ANY_VALUE(p HAVING MAX p.id).id AS id
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN MIN_BY(p, p.id).id AS id, MAX_BY(p, p.id).id AS max_id
 query GQL queries | GRAPH d.g MATCH (p:Person) RETURN ARRAY_AGG(p ORDER BY p.id LIMIT 1)[OFFSET(0)].id AS id

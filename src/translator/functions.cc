@@ -106,7 +106,12 @@ constexpr auto kHandlers =
                 "$MAKE_ARRAY",
                 {
                     .handler = MakeArray,
-                    .uses = {TypeUse::kCarries, TypeUse::kReadsEmptyStruct, TypeUse::kBigNumeric},
+                    .uses = {
+                        TypeUse::kCarries,
+                        TypeUse::kReadsEmptyStruct,
+                        TypeUse::kGraphValues,
+                        TypeUse::kBigNumeric,
+                    },
                 },
             },
             {"$AND", {.handler = Logical}},
