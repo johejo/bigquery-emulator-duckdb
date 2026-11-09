@@ -44,6 +44,11 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
 
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
 
+  using googlesql::Catalog::FindFunction;
+  absl::Status FindFunction(const absl::Span<const std::string>& path,
+                            const googlesql::Function** function,
+                            const FindOptions& options) override;
+
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
                          const FindOptions& options) override;
   absl::Status FindTableWithPathPrefix(absl::Span<const std::string> path,

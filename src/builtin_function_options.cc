@@ -28,6 +28,8 @@ ExcludedFunctionIds BigQueryExcludedFunctionIds() {
       googlesql::FN_ARRAY_LAST_N,
       googlesql::FN_ARRAY_REMOVE_FIRST_N,
       googlesql::FN_ARRAY_REMOVE_LAST_N,
+      googlesql::FN_ARRAY_INCLUDES,
+      googlesql::FN_ARRAY_INCLUDES_LAMBDA,
   };
 }
 

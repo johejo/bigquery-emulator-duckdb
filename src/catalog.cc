@@ -13,6 +13,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/types/span.h"
 #include "googlesql/public/analyzer_output.h"
+#include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/table_valued_function.h"
@@ -50,6 +51,20 @@ BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* ty
       temporary_(temporary) {}
 
 BigQueryCatalog::~BigQueryCatalog() = default;
+
+absl::Status BigQueryCatalog::FindFunction(const absl::Span<const std::string>& path,
+                                           const googlesql::Function** function,
+                                           const FindOptions& options) {
+  // BigQuery reports this GoogleSQL-only function as not implemented, rather than not found.
+  // Keep it available to the GoogleSQL compliance runtime, which excludes no signatures.
+  if (path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "array_includes") &&
+      std::ranges::find(excluded_function_ids_, googlesql::FN_ARRAY_INCLUDES) !=
+          excluded_function_ids_.end()) {
+    *function = nullptr;
+    return absl::UnimplementedError("Function ARRAY_INCLUDES is not yet implemented.");
+  }
+  return googlesql::CatalogWrapper::FindFunction(path, function, options);
+}
 
 absl::Status BigQueryCatalog::FindTableValuedFunction(
     const absl::Span<const std::string>& path, const googlesql::TableValuedFunction** function,
