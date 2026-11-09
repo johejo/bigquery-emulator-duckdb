@@ -1,0 +1,4 @@
+# Observed BigQuery answer recorded with tools/bqanswers: ARRAY_INCLUDES is GoogleSQL-only.
+# Reject it before GoogleSQL's SQL inliner can turn it into supported comparisons.
+SELECT ARRAY_INCLUDES([COLLATE('a', 'und:ci')], 'A')
+=> error: Function ARRAY_INCLUDES is not yet implemented.

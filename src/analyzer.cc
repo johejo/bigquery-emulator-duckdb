@@ -720,10 +720,14 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     const absl::Status formatted =
         googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status);
     // The analyzer nests an error of the catalog's, such as EXTERNAL_QUERY's, in one of its own.
-    // One that the emulator does not support is the statement's error.
+    // One that the emulator does not support is the statement's error, as is a function the
+    // catalog reports as not implemented, which the analyzer returns unchanged.
     const std::string_view formatted_message = formatted.message();
     if (formatted_message.starts_with("The emulator does not support ") ||
-        formatted_message.starts_with("Missing value for SECURE_CONTEXT('")) {
+        formatted_message.starts_with("Missing value for SECURE_CONTEXT('") ||
+        (formatted.code() == absl::StatusCode::kUnimplemented &&
+         formatted_message.starts_with("Function ") &&
+         formatted_message.ends_with(" is not yet implemented."))) {
       throw std::runtime_error(std::string(formatted_message));
     }
     if (const size_t nested = formatted_message.find("\nThe emulator does not support ");

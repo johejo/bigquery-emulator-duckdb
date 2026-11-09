@@ -574,6 +574,7 @@ cc_library(
         "@abseil-cpp//absl/strings:string_view",
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/public:analyzer_output",
+        "@googlesql//googlesql/public:builtin_function_cc_proto",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:simple_catalog_util",
         "@googlesql//googlesql/public:type",
