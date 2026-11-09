@@ -7,6 +7,7 @@
 #include "src/field_schema.h"
 #include "src/location.h"
 #include "src/references.h"
+#include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
@@ -58,6 +59,9 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                               std::vector<FieldSchema>& schema,
                                               TableMetadata metadata, TimestampPrecision precision);
+
+// Updates only the view's options, preserving its definition and source identity.
+std::string AlterViewStatement(const ViewAlteration& alteration, ViewMetadata view);
 
 // The statements that apply `alteration` to its dataset, whose metadata is `metadata` when it
 // runs. Throws ApiError::Invalid for labels BigQuery rejects.

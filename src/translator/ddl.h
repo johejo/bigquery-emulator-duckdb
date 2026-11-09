@@ -6,6 +6,8 @@
 #include "src/translator/context.h"
 
 namespace googlesql {
+// Keep the heavy resolved AST header out of the view alteration interface.
+class ResolvedAlterObjectStmt;
 class ResolvedAlterSchemaStmt;
 class ResolvedAlterTableSetOptionsStmt;
 class ResolvedAlterTableStmt;
@@ -42,6 +44,8 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
                                       const Scope& scope);
 std::optional<std::string> AlterTableSetOptions(
     const googlesql::ResolvedAlterTableSetOptionsStmt& alter, const Scope& scope);
+std::optional<std::string> AlterView(const googlesql::ResolvedAlterObjectStmt& alter,
+                                     const Scope& scope);
 std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& create,
                                       const Scope& scope);
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,

@@ -1,0 +1,80 @@
+# CREATE and ALTER view metadata, including replacement and NULL removal:
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# TABLE_OPTIONS representations:
+# third_party/bigquery_docs/information-schema-table-options.md
+# Synthetic tags use the documented emulator IAM exception.
+# Incremental tag attachment and detachment:
+# third_party/bigquery_docs/tags.md
+
+CREATE VIEW scalars.view_options_tag_merge OPTIONS (tags = [('123456789012/env', 'old')]) AS SELECT 1 AS id;
+ALTER VIEW scalars.view_options_tag_merge SET OPTIONS (tags += [('123456789012/env', 'new'), ('123456789012/team', 'data')]);
+ALTER VIEW scalars.view_options_tag_merge SET OPTIONS (tags -= [('123456789012/team', 'data')]);
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'view_options_tag_merge' AND option_name = 'tags'
+=> "[STRUCT(\"123456789012/env\", \"new\")]"
+
+CREATE TABLE scalars.view_options_mv_tag_source (id INT64);
+CREATE MATERIALIZED VIEW scalars.view_options_mv_tag_merge OPTIONS (tags = [('123456789012/env', 'old')]) AS SELECT COUNT(*) AS n FROM scalars.view_options_mv_tag_source;
+ALTER MATERIALIZED VIEW scalars.view_options_mv_tag_merge SET OPTIONS (tags += [('123456789012/env', 'new'), ('123456789012/team', 'data')]);
+ALTER MATERIALIZED VIEW scalars.view_options_mv_tag_merge SET OPTIONS (tags -= [('123456789012/team', 'data')]);
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'view_options_mv_tag_merge' AND option_name = 'tags'
+=> "[STRUCT(\"123456789012/env\", \"new\")]"
+
+ALTER VIEW scalars.view_options_absent SET OPTIONS (description = 'missing')
+=> error:
+
+ALTER MATERIALIZED VIEW scalars.view_options_absent_mv SET OPTIONS (description = 'missing')
+=> error:
+
+CREATE VIEW scalars.view_options_altered OPTIONS (description = 'original', friendly_name = 'original', labels = [('env', 'old')], tags = [('123456789012/env', 'old')]) AS SELECT 7 AS x;
+ALTER VIEW scalars.view_options_altered SET OPTIONS (description = CONCAT('up', 'dated'), friendly_name = 'new name', labels = [('env', 'new')], tags = [('123456789012/env', 'new')], expiration_timestamp = TIMESTAMP '2099-01-01 00:00:00 UTC');
+SELECT STRING_AGG(CONCAT(option_name, '=', option_value), ';' ORDER BY option_name) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'view_options_altered'
+=> "description=\"updated\";expiration_timestamp=TIMESTAMP \"2099-01-01T00:00:00.000Z\";friendly_name=\"new name\";labels=[STRUCT(\"env\", \"new\")];tags=[STRUCT(\"123456789012/env\", \"new\")]"
+
+CREATE VIEW scalars.options_view_clear OPTIONS (description = 'original', friendly_name = 'original', labels = [('env', 'old')], tags = [('123456789012/env', 'old')], expiration_timestamp = TIMESTAMP '2099-01-01 00:00:00 UTC') AS SELECT 7 AS x;
+ALTER VIEW scalars.options_view_clear SET OPTIONS (description = NULL, friendly_name = NULL, labels = NULL, tags = NULL, expiration_timestamp = NULL);
+SELECT (SELECT x FROM scalars.options_view_clear) = 7 AND NOT EXISTS (SELECT 1 FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_view_clear')
+=> "true"
+
+CREATE TABLE scalars.options_mv_source (x INT64);
+CREATE MATERIALIZED VIEW scalars.options_mv OPTIONS (description = 'original', friendly_name = 'original', labels = [('env', 'old')], tags = [('123456789012/env', 'old')]) AS SELECT SUM(x) AS total FROM scalars.options_mv_source;
+ALTER MATERIALIZED VIEW scalars.options_mv SET OPTIONS (description = CONCAT('up', 'dated'), friendly_name = 'new name', labels = [('env', 'new')], tags = [('123456789012/env', 'new')], expiration_timestamp = TIMESTAMP '2099-01-01 00:00:00 UTC');
+SELECT STRING_AGG(CONCAT(option_name, '=', option_value), ';' ORDER BY option_name) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_mv' AND option_name IN ('description', 'friendly_name', 'labels', 'tags', 'expiration_timestamp')
+=> "description=\"updated\";expiration_timestamp=TIMESTAMP \"2099-01-01T00:00:00.000Z\";friendly_name=\"new name\";labels=[STRUCT(\"env\", \"new\")];tags=[STRUCT(\"123456789012/env\", \"new\")]"
+
+CREATE TABLE scalars.options_mv_clear_source (x INT64);
+INSERT INTO scalars.options_mv_clear_source VALUES (3);
+CREATE MATERIALIZED VIEW scalars.options_mv_clear OPTIONS (description = 'original', friendly_name = 'original', labels = [('env', 'old')], tags = [('123456789012/env', 'old')], expiration_timestamp = TIMESTAMP '2099-01-01 00:00:00 UTC') AS SELECT SUM(x) AS total FROM scalars.options_mv_clear_source;
+ALTER MATERIALIZED VIEW scalars.options_mv_clear SET OPTIONS (description = NULL, friendly_name = NULL, labels = [], tags = [], expiration_timestamp = NULL);
+INSERT INTO scalars.options_mv_clear_source VALUES (5);
+SELECT (SELECT total FROM scalars.options_mv_clear) = 8 AND NOT EXISTS (SELECT 1 FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_mv_clear' AND option_name IN ('description', 'friendly_name', 'labels', 'tags', 'expiration_timestamp'))
+=> "true"
+
+ALTER VIEW IF EXISTS scalars.options_missing_view SET OPTIONS (description = 'ignored');
+ALTER MATERIALIZED VIEW IF EXISTS scalars.options_missing_mv SET OPTIONS (description = 'ignored');
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.TABLES WHERE table_name IN ('options_missing_view', 'options_missing_mv')
+=> "0"
+
+CREATE VIEW scalars.options_expired_view AS SELECT 1 AS x;
+ALTER VIEW scalars.options_expired_view SET OPTIONS (expiration_timestamp = TIMESTAMP '2000-01-01 00:00:00 UTC');
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = 'options_expired_view'
+=> "0"
+
+CREATE TABLE scalars.options_expired_mv_source (x INT64);
+CREATE MATERIALIZED VIEW scalars.options_expired_mv AS SELECT SUM(x) AS total FROM scalars.options_expired_mv_source;
+ALTER MATERIALIZED VIEW scalars.options_expired_mv SET OPTIONS (expiration_timestamp = TIMESTAMP '2000-01-01 00:00:00 UTC');
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = 'options_expired_mv'
+=> "0"
+
+# Observed on BigQuery: IF EXISTS does not suppress an object-kind mismatch.
+CREATE TABLE scalars.wrong_table (id INT64);
+ALTER VIEW IF EXISTS scalars.wrong_table SET OPTIONS (description = 'not a view')
+=> error contains: Invalid value: ALTER VIEW SET OPTIONS only supports setting options for views, while wrong_table is a(n) table
+
+CREATE VIEW scalars.wrong_view AS SELECT 1 AS id;
+ALTER MATERIALIZED VIEW IF EXISTS scalars.wrong_view SET OPTIONS (description = 'not materialized')
+=> error contains: Invalid value: ALTER MATERIALIZED VIEW SET OPTIONS only supports setting options for materialized views, while wrong_view is a(n) view
+
+CREATE TABLE scalars.view_options_wrong_mv_source (id INT64);
+CREATE MATERIALIZED VIEW scalars.wrong_mv AS SELECT COUNT(*) AS n FROM scalars.view_options_wrong_mv_source;
+ALTER VIEW IF EXISTS scalars.wrong_mv SET OPTIONS (description = 'not logical')
+=> error contains: Invalid value: ALTER VIEW SET OPTIONS only supports setting options for views, while wrong_mv is a(n) materialized view

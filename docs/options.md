@@ -31,11 +31,11 @@ the emulator rejected.
 | [ALTER TABLE ALTER COLUMN SET OPTIONS](#alter-table-alter-column-set-options) | 2 | 0 | 2 | 0 |
 | [CREATE SNAPSHOT TABLE](#create-snapshot-table) | 5 | 0 | 0 | 0 |
 | [CREATE VIEW](#create-view) | 5 | 0 | 0 | 1 |
-| [CREATE VIEW column](#create-view-column) | 0 | 0 | 1 | 0 |
-| [ALTER VIEW SET OPTIONS](#alter-view-set-options) | 0 | 0 | 5 | 1 |
-| [ALTER VIEW ALTER COLUMN SET OPTIONS](#alter-view-alter-column-set-options) | 0 | 0 | 1 | 0 |
+| [CREATE VIEW column](#create-view-column) | 1 | 0 | 0 | 0 |
+| [ALTER VIEW SET OPTIONS](#alter-view-set-options) | 5 | 0 | 0 | 1 |
+| [ALTER VIEW ALTER COLUMN SET OPTIONS](#alter-view-alter-column-set-options) | 1 | 0 | 0 | 0 |
 | [CREATE MATERIALIZED VIEW](#create-materialized-view) | 5 | 0 | 5 | 0 |
-| [ALTER MATERIALIZED VIEW SET OPTIONS](#alter-materialized-view-set-options) | 0 | 0 | 9 | 0 |
+| [ALTER MATERIALIZED VIEW SET OPTIONS](#alter-materialized-view-set-options) | 5 | 0 | 4 | 0 |
 | [CREATE FUNCTION SQL](#create-function-sql) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION JavaScript](#create-function-javascript) | 0 | 0 | 2 | 0 |
 | [CREATE TABLE FUNCTION](#create-table-function) | 1 | 0 | 0 | 0 |
@@ -179,24 +179,24 @@ the emulator rejected.
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
-| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
 ## ALTER VIEW SET OPTIONS
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
-| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Unsupported |  |
-| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`privacy_policy`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
-| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## ALTER VIEW ALTER COLUMN SET OPTIONS
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
-| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
 ## CREATE MATERIALIZED VIEW
 
@@ -219,13 +219,13 @@ the emulator rejected.
 | --- | --- | --- | --- |
 | [`enable_refresh`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
 | [`refresh_interval_minutes`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Unsupported |  |
-| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Unsupported |  |
+| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
 | [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
 | [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
-| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
-| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## CREATE FUNCTION SQL
 

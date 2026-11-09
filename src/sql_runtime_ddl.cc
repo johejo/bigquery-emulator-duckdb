@@ -181,6 +181,41 @@ void SqlRuntime::CheckRelationTarget(Backend& backend, const TranslatedStatement
 std::optional<std::vector<std::string>> SqlRuntime::AlterationStatements(
     const TranslatedStatement& translation, Backend* session) {
   Backend& backend = session != nullptr ? *session : backend_;
+  if (const auto& alteration = translation.altered_view) {
+    const auto& table = alteration->table;
+    const auto comment = ViewComment(backend, table);
+    const auto view = comment ? ParseViewMetadata(*comment) : std::nullopt;
+    const auto table_comment = RelationComment(backend, RelationType::kTable, table);
+    if (!comment && !table_comment) {
+      if (alteration->if_exists) {
+        return std::vector<std::string>{};
+      }
+      throw ApiError::NotFound("Not found: Table " + TableName(table));
+    }
+    if (!view || view->materialized != alteration->materialized) {
+      // BigQuery rejects a different object kind even with IF EXISTS; the SET OPTIONS
+      // messages were observed in scalars/view_options.txt.
+      std::string kind;
+      if (view) {
+        kind = view->materialized ? "materialized view" : "view";
+      } else if (table_comment) {
+        const auto metadata = CommentMetadata(*table_comment);
+        if (!metadata.external_data && !metadata.snapshot) {
+          kind = "table";
+        }
+      }
+      if (alteration->columns.empty() && !kind.empty()) {
+        const std::string expected = alteration->materialized ? "materialized views" : "views";
+        throw ApiError::InvalidQuery(
+            "Invalid value: ALTER " +
+            std::string(alteration->materialized ? "MATERIALIZED VIEW" : "VIEW") +
+            " SET OPTIONS only supports setting options for " + expected + ", while " +
+            table.table_id + " is a(n) " + kind);
+      }
+      throw ApiError::InvalidQuery("Object type does not match " + TableName(table));
+    }
+    return std::vector<std::string>{AlterViewStatement(*alteration, *view)};
+  }
   if (const auto& alteration = translation.altered_table) {
     const TableReference& table = alteration->table;
     if (ViewComment(backend, table).has_value()) {

@@ -1,0 +1,95 @@
+version: 1
+# Expected values follow the CREATE VIEW and ALTER VIEW ALTER COLUMN SET OPTIONS sections of
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md.
+description: View column descriptions set by DDL are returned by tables.get.
+vars:
+  dataset: e2e_${run}_${case}
+cases:
+  - name: column_descriptions
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: >-
+              CREATE VIEW `${project}.${dataset}.v`
+              (id OPTIONS (description = CONCAT('column ', 'description')), name)
+              AS SELECT 7 AS id, 'value' AS name
+        observe:
+          errors: /body/errors
+      - name: created
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/v
+        observe:
+          description: /body/schema/fields/0/description
+          type: /body/type
+      - name: alter
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: >-
+              ALTER VIEW `${project}.${dataset}.v` ALTER COLUMN id SET OPTIONS (description = 'changed');
+              ALTER VIEW `${project}.${dataset}.v` ALTER COLUMN IF EXISTS missing SET OPTIONS (description = 'ignored');
+              ALTER VIEW `${project}.${dataset}.v` SET OPTIONS (description = 'view description');
+        observe:
+          errors: /body/errors
+      - name: altered
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/v
+        observe:
+          column_description: /body/schema/fields/0/description
+          description: /body/description
+      - name: clear
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: >-
+              ALTER VIEW `${project}.${dataset}.v` ALTER COLUMN id SET OPTIONS (description = NULL)
+        observe:
+          errors: /body/errors
+      - name: cleared
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/v
+        observe:
+          column_description: /body/schema/fields/0/description
+          description: /body/description
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            query: SELECT id, name FROM `${project}.${dataset}.v`
+        observe:
+          rows: /body/rows
+    expect:
+      create: {}
+      created: {description: column description, type: VIEW}
+      alter: {}
+      altered: {column_description: changed, description: view description}
+      clear: {}
+      cleared: {description: view description}
+      query:
+        rows:
+          - {f: [{v: '7'}, {v: value}]}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

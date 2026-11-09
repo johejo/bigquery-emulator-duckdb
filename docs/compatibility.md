@@ -296,8 +296,9 @@ Materialized views are limited to a single managed base table, projections, filt
 Distinct aggregates, grouping sets, nested aggregation, joins, subqueries, CTEs, ordering, limits,
 view and snapshot references, and explicit output column lists are unsupported.
 
-Partitioning, clustering, replicas and `ALTER MATERIALIZED VIEW` are unsupported, and so are the
-options [options.md](options.md#create-materialized-view) lists as such. The API accepts the
+Partitioning, clustering and replicas are unsupported. `ALTER MATERIALIZED VIEW` supports only
+metadata options; refresh, staleness and encryption options remain unsupported, as listed in
+[options.md](options.md#alter-materialized-view-set-options). The API accepts the
 default `enableRefresh: true` and `allowNonIncrementalDefinition: false`; changing the definition
 or refresh settings through `tables.patch` or `tables.update` is unsupported. Metadata-only
 updates preserve the definition and materialized-view type.

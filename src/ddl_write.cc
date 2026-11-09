@@ -161,6 +161,26 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset) {
   };
 }
 
+std::string AlterViewStatement(const ViewAlteration& alteration, ViewMetadata view) {
+  ApplyOptionUpdates(alteration.options, view.metadata);
+  if (alteration.options.expiration_time.has_value()) {
+    view.metadata.expiration_time = *alteration.options.expiration_time;
+  }
+  for (const auto& column : alteration.columns) {
+    const auto field = FindColumn(view.schema, column.name);
+    if (field == view.schema.end()) {
+      if (column.if_exists) {
+        continue;
+      }
+      throw ApiError::InvalidQuery("Column not found: " + column.name);
+    }
+    if (column.description) {
+      field->description = *column.description;
+    }
+  }
+  return ViewCommentStatement(alteration.table, view);
+}
+
 DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset) {
   if (view.metadata.default_collation.has_value()) {
     throw ApiError::Unsupported("defaultCollation on a view");
