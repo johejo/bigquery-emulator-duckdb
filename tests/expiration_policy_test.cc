@@ -20,9 +20,9 @@ ExpirationPolicy Policy(std::optional<int64_t> deadline, std::optional<int64_t> 
   return {.table_deadline_ms = deadline, .partition_duration_ms = duration};
 }
 
-// The creation matrix in docs/partition-expiration-design.md is sourced from the dataset
-// specification and the recorded partition_expiration_policy/ddl API answers. Runtime entry
-// points still reject positive partition TTLs; these checks do not establish runtime support.
+// Creation policy expectations come from the dataset specification and recorded
+// partition_expiration_policy/ddl API answers; see docs/expiration.md. These checks exercise
+// policy resolution, not runtime support.
 // Creation without partition defaults is covered through the public API and DDL in
 // tests/e2e/goclient/dataset_default_expiration_test.go.
 TEST(ExpirationPolicyTest, CreationWithPartitionDefaults) {

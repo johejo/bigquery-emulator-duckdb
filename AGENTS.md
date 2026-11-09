@@ -212,18 +212,29 @@ a citation with a local path before its snapshot exists. Refresh snapshots only 
 The snapshot directory's README covers authentication and the citation rules
 `just bigquery-docs-check` enforces.
 
-Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
-query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage
-and limits in [docs/storage-api.md](docs/storage-api.md), implementation details in
-[docs/architecture.md](docs/architecture.md), development tools and debugging modes in
-[docs/development.md](docs/development.md), and the probes' catalogs in
-[tools/restprobe/README.md](tools/restprobe/README.md). Describe the current state; leave plans,
-progress and validation records to pull requests and Git history. The support tables listed
-above are generated; the preambles under `tools/restprobe/` and `tools/storageprobe/` are their
-handwritten inputs. A probe's note is a sentence or a link to a section of
-`docs/compatibility.md` or `docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
-probe rejects to the probe. Describe emulator-specific limits and differences; do not restate
-BigQuery's normal semantics for supported features or narrate their implementation.
+Keep setup and deliberate compatibility exceptions in [README.md](README.md).
+[docs/compatibility.md](docs/compatibility.md) is the entry point for detailed query and API
+limits; [docs/external-tables.md](docs/external-tables.md) holds source-format and conversion
+details, and [docs/storage-api.md](docs/storage-api.md) holds Storage client usage and limits.
+[docs/architecture.md](docs/architecture.md) maps the request path, ownership and dependency
+boundaries, linking to implementation details in [representations](docs/representations.md),
+[expiration](docs/expiration.md) and [UDF runtimes](docs/udf-runtimes.md).
+Put development tools and debugging modes in [docs/development.md](docs/development.md), and
+the probes' catalogs in [tools/restprobe/README.md](tools/restprobe/README.md).
+
+Give each behavior one authoritative description and link to it. Keep overview pages readable
+without their detail pages; split a long topic only when readers need a distinct lookup, not
+one page per feature. Use tables for conversion combinations rather than long conditional
+sentences. Describe the current state; leave plans, progress and validation records to pull
+requests and Git history. Preserve edge-case expectations in tests and recorded answers rather
+than maintaining duplicate matrices in prose.
+
+The support tables listed above are generated; their handwritten inputs are the preambles
+under `tools/restprobe/` and `tools/storageprobe/`. A probe's note is a sentence or a link to the
+relevant limits guide. Leave supported and rejected forms to the generated tables; handwritten
+guides explain cross-cutting restrictions and behavior a support status cannot show. Describe
+emulator-specific limits and differences, not BigQuery's normal semantics or implementation
+details in a client guide.
 
 ## Before committing
 

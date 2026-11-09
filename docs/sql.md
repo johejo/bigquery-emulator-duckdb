@@ -110,15 +110,15 @@ rejected.
 | Partitioning and clustering | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
 | Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: ALTER TABLE action AddConstraintAction; ALTER TABLE action DropConstraintAction; generated names for mixed named and unnamed foreign keys. |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
-| `CREATE TABLE LIKE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
-| `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
-| `CREATE TABLE CLONE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
-| `CREATE SNAPSHOT TABLE` | Supported | See [Table snapshots](compatibility.md#table-snapshots). |
+| `CREATE TABLE LIKE` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
+| `CREATE TABLE COPY` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
+| `CREATE TABLE CLONE` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
+| `CREATE SNAPSHOT TABLE` | Supported | See [Time travel](compatibility.md#time-travel) and [Partition expiration](compatibility.md#partition-expiration). |
 | `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: Bigtable cell type INTEGER. |
 | `DROP TABLE` | Supported |  |
 | `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |
-| `ALTER TABLE` | Supported | See [ALTER TABLE](compatibility.md#alter-table). |
+| `ALTER TABLE` | Supported | See [Options and expiration](compatibility.md#options-and-expiration), [Column defaults](compatibility.md#column-defaults) and [External tables](compatibility.md#external-tables). |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1. |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |

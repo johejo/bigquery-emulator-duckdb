@@ -8,6 +8,17 @@ agreement with BigQuery's results or metadata.
 Deliberate compatibility exceptions are listed in the [README](../README.md#compatibility).
 Storage API usage and limits are in its [guide](storage-api.md).
 
+Use the generated tables for supported and rejected forms; the sections below describe
+cross-cutting restrictions and behavior that needs more than a support status.
+
+- [Jobs](#jobs), [datasets](#datasets) and [tables](#tables): lifecycle and metadata.
+- [Types](#types) and [result schemas and values](#result-schemas-and-values): value-level limits.
+- [UDFs](#user-defined-functions), [scripts and transactions](#scripts-and-transactions),
+  and [stored procedures](#stored-procedures): execution limits.
+- [External tables](external-tables.md): source formats and conversion details.
+- [Graphs](#graphs), [approximate aggregates](#approximate-aggregates) and
+  [differential privacy](#differential-privacy): feature-specific limits.
+
 ## Jobs
 
 Jobs finish before `jobs.insert` or `jobs.query` returns. Consequently, `jobs.cancel` returns the
@@ -73,95 +84,8 @@ dataset are unsupported, including enabling the setting on a dataset containing 
 
 ### External tables
 
-GCS external tables support Parquet, CSV and newline-delimited JSON through `CREATE EXTERNAL TABLE`
-or `tables.insert`. Sources
-must use `gs://` URIs; multiple URIs and a single wildcard per URI are supported. A Parquet or CSV
-table created without a schema takes the one BigQuery detects from the alphabetically last source
-file when it is created, so creation reads the sources. Columns and their fields must be of the
-Parquet types that the
-[Parquet conversions](../third_party/bigquery_docs/loading-data-cloud-storage-parquet.md) convert
-to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP, a TIMESTAMP of nanoseconds, which
-reads as its INT64 value, a DECIMAL, which is NUMERIC, or a group, which is a RECORD; a repeated
-field is REPEATED. By default a LIST or MAP group is a RECORD of its repeated field. DDL
-`enable_list_inference` and REST `parquetOptions.enableListInference` can unwrap LIST groups into
-REPEATED fields. Unlike loads, external reads preserve NULL LIST elements. An explicit schema
-gives each nested field the type detected for it. A top-level column can also read an integer or
-a DECIMAL as NUMERIC or BIGNUMERIC, a DECIMAL as STRING or, as BigQuery does, by its unscaled
-value as INT64, a BYTE_ARRAY as STRING or BYTES, a TIMESTAMP of milliseconds or microseconds as
-DATETIME, a DATE or a TIMESTAMP of nanoseconds, whose value BigQuery reads as microseconds, as
-TIMESTAMP, and, as BigQuery does, a BYTE_ARRAY as the TIMESTAMP 0 and a BOOLEAN or a signed
-integer by its value and a DOUBLE by its bits as microseconds of a TIMESTAMP, and a STRING of WKT
-or a BYTE_ARRAY of WKB as GEOGRAPHY; other combinations, such as a FLOAT as TIMESTAMP, fail as
-BigQuery's do or are unsupported. A DECIMAL that NUMERIC does not hold fails on a value NUMERIC does not hold, as
-BigQuery's does for one of bytes, and is unsupported for an INT32 or INT64 one, of both too many
-integer and fractional digits, and of more than 38 integer digits; a nested one,
-GeoParquet, column name conversions and the options that select other types are unsupported. Every source file must
-have each REQUIRED and REPEATED column and field of the schema.
-
-CSV takes a flat schema of the scalar types listed above, given or detected as
-[loads detect it](#loads-extracts-and-copies), and a given schema can also have DATETIME,
-BIGNUMERIC, JSON, GEOGRAPHY, INTERVAL and RANGE columns. It supports `skip_leading_rows` /
-`csvOptions.skipLeadingRows`, a single ASCII `field_delimiter` / `csvOptions.fieldDelimiter`,
-other than a quote, line break or NUL, and the [CSV options](#loads-extracts-and-copies) loads
-take. Schema detection does not take a quote, quoted line breaks or NULL markers. Other CSV
-options are unsupported.
-
-JSON takes a schema of STRING, INT64, BOOL, FLOAT64, BYTES, NUMERIC, BIGNUMERIC, DATE, DATETIME,
-TIME, TIMESTAMP, JSON or GEOGRAPHY fields, RECORDs of those fields, or repeated fields of those
-types. Given a schema, scalar values must use their native JSON representation, except INT64 also
-accepts decimal strings, BOOL accepts its text spellings, and BYTES requires base64 strings.
-NUMERIC accepts decimal numbers or strings with at most 29 integer digits and nine fractional
-digits, without exponent notation. DATE and TIME accept canonical `YYYY-MM-DD` and
-`HH:MM:SS[.SSSSSS]` strings unless a format applies, and TIMESTAMP strings in the forms of the
-[CSV data types](../third_party/bigquery_docs/loading-data-cloud-storage-csv.md) other than a
-Unix epoch time. A table created without a schema takes the one BigQuery
-[detects](../third_party/bigquery_docs/schema-detect.md) from the alphabetically last source
-file, and its reads also take strings in the forms detection converts, and numbers and BOOL
-values for STRING fields. With `autodetect` and a schema, `tables.insert` keeps the schema, and
-reads leave out the top-level fields it lacks; they reject a nested field it lacks, and a value
-whose read would depend on converting it as reads of a detected schema do, as unsupported. Other
-scalar types and JSON options other than `jsonOptions.encoding` are unsupported.
-
-CSV and JSON tables support `compression`, `encoding` / `csvOptions.encoding` and
-`jsonOptions.encoding`, `max_bad_records` / `maxBadRecords`, and `time_zone`, `date_format`,
-`datetime_format`, `time_format` and `timestamp_format` / `timeZone`, `dateFormat`,
-`datetimeFormat`, `timeFormat` and `timestampFormat`. CSV schema detection takes them all, and
-JSON detection only `date_format` / `dateFormat`: a value a format parses has its type, and a
-DATE of the default form is a STRING given a date format. A value several formats parse, a TIME
-or TIMESTAMP of the default form given a format of its type or, for a TIMESTAMP, a DATETIME
-format, a detected DATETIME CSV column without a header, and a JSON DATE of the default form given
-a date format are unsupported. A
-gzip source with compression `NONE`, which BigQuery reads without decompressing it, or in UTF-16
-or UTF-32, and an invalid UTF-16 or UTF-32 sequence, are unsupported. A JSON value of a valid
-record other than a BIGNUMERIC, DATETIME, TIMESTAMP or GEOGRAPHY one or one a format parses,
-that fails to convert still fails the query rather than counting as bad. A JSON row that is a number, a
-BOOL or null is unsupported, and the messages for malformed JSON lines other than those of
-[BigQuery's answers](../tests/e2e/scenarios/testdata/external_table_types_open.api.yaml) take its
-most common one.
-
-[Hive partitioning](../third_party/bigquery_docs/hive-partitioned-queries.md), through
-`WITH PARTITION COLUMNS` or `hivePartitioningOptions`, takes its keys and their types from the
-paths the sources have when the table is created. Queries read every source file, since the
-emulator does not prune partitions, and fail on a file whose path does not have those keys.
-
-Bigtable external tables support BYTES and STRING cell values, `readRowkeyAsString`,
-`ignoreUnspecifiedColumnFamilies` and family-level `onlyReadLatest`. Promoting individual
-qualifiers through `columns`, numeric and boolean conversions, JSON/PROTO values and
-`outputColumnFamiliesAsJson` are unsupported. Explicit schemas and GCS-specific read options
-are rejected. Bigtable schemas are fixed when the external table is created; queries read
-current source rows. Reading a row missing a selected column family is unsupported.
-Endpoint setup is in [README](../README.md#bigtable-external-tables).
-
-`tables.patch` and `tables.update` change an external table's description, friendly name,
-labels, tags and expiration time. They take back the schema and `externalDataConfiguration` that
-`tables.get` returns, but changing them is unsupported.
-`ALTER TABLE SET OPTIONS` fails on external tables, as
-[BigQuery's does](../tests/e2e/scenarios/testdata/external_table_alter.api.yaml); other
-`ALTER TABLE` actions on them are unsupported. BigLake connections, metadata caching
-and time travel are unsupported. Query dry runs validate external table references against the
-stored schema without accessing their sources; they do not estimate external data sizes.
-`tabledata.list`, Storage Read, extracts and copy jobs do not read external tables; use a query
-instead. Writes to external tables are rejected.
+See [External table limits](external-tables.md) for Parquet, CSV, JSON and Bigtable reads,
+schema detection, type conversions, Hive partitioning and metadata updates.
 
 ### Resource tags
 
@@ -256,22 +180,6 @@ deleting a dataset referenced from outside it are unsupported.
 Foreign keys on views and `tableConstraints` on materialized views are unsupported until
 BigQuery's behavior is verified. A self-referencing `CREATE TABLE` returns HTTP 400 rather than
 BigQuery's HTTP 404 for the missing referenced table.
-
-### ALTER TABLE
-
-Supported actions are `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS`, `ADD PRIMARY KEY`,
-`DROP PRIMARY KEY`, and `ALTER COLUMN` with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`. Other actions are unsupported. Column options
-have the limits described under [Options and expiration](#options-and-expiration). See also
-[External tables](#external-tables).
-
-### Copies and clones
-
-For `CREATE TABLE LIKE`, `COPY` and `CLONE`, see the [SQL support table](sql.md) for rejected
-forms.
-
-### Table snapshots
-
-`FOR SYSTEM_TIME AS OF` has the limits of [time travel](#time-travel).
 
 ### Time travel
 
@@ -498,7 +406,7 @@ use grows with the input size rather than with the requested number of results.
 `KLL_QUANTILES` sketches keep up to `64 * precision` items per compaction level, more than
 BigQuery's sketches retain, so they grow larger and their approximate quantiles can differ from
 BigQuery's for the same input. BigQuery reads and merges them; their bytes differ from those it
-writes ([KLL sketches](architecture.md#kll-sketches)). At the default precision a level holds up to
+writes ([KLL sketches](representations.md#kll-sketches)). At the default precision a level holds up to
 64,000 values, so a sketch and each group's aggregation state can reach hundreds of KB per level;
 queries with many groups use correspondingly more memory.
 

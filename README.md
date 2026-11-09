@@ -283,7 +283,8 @@ What the emulator supports is listed in generated pages:
 - [docs/function-types.md](docs/function-types.md): input-type combinations and return types, including enumeration gaps
 
 These tables check execution, not agreement with BigQuery's results or metadata.
-[Query and API limits](docs/compatibility.md) covers restrictions and differences, and the
+[Query and API limits](docs/compatibility.md) covers restrictions and differences, with
+[source-format and conversion details](docs/external-tables.md) for external tables. The
 [Storage API guide](docs/storage-api.md) covers sessions and write streams.
 
 Unsupported behavior is rejected, with these deliberate exceptions:
@@ -323,8 +324,9 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 ## Development
 
 See [AGENTS.md](AGENTS.md) for building and testing, [docs/development.md](docs/development.md)
-for the development tools and debugging modes, and [docs/architecture.md](docs/architecture.md)
-for how a request is processed.
+for development tools and debugging modes. [Architecture](docs/architecture.md) maps request
+processing and component ownership, with details on [value representations](docs/representations.md),
+[expiration and history](docs/expiration.md), and [UDF runtimes](docs/udf-runtimes.md).
 
 ## License
 
