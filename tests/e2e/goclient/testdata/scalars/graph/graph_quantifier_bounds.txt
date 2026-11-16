@@ -1,0 +1,15 @@
+# BigQuery's quantified-path grammar requires an upper bound for bounded repetition.
+# It permits omission of the lower bound only; an exact repetition uses {bound}.
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md
+# Check rejection without asserting an undocumented diagnostic.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->{1,}(b:Person) RETURN COUNT(*) AS result)
+=> error:
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ANY SHORTEST (a:Person)-[:Knows]->{1,}(b:Person) RETURN COUNT(*) AS result)
+=> error:
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((a:Person)-[:Knows]->(b:Person)){1,} RETURN COUNT(*) AS result)
+=> error:
+
+GRAPH scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->{1,}(b:Person) RETURN COUNT(*) AS result
+=> error:
