@@ -11,7 +11,7 @@ SELECT SUM(n) FROM (SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta
 SELECT SUM(n) FROM (SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e20, delta=.01, max_groups_contributed=NULL, privacy_unit_column=id) item, COUNT(*) AS n FROM UNNEST(GENERATE_ARRAY(1, 100)) AS id, UNNEST(['a', 'b']) AS item GROUP BY item)
 => "200"
 
-# Large epsilons short of the 1e308 that the documentation says fails (known_bugs.txt).
+# Large epsilons, with BigQuery's observed answers.
 SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e100, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
 => "2"
 
@@ -19,6 +19,24 @@ SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e200, delta=.01, privacy_unit_
 => "2"
 
 SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e300, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e307, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=9e307, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+# The query-syntax documentation cited above says epsilon=1e308 causes failure, but BigQuery
+# answered these queries successfully, including with two explicit aggregates and with
+# max_groups_contributed=100. Preserve the observed answers rather than imposing an epsilon cap.
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e308, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
+=> "2"
+
+SELECT TO_JSON_STRING(t) FROM (SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e308, delta=.01, privacy_unit_column=id) COUNT(*) AS n, SUM(id, contribution_bounds_per_group => (0, 10)) AS s FROM UNNEST([1, 2]) AS id) AS t
+=> "{\"n\":2,\"s\":3}"
+
+SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e308, delta=.01, max_groups_contributed=100, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
 => "2"
 
 # Explicit bounds clamp each contribution; SUM skips NaN and NULL values.
