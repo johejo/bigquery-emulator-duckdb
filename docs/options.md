@@ -43,8 +43,7 @@ the emulator rejected.
 | [CREATE FUNCTION Python](#create-function-python) | 3 | 0 | 1 | 5 |
 | [CREATE EXTERNAL TABLE](#create-external-table) | 10 | 1 | 2 | 8 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 15 | 1 | 0 | 0 |
-| [CREATE EXTERNAL TABLE Bigtable URI](#create-external-table-bigtable-uri) | 1 | 0 | 0 | 0 |
-| [CREATE EXTERNAL TABLE Bigtable](#create-external-table-bigtable) | 0 | 1 | 0 | 0 |
+| [CREATE EXTERNAL TABLE Bigtable](#create-external-table-bigtable) | 1 | 1 | 0 | 0 |
 
 ## CREATE SCHEMA
 
@@ -312,16 +311,11 @@ the emulator rejected.
 | [`time_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`timestamp_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
-## CREATE EXTERNAL TABLE Bigtable URI
-
-| Option | Type | Status | Notes |
-| --- | --- | --- | --- |
-| [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-
 ## CREATE EXTERNAL TABLE Bigtable
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
+| [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}')`; `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"outputColumnFamiliesAsJson":true}')`. |
 
 ## Unprobed contexts

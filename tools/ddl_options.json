@@ -1941,6 +1941,7 @@
     },
     {
       "name": "CREATE EXTERNAL TABLE Bigtable URI",
+      "heading": "CREATE EXTERNAL TABLE Bigtable",
       "group": "bigtable_uri_option",
       "template": "CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', {option})"
     },

@@ -27,9 +27,11 @@ type Option struct {
 // puts one assignment; a context without one is listed but not probed. Templates replaces it for
 // the options that need another statement, such as one the template already sets, so they stay
 // in the same context. Implementation names the DDL handlers' context, which the C++ test
-// compares types with.
+// compares types with. Heading optionally groups adjacent contexts in the report without
+// combining their option types or probe templates.
 type Context struct {
 	Name           string            `json:"name"`
+	Heading        string            `json:"heading,omitempty"`
 	Group          string            `json:"group"`
 	Template       string            `json:"template,omitempty"`
 	Templates      map[string]string `json:"templates,omitempty"`
