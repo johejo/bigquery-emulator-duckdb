@@ -17,12 +17,6 @@ SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{"radix": 10, 
 SELECT AVG(x) OVER () FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x LIMIT 1
 !> "Infinity"
 
-# BigQuery fails for an extremely large epsilon such as 1e308, though 1e300 runs
-# (differential_privacy.txt).
-# third_party/bigquery_docs/reference/standard-sql/query-syntax.md
-SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=1e308, delta=.01, privacy_unit_column=id) COUNT(*) FROM UNNEST([1, 2]) AS id
-!> error:
-
 # BigQuery reports where the exception was thrown; QuickJS keeps only where an Error was created.
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()
