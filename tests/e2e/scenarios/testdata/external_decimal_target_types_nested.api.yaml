@@ -1,0 +1,225 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run s7fdg2l7uweldxcwfftryuqfmw, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the observations.
+# BigQuery's answers settle the decimalTargetTypes cases external_decimal_target_types.api.yaml
+# leaves open: DECIMALs in RECORDs and REPEATED columns take the selected type, a declared nested
+# type reads as declared, JSON tables keep the option without effect, and tables.insert rejects
+# an unknown type as an invalid enum value.
+# nested.parquet, written by arrow-go v18.8.0 without statistics or dictionaries, has one row of
+# r REQUIRED group {n INT32 DECIMAL(9, 2) = 1.25}, rw REQUIRED group {n FIXED_LEN_BYTE_ARRAY
+# DECIMAL(40, 2) = 1.25} and list REPEATED INT32 DECIMAL(9, 2) = [1.25, 1.00].
+description: >-
+  decimal_target_types of nested Parquet DECIMALs and of JSON tables.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t`
+  nested: "UEFSMRUAFQgVCCwVAhUAFQYVBhwYBH0AAAAYBH0AAAAWACgEfQAAABgEfQAAAAAAAH0AAAAVABUiFSIsFQIVABUGFQYcGBEAAAAAAAAAAAAAAAAAAAAAfRgRAAAAAAAAAAAAAAAAAAAAAH0WACgRAAAAAAAAAAAAAAAAAAAAAH0YEQAAAAAAAAAAAAAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAAH0VABUoFSgsFQQVABUGFQYcGAR9AAAAGARkAAAAFgAoBH0AAAAYBGQAAAAAAAACAAAAAwICAAAABAF9AAAAZAAAABUEGWxIBnNjaGVtYRUGADUAGAFyFQIAFQIlABgBbiUKFQQVEixcFQQVEgAAADUAGAJydxUCABUOFSIVABgBbiUKFQQVUCxcFQQVUAAAABUCJQQYBGxpc3QlChUEFRIsXBUEFRIAAAAWAhkcGTwmCBwVAhklAAYZKAFyAW4VABYCFmIWYiYIPBgEfQAAABgEfQAAABYAKAR9AAAAGAR9AAAAABkcFQAVABUCAAAAJmocFQ4ZJQAGGSgCcncBbhUAFgIW5AEW5AEmajwYEQAAAAAAAAAAAAAAAAAAAAB9GBEAAAAAAAAAAAAAAAAAAAAAfRYAKBEAAAAAAAAAAAAAAAAAAAAAfRgRAAAAAAAAAAAAAAAAAAAAAH0AGRwVABUAFQIAAAAmzgIcFQIZJQAGGRgEbGlzdBUAFgQWggEWggEmzgI8GAR9AAAAGARkAAAAFgAoBH0AAAAYBGQAAAAAGRwVABUAFQIAAAAWyAMWAiYIFsgDFAAAKBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGTwcAAAcAAAcAAAAnQEAAFBBUjE="
+  # '{"n": 1.25}\n'
+  json: eyJuIjogMS4yNX0K
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and reads its metadata and rows.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: metadata
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: >-
+              SELECT (SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'),
+              ARRAY(SELECT AS STRUCT option_name, option_type, option_value
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name)
+        observe:
+          status: /status
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # Creates `t` with tables.insert and the resource `table`, which it rejects.
+  rejected:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: nested_bignumeric
+    template: ddl
+    vars:
+      object: nested.parquet
+      source: '${nested}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/nested.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "decimalTargetTypes": ["BIGNUMERIC"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/nested.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "BIGNUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"fields": [{"mode": "REQUIRED", "name": "n", "type": "BIGNUMERIC"}], "mode": "REQUIRED", "name": "rw", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"${prefix}/nested.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"BIGNUMERIC\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/nested.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}, {"v": {"f": [{"v": "1.25"}]}}, {"v": [{"v": "1.25"}, {"v": "1"}]}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "BIGNUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}, {"fields": [{"mode": "NULLABLE", "name": "n", "type": "BIGNUMERIC"}], "mode": "NULLABLE", "name": "rw", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}, "status": 200}}
+  - name: nested_string
+    template: ddl
+    vars:
+      object: nested.parquet
+      source: '${nested}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/nested.parquet'], decimal_target_types = ['STRING'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "decimalTargetTypes": ["STRING"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/nested.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "STRING"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"fields": [{"mode": "REQUIRED", "name": "n", "type": "STRING"}], "mode": "REQUIRED", "name": "rw", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "STRING"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"STRING\"],\n  uris=[\"${prefix}/nested.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"STRING\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/nested.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}, {"v": {"f": [{"v": "1.25"}]}}, {"v": [{"v": "1.25"}, {"v": "1"}]}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "STRING"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}, {"fields": [{"mode": "NULLABLE", "name": "n", "type": "STRING"}], "mode": "NULLABLE", "name": "rw", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "STRING"}]}, "status": 200}}
+  - name: nested_numeric_bignumeric
+    template: ddl
+    vars:
+      object: nested.parquet
+      source: '${nested}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/nested.parquet'], decimal_target_types = ['NUMERIC', 'BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "decimalTargetTypes": ["NUMERIC", "BIGNUMERIC"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/nested.parquet"]}, "schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "NUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"fields": [{"mode": "REQUIRED", "name": "n", "type": "BIGNUMERIC"}], "mode": "REQUIRED", "name": "rw", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"NUMERIC\", \"BIGNUMERIC\"],\n  uris=[\"${prefix}/nested.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"NUMERIC\", \"BIGNUMERIC\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/nested.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}, {"v": {"f": [{"v": "1.25"}]}}, {"v": [{"v": "1.25"}, {"v": "1"}]}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}, {"fields": [{"mode": "NULLABLE", "name": "n", "type": "BIGNUMERIC"}], "mode": "NULLABLE", "name": "rw", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}}
+  # A declared nested type other than the one decimalTargetTypes selects reads as declared.
+  - name: nested_declared_numeric
+    template: ddl
+    vars:
+      object: nested.parquet
+      source: '${nested}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (r STRUCT<n NUMERIC>, list ARRAY<NUMERIC>) OPTIONS (format = 'PARQUET', uris = ['${prefix}/nested.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"external": {"decimalTargetTypes": ["BIGNUMERIC"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/nested.parquet"]}, "schema": {"fields": [{"fields": [{"name": "n", "type": "NUMERIC"}], "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"${prefix}/nested.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"BIGNUMERIC\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/nested.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}, {"v": [{"v": "1.25"}, {"v": "1"}]}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}}
+  - name: json_ddl
+    template: ddl
+    vars:
+      object: a.json
+      source: '${json}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (n NUMERIC) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"external": {"decimalTargetTypes": ["BIGNUMERIC"], "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"name": "n", "type": "NUMERIC"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\n(\n  n NUMERIC\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"${prefix}/a.json\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"BIGNUMERIC\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"NEWLINE_DELIMITED_JSON\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/a.json\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}]}, "status": 200}}
+  - name: json_autodetect_rest
+    template: rest
+    vars:
+      object: a.json
+      source: '${json}'
+      table:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        externalDataConfiguration:
+          sourceFormat: NEWLINE_DELIMITED_JSON
+          sourceUris: ['${prefix}/a.json']
+          autodetect: true
+          decimalTargetTypes: [BIGNUMERIC]
+    expect: {"create": {"external": {"autodetect": true, "decimalTargetTypes": ["BIGNUMERIC"], "sourceFormat": "NEWLINE_DELIMITED_JSON", "sourceUris": ["${prefix}/a.json"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "n", "type": "FLOAT"}]}, "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "n", "type": "FLOAT"}]}, "status": 200}}
+  # The sidecar keeps the whole error; as table_resource.api.yaml does, this case compares its
+  # status, reason and message.
+  - name: unknown_rest
+    template: rejected
+    vars:
+      table:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/nested.parquet']
+          decimalTargetTypes: [FLOAT64]
+    expect:
+      create:
+        status: 400
+        reason: invalid
+        message: >-
+          Invalid value at 'table.external_data_configuration.decimal_target_types[0]'
+          (type.googleapis.com/google.cloud.bigquery.v2.DecimalTargetType), "FLOAT64"

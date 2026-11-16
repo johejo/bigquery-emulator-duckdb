@@ -54,6 +54,7 @@ enum class DdlOptionId : uint8_t {
   kUris,
   kEnableListInference,
   kEnumAsString,
+  kDecimalTargetTypes,
   kSkipLeadingRows,
   kFieldDelimiter,
   kQuote,

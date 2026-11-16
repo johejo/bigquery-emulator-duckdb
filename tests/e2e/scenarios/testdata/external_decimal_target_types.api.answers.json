@@ -1,0 +1,1647 @@
+{
+  "version": 1,
+  "cases": {
+    "csv_autodetect": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "CSV",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/csv_autodetect/a.csv"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "a",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "a",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "declared_numeric_selected_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "decimalTargetTypes": [
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/declared_numeric_selected_bignumeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_oz2hqlewrcadxyy232otiixm7g_declared_numeric_selected_bignumeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/declared_numeric_selected_bignumeric/types.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"BIGNUMERIC\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/declared_numeric_selected_bignumeric/types.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "declared_string_selected_numeric": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "decimalTargetTypes": [
+              "NUMERIC",
+              "STRING"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/declared_string_selected_numeric/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "dec9",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_oz2hqlewrcadxyy232otiixm7g_declared_string_selected_numeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"NUMERIC\", \"STRING\"],\n  uris=[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/declared_string_selected_numeric/types.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"NUMERIC\", \"STRING\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/declared_string_selected_numeric/types.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "duplicate_ddl": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "NUMERIC",
+              "NUMERIC"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/duplicate_ddl/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec38",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_oz2hqlewrcadxyy232otiixm7g_duplicate_ddl.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"NUMERIC\", \"NUMERIC\"],\n  uris=[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/duplicate_ddl/types.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"NUMERIC\", \"NUMERIC\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/duplicate_ddl/types.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "2024-01-02 03:04:05"
+                },
+                {
+                  "v": "{\"a\":1}"
+                },
+                {
+                  "v": "POINT(1 2)"
+                },
+                {
+                  "v": "YQ=="
+                },
+                {
+                  "v": "AQEAAAAAAAAAAADwPwAAAAAAAABA"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "03:04:05.000006"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                },
+                {
+                  "v": "1.704164645006E9"
+                },
+                {
+                  "v": "1704164645000006007"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "duplicate_rest": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "external": {
+            "decimalTargetTypes": [
+              "STRING",
+              "STRING"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/duplicate_rest/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec9",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec18",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec38",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "42"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "2024-01-02 03:04:05"
+                },
+                {
+                  "v": "{\"a\":1}"
+                },
+                {
+                  "v": "POINT(1 2)"
+                },
+                {
+                  "v": "YQ=="
+                },
+                {
+                  "v": "AQEAAAAAAAAAAADwPwAAAAAAAABA"
+                },
+                {
+                  "v": "2024-01-02"
+                },
+                {
+                  "v": "03:04:05.000006"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                },
+                {
+                  "v": "1.704164645000006E9"
+                },
+                {
+                  "v": "1.704164645006E9"
+                },
+                {
+                  "v": "1704164645000006007"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "empty_ddl": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/empty_ddl/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec38",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_oz2hqlewrcadxyy232otiixm7g_empty_ddl.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/empty_ddl/types.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/empty_ddl/types.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "metadata_ddl": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "max_bad_records option not valid for format PARQUET.",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "max_bad_records option not valid for format PARQUET.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "metadata_rest": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "external": {
+            "decimalTargetTypes": [
+              "BIGNUMERIC",
+              "NUMERIC"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/metadata_rest/types.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "REQUIRED",
+                "name": "bool",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "i8",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u32",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "u64",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f32",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "f64",
+                "type": "FLOAT"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "dec38",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_int",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_date",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_datetime",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_json",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "s_wkt",
+                "type": "STRING"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "b_wkb",
+                "type": "BYTES"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "d",
+                "type": "DATE"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "t",
+                "type": "TIME"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "ts",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsl",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsms",
+                "type": "TIMESTAMP"
+              },
+              {
+                "mode": "REQUIRED",
+                "name": "tsns",
+                "type": "INTEGER"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                },
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec9",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec18",
+                "type": "NUMERIC"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "dec38",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "unknown_ddl": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "'FLOAT64' is not a valid value; failed to set 'decimal_target_types' in external table OPTIONS",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "'FLOAT64' is not a valid value; failed to set 'decimal_target_types' in external table OPTIONS",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "wide_string": {
+      "project": "johejo-sandbox",
+      "run": "oz2hqlewrcadxyy232otiixm7g",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "STRING"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/wide_string/wide.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_oz2hqlewrcadxyy232otiixm7g_wide_string.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"STRING\"],\n  uris=[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/wide_string/wide.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"STRING\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/oz2hqlewrcadxyy232otiixm7g/wide_string/wide.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "dec50",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    }
+  }
+}
