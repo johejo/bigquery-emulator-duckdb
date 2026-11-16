@@ -93,6 +93,7 @@ const ResourceMask& TableFields() {
                    "externalDataConfiguration.bigtableOptions",
                    "externalDataConfiguration.parquetOptions.enableListInference",
                    "externalDataConfiguration.parquetOptions.enumAsString",
+                   "externalDataConfiguration.decimalTargetTypes",
                    "externalDataConfiguration.csvOptions.skipLeadingRows",
                    "externalDataConfiguration.csvOptions.fieldDelimiter",
                    "externalDataConfiguration.csvOptions.quote",

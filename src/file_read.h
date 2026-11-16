@@ -60,6 +60,11 @@ struct ParquetSources {
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
                                    bool list_inference, bool decimal_bytes = false);
 
+// The type of decimalTargetTypes `targets` that a DECIMAL `column` takes: by range, not by the
+// order of `targets`, and, where none holds its precision and scale, the widest listed type,
+// whose values are checked when read (third_party/bigquery_docs/reference/rest/v2/Job.md).
+FieldType DecimalTarget(const ParquetColumn& column, const std::vector<DecimalTargetType>& targets);
+
 // Restores GEOGRAPHY and wide DECIMAL types and REQUIRED modes in an inferred schema. Wide
 // decimals require BIGNUMERIC in targets.
 void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& columns,

@@ -50,6 +50,8 @@ struct GcsExternalData {
   std::optional<bool> autodetect;
   std::optional<bool> enable_list_inference = std::nullopt;
   std::optional<bool> enum_as_string = std::nullopt;
+  // decimalTargetTypes of a Parquet table, as given; none when it leaves them out or empty.
+  std::optional<std::vector<std::string>> decimal_target_types = std::nullopt;
   std::string format = "PARQUET";
   std::optional<BigtableOptions> bigtable_options = std::nullopt;
   std::optional<int64_t> skip_leading_rows = std::nullopt;

@@ -21,7 +21,7 @@ with these supported forms:
 |---|---|
 | Types mapped to INT64, BOOL, FLOAT64, STRING, BYTES, DATE, TIME or TIMESTAMP | Corresponding BigQuery type |
 | Nanosecond TIMESTAMP | INT64 value |
-| DECIMAL | NUMERIC, subject to the limits below |
+| DECIMAL | NUMERIC, or the type `decimal_target_types` / `decimalTargetTypes` selects at the top level, subject to the limits below |
 | Group / repeated field | RECORD / REPEATED |
 | LIST or MAP group, by default | RECORD of its repeated field |
 | LIST with `enable_list_inference` / `parquetOptions.enableListInference` | Unwrapped REPEATED field; NULL elements preserved, unlike loads |
@@ -49,9 +49,12 @@ byte-encoded DECIMAL. These DECIMAL forms remain unsupported:
 
 - INT32- or INT64-encoded values exceeding NUMERIC's range;
 - values with both too many integer and fractional digits, or more than 38 integer digits;
-- nested DECIMAL conversions.
+- nested DECIMAL conversions, including a nested DECIMAL for which `decimal_target_types`
+  selects a type other than NUMERIC.
 
-GeoParquet, column-name conversions and options selecting other types are unsupported.
+CSV tables keep `decimal_target_types` without effect, as BigQuery's do; JSON tables reject it as
+unsupported. GeoParquet, column-name conversions and other options selecting types are
+unsupported.
 Every file must contain all REQUIRED and REPEATED columns and fields of the schema.
 
 ### CSV

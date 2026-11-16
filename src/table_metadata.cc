@@ -505,6 +505,10 @@ json TableMetadata::ToJson() const {
     if (external_data->autodetect.has_value()) {
       fields["externalDataConfiguration"]["autodetect"] = *external_data->autodetect;
     }
+    if (external_data->decimal_target_types) {
+      fields["externalDataConfiguration"]["decimalTargetTypes"] =
+          *external_data->decimal_target_types;
+    }
     if (external_data->enum_as_string.has_value()) {
       fields["externalDataConfiguration"]["parquetOptions"]["enumAsString"] =
           *external_data->enum_as_string;
@@ -757,7 +761,8 @@ TableMetadata TableMetadataFromJson(const json& table) {
           name != "ignoreUnknownValues" && name != "hivePartitioningOptions" &&
           name != "compression" && name != "maxBadRecords" && name != "jsonOptions" &&
           name != "timeZone" && name != "dateFormat" && name != "datetimeFormat" &&
-          name != "timeFormat" && name != "timestampFormat" && name != "bigtableOptions") {
+          name != "timeFormat" && name != "timestampFormat" && name != "bigtableOptions" &&
+          name != "decimalTargetTypes") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
     }
@@ -938,6 +943,19 @@ TableMetadata TableMetadataFromJson(const json& table) {
         throw ApiError::Invalid("must be a positive number.");
       }
       metadata.external_data->max_bad_records = records;
+    }
+    if (config.contains("decimalTargetTypes")) {
+      const auto& targets = config["decimalTargetTypes"];
+      // BigQuery keeps duplicate types, as its answers in
+      // external_decimal_target_types.api.answers.json show.
+      if (!targets.is_array() || !std::ranges::all_of(targets, [](const json& target) {
+            return target == "NUMERIC" || target == "BIGNUMERIC" || target == "STRING";
+          })) {
+        throw ApiError::Invalid("Invalid externalDataConfiguration.decimalTargetTypes");
+      }
+      if (!targets.empty()) {
+        metadata.external_data->decimal_target_types = targets.get<std::vector<std::string>>();
+      }
     }
     if (config.contains("parquetOptions")) {
       if (format != "PARQUET") {

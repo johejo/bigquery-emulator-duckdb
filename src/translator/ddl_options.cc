@@ -368,7 +368,13 @@ std::optional<DecodedDdlOption> DecodeNamedDdlOption(const googlesql::ResolvedOp
       [&](std::optional<googlesql::Value> value) -> std::optional<DecodedDdlOption> {
     const bool bigtable_uri =
         value && definition->name == DdlOptionId::kUris && value->type()->IsString();
-    if (!value || (!bigtable_uri && !DdlOptionValueMatches(definition->type, *value))) {
+    // An empty array literal, which GoogleSQL types ARRAY<INT64>, BigQuery takes as the default,
+    // as its answers in external_decimal_target_types.api.answers.json show.
+    const bool empty_targets = value && definition->name == DdlOptionId::kDecimalTargetTypes &&
+                               value->type()->IsArray() && !value->is_null() &&
+                               value->num_elements() == 0;
+    if (!value ||
+        (!bigtable_uri && !empty_targets && !DdlOptionValueMatches(definition->type, *value))) {
       return std::nullopt;
     }
     return DecodedDdlOption{.id = definition->name, .value = *std::move(value)};
@@ -623,6 +629,33 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    if (decoded && external && decoded->id == DdlOptionId::kDecimalTargetTypes) {
+      if (decoded->value.is_null()) {
+        continue;
+      }
+      std::vector<std::string> targets;
+      for (int i = 0; i < decoded->value.num_elements(); ++i) {
+        const auto& target = decoded->value.element(i);
+        if (target.is_null()) {
+          return Unsupported(scope, "NULL external table decimal target type");
+        }
+        // As BigQuery's answers in external_decimal_target_types.api.answers.json show; it
+        // keeps duplicate types.
+        if (target.string_value() != "NUMERIC" && target.string_value() != "BIGNUMERIC" &&
+            target.string_value() != "STRING") {
+          throw ApiError::InvalidQuery(std::format("'{}' is not a valid value; failed to set "
+                                                   "'decimal_target_types' in external table "
+                                                   "OPTIONS",
+                                                   target.string_value()))
+              .WithLocation("q");
+        }
+        targets.push_back(target.string_value());
+      }
+      if (!targets.empty()) {
+        metadata.external_data->decimal_target_types = std::move(targets);
+      }
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kUris) {
       if (decoded->value.is_null()) {
         return Unsupported(scope, "NULL external table uris");
@@ -652,6 +685,12 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   if (external && scalar_uri != (metadata.external_data->format == "BIGTABLE")) {
     throw ApiError::InvalidQuery(
         "Bigtable uris must be a STRING; other external table uris must be an ARRAY<STRING>");
+  }
+  // As BigQuery's answers in external_decimal_target_types.api.answers.json show.
+  if (external && metadata.external_data->format == "PARQUET" &&
+      metadata.external_data->max_bad_records) {
+    throw ApiError::InvalidQuery("max_bad_records option not valid for format PARQUET.")
+        .WithLocation("q");
   }
   if (external && metadata.external_data->bigtable_options &&
       metadata.external_data->format != "BIGTABLE") {

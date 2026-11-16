@@ -433,9 +433,6 @@ void WideDecimals(const ParquetColumn& column, std::vector<size_t>& elements) {
   }
 }
 
-// Selects a DECIMAL's target by range, not by the order in decimalTargetTypes. If none
-// holds its precision and scale, BigQuery selects the widest listed type and checks values
-// when reading them (third_party/bigquery_docs/reference/rest/v2/Job.md).
 void DetectDecimals(FieldSchema& field, const ParquetColumn* column,
                     const std::vector<DecimalTargetType>& targets) {
   if (column == nullptr) {
@@ -453,22 +450,8 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column,
     }
     return;
   }
-  if (!column->IsDecimal()) {
-    return;
-  }
-  const auto listed = [&targets](DecimalTargetType type) {
-    return std::ranges::find(targets, type) != targets.end();
-  };
-  if (listed(DecimalTargetType::kNumeric) && column->HoldsNumeric()) {
-    field.type = FieldType::kNumeric;
-  } else if (listed(DecimalTargetType::kBigNumeric) && column->scale <= kBigNumericScale &&
-             column->precision - column->scale <= 38) {
-    field.type = FieldType::kBigNumeric;
-  } else if (listed(DecimalTargetType::kString)) {
-    field.type = FieldType::kString;
-  } else {
-    field.type =
-        listed(DecimalTargetType::kBigNumeric) ? FieldType::kBigNumeric : FieldType::kNumeric;
+  if (column->IsDecimal()) {
+    field.type = DecimalTarget(*column, targets);
   }
 }
 
@@ -656,6 +639,24 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
     sources.sources.push_back({.uri = input.uri, .path = staged});
   }
   return sources;
+}
+
+FieldType DecimalTarget(const ParquetColumn& column,
+                        const std::vector<DecimalTargetType>& targets) {
+  const auto listed = [&targets](DecimalTargetType type) {
+    return std::ranges::find(targets, type) != targets.end();
+  };
+  if (listed(DecimalTargetType::kNumeric) && column.HoldsNumeric()) {
+    return FieldType::kNumeric;
+  }
+  if (listed(DecimalTargetType::kBigNumeric) && column.scale <= kBigNumericScale &&
+      column.precision - column.scale <= 38) {
+    return FieldType::kBigNumeric;
+  }
+  if (listed(DecimalTargetType::kString)) {
+    return FieldType::kString;
+  }
+  return listed(DecimalTargetType::kBigNumeric) ? FieldType::kBigNumeric : FieldType::kNumeric;
 }
 
 void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& columns,

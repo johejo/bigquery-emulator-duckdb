@@ -53,6 +53,13 @@ std::vector<std::pair<std::string_view, std::string>> DatetimeFormatOptions(
   return options;
 }
 
+// The decimal_target_types option value of `targets`, as uris lists its URIs.
+std::string DecimalTargetTypesValue(const std::vector<std::string>& targets) {
+  std::vector<std::string> values;
+  std::ranges::transform(targets, std::back_inserter(values), StringOptionValue);
+  return "[" + absl::StrJoin(values, ", ") + "]";
+}
+
 // DDL omits redundant collations: the table's default, and binary when there is no nonempty
 // default. Nested STRING fields and array elements carry their own COLLATE clauses.
 absl::StatusOr<std::string> ColumnTypeDdl(FieldSchema field,
@@ -209,6 +216,12 @@ absl::StatusOr<std::string> TableDdl(
     ddl += "  format=" +
            StringOptionValue(external->format == "BIGTABLE" ? "CLOUD_BIGTABLE" : external->format) +
            ",\n";
+    // After format, as BigQuery's answers in external_decimal_target_types.api.answers.json
+    // show; where it goes relative to the Hive options is not known.
+    if (external->decimal_target_types) {
+      ddl += "  decimal_target_types=" + DecimalTargetTypesValue(*external->decimal_target_types) +
+             ",\n";
+    }
     if (hive) {
       ddl +=
           "  hive_partition_uri_prefix=" + StringOptionValue(HivePrefixOption(*hive).value_or("")) +
@@ -573,6 +586,13 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
               .name = "max_bad_records",
               .type = "INT64",
               .value = std::to_string(*external.max_bad_records),
+          });
+        }
+        if (external.decimal_target_types) {
+          options.push_back({
+              .name = "decimal_target_types",
+              .type = "ARRAY<STRING>",
+              .value = DecimalTargetTypesValue(*external.decimal_target_types),
           });
         }
         for (auto& [name, value] : DatetimeFormatOptions(external)) {

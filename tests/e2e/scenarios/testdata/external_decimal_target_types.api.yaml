@@ -1,0 +1,233 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run oz2hqlewrcadxyy232otiixm7g, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the observations.
+# third_party/bigquery_docs/reference/rest/v2/tables.md documents decimalTargetTypes' type
+# selection; BigQuery's answers settle the rest: tables.get gives the types as given, duplicates
+# included, the DDL lists decimal_target_types after format, an empty list is left out, a declared
+# type reads as it does without the option, a CSV table takes it without changing the types it
+# detects, and an unknown type fails. metadata_ddl shows that DDL also rejects max_bad_records on
+# a Parquet table.
+# types.parquet and wide.parquet are those of external_table_parquet_types.api.yaml:
+# types.parquet has dec9 INT32 DECIMAL(9, 2), dec18 INT64 DECIMAL(18, 4) and dec38
+# FIXED_LEN_BYTE_ARRAY DECIMAL(38, 9), each 1.25, among other columns; wide.parquet has dec50
+# FIXED_LEN_BYTE_ARRAY DECIMAL(50, 20) = 1.25.
+description: >-
+  decimal_target_types and decimalTargetTypes of external tables: metadata, declared types and
+  invalid values.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t`
+  types: "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"
+  wide: "UEFSMRUAFTYVNiwVAhUAFQYVBhwAAAACAAAAAgEAAAAAAAAAAAAAAAAGxrk1uLvUAAAVBBksSAZzY2hlbWEVAgAVDhUqFQIYBWRlYzUwJQoVKBVkLFwVKBVkAAAAFgIZHBkcJggcFQ4ZJQAGGRgFZGVjNTAVABYCFlwWXCYISRwVABUAFQIAAAAWXBYCJggWXBQAABkMGBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGRwcAAAAhQAAAFBBUjE="
+  # "a,b\n1.25,2\n"
+  csv: YSxiCjEuMjUsMgo=
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object `object`, whose contents are
+  # `source`, and reads its metadata and rows.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: metadata
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: >-
+              SELECT (SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'),
+              ARRAY(SELECT AS STRUCT option_name, option_type, option_value
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name)
+        observe:
+          status: /status
+          rows: /body/rows
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+  # As ddl, creating `t` with tables.insert and the resource `table`.
+  rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/${object}', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          external: /body/externalDataConfiguration
+          schema: /body/schema
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/${object}'}
+cases:
+  # max_bad_records fails the statement before decimal_target_types takes effect.
+  - name: metadata_ddl
+    template: ddl
+    vars:
+      object: types.parquet
+      source: '${types}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'], decimal_target_types = ['STRING', 'BIGNUMERIC', 'NUMERIC'], max_bad_records = 1)
+      query: SELECT dec9, dec18, dec38 FROM `${project}.${dataset}.t`
+    expect: {"create": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "location": "q", "locationType": "parameter", "message": "max_bad_records option not valid for format PARQUET.", "reason": "invalidQuery"}], "message": "max_bad_records option not valid for format PARQUET.", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: metadata_rest
+    template: rest
+    vars:
+      object: types.parquet
+      source: '${types}'
+      query: SELECT dec9, dec18, dec38 FROM `${project}.${dataset}.t`
+      table:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/types.parquet']
+          decimalTargetTypes: [BIGNUMERIC, NUMERIC]
+    expect: {"create": {"external": {"decimalTargetTypes": ["BIGNUMERIC", "NUMERIC"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "bool", "type": "BOOLEAN"}, {"mode": "REQUIRED", "name": "i32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i8", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "f32", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "f64", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "dec9", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "dec18", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "dec38", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_int", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_date", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_datetime", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_json", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_wkt", "type": "STRING"}, {"mode": "REQUIRED", "name": "b", "type": "BYTES"}, {"mode": "REQUIRED", "name": "b_wkb", "type": "BYTES"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "REQUIRED", "name": "t", "type": "TIME"}, {"mode": "REQUIRED", "name": "ts", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsl", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsms", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsns", "type": "INTEGER"}]}, "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}, {"v": "1.25"}, {"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "dec9", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "dec18", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "dec38", "type": "NUMERIC"}]}, "status": 200}}
+  # A declared type other than the one decimalTargetTypes selects reads as declared: NUMERIC
+  # where they select BIGNUMERIC, and STRING where they select NUMERIC.
+  - name: declared_numeric_selected_bignumeric
+    template: ddl
+    vars:
+      object: types.parquet
+      source: '${types}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec9 NUMERIC) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"external": {"decimalTargetTypes": ["BIGNUMERIC"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"name": "dec9", "type": "NUMERIC"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"${prefix}/types.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"BIGNUMERIC\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/types.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "dec9", "type": "NUMERIC"}]}, "status": 200}}
+  - name: declared_string_selected_numeric
+    template: ddl
+    vars:
+      object: types.parquet
+      source: '${types}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (dec9 STRING) OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'], decimal_target_types = ['NUMERIC', 'STRING'])
+    expect: {"create": {"status": 200}, "get": {"external": {"decimalTargetTypes": ["NUMERIC", "STRING"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"name": "dec9", "type": "STRING"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"NUMERIC\", \"STRING\"],\n  uris=[\"${prefix}/types.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"NUMERIC\", \"STRING\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/types.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "dec9", "type": "STRING"}]}, "status": 200}}
+  # A DECIMAL that NUMERIC does not hold, of STRING only.
+  - name: wide_string
+    template: ddl
+    vars:
+      object: wide.parquet
+      source: '${wide}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/wide.parquet'], decimal_target_types = ['STRING'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "decimalTargetTypes": ["STRING"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/wide.parquet"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "dec50", "type": "STRING"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"STRING\"],\n  uris=[\"${prefix}/wide.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"STRING\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/wide.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "dec50", "type": "STRING"}]}, "status": 200}}
+  - name: duplicate_ddl
+    template: ddl
+    vars:
+      object: types.parquet
+      source: '${types}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'], decimal_target_types = ['NUMERIC', 'NUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "decimalTargetTypes": ["NUMERIC", "NUMERIC"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "bool", "type": "BOOLEAN"}, {"mode": "REQUIRED", "name": "i32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i8", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "f32", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "f64", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "dec9", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "dec18", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "dec38", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_int", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_date", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_datetime", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_json", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_wkt", "type": "STRING"}, {"mode": "REQUIRED", "name": "b", "type": "BYTES"}, {"mode": "REQUIRED", "name": "b_wkb", "type": "BYTES"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "REQUIRED", "name": "t", "type": "TIME"}, {"mode": "REQUIRED", "name": "ts", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsl", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsms", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsns", "type": "INTEGER"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"NUMERIC\", \"NUMERIC\"],\n  uris=[\"${prefix}/types.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "decimal_target_types"}, {"v": "ARRAY<STRING>"}, {"v": "[\"NUMERIC\", \"NUMERIC\"]"}]}}, {"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/types.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "true"}, {"v": "42"}, {"v": "42"}, {"v": "42"}, {"v": "42"}, {"v": "42"}, {"v": "1.5"}, {"v": "1.5"}, {"v": "1.25"}, {"v": "1.25"}, {"v": "1.25"}, {"v": "a"}, {"v": "42"}, {"v": "2024-01-02"}, {"v": "2024-01-02 03:04:05"}, {"v": "{\"a\":1}"}, {"v": "POINT(1 2)"}, {"v": "YQ=="}, {"v": "AQEAAAAAAAAAAADwPwAAAAAAAABA"}, {"v": "2024-01-02"}, {"v": "03:04:05.000006"}, {"v": "1.704164645000006E9"}, {"v": "1.704164645000006E9"}, {"v": "1.704164645006E9"}, {"v": "1704164645000006007"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "bool", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "i32", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "i64", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "i8", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "u32", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "u64", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "f32", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "f64", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "dec9", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "dec18", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "dec38", "type": "NUMERIC"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_int", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_date", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_datetime", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_json", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_wkt", "type": "STRING"}, {"mode": "NULLABLE", "name": "b", "type": "BYTES"}, {"mode": "NULLABLE", "name": "b_wkb", "type": "BYTES"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "t", "type": "TIME"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "tsl", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "tsms", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "tsns", "type": "INTEGER"}]}, "status": 200}}
+  - name: unknown_ddl
+    template: ddl
+    vars:
+      object: types.parquet
+      source: '${types}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'], decimal_target_types = ['FLOAT64'])
+    expect: {"create": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "location": "q", "locationType": "parameter", "message": "'FLOAT64' is not a valid value; failed to set 'decimal_target_types' in external table OPTIONS", "reason": "invalidQuery"}], "message": "'FLOAT64' is not a valid value; failed to set 'decimal_target_types' in external table OPTIONS", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  - name: duplicate_rest
+    template: rest
+    vars:
+      object: types.parquet
+      source: '${types}'
+      table:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        externalDataConfiguration:
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/types.parquet']
+          decimalTargetTypes: [STRING, STRING]
+    expect: {"create": {"external": {"decimalTargetTypes": ["STRING", "STRING"], "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "bool", "type": "BOOLEAN"}, {"mode": "REQUIRED", "name": "i32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i8", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "f32", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "f64", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "dec9", "type": "STRING"}, {"mode": "REQUIRED", "name": "dec18", "type": "STRING"}, {"mode": "REQUIRED", "name": "dec38", "type": "STRING"}, {"mode": "REQUIRED", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_int", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_date", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_datetime", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_json", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_wkt", "type": "STRING"}, {"mode": "REQUIRED", "name": "b", "type": "BYTES"}, {"mode": "REQUIRED", "name": "b_wkb", "type": "BYTES"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "REQUIRED", "name": "t", "type": "TIME"}, {"mode": "REQUIRED", "name": "ts", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsl", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsms", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsns", "type": "INTEGER"}]}, "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "true"}, {"v": "42"}, {"v": "42"}, {"v": "42"}, {"v": "42"}, {"v": "42"}, {"v": "1.5"}, {"v": "1.5"}, {"v": "1.25"}, {"v": "1.25"}, {"v": "1.25"}, {"v": "a"}, {"v": "42"}, {"v": "2024-01-02"}, {"v": "2024-01-02 03:04:05"}, {"v": "{\"a\":1}"}, {"v": "POINT(1 2)"}, {"v": "YQ=="}, {"v": "AQEAAAAAAAAAAADwPwAAAAAAAABA"}, {"v": "2024-01-02"}, {"v": "03:04:05.000006"}, {"v": "1.704164645000006E9"}, {"v": "1.704164645000006E9"}, {"v": "1.704164645006E9"}, {"v": "1704164645000006007"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "bool", "type": "BOOLEAN"}, {"mode": "NULLABLE", "name": "i32", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "i64", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "i8", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "u32", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "u64", "type": "INTEGER"}, {"mode": "NULLABLE", "name": "f32", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "f64", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "dec9", "type": "STRING"}, {"mode": "NULLABLE", "name": "dec18", "type": "STRING"}, {"mode": "NULLABLE", "name": "dec38", "type": "STRING"}, {"mode": "NULLABLE", "name": "s", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_int", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_date", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_datetime", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_json", "type": "STRING"}, {"mode": "NULLABLE", "name": "s_wkt", "type": "STRING"}, {"mode": "NULLABLE", "name": "b", "type": "BYTES"}, {"mode": "NULLABLE", "name": "b_wkb", "type": "BYTES"}, {"mode": "NULLABLE", "name": "d", "type": "DATE"}, {"mode": "NULLABLE", "name": "t", "type": "TIME"}, {"mode": "NULLABLE", "name": "ts", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "tsl", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "tsms", "type": "TIMESTAMP"}, {"mode": "NULLABLE", "name": "tsns", "type": "INTEGER"}]}, "status": 200}}
+  # An empty list is the default, which the table leaves out.
+  - name: empty_ddl
+    template: ddl
+    vars:
+      object: types.parquet
+      source: '${types}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/types.parquet'], decimal_target_types = [])
+      query: SELECT dec9 FROM `${project}.${dataset}.t`
+    expect: {"create": {"status": 200}, "get": {"external": {"autodetect": true, "sourceFormat": "PARQUET", "sourceUris": ["${prefix}/types.parquet"]}, "schema": {"fields": [{"mode": "REQUIRED", "name": "bool", "type": "BOOLEAN"}, {"mode": "REQUIRED", "name": "i32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "i8", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u32", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "u64", "type": "INTEGER"}, {"mode": "REQUIRED", "name": "f32", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "f64", "type": "FLOAT"}, {"mode": "REQUIRED", "name": "dec9", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "dec18", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "dec38", "type": "NUMERIC"}, {"mode": "REQUIRED", "name": "s", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_int", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_date", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_datetime", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_json", "type": "STRING"}, {"mode": "REQUIRED", "name": "s_wkt", "type": "STRING"}, {"mode": "REQUIRED", "name": "b", "type": "BYTES"}, {"mode": "REQUIRED", "name": "b_wkb", "type": "BYTES"}, {"mode": "REQUIRED", "name": "d", "type": "DATE"}, {"mode": "REQUIRED", "name": "t", "type": "TIME"}, {"mode": "REQUIRED", "name": "ts", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsl", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsms", "type": "TIMESTAMP"}, {"mode": "REQUIRED", "name": "tsns", "type": "INTEGER"}]}}, "metadata": {"rows": [{"f": [{"v": "CREATE EXTERNAL TABLE `${project}.${dataset}.t`\nOPTIONS(\n  format=\"PARQUET\",\n  uris=[\"${prefix}/types.parquet\"]\n);"}, {"v": [{"v": {"f": [{"v": "format"}, {"v": "STRING"}, {"v": "\"PARQUET\""}]}}, {"v": {"f": [{"v": "uris"}, {"v": "ARRAY<STRING>"}, {"v": "[\"${prefix}/types.parquet\"]"}]}}]}]}], "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "dec9", "type": "NUMERIC"}]}, "status": 200}}
+  # A CSV table keeps the option and detects a decimal column as FLOAT64.
+  - name: csv_autodetect
+    template: rest
+    vars:
+      object: a.csv
+      source: '${csv}'
+      table:
+        tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+        externalDataConfiguration:
+          sourceFormat: CSV
+          sourceUris: ['${prefix}/a.csv']
+          autodetect: true
+          decimalTargetTypes: [BIGNUMERIC]
+    expect: {"create": {"external": {"autodetect": true, "decimalTargetTypes": ["BIGNUMERIC"], "sourceFormat": "CSV", "sourceUris": ["${prefix}/a.csv"]}, "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}, "status": 200}, "query": {"jobComplete": true, "rows": [{"f": [{"v": "1.25"}, {"v": "2"}]}], "schema": {"fields": [{"mode": "NULLABLE", "name": "a", "type": "FLOAT"}, {"mode": "NULLABLE", "name": "b", "type": "INTEGER"}]}, "status": 200}}
