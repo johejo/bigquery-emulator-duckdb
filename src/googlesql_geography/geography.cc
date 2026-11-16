@@ -675,9 +675,7 @@ absl::StatusOr<S2BufferOperation::Options> BufferOptions(double radius_meters, b
                                                          const std::string& endcap,
                                                          const std::string& side,
                                                          const std::string& function) {
-  if (use_spheroid) {
-    return absl::OutOfRangeError(function + " does not yet implement use_spheroid=true.");
-  }
+  GOOGLESQL_RETURN_IF_ERROR(CheckBufferSphere(use_spheroid, function).status());
   GOOGLESQL_RETURN_IF_ERROR(CheckFinite(radius_meters, "buffer_radius_meters", function));
   S2BufferOperation::Options options(S2Earth::MetersToAngle(radius_meters));
   const std::string endcap_style = absl::AsciiStrToUpper(endcap);
@@ -704,6 +702,13 @@ absl::StatusOr<S2BufferOperation::Options> BufferOptions(double radius_meters, b
   return options;
 }
 }  // namespace
+
+absl::StatusOr<bool> CheckBufferSphere(bool use_spheroid, const std::string& function) {
+  if (use_spheroid) {
+    return absl::OutOfRangeError(function + " does not yet implement use_spheroid=true.");
+  }
+  return true;
+}
 
 // BigQuery approximates a quarter circle with `num_seg_quarter_circle` segments, as S2's circle
 // segments of a whole circle: a buffered point is a regular polygon of four times as many sides.

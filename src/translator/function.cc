@@ -589,8 +589,20 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (bound.empty()) {
     return "TRY(" + *sql + ")";
   }
-  return "list_transform([struct_pack(" + Join(bound, ", ") + ")], lambda " + lambda + ": TRY(" +
-         *sql + "))[1]";
+  std::string body = "TRY(" + *sql + ")";
+  if ((function == "ST_BUFFER" || function == "ST_BUFFERWITHTOLERANCE") &&
+      placeholders.size() >= 4) {
+    // BigQuery's unimplemented spheroid error survives SAFE., unlike invalid buffer
+    // options. Check it outside TRY, but after binding arguments once and preserving
+    // the backend's NULL propagation.
+    std::vector<std::string> nonnull(placeholders.size());
+    std::ranges::transform(placeholders, nonnull.begin(),
+                           [](const auto& argument) { return argument + " IS NOT NULL"; });
+    body = "CASE WHEN " + Join(nonnull, " AND ") + " THEN CASE WHEN bq_st_buffer_check_sphere(" +
+           placeholders.at(3) + ", " + QuoteLiteral(function) + ") THEN " + body + " END END";
+  }
+  return "list_transform([struct_pack(" + Join(bound, ", ") + ")], lambda " + lambda + ": " + body +
+         ")[1]";
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

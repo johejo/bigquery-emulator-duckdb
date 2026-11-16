@@ -51,6 +51,8 @@ absl::StatusOr<double> Y(const Geography& geography);
 absl::StatusOr<Geography> SetOperation(const Geography& a, const Geography& b,
                                        S2BooleanOperation::OpType operation);
 absl::StatusOr<Geography> Boundary(const Geography& geography);
+// Kept outside SAFE.'s error suppression for the buffer functions.
+absl::StatusOr<bool> CheckBufferSphere(bool use_spheroid, const std::string& function);
 absl::StatusOr<Geography> Buffer(const Geography& geography, double radius_meters,
                                  double num_seg_quarter_circle, bool use_spheroid,
                                  const std::string& endcap, const std::string& side);
