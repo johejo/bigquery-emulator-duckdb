@@ -339,6 +339,7 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
     }
     column.precision = IntField(element, parquet::kElementPrecision).value_or(0);
     column.scale = IntField(element, parquet::kElementScale).value_or(0);
+    column.type_length = IntField(element, parquet::kElementTypeLength).value_or(0);
   } else {
     column.kind = ParquetColumn::Kind::kStruct;
     std::vector<size_t> elements;

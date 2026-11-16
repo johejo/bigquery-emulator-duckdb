@@ -93,22 +93,25 @@ ParquetDetection Detection(const GcsExternalData& definition) {
   return detection;
 }
 
-// Whether a DECIMAL `column` of INT32, INT64 or FIXED_LEN_BYTE_ARRAY, read below the top level
-// or at it without a conversion, holds as `type`: which errors BigQuery gives a value the type does
-// not hold is not known.
-bool DecimalHolds(const ParquetColumn& column, FieldType type) {
-  const bool physical = column.type == parquet::kInt32 || column.type == parquet::kInt64 ||
-                        column.type == parquet::kFixedLenByteArray;
-  switch (type) {
-    case FieldType::kNumeric:
-      return physical && column.HoldsNumeric();
-    case FieldType::kBigNumeric:
-      return physical && column.scale <= 38 && column.precision - column.scale <= 38;
-    case FieldType::kString:
-      return physical && column.scale <= 38;
-    default:
-      return false;
+// Whether a DECIMAL `column` is of INT32, INT64 or FIXED_LEN_BYTE_ARRAY, which reads take.
+bool StoredDecimal(const ParquetColumn& column) {
+  return column.type == parquet::kInt32 || column.type == parquet::kInt64 ||
+         column.type == parquet::kFixedLenByteArray;
+}
+
+// Whether a DECIMAL `column` read below the top level, or at it without a conversion, can be read
+// as `type`: at the top level where the type holds it, and below it as NUMERIC, BIGNUMERIC or
+// STRING, whose values the reader checks as BigQuery's answers in
+// external_decimal_unheld.api.answers.json show.
+bool DecimalReads(const ParquetColumn& column, FieldType type, bool nested) {
+  if (!StoredDecimal(column)) {
+    return false;
   }
+  if (!nested) {
+    return DecimalTypeHolds(column, type);
+  }
+  return type == FieldType::kNumeric || type == FieldType::kBigNumeric ||
+         type == FieldType::kString;
 }
 
 // The type BigQuery detects for the Parquet leaf `column`, whose SchemaElement is `element`, as
@@ -116,10 +119,10 @@ bool DecimalHolds(const ParquetColumn& column, FieldType type) {
 // [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
 // list them, or none for other combinations, which BigQuery does not convert, and for
 // GeoParquet, whose types depend on options the emulator does not take. A DECIMAL takes the type
-// its decimalTargetTypes select where it holds the DECIMAL's precision and scale: below the top
-// level, or in a REPEATED column, `nested`, of any target, which the reader converts as loads do,
-// and at the top level only NUMERIC, since DetectGcsExternalSchema detects the others and
-// ParquetConversion converts them.
+// its decimalTargetTypes select: below the top level, or in a REPEATED column, `nested`, whether
+// or not it holds the DECIMAL's precision and scale, as BigQuery's answers in
+// external_decimal_unheld.api.answers.json show, and at the top level only NUMERIC where it holds
+// them, since DetectGcsExternalSchema detects the others and ParquetConversion converts them.
 std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetColumn& column,
                                       const ParquetDetection& detection, bool nested) {
   if (column.kind != ParquetColumn::Kind::kLeaf || column.edges != ParquetColumn::Edges::kNone) {
@@ -127,7 +130,7 @@ std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetC
   }
   if (column.IsDecimal()) {
     const FieldType target = DecimalTarget(column, detection.decimal_targets);
-    if (DecimalHolds(column, target) && (nested || target == FieldType::kNumeric)) {
+    if (DecimalReads(column, target, nested) && (nested || target == FieldType::kNumeric)) {
       return target;
     }
     return std::nullopt;
@@ -554,8 +557,9 @@ std::string ParquetConversion(const FieldSchema& field, const ThriftValue& eleme
 }
 
 // Whether a source whose `column` has the `detected` field, or none, can be read as `declared`:
-// the same type, or for a DECIMAL any type that holds it, as BigQuery's answers in
-// external_decimal_target_types.api.answers.json show, REPEATED in both or neither, and each
+// the same type, or for a DECIMAL NUMERIC, BIGNUMERIC or STRING, as BigQuery's answers in
+// external_decimal_target_types.api.answers.json and external_decimal_unheld.api.answers.json
+// show, REPEATED in both or neither, and each
 // declared field one of the source's, or NULLABLE and absent. BigQuery, as DuckDB's casts do,
 // matches a RECORD's fields by name in any case and drops the source's other fields.
 bool Matches(const FieldSchema& declared, const FieldSchema* detected,
@@ -569,7 +573,7 @@ bool Matches(const FieldSchema& declared, const FieldSchema* detected,
   const ParquetColumn& value =
       column->kind == ParquetColumn::Kind::kList ? column->children.front() : *column;
   if (value.IsDecimal() && declared.type != FieldType::kRecord) {
-    return DecimalHolds(value, declared.type);
+    return DecimalReads(value, declared.type, /*nested=*/true);
   }
   if (declared.type != detected->type) {
     return false;
@@ -1105,6 +1109,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
                                              .allow_missing_columns = true,
                                              .allow_null_list_elements = true,
                                              .conversions = std::move(conversions),
+                                             .external_table = std::string(table_name),
+                                             .external_uri = source.uri,
                                          },
                                          {read_source}, read_schema, columns)));
     }

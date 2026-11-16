@@ -60,6 +60,10 @@ struct ParquetSources {
 ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, TemporaryFiles& downloads,
                                    bool list_inference, bool decimal_bytes = false);
 
+// Whether NUMERIC, BIGNUMERIC or STRING `type` holds the precision and scale of the DECIMAL
+// `column`; a STRING holds those of BIGNUMERIC's scale, as a top-level column reads them.
+bool DecimalTypeHolds(const ParquetColumn& column, FieldType type);
+
 // The type of decimalTargetTypes `targets` that a DECIMAL `column` takes: by range, not by the
 // order of `targets`, and, where none holds its precision and scale, the widest listed type,
 // whose values are checked when read (third_party/bigquery_docs/reference/rest/v2/Job.md).
