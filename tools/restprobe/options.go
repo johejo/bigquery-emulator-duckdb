@@ -54,9 +54,14 @@ func probeOptions(w io.Writer, binary, path string) error {
 		}
 		results[j.k] = append(results[j.k], p)
 	}
+	return writeOptions(w, cases, results)
+}
+
+func writeOptions(w io.Writer, cases []ddloptions.Case, results [][]probereport.Probe) error {
 	var body, unprobed bytes.Buffer
 	var tallies []probereport.Tally
 	var current *ddloptions.Context
+	currentHeading := ""
 	for i, k := range cases {
 		if k.Context.Template == "" {
 			// A context without a template has only Untested rows, which a list shows shortly.
@@ -69,10 +74,15 @@ func probeOptions(w io.Writer, binary, path string) error {
 			fmt.Fprintf(&unprobed, " `%s`", k.Option.Name)
 			continue
 		}
-		if k.Context != current {
-			current = k.Context
-			fmt.Fprintf(&body, "\n## %s\n\n| Option | Type | Status | Notes |\n| --- | --- | --- | --- |\n", current.Name)
-			tallies = append(tallies, probereport.Tally{Title: current.Name, Counts: map[string]int{}})
+		current = k.Context
+		heading := current.Heading
+		if heading == "" {
+			heading = current.Name
+		}
+		if heading != currentHeading {
+			currentHeading = heading
+			fmt.Fprintf(&body, "\n## %s\n\n| Option | Type | Status | Notes |\n| --- | --- | --- | --- |\n", heading)
+			tallies = append(tallies, probereport.Tally{Title: heading, Counts: map[string]int{}})
 		}
 		counts := map[probereport.Outcome]int{}
 		rejected := map[string]bool{}
