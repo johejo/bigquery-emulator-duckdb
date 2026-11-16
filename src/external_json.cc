@@ -47,16 +47,16 @@ void ValidateObject(json& object, const std::vector<FieldSchema>& schema, bool c
                     const DatetimeFormats& formats);
 
 // BigQuery's message for the line `line`, which is not a JSON object, as its answers in
-// external_table_json_types.api.answers.json, external_table_bad_records.api.answers.json and
-// external_table_types_open.api.answers.json show: an array, a string, a line that ends where a
-// key of the row is expected and a bracket that closes the row are named, and other malformed
-// lines take its most common message. Other JSON values are unsupported.
+// external_table_json_types.api.answers.json, external_table_bad_records.api.answers.json,
+// external_table_types_open.api.answers.json and external_json_rows.api.answers.json show: an
+// array, another JSON value, a line that ends where a key of the row is expected and a bracket
+// that closes the row are named, and other malformed lines take its most common message.
 std::string_view NotObjectMessage(std::string_view line) {
   const std::size_t first = line.find_first_not_of(" \t\r");
   if (line.at(first) == '[') {
     return "Start of array encountered without start of object.";
   }
-  if (line.at(first) == '"' && json::accept(line)) {
+  if (json::accept(line)) {
     return "Value encountered without start of object.";
   }
   try {
@@ -91,9 +91,8 @@ std::string_view NotObjectMessage(std::string_view line) {
     if (row && at < line.size() && line.at(at) == ']') {
       return "Expected , or } after key:value pair";
     }
-    return "Parser terminated before end of string";
   }
-  throw ApiError::Unsupported("reading a JSON row that is a number, a BOOL or null");
+  return "Parser terminated before end of string";
 }
 
 // `line` without the comma after the last member of its object, which BigQuery accepts, as its

@@ -1,0 +1,84 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run or5bsolo5ga4x6sbybvqvs5ftx, with
+# sources in the bucket johejo-sandbox-us; the answers sidecar keeps the observations.
+# BigQuery's answers settle NEWLINE_DELIMITED_JSON external table rows that are numbers, BOOLs
+# or null: each fails with the message of a string row, "Value encountered without start of
+# object.", and counts as one bad record, as external_table_bad_records.api.yaml and
+# external_table_types_open.api.yaml record for other rows that are not objects.
+description: JSON external table rows that are numbers, BOOLs or null.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  query: SELECT * FROM `${project}.${dataset}.t` ORDER BY id
+  # '1\ntrue\nnull\n{"id": 4}\n'
+  scalars: MQp0cnVlCm51bGwKeyJpZCI6IDR9Cg==
+  # '{"id": 1}\n2\n'
+  number: eyJpZCI6IDF9CjIK
+templates:
+  # Creates `t` with the DDL statement `ddl` over a.json, whose contents are `source`, and
+  # queries it.
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/a.json', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${query}
+        observe:
+          status: /status
+          jobComplete: /body/jobComplete
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/a.json'}
+cases:
+  # A number fails the read without bad records.
+  - name: number_without_bad_records
+    template: ddl
+    vars:
+      source: '${number}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'])
+    expect: {"create": {"status": 200}, "query": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 10: Value encountered without start of object. File: ${prefix}/a.json", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON parsing error in row starting at position 10: Value encountered without start of object. File: ${prefix}/a.json", "status": "INVALID_ARGUMENT"}}, "status": 400}}}
+  # A number, a BOOL and null each count as one bad record.
+  - name: scalars_within_bad_records
+    template: ddl
+    vars:
+      source: '${scalars}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'], max_bad_records = 3)
+    expect: {"create": {"status": 200}, "query": {"errors": [{"location": "${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "reason": "invalid"}, {"location": "${prefix}/a.json", "reason": "invalid"}], "jobComplete": true, "rows": [{"f": [{"v": "4"}]}], "status": 200}}
+  - name: scalars_exceeding_bad_records
+    template: ddl
+    vars:
+      source: '${scalars}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (id INT64) OPTIONS (format = 'JSON', uris = ['${prefix}/a.json'], max_bad_records = 2)
+    expect: {"create": {"status": 200}, "query": {"error": {"body": {"error": {"code": 400, "errors": [{"domain": "global", "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON table encountered too many errors, giving up. Rows: 3; errors: 3. Please look into the errors[] collection for more details. File: ${prefix}/a.json", "reason": "invalid"}], "message": "Error while reading table: ${project}.${dataset}.t, error message: JSON table encountered too many errors, giving up. Rows: 3; errors: 3. Please look into the errors[] collection for more details. File: ${prefix}/a.json", "status": "INVALID_ARGUMENT"}}, "status": 400}}}

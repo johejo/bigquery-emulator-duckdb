@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "cases": {
+    "number_without_bad_records": {
+      "project": "johejo-sandbox",
+      "run": "or5bsolo5ga4x6sbybvqvs5ftx",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_or5bsolo5ga4x6sbybvqvs5ftx_number_without_bad_records.t, error message: JSON parsing error in row starting at position 10: Value encountered without start of object. File: gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/number_without_bad_records/a.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_or5bsolo5ga4x6sbybvqvs5ftx_number_without_bad_records.t, error message: JSON parsing error in row starting at position 10: Value encountered without start of object. File: gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/number_without_bad_records/a.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "scalars_exceeding_bad_records": {
+      "project": "johejo-sandbox",
+      "run": "or5bsolo5ga4x6sbybvqvs5ftx",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_or5bsolo5ga4x6sbybvqvs5ftx_scalars_exceeding_bad_records.t, error message: JSON table encountered too many errors, giving up. Rows: 3; errors: 3. Please look into the errors[] collection for more details. File: gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/scalars_exceeding_bad_records/a.json",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_or5bsolo5ga4x6sbybvqvs5ftx_scalars_exceeding_bad_records.t, error message: JSON table encountered too many errors, giving up. Rows: 3; errors: 3. Please look into the errors[] collection for more details. File: gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/scalars_exceeding_bad_records/a.json",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "scalars_within_bad_records": {
+      "project": "johejo-sandbox",
+      "run": "or5bsolo5ga4x6sbybvqvs5ftx",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "query": {
+          "errors": [
+            {
+              "location": "gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/scalars_within_bad_records/a.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/scalars_within_bad_records/a.json",
+              "reason": "invalid"
+            },
+            {
+              "location": "gs://johejo-sandbox-us/or5bsolo5ga4x6sbybvqvs5ftx/scalars_within_bad_records/a.json",
+              "reason": "invalid"
+            }
+          ],
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "4"
+                }
+              ]
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

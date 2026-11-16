@@ -129,7 +129,6 @@ These forms are unsupported:
 - A gzip source with compression `NONE` (BigQuery reads it without decompressing), or a gzip
   source in UTF-16 or UTF-32.
 - Invalid UTF-16 or UTF-32 sequences.
-- JSON rows that are numbers, BOOLs or null.
 
 A conversion failure in a valid JSON record still fails the query rather than counting as a
 bad record, except for BIGNUMERIC, DATETIME, TIMESTAMP, GEOGRAPHY and values parsed by a format.
