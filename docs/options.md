@@ -40,9 +40,7 @@ the emulator rejected.
 | [CREATE FUNCTION JavaScript](#create-function-javascript) | 0 | 0 | 2 | 0 |
 | [CREATE TABLE FUNCTION](#create-table-function) | 1 | 0 | 0 | 0 |
 | [CREATE PROCEDURE SQL](#create-procedure-sql) | 2 | 0 | 0 | 0 |
-| [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
-| [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
-| [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
+| [CREATE FUNCTION Python](#create-function-python) | 3 | 0 | 1 | 5 |
 | [CREATE EXTERNAL TABLE](#create-external-table) | 10 | 1 | 2 | 8 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 15 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE Bigtable URI](#create-external-table-bigtable-uri) | 1 | 0 | 0 | 0 |
@@ -260,22 +258,12 @@ the emulator rejected.
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`library`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
 | [`max_batching_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
+| [`runtime_version`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`entry_point`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`packages`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
 | [`container_cpu`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Untested | No sample for this option's constraints. |
 | [`container_memory`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`container_request_concurrency`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
-
-## CREATE FUNCTION Python runtime
-
-| Option | Type | Status | Notes |
-| --- | --- | --- | --- |
-| [`runtime_version`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-
-## CREATE FUNCTION Python entry point
-
-| Option | Type | Status | Notes |
-| --- | --- | --- | --- |
-| [`entry_point`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
 ## CREATE EXTERNAL TABLE
 
