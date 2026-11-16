@@ -268,9 +268,12 @@ FieldSchema TextJsons(FieldSchema field) {
 // The DuckDB value `sql` of `column`, a Parquet column or null for none, as `field`. DuckDB casts
 // most columns itself, but StageParquetSources makes it read a wide DECIMAL as its bytes, and
 // it casts a DECIMAL to BIGNUM as an integer, so those go through GoogleSQL's conversions. A
-// lambda takes the name _e and its `depth`.
+// lambda takes the name _e and its `depth`. Below the top level, `nested`, an external read
+// reads a DECIMAL its type does not hold through bq_parquet_decimal_read, which names the
+// field's `path`, empty in a REPEATED field.
 std::string ParquetValue(const std::string& sql, const FieldSchema& field,
-                         const ParquetColumn* column, int depth) {
+                         const ParquetColumn* column, int depth, const ParquetReadOptions& options,
+                         const std::string& path, bool nested) {
   std::string cast = std::format("CAST({} AS {})", sql, ToDuckDbReadType(field));
   if (column == nullptr ||
       (field.type != FieldType::kGeography && !HasType(field.fields, FieldType::kGeography) &&
@@ -289,7 +292,7 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
     return MapElements(sql, field, depth,
                        [&](const std::string& name, const FieldSchema& element, int element_depth) {
                          return ParquetValue(name, element, &column->children.front(),
-                                             element_depth);
+                                             element_depth, options, "", true);
                        });
   }
   if (field.type == FieldType::kRecord) {
@@ -297,7 +300,8 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
       return cast;
     }
     return MapFields(sql, field, [&](const std::string& value, const FieldSchema& child) {
-      return ParquetValue(value, child, column->Child(child.name), depth);
+      return ParquetValue(value, child, column->Child(child.name), depth, options,
+                          path.empty() ? "" : path + "." + child.name, true);
     });
   }
   if (field.type == FieldType::kGeography) {
@@ -312,6 +316,24 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
   if (field.type == FieldType::kBytes &&
       (column->logical == parquet::kLogicalEnum || column->converted == parquet::kConvertedEnum)) {
     return std::format("encode({})", sql);
+  }
+  if (nested && !options.external_table.empty() && column->IsDecimal() &&
+      (field.type == FieldType::kNumeric || field.type == FieldType::kBigNumeric ||
+       field.type == FieldType::kString) &&
+      !DecimalTypeHolds(*column, field.type)) {
+    const std::string text =
+        column->IsWideDecimal()
+            ? std::format("bq_parquet_decimal_string({}, {})", sql, column->scale)
+            : std::format("CAST({} AS VARCHAR)", sql);
+    const bool fixed = column->type == parquet::kFixedLenByteArray;
+    return std::format("CAST(bq_parquet_decimal_read({}, {}, {}, {}, {}, {}, {}, {}) AS {})", text,
+                       column->scale,
+                       fixed                             ? column->type_length
+                       : column->type == parquet::kInt64 ? 8
+                                                         : 4,
+                       fixed ? "false" : "true", QuoteLiteral(FieldTypeName(field.type)),
+                       QuoteLiteral(path), QuoteLiteral(options.external_table),
+                       QuoteLiteral(options.external_uri), ToDuckDbReadType(field));
   }
   if (column->IsDecimal() && field.type == FieldType::kString) {
     if (column->IsWideDecimal()) {
@@ -356,7 +378,7 @@ std::string ParquetConverted(const std::string& name, const FieldSchema& field,
                              const ParquetColumn& parquet, const ParquetReadOptions& options) {
   const auto conversion = options.conversions.find(field.name);
   if (conversion == options.conversions.end()) {
-    return ParquetValue(name, field, parquet.Child(field.name), 0);
+    return ParquetValue(name, field, parquet.Child(field.name), 0, options, field.name, false);
   }
   return std::format("CAST({} AS {})",
                      std::vformat(conversion->second, std::make_format_args(name)),
@@ -641,6 +663,19 @@ ParquetSources StageParquetSources(const std::vector<FileSource>& inputs, Tempor
   return sources;
 }
 
+bool DecimalTypeHolds(const ParquetColumn& column, FieldType type) {
+  switch (type) {
+    case FieldType::kNumeric:
+      return column.HoldsNumeric();
+    case FieldType::kBigNumeric:
+      return column.scale <= kBigNumericScale && column.precision - column.scale <= 38;
+    case FieldType::kString:
+      return column.scale <= kBigNumericScale;
+    default:
+      return false;
+  }
+}
+
 FieldType DecimalTarget(const ParquetColumn& column,
                         const std::vector<DecimalTargetType>& targets) {
   const auto listed = [&targets](DecimalTargetType type) {
@@ -649,8 +684,7 @@ FieldType DecimalTarget(const ParquetColumn& column,
   if (listed(DecimalTargetType::kNumeric) && column.HoldsNumeric()) {
     return FieldType::kNumeric;
   }
-  if (listed(DecimalTargetType::kBigNumeric) && column.scale <= kBigNumericScale &&
-      column.precision - column.scale <= 38) {
+  if (listed(DecimalTargetType::kBigNumeric) && DecimalTypeHolds(column, FieldType::kBigNumeric)) {
     return FieldType::kBigNumeric;
   }
   if (listed(DecimalTargetType::kString)) {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -16,6 +17,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "duckdb.h"
+#include "googlesql/base/status_macros.h"
 #include "googlesql/public/functions/arithmetics.h"
 #include "googlesql/public/functions/convert.h"
 #include "googlesql/public/functions/convert_string.h"
@@ -106,6 +108,137 @@ absl::StatusOr<std::string> ParquetNumeric(std::string_view text) {
     return value.status();
   }
   return value->ToString();
+}
+
+// The sign and digits of the decimal `text` of a Parquet DECIMAL, as DuckDB or
+// ParquetDecimalString gives it, without leading integer or trailing fractional zeros.
+struct DecimalDigits {
+  bool negative = false;
+  std::string integer;
+  std::string fraction;
+
+  // The decimal text, such as "-1.25" or "0".
+  [[nodiscard]] std::string Text() const {
+    std::string text = integer.empty() ? "0" : integer;
+    if (!fraction.empty()) {
+      text += "." + fraction;
+    }
+    return negative && text != "0" ? "-" + text : text;
+  }
+};
+
+absl::StatusOr<DecimalDigits> ParseDecimalDigits(std::string_view text) {
+  DecimalDigits digits;
+  if (text.starts_with('-')) {
+    digits.negative = true;
+    text.remove_prefix(1);
+  }
+  const size_t point = text.find('.');
+  const std::string_view integer = text.substr(0, point);
+  const std::string_view fraction = point == std::string_view::npos ? "" : text.substr(point + 1);
+  const auto is_digits = [](std::string_view part) {
+    return std::ranges::all_of(part, [](char c) { return c >= '0' && c <= '9'; });
+  };
+  if (integer.empty() || !is_digits(integer) || !is_digits(fraction)) {
+    return absl::InvalidArgumentError("Invalid Parquet DECIMAL");
+  }
+  digits.integer = integer.substr(std::min(integer.find_first_not_of('0'), integer.size()));
+  digits.fraction = fraction.substr(0, fraction.find_last_not_of('0') + 1);
+  return digits;
+}
+
+// The lowercase hex of the integer of decimal `units`, negative or not, as Parquet stores it in
+// `length` bytes of two's complement: big-endian, or little-endian for an INT32 or INT64 as their
+// plain encoding gives them.
+std::string StoredDecimalHex(std::string_view units, bool negative, int64_t length,
+                             bool little_endian) {
+  // Little-endian bytes of the magnitude.
+  std::vector<unsigned> bytes(static_cast<size_t>(length), 0);
+  for (const char digit : units) {
+    auto carry = static_cast<unsigned>(digit - '0');
+    for (unsigned& byte : bytes) {
+      carry += byte * 10U;
+      byte = carry & 0xffU;
+      carry >>= 8U;
+    }
+  }
+  if (negative) {
+    unsigned carry = 1;
+    for (unsigned& byte : bytes) {
+      carry += byte ^ 0xffU;
+      byte = carry & 0xffU;
+      carry >>= 8U;
+    }
+  }
+  if (!little_endian) {
+    std::ranges::reverse(bytes);
+  }
+  std::string hex;
+  for (const unsigned byte : bytes) {
+    hex += std::format("{:02x}", byte);
+  }
+  return hex;
+}
+
+// The value `text` of a Parquet DECIMAL of `scale` below the top level of an external table, as
+// BigQuery reads it as `type`, NUMERIC, BIGNUMERIC or STRING, where that type does not hold the
+// DECIMAL's precision and scale: a NUMERIC's text, a BIGNUMERIC's units or a STRING. It fails, as
+// BigQuery's answers in external_decimal_unheld.api.answers.json show, on a value of `column`,
+// the field's path, beyond the type's range or with more fractional digits than NUMERIC's, naming
+// the table `table`, the source `uri` and the `length` bytes Parquet stores the value in. Which
+// errors BigQuery gives a value both out of range and too precise, one with more fractional
+// digits than BIGNUMERIC's, or a value of a REPEATED field, `column` empty, is not known.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the SQL function's arguments in order.
+absl::StatusOr<std::string> ParquetDecimalRead(std::string_view text, int64_t scale, int64_t length,
+                                               bool little_endian, std::string_view type,
+                                               std::string_view column, std::string_view table,
+                                               std::string_view uri) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const DecimalDigits digits, ParseDecimalDigits(text));
+  const bool numeric = type == "NUMERIC";
+  const bool bignumeric = type == "BIGNUMERIC";
+  if (!numeric && !bignumeric && type != "STRING") {
+    return absl::InvalidArgumentError("Invalid Parquet DECIMAL target type");
+  }
+  const bool fraction = digits.fraction.size() > (numeric ? 9U : 38U);
+  bool range = numeric && digits.integer.size() > 29;
+  if (bignumeric) {
+    range = !BigNumericValue::FromStringStrict((digits.negative ? "-" : "") +
+                                               (digits.integer.empty() ? "0" : digits.integer))
+                 .ok();
+  }
+  if (!range && !fraction) {
+    if (numeric) {
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto value,
+                                 googlesql::NumericValue::FromStringStrict(digits.Text()));
+      return value.ToString();
+    }
+    if (bignumeric) {
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto value,
+                                 BigNumericValue::FromStringStrict(digits.Text()));
+      return BigNumericUnits(value);
+    }
+    return digits.Text();
+  }
+  if (column.empty() || (range && fraction) || (fraction && !numeric)) {
+    return absl::UnimplementedError(
+        std::format("The emulator does not support reading external Parquet {} value {}, which {} "
+                    "does not hold, as {}",
+                    column.empty() ? "REPEATED field" : std::format("field {}", column),
+                    digits.Text(), type, type));
+  }
+  // The integer number of units of 10^-scale.
+  std::string units = digits.integer + digits.fraction;
+  units.append(static_cast<size_t>(scale) - digits.fraction.size(), '0');
+  return absl::InvalidArgumentError(std::format(
+      "Error while reading table: {}, error message: The value for column '{}' is out of valid {} "
+      "range: {}; input length: {}; scale: {}; input data: {}. Consider specifying decimal target "
+      "types to allow a larger range of values. See "
+      "https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet"
+      "#decimal_logical_type; in column '{}' File: {}",
+      table, column, type,
+      range ? std::format("Value is out of range after scaling to {} type", type)
+            : "Value will lose precision after scaling down to NUMERIC type",
+      length, scale, StoredDecimalHex(units, digits.negative, length, little_endian), column, uri));
 }
 
 // ROUND with a rounding mode.
@@ -450,6 +583,9 @@ void RegisterBigNumericFunctions(duckdb_connection connection, const Options& op
   Register(connection, "bq_parquet_numeric", {kVarchar}, kVarchar, Apply<ParquetNumeric>);
   Register(connection, "bq_parquet_decimal_string", {kBlob, kBigint}, kVarchar,
            Apply<ParquetDecimalString>);
+  Register(connection, "bq_parquet_decimal_read",
+           {kVarchar, kBigint, kBigint, kBoolean, kVarchar, kVarchar, kVarchar, kVarchar}, kVarchar,
+           Apply<ParquetDecimalRead>);
   Register(connection, "bq_bignumeric_from_decimal_bytes", {kBlob, kBigint}, kVarchar,
            Apply<BigNumericFromDecimalBytes>);
   Register(connection, "bq_bignumeric_to_decimal_bytes", {kVarchar}, kBlob,

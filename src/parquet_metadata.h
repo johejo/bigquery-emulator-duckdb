@@ -176,6 +176,8 @@ struct ParquetColumn {
   int16_t logical = 0;
   int64_t precision = 0;
   int64_t scale = 0;
+  // kLeaf: the length of a FIXED_LEN_BYTE_ARRAY, or 0.
+  int64_t type_length = 0;
 
   bool operator==(const ParquetColumn&) const = default;
 

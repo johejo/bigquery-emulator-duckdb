@@ -1,0 +1,225 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run aqh4xausp52h76wm6o5ds2dnh6, with sources in the
+# bucket johejo-sandbox-us; the answers sidecar keeps the observations.
+# BigQuery's answers settle the decimal_target_types cases external_decimal_target_types_nested
+# leaves open: a nested Parquet DECIMAL that neither the selected decimal_target_types type nor
+# the declared type holds takes that type, and a read fails only on a value the type does not hold,
+# naming the table, the field's path and the bytes Parquet stores the value in. A DECIMAL of a
+# scale beyond BIGNUMERIC's reads as BIGNUMERIC or STRING where its value fits.
+# Each source, written by arrow-go v18.8.0 without statistics or dictionaries, has one row of
+# r REQUIRED group {n DECIMAL} and list REPEATED DECIMAL = [n], the same value in both:
+# d40_2_small FIXED_LEN_BYTE_ARRAY DECIMAL(40, 2) = 1.25, d40_2_large DECIMAL(40, 2) = 1e35,
+# d40_12_fine DECIMAL(40, 12) = 1.000000000001, d18_12_fine INT64 DECIMAL(18, 12) =
+# 1.000000000001, d76_40_small DECIMAL(76, 40) = 1.25 and d76_0_large DECIMAL(76, 0) = 1e39.
+description: >-
+  Nested Parquet DECIMALs that neither the selected decimal_target_types type nor the declared
+  type holds.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  d40_2_small: "UEFSMRUAFSIVIiwVAhUAFQYVBhwAAAAAAAAAAAAAAAAAAAAAAAAAfRUAFToVOiwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgEAAAAAAAAAAAAAAAAAAAAAfRUEGUxIBnNjaGVtYRUEADUAGAFyFQIAFQ4VIhUAGAFuJQoVBBVQLFwVBBVQAAAAFQ4VIhUEGARsaXN0JQoVBBVQLFwVBBVQAAAAFgIZHBksJggcFQ4ZJQAGGSgBcgFuFQAWAhZIFkgmCEkcFQAVABUCAAAAJlAcFQ4ZJQAGGRgEbGlzdBUAFgIWYBZgJlBJHBUAFQAVAgAAABaoARYCJggWqAEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZLBwAABwAAADKAAAAUEFSMQ=="
+  d40_2_large: "UEFSMRUAFSIVIiwVAhUAFQYVBhwAAAAAB4XuENXaRtkA9DagAAAAABUAFToVOiwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgEAB4XuENXaRtkA9DagAAAAABUEGUxIBnNjaGVtYRUEADUAGAFyFQIAFQ4VIhUAGAFuJQoVBBVQLFwVBBVQAAAAFQ4VIhUEGARsaXN0JQoVBBVQLFwVBBVQAAAAFgIZHBksJggcFQ4ZJQAGGSgBcgFuFQAWAhZIFkgmCEkcFQAVABUCAAAAJlAcFQ4ZJQAGGRgEbGlzdBUAFgIWYBZgJlBJHBUAFQAVAgAAABaoARYCJggWqAEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZLBwAABwAAADKAAAAUEFSMQ=="
+  d40_12_fine: "UEFSMRUAFSIVIiwVAhUAFQYVBhwAAAAAAAAAAAAAAAAAAADo1KUQARUAFToVOiwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgEAAAAAAAAAAAAAAADo1KUQARUEGUxIBnNjaGVtYRUEADUAGAFyFQIAFQ4VIhUAGAFuJQoVGBVQLFwVGBVQAAAAFQ4VIhUEGARsaXN0JQoVGBVQLFwVGBVQAAAAFgIZHBksJggcFQ4ZJQAGGSgBcgFuFQAWAhZIFkgmCEkcFQAVABUCAAAAJlAcFQ4ZJQAGGRgEbGlzdBUAFgIWYBZgJlBJHBUAFQAVAgAAABaoARYCJggWqAEUAAAoGXBhcnF1ZXQtZ28gdmVyc2lvbiAxOC44LjAZLBwAABwAAADKAAAAUEFSMQ=="
+  d18_12_fine: "UEFSMRUAFRAVECwVAhUAFQYVBhwAAAABEKXU6AAAABUAFSgVKCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgEBEKXU6AAAABUEGUxIBnNjaGVtYRUEADUAGAFyFQIAFQQlABgBbiUKFRgVJCxcFRgVJAAAABUEJQQYBGxpc3QlChUYFSQsXBUYFSQAAAAWAhkcGSwmCBwVBBklAAYZKAFyAW4VABYCFjYWNiYISRwVABUAFQIAAAAmPhwVBBklAAYZGARsaXN0FQAWAhZOFk4mPkkcFQAVABUCAAAAFoQBFgImCBaEARQAACgZcGFycXVldC1nbyB2ZXJzaW9uIDE4LjguMBksHAAAHAAAAMYAAABQQVIx"
+  d76_40_small: "UEFSMRUAFUAVQCwVAhUAFQYVBhwAAAAAAAAAAAAAAAAAAAAAAAAku/RuNDPN75aocrlAAAAAABUAFVgVWCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgEAAAAAAAAAAAAAAAAAAAAku/RuNDPN75aocrlAAAAAABUEGUxIBnNjaGVtYRUEADUAGAFyFQIAFQ4VQBUAGAFuJQoVUBWYASxcFVAVmAEAAAAVDhVAFQQYBGxpc3QlChVQFZgBLFwVUBWYAQAAABYCGRwZLCYIHBUOGSUABhkoAXIBbhUAFgIWZhZmJghJHBUAFQAVAgAAACZuHBUOGSUABhkYBGxpc3QVABYCFn4WfiZuSRwVABUAFQIAAAAW5AEWAiYIFuQBFAAAKBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGSwcAAAcAAAAzgAAAFBBUjE="
+  d76_0_large: "UEFSMRUAFUAVQCwVAhUAFQYVBhwAAAAAAAAAAAAAAAAAAAAAAAAC8FD+k4lDrMRfZVaAAAAAABUAFVgVWCwVAhUAFQYVBhwAAAACAAAAAgACAAAAAgEAAAAAAAAAAAAAAAAAAAAC8FD+k4lDrMRfZVaAAAAAABUEGUxIBnNjaGVtYRUEADUAGAFyFQIAFQ4VQBUAGAFuJQoVABWYASxcFQAVmAEAAAAVDhVAFQQYBGxpc3QlChUAFZgBLFwVABWYAQAAABYCGRwZLCYIHBUOGSUABhkoAXIBbhUAFgIWZhZmJghJHBUAFQAVAgAAACZuHBUOGSUABhkYBGxpc3QVABYCFn4WfiZuSRwVABUAFQIAAAAW5AEWAiYIFuQBFAAAKBlwYXJxdWV0LWdvIHZlcnNpb24gMTguOC4wGSwcAAAcAAAAzgAAAFBBUjE="
+templates:
+  # Creates `t` with the DDL statement `ddl` over the object src.parquet, whose contents are
+  # `source`, and reads its schema, its record and its list.
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/src.parquet', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+      - name: record
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT r FROM `${project}.${dataset}.t`
+        observe:
+          status: /status
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+      - name: list
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT list FROM `${project}.${dataset}.t`
+        observe:
+          status: /status
+          schema: /body/schema
+          rows: /body/rows
+          errors: /body/errors
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/src.parquet'}
+  # As read, where reading the record fails.
+  failed:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        gcs: {method: PUT, object: '${run}/${case}/src.parquet', base64: '${source}'}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${ddl}
+        observe:
+          status: /status
+          errors: /body/errors
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          status: /status
+          schema: /body/schema
+      - name: record
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT r FROM `${project}.${dataset}.t`
+        expectFailure: true
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/src.parquet'}
+cases:
+  # Detected as the default NUMERIC, which does not hold the precision but holds the value.
+  - name: detected_numeric_held
+    template: read
+    vars:
+      source: '${d40_2_small}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "NUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "list": {"rows": [{"f": [{"v": [{"v": "1.25"}]}]}], "schema": {"fields": [{"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}}
+  # A value beyond NUMERIC's range.
+  - name: detected_numeric_range
+    template: failed
+    vars:
+      source: '${d40_2_large}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "NUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 17; scale: 2; input data: 000785ee10d5da46d900f436a000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: ${prefix}/src.parquet"}}
+  # A value with more fractional digits than NUMERIC's, of FIXED_LEN_BYTE_ARRAY and of INT64.
+  - name: detected_numeric_fraction
+    template: failed
+    vars:
+      source: '${d40_12_fine}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "NUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 17; scale: 12; input data: 000000000000000000000000e8d4a51001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: ${prefix}/src.parquet"}}
+  - name: detected_numeric_fraction_int64
+    template: failed
+    vars:
+      source: '${d18_12_fine}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "NUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 8; scale: 12; input data: 0110a5d4e8000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: ${prefix}/src.parquet"}}
+  # BIGNUMERIC selected, which holds neither the scale nor, for d76_0_large, the value.
+  - name: detected_bignumeric_scale
+    template: read
+    vars:
+      source: '${d76_40_small}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "BIGNUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}, "status": 200}, "record": {"rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "BIGNUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "list": {"rows": [{"f": [{"v": [{"v": "1.25"}]}]}], "schema": {"fields": [{"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}, "status": 200}}
+  - name: detected_bignumeric_range
+    template: failed
+    vars:
+      source: '${d76_0_large}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "BIGNUMERIC"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}, "status": 200}, "record": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: The value for column 'r.n' is out of valid BIGNUMERIC range: Value is out of range after scaling to BIGNUMERIC type; input length: 32; scale: 0; input data: 00000000000000000000000000000002f050fe938943acc45f65568000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: ${prefix}/src.parquet"}}
+  # STRING selected, which does not hold a scale beyond BIGNUMERIC's at the top level.
+  - name: detected_string_scale
+    template: read
+    vars:
+      source: '${d76_40_small}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['STRING'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"mode": "REQUIRED", "name": "n", "type": "STRING"}], "mode": "REQUIRED", "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "STRING"}]}, "status": 200}, "record": {"rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "STRING"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "list": {"rows": [{"f": [{"v": [{"v": "1.25"}]}]}], "schema": {"fields": [{"mode": "REPEATED", "name": "list", "type": "STRING"}]}, "status": 200}}
+  # Declared NUMERIC, which neither holds nor is the selected type, over each value.
+  - name: declared_numeric_held
+    template: read
+    vars:
+      source: '${d40_2_small}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (r STRUCT<n NUMERIC>, list ARRAY<NUMERIC>) OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "n", "type": "NUMERIC"}], "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "NUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "list": {"rows": [{"f": [{"v": [{"v": "1.25"}]}]}], "schema": {"fields": [{"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}}
+  - name: declared_numeric_range
+    template: failed
+    vars:
+      source: '${d40_2_large}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (r STRUCT<n NUMERIC>, list ARRAY<NUMERIC>) OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "n", "type": "NUMERIC"}], "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 17; scale: 2; input data: 000785ee10d5da46d900f436a000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: ${prefix}/src.parquet"}}
+  - name: declared_numeric_fraction
+    template: failed
+    vars:
+      source: '${d40_12_fine}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (r STRUCT<n NUMERIC>, list ARRAY<NUMERIC>) OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['BIGNUMERIC'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "n", "type": "NUMERIC"}], "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "NUMERIC"}]}, "status": 200}, "record": {"status": 400, "reason": "invalid", "message": "Error while reading table: ${project}.${dataset}.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 17; scale: 12; input data: 000000000000000000000000e8d4a51001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: ${prefix}/src.parquet"}}
+  # Declared BIGNUMERIC or STRING over a scale beyond BIGNUMERIC's.
+  - name: declared_bignumeric_scale
+    template: read
+    vars:
+      source: '${d76_40_small}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (r STRUCT<n BIGNUMERIC>, list ARRAY<BIGNUMERIC>) OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['STRING'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "n", "type": "BIGNUMERIC"}], "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}, "status": 200}, "record": {"rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "BIGNUMERIC"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "list": {"rows": [{"f": [{"v": [{"v": "1.25"}]}]}], "schema": {"fields": [{"mode": "REPEATED", "name": "list", "type": "BIGNUMERIC"}]}, "status": 200}}
+  - name: declared_string_scale
+    template: read
+    vars:
+      source: '${d76_40_small}'
+      ddl: CREATE EXTERNAL TABLE `${project}.${dataset}.t` (r STRUCT<n STRING>, list ARRAY<STRING>) OPTIONS (format = 'PARQUET', uris = ['${prefix}/src.parquet'], decimal_target_types = ['STRING'])
+    expect: {"create": {"status": 200}, "get": {"schema": {"fields": [{"fields": [{"name": "n", "type": "STRING"}], "name": "r", "type": "RECORD"}, {"mode": "REPEATED", "name": "list", "type": "STRING"}]}, "status": 200}, "record": {"rows": [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}], "schema": {"fields": [{"fields": [{"mode": "NULLABLE", "name": "n", "type": "STRING"}], "mode": "NULLABLE", "name": "r", "type": "RECORD"}]}, "status": 200}, "list": {"rows": [{"f": [{"v": [{"v": "1.25"}]}]}], "schema": {"fields": [{"mode": "REPEATED", "name": "list", "type": "STRING"}]}, "status": 200}}

@@ -109,6 +109,10 @@ struct ParquetReadOptions {
   // The DuckDB values of top-level columns of the schema, by name, with {} for the column, that
   // replace the casts of those columns to their types.
   std::map<std::string, std::string> conversions = {};
+  // Of an external table, its name and the source's URI, which errors reading a nested DECIMAL
+  // its type does not hold name; loads leave them empty.
+  std::string external_table = {};
+  std::string external_uri = {};
 };
 using FileReadOptions = std::variant<CsvReadOptions, JsonReadOptions, ParquetReadOptions>;
 

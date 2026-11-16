@@ -45,12 +45,15 @@ unsupported.
 | STRING of WKT or BYTE_ARRAY of WKB | GEOGRAPHY | Parsed geography |
 
 A DECIMAL exceeding NUMERIC's range fails on an out-of-range value, as BigQuery does for a
-byte-encoded DECIMAL. These DECIMAL forms remain unsupported:
+byte-encoded DECIMAL. A nested DECIMAL takes the selected or declared type even where that type
+does not hold its precision and scale, and fails only on a value the type does not hold.
+These DECIMAL forms remain unsupported:
 
-- INT32- or INT64-encoded values exceeding NUMERIC's range;
-- values with both too many integer and fractional digits, or more than 38 integer digits;
-- nested DECIMALs that the type `decimal_target_types` selects, or the declared type, does not
-  hold.
+- top-level INT32- or INT64-encoded values exceeding NUMERIC's range;
+- values with both too many integer and fractional digits, or top-level values with more than
+  38 integer digits;
+- nested values with more fractional digits than BIGNUMERIC's, and values of REPEATED fields,
+  that the type does not hold.
 
 CSV and JSON tables keep `decimal_target_types` without effect, as BigQuery's do. GeoParquet,
 column-name conversions and other options selecting types are unsupported.

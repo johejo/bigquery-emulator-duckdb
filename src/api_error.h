@@ -17,10 +17,13 @@ class ApiError : public std::runtime_error {
   }
   static ApiError Invalid(const std::string& message) { return {400, "invalid", message}; }
   // A query's failure with `message`: an invalid one for BigQuery's error of reading external
-  // data, which an external read raises as it reads, or else an invalidQuery one.
+  // data or an external table, which an external read raises as it reads, or else an
+  // invalidQuery one.
   static ApiError QueryFailure(const std::string& message) {
-    return message.starts_with("Error while reading data, error message: ") ? Invalid(message)
-                                                                            : InvalidQuery(message);
+    return message.starts_with("Error while reading data, error message: ") ||
+                   message.starts_with("Error while reading table: ")
+               ? Invalid(message)
+               : InvalidQuery(message);
   }
   // A required field left out or empty, named as BigQuery names it, such as dataset_id.
   static ApiError Required(const std::string& field) {
