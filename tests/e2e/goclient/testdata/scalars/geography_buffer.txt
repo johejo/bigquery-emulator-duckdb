@@ -269,6 +269,9 @@ SELECT ST_BUFFERWITHTOLERANCE(ST_GEOGPOINT(1, 2), 100, 1, use_spheroid => TRUE)
 => error: ST_BUFFERWITHTOLERANCE does not yet implement use_spheroid=true.
 
 # The unimplemented spheroid error survives SAFE., unlike invalid options.
+SELECT SAFE.ST_BUFFER(ST_GEOGPOINT(1, 2), 100, use_spheroid => TRUE)
+=> error: ST_BUFFER does not yet implement use_spheroid=true.
+
 SELECT SAFE.ST_BUFFERWITHTOLERANCE(ST_GEOGPOINT(1, 2), 100, 1, use_spheroid => TRUE)
 => error: ST_BUFFERWITHTOLERANCE does not yet implement use_spheroid=true.
 
