@@ -97,20 +97,27 @@ ParquetDetection Detection(const GcsExternalData& definition) {
 // the Parquet conversions of
 // [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
 // list them, or none for other combinations, which BigQuery does not convert, and for
-// GeoParquet, whose types depend on options the emulator does not take. A DECIMAL is NUMERIC
-// where its decimalTargetTypes select NUMERIC; DetectGcsExternalSchema detects a top-level one
-// of another target, and of one that NUMERIC does not hold.
+// GeoParquet, whose types depend on options the emulator does not take. A DECIMAL takes the type
+// its decimalTargetTypes select where it holds the DECIMAL's precision and scale: below the top
+// level, or in a REPEATED column, `nested`, of any target, which the reader converts as loads do,
+// and at the top level only NUMERIC, since DetectGcsExternalSchema detects the others and
+// ParquetConversion converts them.
 std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetColumn& column,
-                                      const ParquetDetection& detection) {
+                                      const ParquetDetection& detection, bool nested) {
   if (column.kind != ParquetColumn::Kind::kLeaf || column.edges != ParquetColumn::Edges::kNone) {
     return std::nullopt;
   }
   if (column.IsDecimal()) {
     const bool physical = column.type == parquet::kInt32 || column.type == parquet::kInt64 ||
                           column.type == parquet::kFixedLenByteArray;
-    if (physical && column.HoldsNumeric() &&
-        DecimalTarget(column, detection.decimal_targets) == FieldType::kNumeric) {
-      return FieldType::kNumeric;
+    const FieldType target = DecimalTarget(column, detection.decimal_targets);
+    // Which errors BigQuery gives a value the selected type does not hold is not known.
+    const bool held = target == FieldType::kNumeric
+                          ? column.HoldsNumeric()
+                          : column.scale <= 38 && (target == FieldType::kString ||
+                                                   column.precision - column.scale <= 38);
+    if (physical && held && (nested || target == FieldType::kNumeric)) {
+      return target;
     }
     return std::nullopt;
   }
@@ -227,10 +234,10 @@ std::string Folded(std::string_view name) {
 
 // The field BigQuery detects for `column` of `metadata`: LIST inference is already applied by
 // ParquetColumns. A group is a RECORD, a MAP the RECORD of its repeated key_value group, a repeated
-// field REPEATED, and another field REQUIRED or NULLABLE as the file declares it. None for a field
-// of a type or name the emulator does not detect.
+// field REPEATED, and another field REQUIRED or NULLABLE as the file declares it, `nested` below
+// the top level. None for a field of a type or name the emulator does not detect.
 std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const ParquetColumn& column,
-                                         const ParquetDetection& detection) {
+                                         const ParquetDetection& detection, bool nested = false) {
   if (!StandardColumnName(column.name)) {
     return std::nullopt;
   }
@@ -249,7 +256,7 @@ std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const Parq
     field.type = FieldType::kRecord;
     std::set<std::string> names;
     for (const ParquetColumn& child : value->children) {
-      auto detected = DetectedField(metadata, child, detection);
+      auto detected = DetectedField(metadata, child, detection, /*nested=*/true);
       if (!detected || !names.insert(Folded(child.name)).second) {
         return std::nullopt;
       }
@@ -257,7 +264,8 @@ std::optional<FieldSchema> DetectedField(const ThriftValue& metadata, const Parq
     }
     return field;
   }
-  const auto type = DetectedType(Element(metadata, *value), *value, detection);
+  const auto type = DetectedType(Element(metadata, *value), *value, detection,
+                                 nested || column.kind == ParquetColumn::Kind::kList);
   if (!type) {
     return std::nullopt;
   }
