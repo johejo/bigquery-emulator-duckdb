@@ -134,12 +134,6 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
     if (external.format != "PARQUET" && external.enum_as_string.has_value()) {
       throw ApiError::Unsupported("enum_as_string on a non-Parquet external table");
     }
-    // BigQuery takes decimal_target_types on a CSV table without changing the types it detects,
-    // as its answers in external_decimal_target_types.api.answers.json show; on a JSON table
-    // it is not known.
-    if (external.format == "NEWLINE_DELIMITED_JSON" && external.decimal_target_types) {
-      throw ApiError::Unsupported("decimal_target_types on a JSON external table");
-    }
     if (external.format == "NEWLINE_DELIMITED_JSON" && external.enable_list_inference) {
       throw ApiError::Unsupported("enable_list_inference on JSON external tables");
     }

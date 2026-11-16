@@ -49,12 +49,11 @@ byte-encoded DECIMAL. These DECIMAL forms remain unsupported:
 
 - INT32- or INT64-encoded values exceeding NUMERIC's range;
 - values with both too many integer and fractional digits, or more than 38 integer digits;
-- nested DECIMAL conversions: a nested DECIMAL must have the type `decimal_target_types`
-  selects, and that type must hold its precision and scale.
+- nested DECIMALs that the type `decimal_target_types` selects, or the declared type, does not
+  hold.
 
-CSV tables keep `decimal_target_types` without effect, as BigQuery's do; JSON tables reject it as
-unsupported. GeoParquet, column-name conversions and other options selecting types are
-unsupported.
+CSV and JSON tables keep `decimal_target_types` without effect, as BigQuery's do. GeoParquet,
+column-name conversions and other options selecting types are unsupported.
 Every file must contain all REQUIRED and REPEATED columns and fields of the schema.
 
 ### CSV

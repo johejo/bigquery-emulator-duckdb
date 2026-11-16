@@ -1,0 +1,910 @@
+{
+  "version": 1,
+  "cases": {
+    "json_autodetect_rest": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/json_autodetect_rest/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "FLOAT"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "FLOAT"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "json_ddl": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "decimalTargetTypes": [
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "NEWLINE_DELIMITED_JSON",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/json_ddl/a.json"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "name": "n",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s7fdg2l7uweldxcwfftryuqfmw_json_ddl.t`\n(\n  n NUMERIC\n)\nOPTIONS(\n  format=\"NEWLINE_DELIMITED_JSON\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/json_ddl/a.json\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"BIGNUMERIC\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"NEWLINE_DELIMITED_JSON\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/json_ddl/a.json\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.25"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "n",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "nested_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_bignumeric/nested.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "rw",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s7fdg2l7uweldxcwfftryuqfmw_nested_bignumeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_bignumeric/nested.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"BIGNUMERIC\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_bignumeric/nested.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": [
+                    {
+                      "v": "1.25"
+                    },
+                    {
+                      "v": "1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "rw",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "nested_declared_numeric": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "decimalTargetTypes": [
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_declared_numeric/nested.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s7fdg2l7uweldxcwfftryuqfmw_nested_declared_numeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"BIGNUMERIC\"],\n  uris=[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_declared_numeric/nested.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"BIGNUMERIC\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_declared_numeric/nested.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": [
+                    {
+                      "v": "1.25"
+                    },
+                    {
+                      "v": "1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "nested_numeric_bignumeric": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "NUMERIC",
+              "BIGNUMERIC"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_numeric_bignumeric/nested.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "rw",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s7fdg2l7uweldxcwfftryuqfmw_nested_numeric_bignumeric.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"NUMERIC\", \"BIGNUMERIC\"],\n  uris=[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_numeric_bignumeric/nested.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"NUMERIC\", \"BIGNUMERIC\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_numeric_bignumeric/nested.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": [
+                    {
+                      "v": "1.25"
+                    },
+                    {
+                      "v": "1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "rw",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "nested_string": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "decimalTargetTypes": [
+              "STRING"
+            ],
+            "sourceFormat": "PARQUET",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_string/nested.parquet"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "rw",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_s7fdg2l7uweldxcwfftryuqfmw_nested_string.t`\nOPTIONS(\n  format=\"PARQUET\",\n  decimal_target_types=[\"STRING\"],\n  uris=[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_string/nested.parquet\"]\n);"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "decimal_target_types"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"STRING\"]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "format"
+                          },
+                          {
+                            "v": "STRING"
+                          },
+                          {
+                            "v": "\"PARQUET\""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "uris"
+                          },
+                          {
+                            "v": "ARRAY\u003cSTRING\u003e"
+                          },
+                          {
+                            "v": "[\"gs://johejo-sandbox-us/s7fdg2l7uweldxcwfftryuqfmw/nested_string/nested.parquet\"]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "status": 200
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.25"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": [
+                    {
+                      "v": "1.25"
+                    },
+                    {
+                      "v": "1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "rw",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
+    },
+    "unknown_rest": {
+      "project": "johejo-sandbox",
+      "run": "s7fdg2l7uweldxcwfftryuqfmw",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                      {
+                        "description": "Invalid value at 'table.external_data_configuration.decimal_target_types[0]' (type.googleapis.com/google.cloud.bigquery.v2.DecimalTargetType), \"FLOAT64\"",
+                        "field": "table.external_data_configuration.decimal_target_types[0]"
+                      }
+                    ]
+                  }
+                ],
+                "errors": [
+                  {
+                    "message": "Invalid value at 'table.external_data_configuration.decimal_target_types[0]' (type.googleapis.com/google.cloud.bigquery.v2.DecimalTargetType), \"FLOAT64\"",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Invalid value at 'table.external_data_configuration.decimal_target_types[0]' (type.googleapis.com/google.cloud.bigquery.v2.DecimalTargetType), \"FLOAT64\"",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

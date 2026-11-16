@@ -93,6 +93,24 @@ ParquetDetection Detection(const GcsExternalData& definition) {
   return detection;
 }
 
+// Whether a DECIMAL `column` of INT32, INT64 or FIXED_LEN_BYTE_ARRAY, read below the top level
+// or at it without a conversion, holds as `type`: which errors BigQuery gives a value the type does
+// not hold is not known.
+bool DecimalHolds(const ParquetColumn& column, FieldType type) {
+  const bool physical = column.type == parquet::kInt32 || column.type == parquet::kInt64 ||
+                        column.type == parquet::kFixedLenByteArray;
+  switch (type) {
+    case FieldType::kNumeric:
+      return physical && column.HoldsNumeric();
+    case FieldType::kBigNumeric:
+      return physical && column.scale <= 38 && column.precision - column.scale <= 38;
+    case FieldType::kString:
+      return physical && column.scale <= 38;
+    default:
+      return false;
+  }
+}
+
 // The type BigQuery detects for the Parquet leaf `column`, whose SchemaElement is `element`, as
 // the Parquet conversions of
 // [Loading Parquet data](third_party/bigquery_docs/loading-data-cloud-storage-parquet.md)
@@ -108,15 +126,8 @@ std::optional<FieldType> DetectedType(const ThriftValue& element, const ParquetC
     return std::nullopt;
   }
   if (column.IsDecimal()) {
-    const bool physical = column.type == parquet::kInt32 || column.type == parquet::kInt64 ||
-                          column.type == parquet::kFixedLenByteArray;
     const FieldType target = DecimalTarget(column, detection.decimal_targets);
-    // Which errors BigQuery gives a value the selected type does not hold is not known.
-    const bool held = target == FieldType::kNumeric
-                          ? column.HoldsNumeric()
-                          : column.scale <= 38 && (target == FieldType::kString ||
-                                                   column.precision - column.scale <= 38);
-    if (physical && held && (nested || target == FieldType::kNumeric)) {
+    if (DecimalHolds(column, target) && (nested || target == FieldType::kNumeric)) {
       return target;
     }
     return std::nullopt;
@@ -542,23 +553,33 @@ std::string ParquetConversion(const FieldSchema& field, const ThriftValue& eleme
   throw unsupported();
 }
 
-// Whether a source whose column has the `detected` field, or none, can be read as `declared`:
-// the same type, REPEATED in both or neither, and each declared field one of the source's, or
-// NULLABLE and absent. BigQuery, as DuckDB's casts do, matches a RECORD's fields by name in any
-// case and drops the source's other fields.
-bool Matches(const FieldSchema& declared, const FieldSchema* detected) {
-  if (detected == nullptr) {
-    return declared.mode == FieldMode::kNullable;
+// Whether a source whose `column` has the `detected` field, or none, can be read as `declared`:
+// the same type, or for a DECIMAL any type that holds it, as BigQuery's answers in
+// external_decimal_target_types.api.answers.json show, REPEATED in both or neither, and each
+// declared field one of the source's, or NULLABLE and absent. BigQuery, as DuckDB's casts do,
+// matches a RECORD's fields by name in any case and drops the source's other fields.
+bool Matches(const FieldSchema& declared, const FieldSchema* detected,
+             const ParquetColumn* column) {
+  if (detected == nullptr || column == nullptr) {
+    return detected == nullptr && declared.mode == FieldMode::kNullable;
   }
-  if (declared.type != detected->type ||
-      (declared.mode == FieldMode::kRepeated) != (detected->mode == FieldMode::kRepeated)) {
+  if ((declared.mode == FieldMode::kRepeated) != (detected->mode == FieldMode::kRepeated)) {
     return false;
   }
-  return std::ranges::all_of(declared.fields, [detected](const FieldSchema& field) {
+  const ParquetColumn& value =
+      column->kind == ParquetColumn::Kind::kList ? column->children.front() : *column;
+  if (value.IsDecimal() && declared.type != FieldType::kRecord) {
+    return DecimalHolds(value, declared.type);
+  }
+  if (declared.type != detected->type) {
+    return false;
+  }
+  return std::ranges::all_of(declared.fields, [detected, &value](const FieldSchema& field) {
     const auto found = std::ranges::find_if(detected->fields, [&field](const FieldSchema& source) {
       return Folded(source.name) == Folded(field.name);
     });
-    return Matches(field, found == detected->fields.end() ? nullptr : &*found);
+    return found == detected->fields.end() ? Matches(field, nullptr, nullptr)
+                                           : Matches(field, &*found, value.Child(found->name));
   });
 }
 
@@ -1057,7 +1078,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
           }
           continue;
         }
-        if ((column != nullptr && !detected) || !Matches(field, detected ? &*detected : nullptr)) {
+        if ((column != nullptr && !detected) ||
+            !Matches(field, detected ? &*detected : nullptr, column)) {
           throw ApiError::Unsupported(std::string("external Parquet source schema for column ") +
                                       field.name);
         }
