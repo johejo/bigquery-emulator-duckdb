@@ -1819,6 +1819,10 @@
       "name": "CREATE FUNCTION Python",
       "group": "function_option_list",
       "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f', {option}) AS 'def f(x): return x'",
+      "templates": {
+        "runtime_version": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(entry_point='f', {option}) AS 'def f(x): return x'",
+        "entry_point": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', {option}) AS 'def f(x): return x'"
+      },
       "implementation": "CREATE FUNCTION",
       "only": [
         "description",
@@ -1827,24 +1831,8 @@
         "packages",
         "container_cpu",
         "container_memory",
-        "container_request_concurrency"
-      ]
-    },
-    {
-      "name": "CREATE FUNCTION Python runtime",
-      "group": "function_option_list",
-      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(entry_point='f', {option}) AS 'def f(x): return x'",
-      "implementation": "CREATE FUNCTION",
-      "only": [
-        "runtime_version"
-      ]
-    },
-    {
-      "name": "CREATE FUNCTION Python entry point",
-      "group": "function_option_list",
-      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', {option}) AS 'def f(x): return x'",
-      "implementation": "CREATE FUNCTION",
-      "only": [
+        "container_request_concurrency",
+        "runtime_version",
         "entry_point"
       ]
     },
