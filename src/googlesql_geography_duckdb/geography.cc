@@ -518,6 +518,8 @@ const Definitions& GeographyDefinitions() {
                         EachRow<SetOperation<S2BooleanOperation::OpType::DIFFERENCE>>);
     definitions->Scalar("bq_st_boundary", {kGeography}, kGeography,
                         EachRow<Call<googlesql_geography::Boundary>>);
+    definitions->Scalar("bq_st_buffer_check_sphere", {kBoolean, kVarchar}, kBoolean,
+                        EachRow<Call<googlesql_geography::CheckBufferSphere>>);
     definitions->Scalar("bq_st_buffer",
                         {kGeography, kDouble, kDouble, kBoolean, kVarchar, kVarchar}, kGeography,
                         EachRow<Call<googlesql_geography::Buffer>>);
