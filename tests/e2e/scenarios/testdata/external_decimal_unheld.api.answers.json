@@ -854,6 +854,333 @@
           "status": 200
         }
       }
+    },
+    "list_bignumeric_range": {
+      "project": "johejo-sandbox",
+      "run": "gz4goqerj6jcizgefud5fnn2hh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'list' is out of valid BIGNUMERIC range: Value is out of range after scaling to BIGNUMERIC type; input length: 32; scale: 0; input data: 00000000000000000000000000000002f050fe938943acc45f65568000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'list' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/list_bignumeric_range/src.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'list' is out of valid BIGNUMERIC range: Value is out of range after scaling to BIGNUMERIC type; input length: 32; scale: 0; input data: 00000000000000000000000000000002f050fe938943acc45f65568000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'list' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/list_bignumeric_range/src.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "list_numeric_fraction": {
+      "project": "johejo-sandbox",
+      "run": "gz4goqerj6jcizgefud5fnn2hh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'list' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 17; scale: 12; input data: 000000000000000000000000e8d4a51001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'list' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/list_numeric_fraction/src.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'list' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 17; scale: 12; input data: 000000000000000000000000e8d4a51001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'list' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/list_numeric_fraction/src.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "list_numeric_range": {
+      "project": "johejo-sandbox",
+      "run": "gz4goqerj6jcizgefud5fnn2hh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading data, error message: The value for column 'list' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 17; scale: 2; input data: 000785ee10d5da46d900f436a000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'list' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/list_numeric_range/src.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading data, error message: The value for column 'list' is out of valid NUMERIC range: Value is out of range after scaling to NUMERIC type; input length: 17; scale: 2; input data: 000785ee10d5da46d900f436a000000000. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'list' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/list_numeric_range/src.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "record_bignumeric_fraction": {
+      "project": "johejo-sandbox",
+      "run": "gz4goqerj6jcizgefud5fnn2hh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "BIGNUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "BIGNUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_gz4goqerj6jcizgefud5fnn2hh_record_bignumeric_fraction.t, error message: The value for column 'r.n' is out of valid BIGNUMERIC range: Value will lose precision after scaling down to BIGNUMERIC type; input length: 32; scale: 40; input data: 0000000000000000000000000000001d6329f1c35ca4bfabb9f5610000000001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/record_bignumeric_fraction/src.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_gz4goqerj6jcizgefud5fnn2hh_record_bignumeric_fraction.t, error message: The value for column 'r.n' is out of valid BIGNUMERIC range: Value will lose precision after scaling down to BIGNUMERIC type; input length: 32; scale: 40; input data: 0000000000000000000000000000001d6329f1c35ca4bfabb9f5610000000001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/record_bignumeric_fraction/src.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "record_numeric_both": {
+      "project": "johejo-sandbox",
+      "run": "gz4goqerj6jcizgefud5fnn2hh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "NUMERIC"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "NUMERIC"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox.bqa_gz4goqerj6jcizgefud5fnn2hh_record_numeric_both.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 21; scale: 12; input data: 0000000b7abc627050305adf14a3d9e40000000001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/record_numeric_both/src.parquet",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox.bqa_gz4goqerj6jcizgefud5fnn2hh_record_numeric_both.t, error message: The value for column 'r.n' is out of valid NUMERIC range: Value will lose precision after scaling down to NUMERIC type; input length: 21; scale: 12; input data: 0000000b7abc627050305adf14a3d9e40000000001. Consider specifying decimal target types to allow a larger range of values. See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#decimal_logical_type; in column 'r.n' File: gs://johejo-sandbox-us/gz4goqerj6jcizgefud5fnn2hh/record_numeric_both/src.parquet",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "record_string_fraction": {
+      "project": "johejo-sandbox",
+      "run": "gz4goqerj6jcizgefud5fnn2hh",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "get": {
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "REQUIRED",
+                    "name": "n",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REQUIRED",
+                "name": "r",
+                "type": "RECORD"
+              },
+              {
+                "mode": "REPEATED",
+                "name": "list",
+                "type": "STRING"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "read": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": "1.0000000000000000000000000000000000000001"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "n",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "r",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        }
+      }
     }
   }
 }

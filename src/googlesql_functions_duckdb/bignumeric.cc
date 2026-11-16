@@ -182,12 +182,13 @@ std::string StoredDecimalHex(std::string_view units, bool negative, int64_t leng
 
 // The value `text` of a Parquet DECIMAL of `scale` below the top level of an external table, as
 // BigQuery reads it as `type`, NUMERIC, BIGNUMERIC or STRING, where that type does not hold the
-// DECIMAL's precision and scale: a NUMERIC's text, a BIGNUMERIC's units or a STRING. It fails, as
-// BigQuery's answers in external_decimal_unheld.api.answers.json show, on a value of `column`,
-// the field's path, beyond the type's range or with more fractional digits than NUMERIC's, naming
-// the table `table`, the source `uri` and the `length` bytes Parquet stores the value in. Which
-// errors BigQuery gives a value both out of range and too precise, one with more fractional
-// digits than BIGNUMERIC's, or a value of a REPEATED field, `column` empty, is not known.
+// DECIMAL's precision and scale: a NUMERIC's text, a BIGNUMERIC's units or a STRING, which holds
+// any value. As BigQuery's answers in external_decimal_unheld.api.answers.json show, a NUMERIC or
+// BIGNUMERIC value fails with more fractional digits than the type's, or else beyond the type's
+// range, naming `column`, the field's path, the source `uri`, the `length` bytes Parquet stores
+// the value in and the table `table`, empty for an element of a top-level REPEATED field. Which
+// error BigQuery gives a BIGNUMERIC value both out of range and too precise, or a value below
+// another REPEATED field, `column` empty, is not known.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the SQL function's arguments in order.
 absl::StatusOr<std::string> ParquetDecimalRead(std::string_view text, int64_t scale, int64_t length,
                                                bool little_endian, std::string_view type,
@@ -198,6 +199,9 @@ absl::StatusOr<std::string> ParquetDecimalRead(std::string_view text, int64_t sc
   const bool bignumeric = type == "BIGNUMERIC";
   if (!numeric && !bignumeric && type != "STRING") {
     return absl::InvalidArgumentError("Invalid Parquet DECIMAL target type");
+  }
+  if (!numeric && !bignumeric) {
+    return digits.Text();
   }
   const bool fraction = digits.fraction.size() > (numeric ? 9U : 38U);
   bool range = numeric && digits.integer.size() > 29;
@@ -212,14 +216,10 @@ absl::StatusOr<std::string> ParquetDecimalRead(std::string_view text, int64_t sc
                                  googlesql::NumericValue::FromStringStrict(digits.Text()));
       return value.ToString();
     }
-    if (bignumeric) {
-      GOOGLESQL_ASSIGN_OR_RETURN(const auto value,
-                                 BigNumericValue::FromStringStrict(digits.Text()));
-      return BigNumericUnits(value);
-    }
-    return digits.Text();
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value, BigNumericValue::FromStringStrict(digits.Text()));
+    return BigNumericUnits(value);
   }
-  if (column.empty() || (range && fraction) || (fraction && !numeric)) {
+  if (column.empty() || (range && fraction && bignumeric)) {
     return absl::UnimplementedError(
         std::format("The emulator does not support reading external Parquet {} value {}, which {} "
                     "does not hold, as {}",
@@ -230,14 +230,14 @@ absl::StatusOr<std::string> ParquetDecimalRead(std::string_view text, int64_t sc
   std::string units = digits.integer + digits.fraction;
   units.append(static_cast<size_t>(scale) - digits.fraction.size(), '0');
   return absl::InvalidArgumentError(std::format(
-      "Error while reading table: {}, error message: The value for column '{}' is out of valid {} "
-      "range: {}; input length: {}; scale: {}; input data: {}. Consider specifying decimal target "
-      "types to allow a larger range of values. See "
+      "Error while reading {}, error message: The value for column '{}' is out of valid {} range: "
+      "{}; input length: {}; scale: {}; input data: {}. Consider specifying decimal target types "
+      "to allow a larger range of values. See "
       "https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet"
       "#decimal_logical_type; in column '{}' File: {}",
-      table, column, type,
-      range ? std::format("Value is out of range after scaling to {} type", type)
-            : "Value will lose precision after scaling down to NUMERIC type",
+      table.empty() ? std::string("data") : std::format("table: {}", table), column, type,
+      fraction ? std::format("Value will lose precision after scaling down to {} type", type)
+               : std::format("Value is out of range after scaling to {} type", type),
       length, scale, StoredDecimalHex(units, digits.negative, length, little_endian), column, uri));
 }
 

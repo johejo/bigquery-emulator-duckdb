@@ -53,5 +53,10 @@
     "file": "tests/e2e/scenarios/testdata/external_decimal_unheld.api.yaml",
     "contains": "Consider specifying decimal target types",
     "reason": "Recorded BigQuery error messages, including their URLs, are expected responses, not citations."
+  },
+  {
+    "file": "tests/e2e/scenarios/testdata/external_decimal_unheld.api.answers.json",
+    "contains": "Consider specifying decimal target types",
+    "reason": "Recorded BigQuery error messages, including their URLs, are expected responses, not citations."
   }
 ]
