@@ -153,6 +153,8 @@ struct AggregateOptions {
 template <template <typename> typename List>
 struct BasicAggregateRule : AggregateOptions {
   std::string_view function;
+  // A different backend for window calls; empty uses `function` for both forms.
+  std::string_view window_function = {};
   // The type the first argument has to have; TYPE_UNKNOWN accepts any.
   googlesql::TypeKind type = googlesql::TYPE_UNKNOWN;
   // What the other arguments have to be; only their types count.

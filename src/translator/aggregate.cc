@@ -438,7 +438,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
     return finish(sql, tail);
   }
-  const std::string sql = std::string(rule->function) + "(" + inner + order + ")" + tail;
+  const auto function =
+      !over.empty() && !rule->window_function.empty() ? rule->window_function : rule->function;
+  const std::string sql = std::string(function) + "(" + inner + order + ")" + tail;
   if (limit.empty()) {
     return finish(sql, tail);
   }

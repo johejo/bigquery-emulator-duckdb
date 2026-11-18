@@ -26,7 +26,8 @@ struct Options {
   bool extended_array_limits = false;
   // FLOAT64 ROUND and TRUNC with digits return positive zero at their early zero exits.
   bool rounding_early_positive_zero = false;
-  // FLOAT64 AVG keeps its running mean in a double rather than a long double.
+  // FLOAT64 AVG keeps its running mean in a double rather than a long double;
+  // window AVG tracks infinities separately instead of subtracting them from the mean.
   bool double_average = false;
   // FLOAT64 SUM fails where a partial sum overflows, rather than only where the total does.
   bool double_sum = false;

@@ -453,7 +453,11 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
                      .finish = NumericAggregate<true>,
                  },
                  // src/googlesql_functions_duckdb/math.cc; DuckDB's avg() overflows.
-                 {.function = "bq_avg_double", .type = googlesql::TYPE_DOUBLE},
+                 {
+                     .function = "bq_avg_double",
+                     .window_function = "bq_window_avg_double",
+                     .type = googlesql::TYPE_DOUBLE,
+                 },
                  BigNumericAggregate<kBigNumericAvg>(1),
                  IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
                  IntervalAggregate<kIntervalAvg>(),

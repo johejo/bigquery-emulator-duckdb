@@ -256,15 +256,18 @@ bool RoundWithMode(T in, int64_t digits, T* out, absl::Status* error) {
   return fn::RoundDecimalWithRoundingMode(in, digits, kMode, out, error);
 }
 
-// AVG of FLOAT64 as GoogleSQL's reference implementation and BigQuery compute it: a running mean
-// that adds (value - mean) / count for each value. No sum overflows, so two maximum values
-// average to the maximum, and two infinities give NaN; DuckDB's avg() divides an overflowing sum
-// instead. The reference implementation keeps the mean in a long double, but BigQuery in a
+// Aggregate AVG of FLOAT64 as GoogleSQL's reference implementation and BigQuery compute it: a
+// running mean that adds (value - mean) / count for each value. No sum overflows, so two maximum
+// values average to the maximum, and two infinities give NaN; DuckDB's avg() divides an overflowing
+// sum instead. The reference implementation keeps the mean in a long double, but BigQuery in a
 // double, so that a difference such as the maximum less its negation overflows.
 template <typename Float>
 struct Mean {
   Float mean;
   uint64_t count;
+  // Window AVG preserves infinities rather than subtracting them in the running mean.
+  // Bits record positive infinity, negative infinity and NaN independently across states.
+  unsigned non_finite;
 };
 
 template <typename Float>
@@ -279,18 +282,31 @@ idx_t MeanSize(duckdb_function_info /*info*/) {
 
 template <typename Float>
 void InitMean(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
-  MeanState<Float>(state) = {.mean = 0, .count = 0};
+  MeanState<Float>(state) = {.mean = 0, .count = 0, .non_finite = 0};
 }
 
 // Moves the mean of `state` toward `value`, the mean of `count` more values. Dividing the
 // difference before multiplying keeps a combined difference from overflowing where the values'
 // own would not.
-template <typename Float>
+template <typename Float, bool kWindow>
 bool AddToMean(duckdb_function_info info, Mean<Float>& state, Float value, uint64_t count) {
   state.count += count;
   Float delta = 0;
   absl::Status error;
-  if (!fn::Subtract(value, state.mean, &delta, &error) ||
+  const bool difference_ok = fn::Subtract(value, state.mean, &delta, &error);
+  if constexpr (kWindow) {
+    if (!difference_ok) {
+      // Window AVG of the opposite FLOAT64 maxima is zero in BigQuery, whereas aggregate
+      // AVG fails on their difference. Window inputs here are finite, so a failed difference
+      // means opposite signs: scale each mean before adding, which cannot overflow and also
+      // works where long double has no wider exponent range than double.
+      const auto total = static_cast<Float>(state.count);
+      state.mean = (state.mean * (static_cast<Float>(state.count - count) / total)) +
+                   (value * (static_cast<Float>(count) / total));
+      return true;
+    }
+  }
+  if (!difference_ok ||
       !fn::Add(state.mean, delta / static_cast<Float>(state.count) * static_cast<Float>(count),
                &state.mean, &error)) {
     duckdb_aggregate_function_set_error(info,
@@ -300,7 +316,7 @@ bool AddToMean(duckdb_function_info info, Mean<Float>& state, Float value, uint6
   return true;
 }
 
-template <typename Float>
+template <typename Float, bool kWindow>
 void UpdateMeans(duckdb_function_info info, duckdb_data_chunk input,
                  duckdb_aggregate_state* states) {
   for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
@@ -308,13 +324,21 @@ void UpdateMeans(duckdb_function_info info, duckdb_data_chunk input,
     if (arguments.IsNull(0)) {
       continue;
     }
-    if (!AddToMean<Float>(info, MeanState<Float>(states[row]), arguments.Double(0), 1)) {
+    auto& state = MeanState<Float>(states[row]);
+    const double value = arguments.Double(0);
+    if constexpr (kWindow) {
+      if (!std::isfinite(value)) {
+        state.non_finite |= std::isnan(value) ? 4U : (value > 0 ? 1U : 2U);
+        continue;
+      }
+    }
+    if (!AddToMean<Float, kWindow>(info, state, value, 1)) {
       return;
     }
   }
 }
 
-template <typename Float>
+template <typename Float, bool kWindow>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DuckDB's callback.
 void CombineMeans(duckdb_function_info info, duckdb_aggregate_state* source,
                   duckdb_aggregate_state* target, idx_t count) {
@@ -322,12 +346,16 @@ void CombineMeans(duckdb_function_info info, duckdb_aggregate_state* source,
     // DuckDB may combine a window's states again, so the source stays as it is.
     const Mean<Float>& from = MeanState<Float>(source[i]);
     Mean<Float>& to = MeanState<Float>(target[i]);
+    if constexpr (kWindow) {
+      to.non_finite |= from.non_finite;
+    }
     if (from.count == 0) {
       continue;
     }
     if (to.count == 0) {
-      to = from;
-    } else if (!AddToMean<Float>(info, to, from.mean, from.count)) {
+      to.mean = from.mean;
+      to.count = from.count;
+    } else if (!AddToMean<Float, kWindow>(info, to, from.mean, from.count)) {
       return;
     }
   }
@@ -335,34 +363,43 @@ void CombineMeans(duckdb_function_info info, duckdb_aggregate_state* source,
 
 // The mean as FLOAT64, or NULL where no value reached it.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters): DuckDB's callback.
-template <typename Float>
+template <typename Float, bool kWindow>
 void FinalizeMeans(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
                    duckdb_vector result, idx_t count, idx_t offset) {
   // NOLINTEND(bugprone-easily-swappable-parameters)
   duckdb_vector_ensure_validity_writable(result);
   for (idx_t i = 0; i < count; ++i) {
     const Mean<Float>& state = MeanState<Float>(source[i]);
+    if constexpr (kWindow) {
+      if (state.non_finite != 0) {
+        const double value = state.non_finite == 1U   ? std::numeric_limits<double>::infinity()
+                             : state.non_finite == 2U ? -std::numeric_limits<double>::infinity()
+                                                      : std::numeric_limits<double>::quiet_NaN();
+        SetResult(result, offset + i, value);
+        continue;
+      }
+    }
     SetResult(
         result, offset + i,
         state.count == 0 ? std::nullopt : std::optional<double>(static_cast<double>(state.mean)));
   }
 }
 
-template <typename Float>
-void RegisterAverage(duckdb_connection connection) {
+template <typename Float, bool kWindow = false>
+void RegisterAverage(duckdb_connection connection, const char* name = "bq_avg_double") {
   Handle<duckdb_aggregate_function, duckdb_destroy_aggregate_function> const function(
       duckdb_create_aggregate_function());
-  duckdb_aggregate_function_set_name(function.get(), "bq_avg_double");
+  duckdb_aggregate_function_set_name(function.get(), name);
   LogicalType const float64(duckdb_create_logical_type(kDouble));
   duckdb_aggregate_function_add_parameter(function.get(), float64.get());
   duckdb_aggregate_function_set_return_type(function.get(), float64.get());
   duckdb_aggregate_function_set_functions(function.get(), MeanSize<Float>, InitMean<Float>,
-                                          UpdateMeans<Float>, CombineMeans<Float>,
-                                          FinalizeMeans<Float>);
+                                          UpdateMeans<Float, kWindow>, CombineMeans<Float, kWindow>,
+                                          FinalizeMeans<Float, kWindow>);
   // UpdateMeans skips NULL values itself.
   duckdb_aggregate_function_set_special_handling(function.get());
   if (duckdb_register_aggregate_function(connection, function.get()) == DuckDBError) {
-    throw BackendError("DuckDB failed to register bq_avg_double");
+    throw BackendError(std::string("DuckDB failed to register ") + name);
   }
 }
 
@@ -585,9 +622,13 @@ void RegisterMathFunctions(duckdb_connection connection, const Options& options)
                                                options.extended_array_limits);
   if (options.double_average) {
     RegisterAverage<double>(connection);
+    RegisterAverage<double, true>(connection, "bq_window_avg_double");
   } else {
     // The reference implementation's type, whose precision depends on the platform.
     RegisterAverage<long double>(connection);  // NOLINT(google-runtime-float)
+    // Compliance keeps GoogleSQL's window behavior as well as its precision.
+    // NOLINTNEXTLINE(google-runtime-float)
+    RegisterAverage<long double>(connection, "bq_window_avg_double");
   }
   if (options.double_sum) {
     RegisterSum<double>(connection);
