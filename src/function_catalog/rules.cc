@@ -264,6 +264,7 @@ Rule Own(const StaticRule& rule) {
 AggregateRule Own(const StaticAggregateRule& rule) {
   return {
       .function = rule.function,
+      .window_function = rule.window_function,
       .type = rule.type,
       .conditions = OwnConditions(rule.conditions),
       .arguments = {rule.arguments.begin(), rule.arguments.end()},

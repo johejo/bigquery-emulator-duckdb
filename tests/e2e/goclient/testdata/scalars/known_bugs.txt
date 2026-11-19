@@ -11,12 +11,6 @@
 SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{"radix": 10, "input_length": 6}'))
 !> "1"
 
-# Observed BigQuery answer recorded with tools/bqanswers: as a window function, AVG of two
-# infinities is Infinity, though the aggregate gives NaN (aggregates.txt). Which mean BigQuery's
-# windows compute is unknown; bq_avg_double gives NaN for both.
-SELECT AVG(x) OVER () FROM UNNEST([CAST('inf' AS FLOAT64), CAST('inf' AS FLOAT64)]) AS x LIMIT 1
-!> "Infinity"
-
 # BigQuery reports where the exception was thrown; QuickJS keeps only where an Error was created.
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()
