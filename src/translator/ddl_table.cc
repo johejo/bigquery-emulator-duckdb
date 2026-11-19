@@ -491,15 +491,22 @@ bool PrimaryKey(const googlesql::ResolvedCreateTableStmtBase& create, TableMetad
   return true;
 }
 
+bool SupportedForeignKey(const googlesql::ResolvedForeignKey& key, const Scope& scope) {
+  if (key.enforced() || key.match_mode() != googlesql::ResolvedForeignKey::SIMPLE ||
+      key.update_action() != googlesql::ResolvedForeignKey::NO_ACTION ||
+      key.delete_action() != googlesql::ResolvedForeignKey::NO_ACTION ||
+      !key.option_list().empty()) {
+    Unsupported(scope, "this foreign key definition");
+    return false;
+  }
+  return true;
+}
+
 bool ForeignKeys(const googlesql::ResolvedCreateTableStmtBase& create, TableDefinition& table,
                  const Scope& scope) {
   for (const auto& key : create.foreign_key_list()) {
     const auto* referenced = dynamic_cast<const BigQueryTable*>(key->referenced_table());
-    if (table.temporary || referenced == nullptr || key->enforced() ||
-        key->match_mode() != googlesql::ResolvedForeignKey::SIMPLE ||
-        key->update_action() != googlesql::ResolvedForeignKey::NO_ACTION ||
-        key->delete_action() != googlesql::ResolvedForeignKey::NO_ACTION ||
-        !key->option_list().empty()) {
+    if (table.temporary || referenced == nullptr || !SupportedForeignKey(*key, scope)) {
       Unsupported(scope, "this foreign key definition");
       return false;
     }
@@ -777,7 +784,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
 }  // namespace
 
 // ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT,
-// ADD and DROP PRIMARY KEY and SET OPTIONS, applied to the table as it is when the statement runs.
+// ADD and DROP key constraints and SET OPTIONS, applied to the table as it is when the statement
+// runs.
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope) {
   const auto path = TargetTable(alter.name_path(), scope);
@@ -885,6 +893,45 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
                              ->constraint()
                              ->GetAs<googlesql::ResolvedPrimaryKey>();
       alteration.actions.emplace_back(PrimaryKeyAction{.columns = key.column_name_list()});
+    } else if (action->Is<googlesql::ResolvedAddConstraintAction>() &&
+               action->GetAs<googlesql::ResolvedAddConstraintAction>()
+                   ->constraint()
+                   ->Is<googlesql::ResolvedForeignKey>()) {
+      const auto& add = *action->GetAs<googlesql::ResolvedAddConstraintAction>();
+      const auto& key = *add.constraint()->GetAs<googlesql::ResolvedForeignKey>();
+      const auto* referenced = dynamic_cast<const BigQueryTable*>(key.referenced_table());
+      const TemporaryTables* temporary = scope.context.defaults.temporary;
+      if ((temporary != nullptr && target->project_id == temporary->project &&
+           target->dataset_id == temporary->dataset) ||
+          referenced == nullptr || !SupportedForeignKey(key, scope)) {
+        return Unsupported(scope, "this ALTER TABLE foreign key definition");
+      }
+      auto description = referenced->Describe();
+      if (!description) {
+        return Unsupported(scope, "foreign keys referencing views");
+      }
+      ForeignKey stored{
+          .name = key.constraint_name(),
+          .referenced_table = referenced->reference(),
+          .columns = {},
+          .generated_name = key.constraint_name().empty(),
+      };
+      for (int i = 0; i < key.referencing_column_list_size(); ++i) {
+        stored.columns.push_back({
+            .referencing_column = key.referencing_column_list(i),
+            .referenced_column =
+                referenced->GetColumn(key.referenced_column_offset_list(i))->Name(),
+        });
+      }
+      alteration.actions.emplace_back(AddForeignKeyAction{
+          .key = std::move(stored),
+          .referenced = *std::move(description),
+          .if_not_exists = add.is_if_not_exists(),
+      });
+    } else if (action->Is<googlesql::ResolvedDropConstraintAction>()) {
+      const auto& drop = *action->GetAs<googlesql::ResolvedDropConstraintAction>();
+      alteration.actions.emplace_back(
+          DropConstraintAction{.name = drop.name(), .if_exists = drop.is_if_exists()});
     } else if (action->Is<googlesql::ResolvedDropPrimaryKeyAction>()) {
       alteration.actions.emplace_back(PrimaryKeyAction{
           .drop = true,

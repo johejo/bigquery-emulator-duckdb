@@ -148,9 +148,20 @@ struct PrimaryKeyAction {
   bool if_exists = false;
 };
 
-using TableAlterAction =
-    std::variant<AddColumnAction, DropColumnAction, RenameTableAction, ColumnOptionsAction,
-                 ColumnDefaultAction, PrimaryKeyAction, OptionUpdates>;
+struct AddForeignKeyAction {
+  ForeignKey key;
+  TableDescription referenced;
+  bool if_not_exists = false;
+};
+
+struct DropConstraintAction {
+  std::string name;
+  bool if_exists = false;
+};
+
+using TableAlterAction = std::variant<AddColumnAction, DropColumnAction, RenameTableAction,
+                                      ColumnOptionsAction, ColumnDefaultAction, PrimaryKeyAction,
+                                      AddForeignKeyAction, DropConstraintAction, OptionUpdates>;
 
 // The actions of an ALTER TABLE, in order. DuckDB takes one action per ALTER and keeps neither
 // the BigQuery schema nor the metadata they change, so the emulator applies them to what the table

@@ -158,20 +158,21 @@ add a new column with a default, and the Storage Write API cannot write to a tab
 
 ### Primary and foreign keys
 
-Tables keep primary and foreign keys from `CREATE TABLE` and REST `tableConstraints`.
+Tables keep primary and foreign keys from `CREATE TABLE`, `ALTER TABLE` and REST `tableConstraints`.
 `tables.get`, `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `INFORMATION_SCHEMA.KEY_COLUMN_USAGE`
 report them. Foreign keys may be all named or all unnamed, in DDL and REST; mixing named and
 unnamed keys is unsupported until its generated names are verified.
 
 Foreign keys must reference the complete primary key of a managed table, with matching scalar
 column types, canonical table references and column names in their schema's case. Parameterized
-or collated columns, references to views or snapshots, temporary-table foreign keys, and duplicate
-or reserved constraint names are unsupported. `ALTER TABLE ADD FOREIGN KEY` and `DROP CONSTRAINT`
-remain unsupported.
+or collated columns, references to views or snapshots, temporary-table foreign keys, and reserved
+constraint names are unsupported. Duplicate constraint names in `CREATE TABLE` and REST are unsupported.
+`ALTER TABLE ADD FOREIGN KEY` supports named and unnamed keys and `IF NOT EXISTS`.
+`DROP CONSTRAINT` matches foreign key names case-insensitively and supports `IF EXISTS`.
 
-A table with foreign keys supports only `ALTER TABLE SET OPTIONS`, `DROP COLUMN` and
-`ALTER COLUMN SET DEFAULT` or `DROP DEFAULT`, subject to key-column restrictions. REST metadata
-updates can preserve or clear existing foreign keys, but cannot add or replace their definitions;
+A table with foreign keys supports `ALTER TABLE SET OPTIONS`, `ADD FOREIGN KEY`, `DROP CONSTRAINT`,
+`DROP COLUMN`, and `ALTER COLUMN SET DEFAULT` or `DROP DEFAULT`, subject to key-column restrictions.
+REST metadata updates can preserve or clear existing foreign keys, but cannot add or replace their definitions;
 REST schema changes are unsupported. Copy jobs from or into tables with foreign keys are
 unsupported; SQL `CREATE TABLE LIKE`, `COPY`, `CLONE` and `CREATE SNAPSHOT TABLE` preserve them.
 Replacing or expiring a referenced table, changing its schema or primary key through REST, and
