@@ -1,0 +1,51 @@
+# Observed on BigQuery via bqanswers, promoted from unverified/foreign_key_alter.txt.
+CREATE SCHEMA IF NOT EXISTS bqa_fk_alter_missing;
+CREATE OR REPLACE TABLE bqa_fk_alter_missing.child (a INT64);
+ALTER TABLE bqa_fk_alter_missing.child DROP CONSTRAINT absent
+=> error contains: Not found: Constraint absent
+
+CREATE SCHEMA IF NOT EXISTS bqa_fk_alter_duplicate;
+CREATE OR REPLACE TABLE bqa_fk_alter_duplicate.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE OR REPLACE TABLE bqa_fk_alter_duplicate.child (a INT64);
+ALTER TABLE bqa_fk_alter_duplicate.child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES bqa_fk_alter_duplicate.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_duplicate.child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES bqa_fk_alter_duplicate.parent(id) NOT ENFORCED
+=> error contains: Already Exists: Constraint fk
+
+CREATE SCHEMA IF NOT EXISTS bqa_fk_alter_case;
+CREATE OR REPLACE TABLE bqa_fk_alter_case.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE OR REPLACE TABLE bqa_fk_alter_case.child (a INT64);
+ALTER TABLE bqa_fk_alter_case.child ADD CONSTRAINT MixedCase FOREIGN KEY (a) REFERENCES bqa_fk_alter_case.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_case.child DROP CONSTRAINT mixedcase;
+SELECT COUNT(*) FROM bqa_fk_alter_case.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child'
+=> "0"
+
+# Generated names when adding unnamed keys to a table that already has one.
+CREATE SCHEMA IF NOT EXISTS bqa_fk_alter_generated;
+CREATE OR REPLACE TABLE bqa_fk_alter_generated.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE OR REPLACE TABLE bqa_fk_alter_generated.child (a INT64, b INT64);
+ALTER TABLE bqa_fk_alter_generated.child ADD FOREIGN KEY (a) REFERENCES bqa_fk_alter_generated.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_generated.child ADD FOREIGN KEY (b) REFERENCES bqa_fk_alter_generated.parent(id) NOT ENFORCED;
+SELECT STRING_AGG(constraint_name, ', ' ORDER BY constraint_name) FROM bqa_fk_alter_generated.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child'
+=> "child.fk$1, child.fk$2"
+
+# Removing an earlier generated name does not cause that name to be reused.
+CREATE SCHEMA IF NOT EXISTS bqa_fk_alter_generated_gap;
+CREATE OR REPLACE TABLE bqa_fk_alter_generated_gap.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE OR REPLACE TABLE bqa_fk_alter_generated_gap.child (a INT64, b INT64);
+ALTER TABLE bqa_fk_alter_generated_gap.child ADD FOREIGN KEY (a) REFERENCES bqa_fk_alter_generated_gap.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_generated_gap.child ADD FOREIGN KEY (b) REFERENCES bqa_fk_alter_generated_gap.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_generated_gap.child DROP CONSTRAINT `fk$1`;
+ALTER TABLE bqa_fk_alter_generated_gap.child ADD FOREIGN KEY (a) REFERENCES bqa_fk_alter_generated_gap.parent(id) NOT ENFORCED;
+SELECT STRING_AGG(constraint_name, ', ' ORDER BY constraint_name) FROM bqa_fk_alter_generated_gap.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child'
+=> "child.fk$2, child.fk$3"
+
+# Removing the highest generated name allows that name to be reused.
+CREATE SCHEMA IF NOT EXISTS bqa_fk_alter_generated_last;
+CREATE OR REPLACE TABLE bqa_fk_alter_generated_last.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE OR REPLACE TABLE bqa_fk_alter_generated_last.child (a INT64, b INT64);
+ALTER TABLE bqa_fk_alter_generated_last.child ADD FOREIGN KEY (a) REFERENCES bqa_fk_alter_generated_last.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_generated_last.child ADD FOREIGN KEY (b) REFERENCES bqa_fk_alter_generated_last.parent(id) NOT ENFORCED;
+ALTER TABLE bqa_fk_alter_generated_last.child DROP CONSTRAINT `fk$2`;
+ALTER TABLE bqa_fk_alter_generated_last.child ADD FOREIGN KEY (b) REFERENCES bqa_fk_alter_generated_last.parent(id) NOT ENFORCED;
+SELECT STRING_AGG(constraint_name, ', ' ORDER BY constraint_name) FROM bqa_fk_alter_generated_last.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child'
+=> "child.fk$1, child.fk$2"

@@ -1,0 +1,63 @@
+# ALTER TABLE ADD FOREIGN KEY and DROP CONSTRAINT:
+# third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# The documented constraints are metadata only (NOT ENFORCED).
+
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_add;
+CREATE TABLE scalars_fk_alter_add.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE scalars_fk_alter_add.child (a INT64, b INT64);
+ALTER TABLE scalars_fk_alter_add.child
+  ADD CONSTRAINT first_fk FOREIGN KEY (a) REFERENCES scalars_fk_alter_add.parent(id) NOT ENFORCED,
+  ADD CONSTRAINT second_fk FOREIGN KEY (b) REFERENCES scalars_fk_alter_add.parent(id) NOT ENFORCED;
+SELECT COUNT(*) FROM scalars_fk_alter_add.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child' AND constraint_type = 'FOREIGN KEY'
+=> "2"
+
+# IF NOT EXISTS leaves the original column mapping intact.
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_if_not_exists;
+CREATE TABLE scalars_fk_alter_if_not_exists.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE scalars_fk_alter_if_not_exists.child (a INT64, b INT64);
+ALTER TABLE scalars_fk_alter_if_not_exists.child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES scalars_fk_alter_if_not_exists.parent(id) NOT ENFORCED;
+ALTER TABLE scalars_fk_alter_if_not_exists.child ADD CONSTRAINT IF NOT EXISTS fk FOREIGN KEY (b) REFERENCES scalars_fk_alter_if_not_exists.parent(id) NOT ENFORCED;
+SELECT column_name FROM scalars_fk_alter_if_not_exists.INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE table_name = 'child'
+=> "a"
+
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_drop;
+CREATE TABLE scalars_fk_alter_drop.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE scalars_fk_alter_drop.child (a INT64, b INT64);
+ALTER TABLE scalars_fk_alter_drop.child ADD CONSTRAINT first_fk FOREIGN KEY (a) REFERENCES scalars_fk_alter_drop.parent(id) NOT ENFORCED;
+ALTER TABLE scalars_fk_alter_drop.child ADD CONSTRAINT second_fk FOREIGN KEY (b) REFERENCES scalars_fk_alter_drop.parent(id) NOT ENFORCED;
+ALTER TABLE scalars_fk_alter_drop.child DROP CONSTRAINT IF EXISTS first_fk;
+SELECT column_name FROM scalars_fk_alter_drop.INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE table_name = 'child'
+=> "b"
+
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_drop_absent;
+CREATE TABLE scalars_fk_alter_drop_absent.child (a INT64);
+ALTER TABLE scalars_fk_alter_drop_absent.child DROP CONSTRAINT IF EXISTS absent;
+SELECT COUNT(*) FROM scalars_fk_alter_drop_absent.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child'
+=> "0"
+
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_unnamed;
+CREATE TABLE scalars_fk_alter_unnamed.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE scalars_fk_alter_unnamed.child (a INT64);
+ALTER TABLE scalars_fk_alter_unnamed.child ADD FOREIGN KEY (a) REFERENCES scalars_fk_alter_unnamed.parent(id) NOT ENFORCED;
+SELECT column_name FROM scalars_fk_alter_unnamed.INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE table_name = 'child'
+=> "a"
+
+# The documentation explicitly permits adding primary and foreign keys together.
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_primary;
+CREATE TABLE scalars_fk_alter_primary.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE scalars_fk_alter_primary.child (a INT64, b INT64);
+ALTER TABLE scalars_fk_alter_primary.child
+  ADD PRIMARY KEY (a) NOT ENFORCED,
+  ADD CONSTRAINT fk FOREIGN KEY (b) REFERENCES scalars_fk_alter_primary.parent(id) NOT ENFORCED;
+SELECT COUNT(*) FROM scalars_fk_alter_primary.INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE table_name = 'child'
+=> "2"
+
+# Existing data need not satisfy a NOT ENFORCED foreign key.
+CREATE SCHEMA IF NOT EXISTS scalars_fk_alter_rows;
+CREATE TABLE scalars_fk_alter_rows.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE scalars_fk_alter_rows.child (a INT64);
+INSERT INTO scalars_fk_alter_rows.child VALUES (42);
+ALTER TABLE scalars_fk_alter_rows.child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES scalars_fk_alter_rows.parent(id) NOT ENFORCED;
+ALTER TABLE scalars_fk_alter_rows.child DROP CONSTRAINT fk;
+SELECT a FROM scalars_fk_alter_rows.child
+=> "42"

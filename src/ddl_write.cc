@@ -1,13 +1,17 @@
 #include "src/ddl_write.h"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <string>
+#include <system_error>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -329,7 +333,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
   for (const TableAlterAction& action : alteration.actions) {
     if (!metadata.foreign_keys.empty() && !std::holds_alternative<OptionUpdates>(action) &&
         !std::holds_alternative<DropColumnAction>(action) &&
-        !std::holds_alternative<ColumnDefaultAction>(action)) {
+        !std::holds_alternative<ColumnDefaultAction>(action) &&
+        !std::holds_alternative<AddForeignKeyAction>(action) &&
+        !std::holds_alternative<DropConstraintAction>(action)) {
       throw ApiError::Unsupported(
           "ALTER TABLE actions other than SET OPTIONS on a table with foreign keys");
     }
@@ -446,6 +452,67 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
         }
         metadata.primary_key = PrimaryKeyColumns(key->columns, schema);
       }
+      set_options = true;
+    } else if (const auto* foreign = std::get_if<AddForeignKeyAction>(&action)) {
+      ForeignKey stored = foreign->key;
+      if (!stored.name.empty() &&
+          std::ranges::any_of(metadata.foreign_keys, [&](const ForeignKey& existing) {
+            return ToLowerAscii(existing.name) == ToLowerAscii(stored.name);
+          })) {
+        if (foreign->if_not_exists) {
+          continue;
+        }
+        throw ApiError::Duplicate("Already Exists: Constraint " + stored.name);
+      }
+      for (ForeignKeyColumn& column : stored.columns) {
+        const auto field = FindColumn(schema, column.referencing_column);
+        if (field == schema.end()) {
+          throw ApiError::Invalid("Column not found: " + column.referencing_column);
+        }
+        column.referencing_column = field->name;
+      }
+      // A preceding ADD PRIMARY KEY in the same statement is visible to a self-reference.
+      const bool self = ToLowerAscii(QualifiedName(stored.referenced_table)) ==
+                        ToLowerAscii(QualifiedName(table));
+      ValidateForeignKey(
+          stored, schema,
+          self ? TableDescription{.schema = schema, .metadata = metadata} : foreign->referenced);
+      if (std::ranges::any_of(metadata.foreign_keys, [&](const ForeignKey& existing) {
+            return existing.generated_name != stored.generated_name;
+          })) {
+        throw ApiError::Unsupported("generated names for mixed named and unnamed foreign keys");
+      }
+      if (stored.generated_name) {
+        size_t maximum = 0;
+        for (const ForeignKey& existing : metadata.foreign_keys) {
+          if (!existing.name.starts_with("fk$")) {
+            throw ApiError::Unsupported("this generated foreign key name");
+          }
+          size_t ordinal = 0;
+          const char* end = existing.name.data() + existing.name.size();
+          const auto parsed = std::from_chars(existing.name.data() + 3, end, ordinal);
+          if (parsed.ec != std::errc{} || parsed.ptr != end ||
+              ordinal == std::numeric_limits<size_t>::max()) {
+            throw ApiError::Unsupported("this generated foreign key name");
+          }
+          maximum = std::max(maximum, ordinal);
+        }
+        stored.name = "fk$" + std::to_string(maximum + 1);
+      }
+      metadata.foreign_keys.push_back(std::move(stored));
+      set_options = true;
+    } else if (const auto* constraint = std::get_if<DropConstraintAction>(&action)) {
+      const auto found =
+          std::ranges::find_if(metadata.foreign_keys, [&](const ForeignKey& existing) {
+            return ToLowerAscii(existing.name) == ToLowerAscii(constraint->name);
+          });
+      if (found == metadata.foreign_keys.end()) {
+        if (constraint->if_exists) {
+          continue;
+        }
+        throw ApiError::NotFound("Not found: Constraint " + constraint->name);
+      }
+      metadata.foreign_keys.erase(found);
       set_options = true;
     } else {
       const auto& updates = std::get<OptionUpdates>(action);

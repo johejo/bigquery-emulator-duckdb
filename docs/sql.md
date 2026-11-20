@@ -108,7 +108,7 @@ rejected.
 | Column rounding modes | Supported |  |
 | Default rounding modes | Supported |  |
 | Partitioning and clustering | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
-| Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: ALTER TABLE action AddConstraintAction; ALTER TABLE action DropConstraintAction; generated names for mixed named and unnamed foreign keys. |
+| Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: generated names for mixed named and unnamed foreign keys. |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `CREATE TABLE LIKE` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
 | `CREATE TABLE COPY` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
