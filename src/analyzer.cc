@@ -178,6 +178,42 @@ std::vector<std::string> ResultColumnNames(const googlesql::ResolvedQueryStmt& q
 
 namespace {
 
+// GoogleSQL resolves STDDEV and VARIANCE to their _SAMP functions. Reject DISTINCT
+// before translation loses the source spelling, just as for the canonical names.
+absl::Status CheckAnalyticDistinctAliases(const googlesql::ResolvedNode& node,
+                                          std::string_view sql) {
+  std::vector<const googlesql::ResolvedNode*> calls;
+  node.GetDescendantsWithKinds({googlesql::RESOLVED_ANALYTIC_FUNCTION_CALL}, &calls);
+  for (const auto* descendant : calls) {
+    const auto& call = *descendant->GetAs<googlesql::ResolvedAnalyticFunctionCall>();
+    if (!IsBuiltinFunction(*call.function()) || !call.distinct() ||
+        (call.function()->Name() != "stddev_samp" && call.function()->Name() != "var_samp")) {
+      continue;
+    }
+    const auto* location = call.GetParseLocationRangeOrNULL();
+    if (location == nullptr) {
+      continue;
+    }
+    // Inlined SQL functions may carry locations from their definition, not this input.
+    const std::size_t start = location->start().GetByteOffset();
+    const std::size_t end = location->end().GetByteOffset();
+    if (start > end || end > sql.size()) {
+      continue;
+    }
+    std::string name;
+    if (googlesql::ParseIdentifier(sql.substr(start, end - start), GoogleSqlLanguageOptions(),
+                                   &name)
+            .ok()) {
+      name = ToLowerAscii(name);
+      if (name == "stddev" || name == "variance") {
+        return absl::InvalidArgumentError("Analytic function " + name +
+                                          " does not support DISTINCT.");
+      }
+    }
+  }
+  return absl::OkStatus();
+}
+
 // Whether `node` has type parameters, such as STRING(3) or ARRAY<NUMERIC(5, 2)>.
 bool HasTypeParameters(const googlesql::ASTNode& node) {
   if (node.node_kind() == googlesql::AST_TYPE_PARAMETER_LIST) {
@@ -340,6 +376,8 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision pr
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
   options.set_language(AnalyzerLanguageOptions(precision));
+  // Keep the spelling of analytic function aliases for BigQuery's DISTINCT errors.
+  options.set_parse_location_record_type(googlesql::PARSE_LOCATION_RECORD_CODE_SEARCH);
   // A table scan lists only the columns the statement reads, which are all that BigQuery
   // converts of an external table's sources.
   options.set_prune_unused_columns(true);
@@ -736,6 +774,11 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     }
     throw std::runtime_error(formatted.ToString());
   }
+  if (const auto distinct =
+          CheckAnalyticDistinctAliases(*analyzer_output->resolved_statement(), sql);
+      !distinct.ok()) {
+    throw std::runtime_error(std::string(distinct.message()));
+  }
   if (settings.cast_without_type_parameters) {
     if (const auto casts = CheckCastTypeParameters(sql, false); !casts.ok()) {
       throw std::runtime_error(std::string(casts.message()));
@@ -796,6 +839,8 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
     CheckMissingForeignKeyTarget(segment.GetSegmentText(), status, catalog);
   }
   GOOGLESQL_RETURN_IF_ERROR(status).With(googlesql::ConvertLocalErrorToScriptError(segment));
+  GOOGLESQL_RETURN_IF_ERROR(CheckAnalyticDistinctAliases(*analyzer_output->resolved_statement(),
+                                                         segment.GetSegmentText()));
   if (settings.cast_without_type_parameters) {
     GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
   }
@@ -831,6 +876,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
     GOOGLESQL_RETURN_IF_ERROR(status).With(googlesql::ConvertLocalErrorToScriptError(*segment));
   }
   GOOGLESQL_RETURN_IF_ERROR(status);
+  GOOGLESQL_RETURN_IF_ERROR(CheckAnalyticDistinctAliases(*analyzer_output->resolved_expr(), sql));
   if (settings.cast_without_type_parameters) {
     GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(sql, true));
   }
