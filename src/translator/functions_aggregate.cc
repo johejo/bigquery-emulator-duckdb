@@ -329,8 +329,64 @@ constexpr StaticAggregateRule KllMerge() {
   };
 }
 
-// Aggregate functions, which also take a window.
+template <bool kNullOnAllNull>
+std::string UnpackQuantiles(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                            const std::string& /*tail*/) {
+  if constexpr (kNullOnAllNull) {
+    // BigQuery documents a NULL result when every input is NULL. The last quantile is the maximum.
+    return "list_transform([" + sql +
+           "], lambda q: CASE WHEN q[-1].present THEN list_transform(q, lambda e: e.value) END)[1]";
+  }
+  return "list_transform(" + sql + ", lambda e: e.value)";
+}
+
 }  // namespace
+
+function_catalog::StaticNamedDefinition<StaticAggregateRule> ApproxQuantiles(
+    bool null_on_all_null) {
+  // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1.
+  static constexpr std::string_view kQuantiles = "list_transform(range($2 + 1), lambda i: i / $2)";
+  static constexpr std::string_view kIgnoreNullArguments[] = {"$1", kQuantiles};
+  // quantile_disc skips SQL NULLs. Pack every value once, ordering NULL first and retaining
+  // exactly one of them under DISTINCT.
+  static constexpr std::string_view kRespectNullArguments[] = {
+      "list_transform([$1], lambda v: {'present': v IS NOT NULL, 'value': v})[1]",
+      kQuantiles,
+  };
+  static constexpr function_catalog::TypeRejection kRejections[] = {
+      {
+          .types = kIntervalTypes,
+          .message = "Unsupported type INTERVAL for aggregate function approx_quantiles",
+      },
+      {
+          .types = kJsonTypes,
+          .message = "Argument 1 to APPROX_QUANTILES must support ordering; Type JSON does not",
+      },
+  };
+  constexpr auto define = [](bool bigquery) {
+    return Define("APPROX_QUANTILES",
+                  {
+                      {
+                          .function = "quantile_disc",
+                          .arguments = kRespectNullArguments,
+                          .nulls = AggregateRule::Nulls::kRequiresRespect,
+                          .finish = bigquery ? UnpackQuantiles<true> : UnpackQuantiles<false>,
+                      },
+                      {
+                          .function = "quantile_disc",
+                          .arguments = kIgnoreNullArguments,
+                          .nulls = AggregateRule::Nulls::kIgnore,
+                      },
+                  },
+                  {
+                      .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+                      .type_rejections = kRejections,
+                  });
+  };
+  static constexpr auto kBigQuery = define(true);
+  static constexpr auto kGoogleSql = define(false);
+  return function_catalog::DefinitionView(null_on_all_null ? kBigQuery : kGoogleSql);
+}
 
 std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Aggregates() {
   using enum AggregateRule::Nulls;
@@ -342,10 +398,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
   static constexpr std::string_view kCollationKey[] = {"$2"};
   static constexpr std::string_view kValueAndCollationKey[] = {"$1", "$2"};
   static constexpr std::string_view kNanFirst[] = {"{'number': NOT isnan($1), 'value': $1}"};
-  static constexpr std::string_view kQuantileArguments[] = {
-      "$1",
-      "list_transform(range($2 + 1), lambda i: i / $2)",
-  };
   static constexpr std::string_view kHexArguments[] = {"hex($1)", "hex($2)"};
   static constexpr std::string_view kHexDefaults[] = {"", "unhex('2C')"};
   static constexpr std::string_view kCountIfArguments[] = {"CASE WHEN $1 THEN TRUE END"};
@@ -364,16 +416,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
           .types = kJsonTypes,
           .message = "The argument to APPROX_COUNT_DISTINCT must support grouping; Type JSON does "
                      "not",
-      },
-  };
-  static constexpr function_catalog::TypeRejection kApproxQuantileRejections[] = {
-      {
-          .types = kIntervalTypes,
-          .message = "Unsupported type INTERVAL for aggregate function approx_quantiles",
-      },
-      {
-          .types = kJsonTypes,
-          .message = "Argument 1 to APPROX_QUANTILES must support ordering; Type JSON does not",
       },
   };
   // APPROX_TOP_COUNT and APPROX_TOP_SUM list STRUCT and ARRAY values last, which only BigQuery
@@ -621,21 +663,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticAggregateRule>> Ag
              {
                  .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsCollation, TypeUse::kRejectsOver},
                  .type_rejections = kApproxCountRejections,
-             }),
-      // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
-      // skips NULLs, as APPROX_QUANTILES does by default.
-
-      Define("APPROX_QUANTILES",
-             {
-                 {
-                     .function = "quantile_disc",
-                     .arguments = kQuantileArguments,
-                     .nulls = kIgnore,
-                 },
-             },
-             {
-                 .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
-                 .type_rejections = kApproxQuantileRejections,
              }),
       // histogram() takes only the values; TopCount() applies the count afterwards.
 

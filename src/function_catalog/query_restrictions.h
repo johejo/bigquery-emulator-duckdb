@@ -29,6 +29,8 @@ struct QueryRestrictions {
   bool distinct_comparisons_without_structs = false;
   // APPROX_TOP_COUNT and APPROX_TOP_SUM take no STRUCT or ARRAY values.
   bool approx_top_scalar_values_only = false;
+  // APPROX_QUANTILES returns NULL for all-NULL inputs even with RESPECT NULLS.
+  bool approx_quantiles_null_on_all_null = false;
   // GREATEST, LEAST, NULLIF and CASE with a value compare no INTERVAL values.
   bool selections_without_intervals = false;
   // Query results and written values hold no ARRAY with a NULL element.

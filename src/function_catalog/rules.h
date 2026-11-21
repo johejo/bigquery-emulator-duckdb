@@ -130,6 +130,8 @@ struct AggregateOptions {
     kIgnore,
     // It leaves out the rows whose first argument is NULL unless the call has RESPECT NULLS.
     kFilterUnlessRespected,
+    // Only a call with RESPECT NULLS matches this rule.
+    kRequiresRespect,
   };
   enum class Distinct : std::uint8_t {
     kAllowed,

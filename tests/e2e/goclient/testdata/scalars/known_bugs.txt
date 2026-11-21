@@ -73,10 +73,3 @@ SELECT COUNT(*) FROM committed
 # BigQuery adds the planar edge's midpoints until it is close enough to the geodesic one.
 SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040'), planar => TRUE)
 => "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
-
-# APPROX_QUANTILES with RESPECT NULLS is unsupported; BigQuery keeps the NULL, which a result
-# array cannot hold.
-SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
-  RANGE<DATE> '[2020-01-01, 2020-02-01)', CAST(NULL AS RANGE<DATE>),
-  RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']) AS r
-!> error: Array cannot have a null element; error in writing field f0_

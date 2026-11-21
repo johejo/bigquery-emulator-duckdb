@@ -449,6 +449,9 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .target = target,
                         });
   }
+  const auto [quantile_name, quantile_definition] =
+      ApproxQuantiles(functions.restrictions().approx_quantiles_null_on_all_null);
+  functions.AddAggregates(quantile_name, quantile_definition, Translation::kAggregate);
   for (const auto& [name, definition] : Aggregates()) {
     auto selected = definition;
     if ((name == "APPROX_TOP_COUNT" || name == "APPROX_TOP_SUM") &&

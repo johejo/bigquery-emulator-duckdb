@@ -221,6 +221,12 @@ SELECT APPROX_QUANTILES(DISTINCT r, 2) FROM UNNEST([
   RANGE<DATE> '[2020-01-01, 2020-02-01)', RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']) AS r
 => [{"v": "[UNBOUNDED, UNBOUNDED)"}, {"v": "[UNBOUNDED, UNBOUNDED)"}, {"v": "[2020-01-01, 2020-02-01)"}]
 
+# BigQuery retains the NULL boundary but rejects a NULL element in the returned array.
+SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
+  RANGE<DATE> '[2020-01-01, 2020-02-01)', CAST(NULL AS RANGE<DATE>),
+  RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']) AS r
+=> error: Array cannot have a null element; error in writing field f0_
+
 # BigQuery rejects APPROX_COUNT_DISTINCT, APPROX_TOP_COUNT and APPROX_TOP_SUM over RANGE values,
 # naming the functions it implements them with; confirmed against BigQuery.
 SELECT APPROX_COUNT_DISTINCT(r) FROM UNNEST([
