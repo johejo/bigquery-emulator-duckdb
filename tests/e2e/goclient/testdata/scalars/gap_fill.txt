@@ -1,0 +1,128 @@
+## GAP_FILL
+# Source: the GAP_FILL examples of BigQuery's time series functions
+# (third_party/bigquery_docs/reference/standard-sql/time-series-functions.md). Each query reads
+# the example's device_data and aggregates the example's result table into one value.
+
+# The locf, linear and null gap-filling methods.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', 78, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'locf')])
+=> "2023-11-01 09:35:00=74;2023-11-01 09:36:00=77;2023-11-01 09:37:00=78;2023-11-01 09:38:00=78"
+
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', 78, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'linear')])
+=> "2023-11-01 09:35:00=75;2023-11-01 09:36:00=77;2023-11-01 09:37:00=78;2023-11-01 09:38:00=80"
+
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', 78, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'null')])
+=> "2023-11-01 09:35:00=NULL;2023-11-01 09:36:00=77;2023-11-01 09:37:00=78;2023-11-01 09:38:00=NULL"
+
+# NULL input values are skipped by default, and kept with ignore_null_values => FALSE.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', NULL, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'linear')])
+=> "2023-11-01 09:35:00=75;2023-11-01 09:36:00=77;2023-11-01 09:37:00=78;2023-11-01 09:38:00=80"
+
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', NULL, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'linear')], ignore_null_values => FALSE)
+=> "2023-11-01 09:35:00=75;2023-11-01 09:36:00=77;2023-11-01 09:37:00=NULL;2023-11-01 09:38:00=NULL"
+
+# Without value_columns, every other column is filled with NULL, after the time series column.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', 79, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])) SELECT STRING_AGG(TO_JSON_STRING(g), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE) AS g
+=> "{\"time\":\"2023-11-01T09:35:00\",\"device_id\":null,\"signal\":null,\"state\":null};{\"time\":\"2023-11-01T09:36:00\",\"device_id\":2,\"signal\":77,\"state\":\"ACTIVE\"};{\"time\":\"2023-11-01T09:37:00\",\"device_id\":3,\"signal\":79,\"state\":\"ACTIVE\"};{\"time\":\"2023-11-01T09:38:00\",\"device_id\":null,\"signal\":null,\"state\":null}"
+
+# Rows of one time point with the same values are condensed.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:35:39', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:60', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', 77, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:37:20', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'locf')])
+=> "2023-11-01 09:36:00=74;2023-11-01 09:37:00=77"
+
+# Each partition is filled separately, between its own first and last time points.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(2, DATETIME '2023-11-01 09:35:07', 87, 'ACTIVE'), STRUCT(1, DATETIME '2023-11-01 09:35:26', 82, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:35:39', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:07', 88, 'ACTIVE'), STRUCT(1, DATETIME '2023-11-01 09:36:26', 82, 'ACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:37:07', 88, 'ACTIVE'), STRUCT(1, DATETIME '2023-11-01 09:37:28', 80, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:39', 77, 'ACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:38:07', 86, 'ACTIVE'), STRUCT(1, DATETIME '2023-11-01 09:38:26', 81, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:38:39', 77, 'ACTIVE')])) SELECT STRING_AGG(TO_JSON_STRING(g), ';' ORDER BY device_id, time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, partitioning_columns => ['device_id'], value_columns => [('signal', 'locf')]) AS g
+=> "{\"time\":\"2023-11-01T09:36:00\",\"device_id\":1,\"signal\":82};{\"time\":\"2023-11-01T09:37:00\",\"device_id\":1,\"signal\":82};{\"time\":\"2023-11-01T09:38:00\",\"device_id\":1,\"signal\":80};{\"time\":\"2023-11-01T09:36:00\",\"device_id\":2,\"signal\":87};{\"time\":\"2023-11-01T09:37:00\",\"device_id\":2,\"signal\":88};{\"time\":\"2023-11-01T09:38:00\",\"device_id\":2,\"signal\":88};{\"time\":\"2023-11-01T09:36:00\",\"device_id\":3,\"signal\":74};{\"time\":\"2023-11-01T09:37:00\",\"device_id\":3,\"signal\":74};{\"time\":\"2023-11-01T09:38:00\",\"device_id\":3,\"signal\":77}"
+
+# Each value column uses its own method.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'ACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'INACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:38:00', 78, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:39:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t,%t', time, signal, state), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'linear'), ('state', 'locf')])
+=> "2023-11-01 09:35:00=75,ACTIVE;2023-11-01 09:36:00=77,INACTIVE;2023-11-01 09:37:00=78,INACTIVE;2023-11-01 09:38:00=78,ACTIVE;2023-11-01 09:39:00=80,ACTIVE"
+
+# Buckets expand from a custom origin.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'ACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'INACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:38:00', 78, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:39:01', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'null')], origin => DATETIME '2023-11-01 09:30:01')
+=> "2023-11-01 09:34:01=74;2023-11-01 09:35:01=NULL;2023-11-01 09:36:01=NULL;2023-11-01 09:37:01=NULL;2023-11-01 09:38:01=NULL;2023-11-01 09:39:01=80"
+
+# A subquery is the input.
+SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL((SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:34:01', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:36:00', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:37:00', 78, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:38:01', 80, 'ACTIVE')])), ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'linear')])
+=> "2023-11-01 09:35:00=75;2023-11-01 09:36:00=77;2023-11-01 09:37:00=78;2023-11-01 09:38:00=80"
+
+# Observed BigQuery answers collected with tools/bqanswers.
+
+# The documentation's example of added rows shows 74 at 09:38:00 and 77 at 09:40:00, although
+# 09:38:00 has a row of 77 and 09:40:00 a row of 80. BigQuery returns each row's own value at its
+# time point, as the documentation's other examples do.
+WITH device_data AS (SELECT * FROM UNNEST(ARRAY<STRUCT<device_id INT64, time DATETIME, signal INT64, state STRING>>[STRUCT(1, DATETIME '2023-11-01 09:35:39', 74, 'INACTIVE'), STRUCT(2, DATETIME '2023-11-01 09:37:39', 77, 'ACTIVE'), STRUCT(3, DATETIME '2023-11-01 09:38:00', 77, 'ACTIVE'), STRUCT(4, DATETIME '2023-11-01 09:40:00', 80, 'ACTIVE')])) SELECT STRING_AGG(FORMAT('%t=%t', time, signal), ';' ORDER BY time) FROM GAP_FILL(TABLE device_data, ts_column => 'time', bucket_width => INTERVAL 1 MINUTE, value_columns => [('signal', 'locf')])
+=> "2023-11-01 09:36:00=74;2023-11-01 09:37:00=74;2023-11-01 09:38:00=77;2023-11-01 09:39:00=77;2023-11-01 09:40:00=80"
+
+# Rows without a time point are ignored.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT NULL, 2 UNION ALL SELECT DATE '2023-11-03', 3), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf')])
+=> "2023-11-01=1;2023-11-02=1;2023-11-03=3"
+
+# FLOAT64 interpolates from the earlier point; INT64 rounds a halfway value toward the later
+# point's value.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1.0 AS v UNION ALL SELECT DATE '2023-11-04', 2.0), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=1.0;2023-11-02=1.3333333333333333;2023-11-03=1.6666666666666665;2023-11-04=2.0"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, -3 AS v UNION ALL SELECT DATE '2023-11-03', -2), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=-3;2023-11-02=-2;2023-11-03=-2"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 3 AS v UNION ALL SELECT DATE '2023-11-03', 2), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=3;2023-11-02=2;2023-11-03=2"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, -2 AS v UNION ALL SELECT DATE '2023-11-03', -3), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=-2;2023-11-02=-3;2023-11-03=-3"
+
+# NUMERIC and BIGNUMERIC round to their scales.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '1' AS v UNION ALL SELECT DATE '2023-11-04', NUMERIC '2'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=1;2023-11-02=1.333333333;2023-11-03=1.666666667;2023-11-04=2"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, BIGNUMERIC '1' AS v UNION ALL SELECT DATE '2023-11-04', BIGNUMERIC '2'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=1;2023-11-02=1.33333333333333333333333333333333333333;2023-11-03=1.66666666666666666666666666666666666667;2023-11-04=2"
+
+# FLOAT64 also rounds the fraction first: 3 * (1.0 / 10) is 0.30000000000000004.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 0.0 AS v UNION ALL SELECT DATE '2023-11-11', 3.0), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')]) WHERE t = DATE '2023-11-02'
+=> "2023-11-02=0.30000000000000004"
+
+# The fraction of elapsed time rounds before it multiplies the difference, so 2 * (1 / 3) is
+# 0.666666666, and the product rounds before the addition. Large values do not overflow.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '0' AS v UNION ALL SELECT DATE '2023-11-04', NUMERIC '2'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=0;2023-11-02=0.666666666;2023-11-03=1.333333334;2023-11-04=2"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '-1' AS v UNION ALL SELECT DATE '2023-11-05', NUMERIC '-0.999999998'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=-1;2023-11-02=-0.999999999;2023-11-03=-0.999999999;2023-11-04=-0.999999998;2023-11-05=-0.999999998"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '1e20' AS v UNION ALL SELECT DATE '2023-11-04', NUMERIC '2e20'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=100000000000000000000;2023-11-02=133333333300000000000;2023-11-03=166666666700000000000;2023-11-04=200000000000000000000"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, BIGNUMERIC '1e30' AS v UNION ALL SELECT DATE '2023-11-04', BIGNUMERIC '2e30'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> "2023-11-01=1000000000000000000000000000000;2023-11-02=1333333333333333333333333333333.33333333;2023-11-03=1666666666666666666666666666666.66666667;2023-11-04=2000000000000000000000000000000"
+
+# Method names are case-insensitive, and NULL origin, value_columns and partitioning_columns are
+# their defaults.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-03', 3), 't', INTERVAL 1 DAY, value_columns => [('v', 'LOCF')])
+=> "2023-11-01=1;2023-11-02=1;2023-11-03=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-03', 3), 't', INTERVAL 1 DAY, origin => CAST(NULL AS DATE))
+=> "2023-11-01=1;2023-11-02=NULL;2023-11-03=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-03', 3), 't', INTERVAL 1 DAY, value_columns => NULL)
+=> "2023-11-01=1;2023-11-02=NULL;2023-11-03=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-03', 3), 't', INTERVAL 1 DAY, partitioning_columns => NULL)
+=> "2023-11-01=1;2023-11-02=NULL;2023-11-03=3"
+
+# Different values of one time point that no bucket reads do not affect the result.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATETIME '2023-11-01 00:00:00' AS t, 1 AS v UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 2 UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 4 UNION ALL SELECT DATETIME '2023-11-01 00:01:00', 5), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'locf')])
+=> "2023-11-01 00:00:00=1;2023-11-01 00:01:00=5"
+
+# Buckets of months start at the beginning of a month, or at the origin's day, on the last day of
+# a shorter month.
+SELECT STRING_AGG(FORMAT('%t', t), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-01-15' AS t UNION ALL SELECT DATE '2023-04-15'), 't', INTERVAL 1 MONTH)
+=> "2023-02-01;2023-03-01;2023-04-01"
+
+SELECT STRING_AGG(FORMAT('%t', t), ';' ORDER BY t) FROM GAP_FILL((SELECT DATETIME '2023-01-15 00:00:00' AS t UNION ALL SELECT DATETIME '2023-04-15 00:00:00'), 't', INTERVAL 1 MONTH)
+=> "2023-02-01 00:00:00;2023-03-01 00:00:00;2023-04-01 00:00:00"
+
+SELECT STRING_AGG(FORMAT('%t', t), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-01-01' AS t UNION ALL SELECT DATE '2023-05-01'), 't', INTERVAL 1 MONTH, origin => DATE '2023-01-15')
+=> "2023-01-15;2023-02-15;2023-03-15;2023-04-15"
+
+SELECT STRING_AGG(FORMAT('%t', t), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-01-01' AS t UNION ALL SELECT DATE '2023-05-01'), 't', INTERVAL 1 MONTH, origin => DATE '2022-12-31')
+=> "2023-01-31;2023-02-28;2023-03-31;2023-04-30"

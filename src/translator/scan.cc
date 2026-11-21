@@ -42,6 +42,7 @@
 #include "src/translator/differential_privacy.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
+#include "src/translator/gap_fill.h"
 #include "src/translator/graph.h"
 #include "src/type_mapping.h"
 
@@ -126,6 +127,9 @@ std::optional<Relation> ExternalQueryScan(const googlesql::ResolvedTVFScan& tvf,
 std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, const Scope& scope) {
   if (tvf.tvf()->Name() == "external_query") {
     return ExternalQueryScan(tvf, scope);
+  }
+  if (tvf.tvf()->Name() == "gap_fill") {
+    return GapFillScan(tvf, scope);
   }
   if (tvf.tvf()->Name() != "range_sessionize") {
     return Unsupported(scope, "table function " + tvf.tvf()->Name());
