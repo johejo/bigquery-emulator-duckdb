@@ -152,7 +152,10 @@ Bigtable supports BYTES and STRING cell values, `readRowkeyAsString`,
 - Promoting individual qualifiers through `columns`.
 - Numeric/boolean conversion, JSON/PROTO values and `outputColumnFamiliesAsJson`.
 - Explicit schemas and GCS-specific read options.
-- Reading a row missing a selected family.
+
+A scan that references column families includes only source rows with a cell in at least one
+of those families. In an included row, a missing family is `NULL`. A scan that references
+no family, such as in `SELECT rowkey`, includes all source rows.
 
 Schemas are fixed at creation; queries read current source rows. Endpoint setup is in the
 [README](../README.md#bigtable-external-tables).
