@@ -20,3 +20,50 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:
 !> "4"
 SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e1:Transfers COST 9223372036854775807]->(b:Account)-[e2:Transfers COST 9223372036854775807]->(c:Account) RETURN COUNT(*) AS result)
 !> "5"
+
+# The documented StoreGraph counts the location once for AGG but twice for SUM.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
+CREATE PROPERTY GRAPH scalar_graph.StoreGraphWithMeasure
+  NODE TABLES (scalar_graph.Stores AS S, scalar_graph.Locations AS L
+    PROPERTIES (id, name, population, MEASURE(SUM(population)) AS total_population))
+  EDGE TABLES (scalar_graph.Stores AS SL SOURCE KEY (location_id) REFERENCES L (id)
+    DESTINATION KEY (name) REFERENCES S (name));
+SELECT TO_JSON_STRING(STRUCT(AGG(L_total_population) AS total, SUM(L_population) AS ordinary_sum))
+FROM GRAPH_EXPAND('scalar_graph.StoreGraphWithMeasure') GROUP BY S_location_id;
+!> "{\"total\":1000,\"ordinary_sum\":2000}"
+
+# Observed with tools/bqanswers: a graph measure must use COUNT(column), not COUNT(*).
+CREATE PROPERTY GRAPH scalar_graph.StoreGraphWithCountStarMeasure
+  NODE TABLES (scalar_graph.Locations AS L
+    PROPERTIES (id, MEASURE(COUNT(*)) AS location_count));
+!> error contains: COUNT(*) is not allowed in a measure expression in BigQuery
+
+# Observed with tools/bqanswers in both modes. AGG counts a matched key with NULL amount once,
+# skips absent keys, and sums equal amounts for distinct keys while removing join duplicates.
+CREATE TABLE scalar_graph.MeasureLocations (id INT64 PRIMARY KEY NOT ENFORCED, amount INT64)
+AS SELECT 1 AS id, 100 AS amount UNION ALL SELECT 2, 100 UNION ALL SELECT 3, NULL;
+CREATE TABLE scalar_graph.MeasureStores (id INT64 PRIMARY KEY NOT ENFORCED,
+  location_id INT64 REFERENCES scalar_graph.MeasureLocations(id) NOT ENFORCED)
+AS SELECT id, CASE WHEN id <= 2 THEN 1 WHEN id = 3 THEN 2 WHEN id >= 6 THEN 3 END AS location_id
+FROM UNNEST(GENERATE_ARRAY(1, 7)) AS id;
+CREATE PROPERTY GRAPH scalar_graph.MeasureGraph
+  NODE TABLES (scalar_graph.MeasureStores AS S,
+    scalar_graph.MeasureLocations AS L PROPERTIES (id, amount, MEASURE(SUM(amount)) AS total_amount,
+      MEASURE(COUNT(id)) AS location_count))
+  EDGE TABLES (scalar_graph.MeasureStores AS SL SOURCE KEY (location_id) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+WITH results AS (
+  SELECT 'flat' AS mode,
+    CASE WHEN S_id <= 4 THEN 'mixed' WHEN S_id = 5 THEN 'unmatched' ELSE 'matched_null' END AS bucket,
+    AGG(L_total_amount) AS total, AGG(L_location_count) AS locations,
+    COUNT(*) AS joined_rows, COUNT(S_location_id) AS matched_rows
+  FROM GRAPH_EXPAND('scalar_graph.MeasureGraph') GROUP BY bucket
+  UNION ALL
+  SELECT 'nested' AS mode,
+    CASE WHEN id <= 4 THEN 'mixed' WHEN id = 5 THEN 'unmatched' ELSE 'matched_null' END AS bucket,
+    AGG(L.total_amount) AS total, AGG(L.location_count) AS locations,
+    COUNT(*) AS joined_rows, COUNT(location_id) AS matched_rows
+  FROM GRAPH_EXPAND('scalar_graph.MeasureGraph', flatten_results => FALSE) GROUP BY bucket
+)
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM results ORDER BY mode, bucket));
+!> "[{\"mode\":\"flat\",\"bucket\":\"matched_null\",\"total\":null,\"locations\":1,\"joined_rows\":2,\"matched_rows\":2},{\"mode\":\"flat\",\"bucket\":\"mixed\",\"total\":200,\"locations\":2,\"joined_rows\":4,\"matched_rows\":3},{\"mode\":\"flat\",\"bucket\":\"unmatched\",\"total\":null,\"locations\":0,\"joined_rows\":1,\"matched_rows\":0},{\"mode\":\"nested\",\"bucket\":\"matched_null\",\"total\":null,\"locations\":1,\"joined_rows\":2,\"matched_rows\":2},{\"mode\":\"nested\",\"bucket\":\"mixed\",\"total\":200,\"locations\":2,\"joined_rows\":4,\"matched_rows\":3},{\"mode\":\"nested\",\"bucket\":\"unmatched\",\"total\":null,\"locations\":0,\"joined_rows\":1,\"matched_rows\":0}]"
