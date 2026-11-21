@@ -315,17 +315,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "TRAIL counts one edge for a row of an edge table whose endpoints reference non-key node columns, where the reference implementation counts one edge for each pair of endpoint nodes; BigQuery's behavior is unverified"
-  label: "graph_table_gql_extended4_test:trail_path_mode_with_duplicate_scalar_nodes"
-  label: "graph_table_gql_extended4_test:trail_path_mode_with_scalar_edges_of_different_types"
-  label: "graph_table_gql_extended5_test:trail_path_mode_with_array_edges_and_duplicate_scalar_nodes"
-  label: "graph_table_gql_extended5_test:trail_path_mode_with_array_edges_of_different_types"
-  label: "graph_table_gql_extended5_test:trail_path_mode_with_array_edges_over_quantified_paths"
-  label: "graph_table_gql_extended5_test:trail_path_mode_with_scalar_and_array_edges_of_different_types"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "DuckDB fails on a string that is not valid UTF-8 where BigQuery returns a result, or NULL under SAFE"
   label: "code:SafeCastTo_BYTES_STRING_<@xc2@xa3_dTGF3WUAsUQ_@xc2@xa3>_STRING_<utf-8>"

@@ -91,6 +91,9 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // Destroy graphs before their analyzer outputs and the tables they borrow.
   std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> graph_artifacts_;
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleCatalog>> graphs_;
+  // The graphs of graphs_, with the order of their definitions.
+  std::map<std::vector<std::string>, std::unique_ptr<const googlesql::PropertyGraph>>
+      ordered_graphs_;
 };
 
 }  // namespace bigquery_emulator_duckdb

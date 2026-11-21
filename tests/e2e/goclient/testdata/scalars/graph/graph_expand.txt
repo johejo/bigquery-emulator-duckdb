@@ -1,18 +1,51 @@
 # GRAPH_EXPAND joins the documented StoreGraph from its root, Stores, to Locations. Sometown,
 # which no store references, drops out of the LEFT JOIN, and the inlined edge SL adds no columns.
 # third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
-SELECT TO_JSON_STRING(t) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') AS t WHERE S_name = 'Store 1'
-=> "{\"S_location_id\":101,\"S_name\":\"Store 1\",\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000}"
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_name) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') AS t
+=> "{\"S_location_id\":101,\"S_name\":\"Store 1\",\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000},{\"S_location_id\":101,\"S_name\":\"Store 2\",\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000}"
 SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreGraph')
 => "2"
 SELECT SUM(L_population) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') GROUP BY S_location_id
 => "2000"
+
+# BigQuery inlines an edge table with its node table's table and properties only where the table
+# has no columns other than those the edge references, whichever endpoint references the node
+# table and whether a foreign key relates the tables; observed BigQuery answers collected with
+# tools/bqanswers.
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_name) FROM GRAPH_EXPAND('scalar_graph.StoreGraphReversed') AS t
+=> "{\"S_location_id\":101,\"S_name\":\"Store 1\",\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000},{\"S_location_id\":101,\"S_name\":\"Store 2\",\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000}"
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_name) FROM GRAPH_EXPAND('scalar_graph.SizedStoreGraph') AS t
+=> "{\"S_location_id\":101,\"S_name\":\"Store 1\",\"S_size\":3,\"SL_location_id\":101,\"SL_name\":\"Store 1\",\"SL_size\":3,\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000},{\"S_location_id\":101,\"S_name\":\"Store 2\",\"S_size\":3,\"SL_location_id\":101,\"SL_name\":\"Store 2\",\"SL_size\":3,\"L_id\":101,\"L_name\":\"Anytown\",\"L_population\":1000}"
 
 # start_node expands the subgraph reachable from that node table.
 SELECT STRING_AGG(L_name ORDER BY L_id) FROM GRAPH_EXPAND('scalar_graph.StoreGraph', start_node => 'L')
 => "Anytown,Sometown"
 SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreLocations', start_node => 'S')
 => "2"
+
+# An edge table joins between its node tables and adds its properties and key columns, ordered by
+# name; a shop without a place keeps its edge row. Observed on BigQuery with tools/bqanswers.
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopPlaces') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SP_edge_size\":3,\"SP_id\":1,\"P_id\":1,\"P_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SP_edge_size\":4,\"SP_id\":2,\"P_id\":null,\"P_name\":null}"
+
+# Shops has columns its edges do not reference, so BigQuery joins an edge table with Shops'
+# table and properties, whether it references S as its source or its destination; observed
+# BigQuery answers collected with tools/bqanswers.
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopsNear') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SN_id\":1,\"SN_other_place_id\":2,\"SN_place_id\":1,\"SN_size\":3,\"Near_id\":1,\"Near_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SN_id\":2,\"SN_other_place_id\":null,\"SN_place_id\":null,\"SN_size\":4,\"Near_id\":null,\"Near_name\":null}"
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopsNearInlined') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"NS_id\":1,\"NS_other_place_id\":2,\"NS_place_id\":1,\"NS_size\":3,\"Near_id\":1,\"Near_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"NS_id\":2,\"NS_other_place_id\":null,\"NS_place_id\":null,\"NS_size\":4,\"Near_id\":null,\"Near_name\":null}"
+# A node table related to two others joins each, edge then node table, in the order the graph
+# defines the edge tables, whatever the order of the node tables (ShopsFarNearEdges).
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopsNearFar') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SN_id\":1,\"SN_other_place_id\":2,\"SN_place_id\":1,\"SN_size\":3,\"Near_id\":1,\"Near_name\":\"p\",\"SF_id\":1,\"SF_other_place_id\":2,\"SF_place_id\":1,\"SF_size\":3,\"Far_id\":2,\"Far_name\":\"q\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SN_id\":2,\"SN_other_place_id\":null,\"SN_place_id\":null,\"SN_size\":4,\"Near_id\":null,\"Near_name\":null,\"SF_id\":2,\"SF_other_place_id\":null,\"SF_place_id\":null,\"SF_size\":4,\"Far_id\":null,\"Far_name\":null}"
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopsFarNear') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SF_id\":1,\"SF_other_place_id\":2,\"SF_place_id\":1,\"SF_size\":3,\"Far_id\":2,\"Far_name\":\"q\",\"SN_id\":1,\"SN_other_place_id\":2,\"SN_place_id\":1,\"SN_size\":3,\"Near_id\":1,\"Near_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SF_id\":2,\"SF_other_place_id\":null,\"SF_place_id\":null,\"SF_size\":4,\"Far_id\":null,\"Far_name\":null,\"SN_id\":2,\"SN_other_place_id\":null,\"SN_place_id\":null,\"SN_size\":4,\"Near_id\":null,\"Near_name\":null}"
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopsFarNearEdges') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SN_id\":1,\"SN_other_place_id\":2,\"SN_place_id\":1,\"SN_size\":3,\"Near_id\":1,\"Near_name\":\"p\",\"SF_id\":1,\"SF_other_place_id\":2,\"SF_place_id\":1,\"SF_size\":3,\"Far_id\":2,\"Far_name\":\"q\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SN_id\":2,\"SN_other_place_id\":null,\"SN_place_id\":null,\"SN_size\":4,\"Near_id\":null,\"Near_name\":null,\"SF_id\":2,\"SF_other_place_id\":null,\"SF_place_id\":null,\"SF_size\":4,\"Far_id\":null,\"Far_name\":null}"
+# A joined edge adds its key columns, not the other columns that reference its source node.
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopSizes') AS t
+=> "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SP_edge_size\":3,\"SP_id\":1,\"P_id\":1,\"P_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SP_edge_size\":4,\"SP_id\":2,\"P_id\":null,\"P_name\":null}"
 
 # Graphs that the documented input limitations exclude: multiple root node tables without
 # start_node, and a label other than the default one.

@@ -20,20 +20,34 @@ SELECT STRING_AGG(FORMAT('%d:%d:%d', d, hops, first), ',' ORDER BY d) FROM GRAPH
 SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH p = ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount]->{0,2}(b:Account) RETURN SUM(PATH_LENGTH(p)) AS result)
 => "8"
 
-# Without ANY CHEAPEST, COST selects nothing.
+# Without ANY CHEAPEST, COST selects nothing, and BigQuery does not check it: a zero cost
+# matches, as observed with tools/bqanswers.
 SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (a:Account)-[e:Transfers COST e.amount]->(b:Account) RETURN COUNT(*) AS result)
 => "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (a:Account)-[e:Transfers COST e.amount - 100]->(b:Account) RETURN COUNT(*) AS result)
+=> "5"
 
-# NULL, zero, negative, infinite and NaN costs are runtime errors.
-SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount > 0, NULL, e.amount)]->(b:Account) RETURN COUNT(*) AS result)
-=> error:
-SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount - 100]->(b:Account) RETURN COUNT(*) AS result)
-=> error:
-SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST -e.amount]->(b:Account) RETURN COUNT(*) AS result)
-=> error:
-SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IEEE_DIVIDE(e.amount, 0)]->(b:Account) RETURN COUNT(*) AS result)
-=> error:
-SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IEEE_DIVIDE(0, 0) + e.amount]->(b:Account) RETURN COUNT(*) AS result)
+# Where the result depends on the selected path, a NULL, zero, negative, infinite or NaN cost is
+# a runtime error, as documented in
+# third_party/bigquery_docs/reference/standard-sql/graph-patterns.md, with these messages, and so
+# is a total that overflows its type; observed BigQuery answers collected with tools/bqanswers.
+# BigQuery answered COUNT(*) of the same paths without an error; see known_bugs.txt.
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> "7:16:100,16:20:300,20:7:500,20:16:200"
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount = 100, NULL, e.amount)]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> error contains: Graph cost expression must not be NULL
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount > 0, NULL, e.amount)]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> error contains: Graph cost expression must not be NULL
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount - 100]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> error contains: Graph cost expression must be positive
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount = 300, -1, e.amount)]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> error contains: Graph cost expression must be positive
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount = 100, IEEE_DIVIDE(1, 0), e.amount)]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> error contains: Graph cost expression must not be Inf
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount = 100, IEEE_DIVIDE(0, 0), e.amount)]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
+=> error contains: Graph cost expression must not be NaN
+# BigQuery's message is "int64 overflow: 9223372036854775507 + 9223372036854775507".
+SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, c_id, amount), ',' ORDER BY a_id, c_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e1:Transfers COST 9223372036854775807 - e1.amount]->(b:Account)-[e2:Transfers COST 9223372036854775807 - e2.amount]->(c:Account) RETURN a.id AS a_id, c.id AS c_id, e1.amount + e2.amount AS amount)
 => error:
 
 # ANY CHEAPEST needs a COST, on every quantified edge pattern, of a numeric type, and only on

@@ -579,6 +579,7 @@ cc_library(
         "@googlesql//googlesql/public:simple_catalog_util",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public/types",
+        "@googlesql//googlesql/resolved_ast",
     ],
     deps = [
         ":builtin_function_options",

@@ -1,0 +1,16 @@
+# A row of an edge table whose endpoints reference columns other than the node key is one edge
+# for each pair of endpoint nodes it relates, as TRAIL and SAME observe it. The graph reference
+# does not say; observed BigQuery answers collected with tools/bqanswers. KindGraph relates
+# accounts 1 and 3 (checking) to 2 (savings) both ways, through two rows.
+
+# Three distinct edges, where one edge per row would allow no three-edge trail.
+SELECT STRING_AGG(FORMAT('%d%d%d%d', a, b, c, d), ',' ORDER BY a, b, c, d) FROM GRAPH_TABLE(scalar_graph.KindGraph MATCH TRAIL (a)-[e1]->(b)-[e2]->(c)-[e3]->(d) RETURN a.id AS a, b.id AS b, c.id AS c, d.id AS d)
+=> "1232,2123,2321,3212"
+
+# One row's edges to and from different accounts are different edges.
+SELECT STRING_AGG(FORMAT('%d%d%d%d', a, b, c, d), ',' ORDER BY a, b, c, d) FROM GRAPH_TABLE(scalar_graph.KindGraph MATCH (a)-[e1]->(b), (c)-[e2]->(d) WHERE SAME(e1, e2) RETURN a.id AS a, b.id AS b, c.id AS c, d.id AS d)
+=> "1212,2121,2323,3232"
+SELECT COUNTIF(same) FROM GRAPH_TABLE(scalar_graph.KindGraph MATCH (a)-[e1]->(b), (c)-[e2]->(d) RETURN SAME(e1, e2) AS same)
+=> "4"
+SELECT COUNT(*) FROM GRAPH_TABLE(scalar_graph.KindGraph MATCH (a)-[e1]->(b), (c)-[e2]->(d) RETURN SAME(e1, e2) AS same)
+=> "16"
