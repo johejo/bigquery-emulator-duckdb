@@ -11,11 +11,6 @@
 SELECT KEYS.KEYSET_LENGTH(KEYS.NEW_KEYSET('FPE_FF1', metadata => '{"radix": 10, "input_length": 6}'))
 !> "1"
 
-# BigQuery reports where the exception was thrown; QuickJS keeps only where an Error was created.
-CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
-SELECT f()
-!> error: Error: boom at f() line 1, column 1
-
 # Splitting is supported, but where an edge is cut at the antimeridian, tessellation differs
 # in the last digits of some longitudes and latitudes. Away from it, as in
 # geography_geojson.txt, the digits agree.

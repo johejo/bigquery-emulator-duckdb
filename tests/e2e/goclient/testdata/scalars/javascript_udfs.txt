@@ -51,6 +51,42 @@ CREATE TEMP FUNCTION f(a ARRAY<STRUCT<x FLOAT64, y ARRAY<BYTES>>>) RETURNS STRIN
 SELECT f([STRUCT(1.0 AS x, [b"abc"] AS y), STRUCT(2.0 AS x, [b"abc", b""] AS y)])
 => "1YWJj,2YWJj/"
 
+# BigQuery reports the throw statement's position relative to the UDF body.
+CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
+SELECT f()
+=> error: Error: boom at f() line 1, column 1
+
+# An Error's creation does not set the reported position of a later throw.
+CREATE TEMP FUNCTION raise_later() RETURNS STRING LANGUAGE js AS """const err = new Error('boom');
+  throw err;
+""";
+SELECT raise_later()
+=> error: Error: boom at raise_later() line 2, columns 2-3
+
+# A helper's throw is reported under the SQL UDF name.
+CREATE TEMP FUNCTION raise_nested() RETURNS STRING LANGUAGE js AS """function helper() {
+  throw new Error('nested');
+}
+return helper();
+""";
+SELECT raise_nested()
+=> error: Error: nested at raise_nested() line 2, columns 2-3
+
+# A finally block that completes normally preserves the original location.
+CREATE TEMP FUNCTION raise_with_finally() RETURNS STRING LANGUAGE js AS """try {
+  throw new Error('boom');
+} finally {
+  void 0;
+}
+""";
+SELECT raise_with_finally()
+=> error: Error: boom at raise_with_finally() line 2, columns 2-3
+
+# A thrown string is reported without an Error prefix.
+CREATE TEMP FUNCTION raise_string() RETURNS STRING LANGUAGE js AS "throw 'boom';";
+SELECT raise_string()
+=> error: boom at raise_string() line 1, column 1
+
 # BigQuery's answers to cases that its documentation does not settle.
 CREATE TEMP FUNCTION f(x STRING) RETURNS STRING LANGUAGE js AS "return x === null ? 'null' : typeof x;";
 SELECT f(NULL)

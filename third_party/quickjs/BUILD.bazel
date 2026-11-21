@@ -1,1 +1,4 @@
-exports_files(["unicode_symbol.patch"])
+exports_files([
+    "throw_location.patch",
+    "unicode_symbol.patch",
+])
