@@ -67,7 +67,6 @@ func TestPropertyGraph(t *testing.T) {
 		t.Fatalf("schema = %v", rows.Schema)
 	}
 	for _, sql := range []string{
-		"CREATE PROPERTY GRAPH go_graph.measured NODE TABLES (go_graph.Person KEY (id) PROPERTIES (MEASURE(SUM(id)) AS total))",
 		"CREATE PROPERTY GRAPH go_graph.inferred NODE TABLES (go_graph.Person)",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) COLUMNS (p.name))",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN p)",

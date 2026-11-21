@@ -897,7 +897,109 @@ namespace {
 
 std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan& aggregate,
                                           const Scope& scope, std::optional<Relation> input,
-                                          std::vector<Collation> collations = {}) {
+                                          std::vector<Collation> collations = {});
+
+// Each outer group supplies its own input rows to the inner GROUP BY. Bind those rows as an
+// intermediate aggregate, then run the two levels in a scalar subquery over that batch. This
+// keeps ordinary aggregates in the same SELECT at the original grain.
+std::optional<std::string> MultiLevelAggregate(const googlesql::ResolvedAggregateFunctionCall& call,
+                                               const Scope& scope, const Columns& input,
+                                               std::vector<std::string>& intermediates) {
+  if (call.having_expr() != nullptr || call.having_modifier() != nullptr ||
+      std::ranges::any_of(call.group_by_list(), [](const auto& key) {
+        return HasCollation(key->expr()->type_annotation_map());
+      })) {
+    return Unsupported(scope, "multi-level aggregation with HAVING or collated keys");
+  }
+  std::vector<const googlesql::ResolvedNode*> refs;
+  call.GetDescendantsWithKinds({googlesql::RESOLVED_COLUMN_REF}, &refs);
+  std::set<int> used;
+  for (const auto* node : refs) {
+    const auto& ref = *node->GetAs<googlesql::ResolvedColumnRef>();
+    if (ref.is_correlated()) {
+      return Unsupported(scope, "multi-level aggregation with correlated inputs");
+    }
+    used.insert(ref.column().column_id());
+  }
+  const std::string batch = scope.context.FreshName("_multi_rows");
+  std::vector<std::string> fields;
+  Columns rows;
+  for (const auto& [id, sql] : input) {
+    if (!used.contains(id)) {
+      continue;
+    }
+    const auto name = ColumnName(id);
+    fields.push_back(std::string(name).append(" := ").append(sql));
+    rows.emplace(id, "q." + name);
+  }
+  if (fields.empty()) {
+    fields.emplace_back("unit := 1");
+  }
+
+  auto inner = googlesql::MakeResolvedAggregateScan();
+  for (const auto& key : call.group_by_list()) {
+    auto copy = googlesql::ResolvedASTDeepCopyVisitor::Copy(key.get());
+    if (!copy.ok()) {
+      return std::nullopt;
+    }
+    inner->add_group_by_list(std::move(*copy));
+  }
+  for (const auto& aggregate : call.group_by_aggregate_list()) {
+    const auto* expr = aggregate->expr();
+    if (!expr->Is<googlesql::ResolvedAggregateFunctionCall>() ||
+        !expr->GetAs<googlesql::ResolvedAggregateFunctionCall>()->group_by_list().empty()) {
+      return Unsupported(scope, "multi-level aggregation nested more than once");
+    }
+    auto copy = googlesql::ResolvedASTDeepCopyVisitor::Copy(aggregate.get());
+    if (!copy.ok()) {
+      return std::nullopt;
+    }
+    inner->add_aggregate_list(std::move(*copy));
+  }
+  const auto groups = AggregateRelation(
+      *inner, scope,
+      Relation{
+          .sql = "SELECT unnest(r.row_value) FROM unnest(q." + batch + ") AS r(row_value)",
+          .columns = std::move(rows),
+      });
+  if (!groups) {
+    return std::nullopt;
+  }
+
+  auto outer = googlesql::ResolvedASTDeepCopyVisitor::Copy(&call);
+  if (!outer.ok()) {
+    return std::nullopt;
+  }
+  (*outer)->set_where_expr(nullptr);
+  (*outer)->set_group_by_list({});
+  (*outer)->set_group_by_aggregate_list({});
+  std::vector<std::string> outer_intermediates;
+  const auto sql =
+      NonScalarCall(**outer, outer->get(), "", scope, groups->columns, "", &outer_intermediates);
+  if (!sql) {
+    return std::nullopt;
+  }
+  std::string collect = "list(struct_pack(" + Join(fields, ", ") + "))";
+  if (call.where_expr() != nullptr) {
+    // The filter applies to original rows, before the inner groups are formed. In particular,
+    // a missing outer-join row must not form a grain group for a measure.
+    const auto filter = Expression(*call.where_expr(), scope, input);
+    if (!filter) {
+      return std::nullopt;
+    }
+    collect.append(" FILTER (WHERE ").append(*filter).append(")");
+  }
+  intermediates.push_back(std::move(collect).append(" AS ").append(batch));
+  if (outer_intermediates.empty()) {
+    return "(SELECT " + *sql + groups->From() + ")";
+  }
+  return "(SELECT " + *sql + " FROM (SELECT " + Join(outer_intermediates, ", ") + groups->From() +
+         ") AS q)";
+}
+
+std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan& aggregate,
+                                          const Scope& scope, std::optional<Relation> input,
+                                          std::vector<Collation> collations) {
   // Keys with INTERVAL values group by their lengths, and collated strings by their collation keys,
   // and return the first of equal values in input order, as BigQuery does. Graph elements group by
   // identity, as SAME compares them.
@@ -1156,8 +1258,11 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
     }
     const auto having = havings.find(call);
     const std::size_t previous = intermediates.size();
-    const auto sql = NonScalarCall(*call, call, "", aggregate_scope, input->columns,
-                                   having == havings.end() ? "" : having->second, &intermediates);
+    const auto sql =
+        call->group_by_list().empty()
+            ? NonScalarCall(*call, call, "", aggregate_scope, input->columns,
+                            having == havings.end() ? "" : having->second, &intermediates)
+            : MultiLevelAggregate(*call, aggregate_scope, input->columns, intermediates);
     if (!sql) {
       return std::nullopt;
     }

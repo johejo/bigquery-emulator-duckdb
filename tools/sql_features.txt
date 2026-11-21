@@ -34,15 +34,20 @@ query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY 
 query `CREATE PROPERTY GRAPH` | CREATE OR REPLACE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id OPTIONS (description = 'x')))
 query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH IF NOT EXISTS d.g NODE TABLES (d.t KEY (id) PROPERTIES (id))
+query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, MEASURE(SUM(id + 1)) AS total))
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
 query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name)); SELECT * FROM GRAPH_EXPAND('test.d.g2')
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name)); SELECT * FROM GRAPH_EXPAND('d.g2', start_node => 't')
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name)); SELECT * FROM GRAPH_EXPAND('d.g2', flatten_results => FALSE)
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, MEASURE(SUM(id)) AS total)); SELECT AGG(t_total) FROM GRAPH_EXPAND('d.g2')
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id) PROPERTIES (name, MEASURE(COUNT(id)) AS total)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id)); SELECT AGG(located.places.total) FROM GRAPH_EXPAND('d.g2', flatten_results => FALSE)
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, MEASURE(SUM(id + 1)) AS total)); SELECT AGG(t_total) FROM GRAPH_EXPAND('d.g2')
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id)); SELECT * FROM GRAPH_EXPAND('d.g2')
-query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id)); SELECT * FROM GRAPH_EXPAND('d.g2', flatten_results => FALSE)
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id)); SELECT located.places.name FROM GRAPH_EXPAND('d.g2', flatten_results => FALSE)
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places KEY (id)) EDGE TABLES (d.shops AS located KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES places (id) PROPERTIES (id AS shop_id)); SELECT * FROM GRAPH_EXPAND('d.g2')
 query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places AS near KEY (id), d.places AS far KEY (id)) EDGE TABLES (d.shops AS near_edges KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES near (id), d.shops AS far_edges KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (other_place_id) REFERENCES far (id)); SELECT * FROM GRAPH_EXPAND('d.g2')
+query `GRAPH_EXPAND` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.shops KEY (id), d.places AS near KEY (id), d.places AS far KEY (id)) EDGE TABLES (d.shops AS near_edges KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (place_id) REFERENCES near (id), d.shops AS far_edges KEY (id) SOURCE KEY (id) REFERENCES shops (id) DESTINATION KEY (other_place_id) REFERENCES far (id)); SELECT near_edges.near.name, far_edges.far.name FROM GRAPH_EXPAND('d.g2', flatten_results => FALSE)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n) RETURN n.id, LABELS(n) AS labels)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Person|Account) RETURN n.name, n.v)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g_nodes MATCH (n:Entity&!Person)-[e:Relation&Transfers]->(m:Account) RETURN n.id, e.v, LABELS(m) AS labels)
@@ -172,6 +177,8 @@ query Correlated subqueries | SELECT id, (SELECT COUNT(*) FROM UNNEST(tags)) AS 
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*), SUM(id) FROM t GROUP BY name
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*) FROM t GROUP BY 1 HAVING COUNT(*) > 0
 query Aggregates and `GROUP BY` | SELECT COUNT(DISTINCT name) FROM t
+query Multi-level aggregation | SELECT name, SUM(ANY_VALUE(id) GROUP BY id), COUNT(*) FROM t GROUP BY name
+query Multi-level aggregation | SELECT SUM(MAX(COUNT(*) GROUP BY id) GROUP BY name) FROM t
 query `GROUP BY ALL` | SELECT name, COUNT(*) FROM t GROUP BY ALL
 query `GROUPING SETS`, `ROLLUP`, `CUBE` | SELECT id, name, COUNT(*) FROM t GROUP BY GROUPING SETS ((id), (name), ())
 query `GROUPING SETS`, `ROLLUP`, `CUBE` | SELECT id, name, COUNT(*) FROM t GROUP BY ROLLUP (id, name)

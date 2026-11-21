@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -200,6 +201,42 @@ bool PortableProperty(const googlesql::ResolvedNode& node) {
   return std::ranges::all_of(children, [](const auto* child) { return PortableProperty(*child); });
 }
 
+// BigQuery allows COUNT(column) in graph measures but rejects the COUNT(*) overload.
+void CheckMeasure(const googlesql::ResolvedExpr& expr) {
+  std::vector<const googlesql::ResolvedNode*> calls;
+  expr.GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_FUNCTION_CALL}, &calls);
+  for (const auto* node : calls) {
+    const auto* function = node->GetAs<googlesql::ResolvedAggregateFunctionCall>()->function();
+    if (function->IsGoogleSQLBuiltin() && function->Name() == "$count_star") {
+      throw std::invalid_argument(
+          "COUNT(*) is not allowed in a measure expression in BigQuery. "
+          "Please specify a column, e.g., COUNT(<column_name>).");
+    }
+  }
+}
+
+bool SupportedMeasure(const googlesql::ResolvedExpr& expr, const googlesql::Table& table) {
+  if (!expr.Is<googlesql::ResolvedAggregateFunctionCall>()) {
+    return false;
+  }
+  const auto& call = *expr.GetAs<googlesql::ResolvedAggregateFunctionCall>();
+  if (!call.function()->IsGoogleSQLBuiltin() ||
+      (call.function()->Name() != "sum" && call.function()->Name() != "count") ||
+      call.argument_list_size() != 1 ||
+      !call.argument_list(0)->Is<googlesql::ResolvedCatalogColumnRef>() || call.distinct() ||
+      call.where_expr() != nullptr || call.having_modifier() != nullptr ||
+      !call.group_by_list().empty() || !call.order_by_item_list().empty() ||
+      call.limit() != nullptr) {
+    return false;
+  }
+  const auto& ref = *call.argument_list(0)->GetAs<googlesql::ResolvedCatalogColumnRef>();
+  // References to graph properties have a name but no catalog column pointer.
+  // Accept them only when they also identify the identically named physical column.
+  const auto* input =
+      table.FindColumnByName(ref.column() == nullptr ? ref.name() : ref.column()->Name());
+  return input != nullptr && (ref.column() == nullptr || ref.column() == input);
+}
+
 }  // namespace
 
 std::optional<std::string> CreatePropertyGraph(
@@ -211,6 +248,16 @@ std::optional<std::string> CreatePropertyGraph(
   if (std::ranges::any_of(create.label_list(),
                           [](const auto& label) { return !label->options_list().empty(); })) {
     return Unsupported(scope, "graph label options");
+  }
+  // Diagnose invalid measures before the support check for otherwise valid measures.
+  for (const auto* elements : {&create.node_table_list(), &create.edge_table_list()}) {
+    for (const auto& element : *elements) {
+      for (const auto& property : element->property_definition_list()) {
+        if (property->is_measure()) {
+          CheckMeasure(*property->expr());
+        }
+      }
+    }
   }
   const auto parts =
       NormalizeTablePath(create.name_path(), scope.context.defaults.project,
@@ -292,18 +339,23 @@ std::optional<std::string> CreatePropertyGraph(
       std::vector<std::string> native_properties;
       for (const auto& property : element->property_definition_list()) {
         const auto column = Key(*property->expr(), table, false);
-        if ((!column && !PortableProperty(*property->expr())) ||
+        if (property->is_measure() && !SupportedMeasure(*property->expr(), *table.table())) {
+          return Unsupported(scope, "graph measures other than SUM(column) and COUNT(column)");
+        }
+        if ((!property->is_measure() && !column && !PortableProperty(*property->expr())) ||
             !DuckDbType(property->expr()->type(), scope.context.timestamp_precision) ||
-            !property->options_list().empty() || property->is_measure() ||
+            !property->options_list().empty() ||
             property->expr()->type_annotation_map() != nullptr) {
           return Unsupported(scope,
-                             "measures, property options or computed properties that call "
+                             "graph property options, annotated properties or properties that call "
                              "user-defined functions or read parameters, variables or constants");
         }
+        const std::string expr = property->is_measure()
+                                     ? "MEASURE(" + property->sql() + ")"
+                                     : column.value_or("(" + property->sql() + ")");
         properties.emplace(
             absl::AsciiStrToLower(property->property_declaration_name()),
-            column.value_or("(" + property->sql() + ")") + " AS " +
-                googlesql::ToIdentifierLiteral(property->property_declaration_name()));
+            expr + " AS " + googlesql::ToIdentifierLiteral(property->property_declaration_name()));
         // DuckPGQ properties are columns; queries read computed ones from the saved definition.
         if (const auto native_column = Key(*property->expr(), table, true)) {
           native_properties.push_back(*native_column + " AS " +
