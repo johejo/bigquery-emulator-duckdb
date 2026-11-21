@@ -1,0 +1,112 @@
+version: 1
+description: Generated foreign key names when explicit and omitted names coexist.
+# Provenance: foreign_key_mixed_names.api.answers.json.
+vars:
+  dataset: bqa_${run}_${case}
+  child: '`${project}.${dataset}.child`'
+  parent: '`${project}.${dataset}.parent`'
+  named_key: CONSTRAINT named_fk FOREIGN KEY (a) REFERENCES ${parent}(id) NOT ENFORCED
+  unnamed_key: FOREIGN KEY (b) REFERENCES ${parent}(id) NOT ENFORCED
+  referenced_table: {projectId: '${project}', datasetId: '${dataset}', tableId: parent}
+  named_metadata:
+    name: named_fk
+    referencedTable: '${referenced_table}'
+    columnReferences: [{referencingColumn: a, referencedColumn: id}]
+  unnamed_metadata:
+    name: fk$1
+    referencedTable: '${referenced_table}'
+    columnReferences: [{referencingColumn: b, referencedColumn: id}]
+  names: [{f: [{v: 'child.fk$1'}]}, {f: [{v: child.named_fk}]}]
+templates:
+  mixed_names:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create_parent
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE ${parent} (id INT64 PRIMARY KEY NOT ENFORCED)
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: define_keys
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: '${ddl}'
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {error: /body/error, jobComplete: /body/jobComplete}
+      - name: constraint_names
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              SELECT constraint_name
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_CONSTRAINTS`
+              WHERE table_name = 'child' AND constraint_type = 'FOREIGN KEY'
+              ORDER BY constraint_name
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+        observe: {rows: /body/rows, error: /body/error, jobComplete: /body/jobComplete}
+      - name: table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/child
+        observe: {tableConstraints: /body/tableConstraints}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: create_named_first
+    template: mixed_names
+    vars:
+      ddl: CREATE TABLE ${child} (a INT64, b INT64, ${named_key}, ${unnamed_key})
+    expect:
+      create_parent: {jobComplete: true}
+      define_keys: {jobComplete: true}
+      constraint_names: {jobComplete: true, rows: '${names}'}
+      table: {tableConstraints: {foreignKeys: ['${named_metadata}', '${unnamed_metadata}']}}
+  - name: create_unnamed_first
+    template: mixed_names
+    vars:
+      ddl: CREATE TABLE ${child} (a INT64, b INT64, ${unnamed_key}, ${named_key})
+    expect:
+      create_parent: {jobComplete: true}
+      define_keys: {jobComplete: true}
+      constraint_names: {jobComplete: true, rows: '${names}'}
+      table: {tableConstraints: {foreignKeys: ['${unnamed_metadata}', '${named_metadata}']}}
+  - name: alter_add_unnamed
+    template: mixed_names
+    vars:
+      ddl: |-
+        CREATE TABLE ${child} (a INT64, b INT64, ${named_key});
+        ALTER TABLE ${child} ADD ${unnamed_key};
+    expect:
+      create_parent: {jobComplete: true}
+      define_keys: {jobComplete: true}
+      constraint_names: {jobComplete: true, rows: '${names}'}
+      table: {tableConstraints: {foreignKeys: ['${named_metadata}', '${unnamed_metadata}']}}
+  - name: alter_add_named
+    template: mixed_names
+    vars:
+      ddl: |-
+        CREATE TABLE ${child} (a INT64, b INT64, ${unnamed_key});
+        ALTER TABLE ${child} ADD ${named_key};
+    expect:
+      create_parent: {jobComplete: true}
+      define_keys: {jobComplete: true}
+      constraint_names: {jobComplete: true, rows: '${names}'}
+      table: {tableConstraints: {foreignKeys: ['${unnamed_metadata}', '${named_metadata}']}}

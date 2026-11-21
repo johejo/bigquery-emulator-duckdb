@@ -160,13 +160,12 @@ add a new column with a default, and the Storage Write API cannot write to a tab
 
 Tables keep primary and foreign keys from `CREATE TABLE`, `ALTER TABLE` and REST `tableConstraints`.
 `tables.get`, `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and `INFORMATION_SCHEMA.KEY_COLUMN_USAGE`
-report them. Foreign keys may be all named or all unnamed, in DDL and REST; mixing named and
-unnamed keys is unsupported until its generated names are verified.
+report them. DDL can mix named and unnamed foreign keys; REST cannot create a table with both.
 
 Foreign keys must reference the complete primary key of a managed table, with matching scalar
 column types, canonical table references and column names in their schema's case. Parameterized
 or collated columns, references to views or snapshots, temporary-table foreign keys, and reserved
-constraint names are unsupported. Duplicate constraint names in `CREATE TABLE` and REST are unsupported.
+constraint names are rejected. Duplicate constraint names in `CREATE TABLE` and REST are unsupported.
 `ALTER TABLE ADD FOREIGN KEY` supports named and unnamed keys and `IF NOT EXISTS`.
 `DROP CONSTRAINT` matches foreign key names case-insensitively and supports `IF EXISTS`.
 

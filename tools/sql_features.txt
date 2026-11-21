@@ -334,6 +334,7 @@ query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED
 query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE t ADD FOREIGN KEY (id) REFERENCES u (id) NOT ENFORCED
 query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE t ADD FOREIGN KEY (id) REFERENCES u (id) NOT ENFORCED; ALTER TABLE t ADD FOREIGN KEY (id) REFERENCES u (id) NOT ENFORCED
 query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; ALTER TABLE t ADD CONSTRAINT MixedCase FOREIGN KEY (id) REFERENCES u (id) NOT ENFORCED; ALTER TABLE t DROP CONSTRAINT mixedcase
+query Primary and foreign keys | ALTER TABLE u ADD PRIMARY KEY (id) NOT ENFORCED; CREATE TABLE n (a INT64, b INT64, CONSTRAINT fk FOREIGN KEY (a) REFERENCES u (id) NOT ENFORCED); ALTER TABLE n ADD FOREIGN KEY (b) REFERENCES u (id) NOT ENFORCED
 query Primary and foreign keys | ALTER TABLE t DROP CONSTRAINT IF EXISTS fk
 note Primary and foreign keys | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys).
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64); INSERT n (a) VALUES (1); SELECT a FROM n

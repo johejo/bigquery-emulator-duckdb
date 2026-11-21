@@ -1278,18 +1278,18 @@ std::vector<std::string> PrimaryKeyColumns(const std::vector<std::string>& prima
   return columns;
 }
 
-void AssignForeignKeyNames(std::vector<ForeignKey>& keys) {
+void AssignForeignKeyNames(std::vector<ForeignKey>& keys, bool allow_mixed_names) {
   const auto unnamed = [](const ForeignKey& key) { return key.name.empty(); };
-  if (!std::ranges::any_of(keys, unnamed)) {
-    return;
-  }
-  if (!std::ranges::all_of(keys, unnamed)) {
+  if (!allow_mixed_names && std::ranges::any_of(keys, unnamed) &&
+      !std::ranges::all_of(keys, unnamed)) {
     throw ApiError::Unsupported("generated names for mixed named and unnamed foreign keys");
   }
   size_t ordinal = 0;
   for (ForeignKey& key : keys) {
-    key.name = "fk$" + std::to_string(++ordinal);
-    key.generated_name = true;
+    if (unnamed(key)) {
+      key.name = "fk$" + std::to_string(++ordinal);
+      key.generated_name = true;
+    }
   }
 }
 

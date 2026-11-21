@@ -227,7 +227,7 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id},
                &lock);
-  AssignForeignKeyNames(metadata.foreign_keys);
+  AssignForeignKeyNames(metadata.foreign_keys, /*allow_mixed_names=*/false);
   for (const ForeignKey& key : metadata.foreign_keys) {
     const TableInfo referenced = GetTable(key.referenced_table, /*include_row_count=*/false,
                                           /*expire=*/true, &lock);
