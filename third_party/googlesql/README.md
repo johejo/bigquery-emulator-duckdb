@@ -9,9 +9,8 @@ repository to the `googlesql_implementation` package group, which guards the tes
 under `googlesql/compliance` and the reference implementation's
 `type_parameter_constraints`, which script variables use, and marks `compliance_test_cases` `alwayslink`: nothing references
 its test cases, which register themselves, so the linker would otherwise drop them all. GoogleSQL
-also looks for its `.test` files and test protos in the runfiles of the main repository, `_main`,
-and of `protobuf~` and `googleapis~`; the patch points those at the canonical names of the modules,
-`googlesql+`, `protobuf+` and `googleapis+`. Last, it adds to GoogleSQL's existing `patch_cmds`
+also looks for its `.test` files and test protos in the runfiles of the main repository, `_main`;
+the patch points those at the canonical name of the module, `googlesql+`. Last, it adds to GoogleSQL's existing `patch_cmds`
 for the `http_archive` of file-based-test-driver to fix `Match` and `GetContents`, which pass the
 data of a `string_view` that is not NUL-terminated to `stat()` and so fail to find a `.test` file
 at random. It stays as long as that test does.
