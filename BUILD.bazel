@@ -846,6 +846,7 @@ cc_library(
         ":backend_error",
         ":duckdb_capi",
         ":duckdb_handle",
+        "//src/duckdb_functions:float_range",
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_collation_duckdb",
         "//src/googlesql_differential_privacy_duckdb",

@@ -8,6 +8,7 @@
 #include "src/backend_error.h"
 #include "src/backend_initializer.h"
 #include "src/duckdb_capi.h"
+#include "src/duckdb_functions/float_range.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_aead_duckdb/aead.h"
 #include "src/googlesql_collation_duckdb/collation.h"
@@ -88,6 +89,7 @@ void RegisterBackendFunctions(duckdb::DuckDB& database,
   duckdb::Connection owned(database);
   auto* const connection = BorrowCConnection(owned);
   RegisterSessionUser(connection, session_user);
+  duckdb_functions::RegisterFloatRangeFunctions(connection);
   functions_duckdb::RegisterBigNumericFunctions(connection, functions);
   functions_duckdb::RegisterMathFunctions(connection, functions);
   functions_duckdb::RegisterStringFunctions(connection, functions);

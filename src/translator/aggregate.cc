@@ -451,7 +451,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,
-                                      const Scope& scope) {
+                                      const Scope& scope, bool float_range_frame) {
   switch (bound.boundary_type()) {
     case googlesql::ResolvedWindowFrameExpr::UNBOUNDED_PRECEDING:
       return "UNBOUNDED PRECEDING";
@@ -466,10 +466,14 @@ std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& 
         return std::nullopt;
       }
       // DuckDB accepts NULL offsets as CURRENT ROW; GoogleSQL rejects them.
-      return "coalesce(" + *offset + ", error('The boundary offset value cannot be null'))" +
-             (bound.boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_PRECEDING
-                  ? " PRECEDING"
-                  : " FOLLOWING");
+      std::string value =
+          "coalesce(" + *offset + ", error('The boundary offset value cannot be null'))";
+      if (float_range_frame) {
+        value = "{bq_float_range_offset: bq_float_range_offset(" + value + ")}";
+      }
+      return value + (bound.boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_PRECEDING
+                          ? " PRECEDING"
+                          : " FOLLOWING");
     }
     default:
       return std::nullopt;
@@ -531,6 +535,7 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
   if (!keys->empty()) {
     window.push_back("PARTITION BY " + Join(*keys, ", "));
   }
+  bool float_range_frame = false;
   if (const auto* ordering = group.order_by(); ordering != nullptr) {
     if (!ordering->hint_list().empty()) {
       return std::nullopt;
@@ -539,18 +544,21 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
       return bound->boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_PRECEDING ||
              bound->boundary_type() == googlesql::ResolvedWindowFrameExpr::OFFSET_FOLLOWING;
     };
-    const auto order = OrderItems(
-        ordering->order_by_item_list(), scope, columns,
+    const bool offset_range_frame =
         frame != nullptr && frame->frame_unit() == googlesql::ResolvedWindowFrame::RANGE &&
-            (is_offset(frame->start_expr()) || is_offset(frame->end_expr())));
+        (is_offset(frame->start_expr()) || is_offset(frame->end_expr()));
+    float_range_frame = offset_range_frame && ordering->order_by_item_list_size() == 1 &&
+                        ordering->order_by_item_list(0)->column_ref()->type()->IsFloatingPoint();
+    const auto order =
+        OrderItems(ordering->order_by_item_list(), scope, columns, offset_range_frame);
     if (!order) {
       return std::nullopt;
     }
     window.push_back("ORDER BY " + *order);
   }
   if (frame != nullptr) {
-    const auto start = FrameBound(*frame->start_expr(), scope);
-    const auto end = FrameBound(*frame->end_expr(), scope);
+    const auto start = FrameBound(*frame->start_expr(), scope, float_range_frame);
+    const auto end = FrameBound(*frame->end_expr(), scope, float_range_frame);
     if (!start || !end) {
       return std::nullopt;
     }

@@ -520,13 +520,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "AVG over windows differs on FLOAT64 frames with extreme offsets or special values"
-  label: "analytic_avg_test:analytic_avg_range_current_and_following_double_asc"
-  label: "analytic_avg_test:analytic_avg_range_current_and_following_double_desc"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "SAFE.ERROR fails, as BigQuery does, where the reference implementation returns NULL"
   label: "code:safe_error_mode__safe_error_STRING_<message>"
   label: "code:safe_error_mode__safe_error_STRING_NULL"
@@ -587,15 +580,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "RANGE window frames with an offset, ordered by FLOAT64, sort NaN after +inf rather than below -inf"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_0"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_following_1"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_asc"
-  label: "analytic_sum_test:analytic_sum_range_unbounded_and_preceding_order_by_double_desc"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "RANGE window frames over NUMERIC overflow near the type's limits"
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_asc_with_special_values_1"
@@ -616,17 +600,6 @@ known_errors {
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_desc_with_special_values_4"
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_desc_with_special_values_6"
   label: "analytic_numeric_range_window_frames_test:range_window_asc_with_special_values_7"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "RANGE window frames overflow INT64 near the type's limits, and infinite offsets are not handled as BigQuery does"
-  label: "analytic_window_frames_test:range_window_inf_offset_11"
-  label: "analytic_window_frames_test:range_window_inf_offset_12"
-  label: "analytic_window_frames_test:range_window_inf_offset_13"
-  label: "analytic_window_frames_test:range_window_inf_offset_14"
-  label: "analytic_window_frames_test:range_window_nan_offset_3"
-  label: "analytic_window_frames_test:range_window_nan_offset_4"
 }
 
 known_errors {

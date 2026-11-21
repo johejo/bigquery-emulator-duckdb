@@ -376,6 +376,10 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision pr
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
   options.set_language(AnalyzerLanguageOptions(precision));
+  if (settings.literal_window_frame_offsets_only) {
+    options.mutable_language()->DisableLanguageFeature(
+        googlesql::FEATURE_QUERY_CONSTANT_WINDOW_FRAME_EXPRESSIONS);
+  }
   // Keep the spelling of analytic function aliases for BigQuery's DISTINCT errors.
   options.set_parse_location_record_type(googlesql::PARSE_LOCATION_RECORD_CODE_SEARCH);
   // A table scan lists only the columns the statement reads, which are all that BigQuery

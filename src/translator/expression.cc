@@ -483,6 +483,9 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
   if (offset_range_frame && item.column_ref()->type()->IsInt64()) {
     column = "CAST(" + *column + " AS HUGEINT)";
   }
+  if (offset_range_frame && item.column_ref()->type()->IsFloatingPoint()) {
+    column = "bq_float_range_key(" + *column + ")";
+  }
   column = CollationKey(*column, *collation, item.column_ref()->type());
   // BigQuery sorts NULL first for ASC and last for DESC, unlike DuckDB's ASC default.
   const bool nulls_first =
@@ -491,8 +494,8 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
        !item.is_descending());
   const std::string nulls = nulls_first ? " NULLS FIRST" : " NULLS LAST";
   std::string order = *column + (item.is_descending() ? " DESC" : " ASC") + nulls;
-  // BigQuery sorts NaN below -inf, where DuckDB sorts it above +inf. A RANGE frame with an offset
-  // takes a single key, so its NaN rows still sort last.
+  // BigQuery sorts NaN below -inf, where DuckDB sorts it above +inf. Offset RANGE frames
+  // already use an integer key with that order, since they cannot take a second ORDER BY key.
   if (item.column_ref()->type()->IsFloatingPoint() && !offset_range_frame) {
     order =
         "isnan(" + *column + ")" + (item.is_descending() ? " ASC" : " DESC") + nulls + ", " + order;

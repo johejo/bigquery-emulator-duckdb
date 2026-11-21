@@ -39,6 +39,8 @@ struct QueryRestrictions {
   bool cast_without_type_parameters = false;
   // PIVOT takes no HAVING modifiers or aggregates that respect NULL inputs.
   bool restrict_pivot_aggregates = false;
+  // Window frame offsets take only literals or query parameters.
+  bool literal_window_frame_offsets_only = false;
 
   std::strong_ordering operator<=>(const QueryRestrictions&) const = default;
 };
