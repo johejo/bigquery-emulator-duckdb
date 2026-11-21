@@ -35,6 +35,31 @@ void AddTextAnalysisFunctions(googlesql::SimpleCatalog& catalog) {
               },
               /*context_id=*/static_cast<int64_t>(0)),
       }));
+  // SEARCH takes data_to_search of any type, a table reference being a STRUCT of its columns. Its
+  // named arguments default as BigQuery documents.
+  googlesql::FunctionArgumentTypeOptions json_scope(googlesql::FunctionArgumentType::OPTIONAL);
+  json_scope.set_argument_name("json_scope", googlesql::kNamedOnly);
+  json_scope.set_default(googlesql::Value::String("JSON_VALUES"));
+  // Only the legacy constness reports "must be a constant expression", as BigQuery does.
+  googlesql::FunctionArgumentTypeOptions search_query;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  search_query.set_must_be_constant_expression();
+#pragma clang diagnostic pop
+  catalog.AddOwnedFunction(new googlesql::Function(
+      "search", kBigQueryGroup, googlesql::Function::SCALAR,
+      {
+          googlesql::FunctionSignature(
+              googlesql::FunctionArgumentType(googlesql::types::BoolType()),
+              {
+                  googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ARBITRARY),
+                  googlesql::FunctionArgumentType(googlesql::types::StringType(), search_query),
+                  googlesql::FunctionArgumentType(googlesql::types::StringType(), json_scope),
+                  googlesql::FunctionArgumentType(googlesql::types::StringType(), analyzer),
+                  googlesql::FunctionArgumentType(googlesql::types::StringType(), analyzer_options),
+              },
+              /*context_id=*/static_cast<int64_t>(0)),
+      }));
   const googlesql::Type* term = nullptr;
   if (!catalog.type_factory()
            ->MakeStructType(

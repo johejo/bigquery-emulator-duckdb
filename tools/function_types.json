@@ -18827,6 +18827,573 @@
       ]
     },
     {
+      "name": "SEARCH",
+      "source": "third_party/bigquery_docs/reference/standard-sql/search_functions.md",
+      "note": "Table references and the named json_scope, analyzer and analyzer_options arguments are not yet enumerated.",
+      "signatures": [
+        {
+          "arguments": [
+            "INT64",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "NUMERIC",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BIGNUMERIC",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "FLOAT64",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BOOL",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRING",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "BYTES",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATE",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "DATETIME",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIME",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "TIMESTAMP",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "INTERVAL",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "GEOGRAPHY",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "JSON",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATE\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cDATETIME\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "RANGE\u003cTIMESTAMP\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cx INT64, label STRING\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "STRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINT64\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cNUMERIC\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBIGNUMERIC\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cFLOAT64\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBOOL\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRING\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cBYTES\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATE\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cDATETIME\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIME\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cTIMESTAMP\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cINTERVAL\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cGEOGRAPHY\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cJSON\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATE\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cDATETIME\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cRANGE\u003cTIMESTAMP\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cx INT64, label STRING\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003cn NUMERIC, nested STRUCT\u003cflag BOOL\u003e\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        },
+        {
+          "arguments": [
+            "ARRAY\u003cSTRUCT\u003citems ARRAY\u003cBIGNUMERIC\u003e, span RANGE\u003cDATE\u003e\u003e\u003e",
+            "STRING"
+          ],
+          "result": "BOOL",
+          "samples": [
+            "",
+            "'b'"
+          ],
+          "literal_arguments": [
+            1
+          ]
+        }
+      ]
+    },
+    {
       "name": "SEC",
       "source": "third_party/bigquery_docs/reference/standard-sql/mathematical_functions.md",
       "signatures": [

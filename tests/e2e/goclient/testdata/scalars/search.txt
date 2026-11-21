@@ -1,0 +1,464 @@
+## SEARCH
+# The expected values are the examples of the search functions documentation:
+# third_party/bigquery_docs/reference/standard-sql/search_functions.md
+# Cases after the examples are observed BigQuery answers collected with tools/bqanswers.
+
+# LOG_ANALYZER, the default, splits search_query and data_to_search at its delimiters and
+# lowercases them.
+SELECT SEARCH('foobar-example', 'foobar example')
+=> "true"
+
+SELECT SEARCH('foobar-example', CONCAT('foo', 'bar'))
+=> "true"
+
+SELECT SEARCH('foobar-example', 'foobarexample')
+=> "false"
+
+SELECT SEARCH('foobar-example', 'foobar\\&example')
+=> "true"
+
+SELECT SEARCH('foobar-example', R'foobar\&example')
+=> "true"
+
+SELECT SEARCH('foobar-example', 'example foobar')
+=> "true"
+
+SELECT SEARCH('foobar-example', 'Foobar Example')
+=> "true"
+
+# A backtick term matches the text as it is, between delimiters.
+SELECT SEARCH('foobar-example', '`foobar&example`')
+=> "false"
+
+SELECT SEARCH('foobar&example', '`foobar&example`')
+=> "true"
+
+SELECT SEARCH('foobar-example', '`foobar-example`')
+=> "true"
+
+SELECT SEARCH('foobar-example', '`Foobar`')
+=> "false"
+
+SELECT SEARCH('`foobar-example`', '`foobar-example`')
+=> "false"
+
+SELECT SEARCH('foobar@example.com', '`example.com`')
+=> "true"
+
+SELECT SEARCH('a foobar-example b', '`foobar-example`')
+=> "true"
+
+SELECT SEARCH('foobar=', '`foobar\\=`')
+=> "false"
+
+SELECT SEARCH('foobar=', R'`\foobar=`')
+=> "false"
+
+SELECT SEARCH('foobar=', 'foobar\\=')
+=> "true"
+
+SELECT SEARCH('foobar=', R'foobar\=')
+=> "true"
+
+SELECT SEARCH('foobar.example', '`foobar`')
+=> "true"
+
+SELECT SEARCH('foobar.example', '`foobar.\`')
+=> "false"
+
+SELECT SEARCH('foobar..example', '`foobar.`')
+=> "true"
+
+SELECT SEARCH('Hello-world', '`WORLD`', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "LOWER"}}]}')
+=> "false"
+
+# Each element of an ARRAY is searched on its own.
+SELECT SEARCH(['foobar', 'example'], 'foobar example')
+=> "false"
+
+# Whitespace and AND combine terms, and OR binds more loosely.
+SELECT SEARCH(R'foo bar baz', R'foo bar')
+=> "true"
+
+SELECT SEARCH(R'foo bar baz', R'foo AND bar')
+=> "true"
+
+SELECT SEARCH(R'foo', R'foo OR bar')
+=> "true"
+
+SELECT SEARCH(R'foo', R'foo AND (bar OR baz)')
+=> "false"
+
+# A phrase's tokens appear next to each other, in order.
+SELECT SEARCH(R'foo bar baz', R'"foo bar"')
+=> "true"
+
+SELECT SEARCH(R'Foo bar baz', R'"foo Bar"')
+=> "true"
+
+SELECT SEARCH(R'foo bar baz', R'"`foo bar`"')
+=> "false"
+
+SELECT SEARCH(R'foo else bar', R'"foo bar"')
+=> "false"
+
+SELECT SEARCH(R'foo-bar-baz', R'bar "foo&baz"')
+=> "false"
+
+SELECT SEARCH(R'foo bar baz', R'"foo\ bar"', analyzer_options => '{"delimiters": [" "]}')
+=> "false"
+
+SELECT SEARCH(R'foo bar baz', R'"foo? bar"', analyzer_options => '{"delimiters": [" ", "?"]}')
+=> "true"
+
+SELECT SEARCH('read the book now', R'"read the book"', analyzer_options => '{ "token_filters": [{"stop_words": ["the"]}] }')
+=> "true"
+
+SELECT SEARCH(R'abcdef', R'"c d"', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["(?:cd)|[a-z]"]}')
+=> "false"
+
+SELECT SEARCH(R'ant orange apple avocado', R'"ant apple"', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["a[a-z]"]}')
+=> "true"
+
+# NO_OP_ANALYZER compares the whole query with each field.
+SELECT SEARCH('foobar', 'foobar', analyzer => 'NO_OP_ANALYZER')
+=> "true"
+
+SELECT SEARCH('foobar', '\`foobar\`', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+SELECT SEARCH('foobar', 'Foobar', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+SELECT SEARCH('foobar example', 'foobar', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+SELECT SEARCH('', '', analyzer => 'NO_OP_ANALYZER')
+=> "true"
+
+SELECT SEARCH(R'foo bar baz', R'"foo bar"', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+SELECT SEARCH(R'foo', R'foo OR bar', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+# A column, several columns and a whole table.
+WITH meals AS (SELECT 'Potato pancakes' AS breakfast, 'Toasted cheese sandwich' AS lunch, 'Beef soup' AS dinner UNION ALL SELECT 'Avocado toast', 'Tomato soup', 'Chicken soup') SELECT ARRAY_AGG(STRUCT(SEARCH(lunch, 'soup') AS lunch_soup, SEARCH((breakfast, dinner), 'soup') AS breakfast_or_dinner_soup, SEARCH(meals, 'soup') AS anytime_soup) ORDER BY breakfast DESC) FROM meals
+=> [{"v": {"f": [{"v": "false"}, {"v": "true"}, {"v": "true"}]}}, {"v": {"f": [{"v": "true"}, {"v": "true"}, {"v": "true"}]}}]
+
+WITH data AS (SELECT 'Please use foobar@example.com as your email.' AS email) SELECT [SEARCH(email, 'exam'), SEARCH(email, 'foobar'), SEARCH(email, 'example.com'), SEARCH(email, R'"please use"'), SEARCH(email, R'"as email"')] FROM data
+=> [{"v": "false"}, {"v": "true"}, {"v": "true"}, {"v": "true"}, {"v": "false"}]
+
+WITH data AS (SELECT 'Please use foobar@example.com as your email.' AS email) SELECT [SEARCH(email, 'foobar', analyzer_options => '{"delimiters": [" ", "@"]}'), SEARCH(email, 'example', analyzer_options => '{"delimiters": [" ", "@"]}'), SEARCH(email, 'example.com', analyzer_options => '{"delimiters": [" ", "@"]}'), SEARCH(email, 'foobar@example.com', analyzer_options => '{"delimiters": [" ", "@"]}'), SEARCH(email, R'use "foobar example.com" "as your"', analyzer_options => '{"delimiters": [" ", "@"]}')] FROM data
+=> [{"v": "true"}, {"v": "false"}, {"v": "true"}, {"v": "true"}, {"v": "true"}]
+
+WITH meals AS (SELECT 'Tomato soup' AS lunch) SELECT [SEARCH(lunch, 'Tomato soup', analyzer => 'NO_OP_ANALYZER'), SEARCH(lunch, 'soup', analyzer => 'NO_OP_ANALYZER'), SEARCH(lunch, 'tomato soup', analyzer => 'NO_OP_ANALYZER'), SEARCH(lunch, R'"Tomato soup"', analyzer => 'NO_OP_ANALYZER')] FROM meals
+=> [{"v": "true"}, {"v": "false"}, {"v": "false"}, {"v": "false"}]
+
+WITH data AS (SELECT 'Please use foobar@example.com as your email.' AS email) SELECT [SEARCH(email, 'exam', analyzer => 'PATTERN_ANALYZER'), SEARCH(email, 'foobar', analyzer => 'PATTERN_ANALYZER'), SEARCH(email, 'example.com', analyzer => 'PATTERN_ANALYZER'), SEARCH(email, R'foobar "EXAMPLE.com as" email', analyzer => 'PATTERN_ANALYZER')] FROM data
+=> [{"v": "false"}, {"v": "true"}, {"v": "true"}, {"v": "true"}]
+
+# The documentation's result has a fifth column, e, the query does not select; the four selected
+# columns come first.
+WITH data AS (SELECT 'Please use foobar@EXAMPLE.com as your email.' AS email) SELECT [SEARCH(email, 'EXAMPLE', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[A-Z]*"]}'), SEARCH(email, 'example', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]*"]}'), SEARCH(email, 'example.com', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]*"]}'), SEARCH(email, 'example.com', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-zA-Z.]*"]}')] FROM data
+=> [{"v": "true"}, {"v": "false"}, {"v": "false"}, {"v": "true"}]
+
+# Only STRING fields are searched, and a NULL one makes the result NULL unless another matches.
+SELECT SEARCH(CAST(NULL AS STRING), 'foo')
+=> null
+
+SELECT SEARCH(('foo', CAST(NULL AS STRING)), 'foo')
+=> "true"
+
+SELECT SEARCH(('bar', CAST(NULL AS STRING)), 'foo')
+=> null
+
+SELECT SEARCH(1, '1')
+=> "false"
+
+SELECT SEARCH(STRUCT(1 AS a, 'x' AS b), '1')
+=> "false"
+
+# The documentation's examples whose comments and results disagree. A quoted phrase containing
+# AND and OR is said to be TRUE, though its tokens are not next to each other in the data.
+
+SELECT SEARCH(R'foo bar', R'"foo AND (bar OR baz)"')
+=> "false"
+
+# The comment says TRUE since - and & are delimiters, the result table false.
+
+SELECT SEARCH(R'foo-bar baz', R'"foo&bar"')
+=> "true"
+
+# NO_OP_ANALYZER is said to be case-insensitive here, though 'Foobar' does not match 'foobar'.
+
+SELECT SEARCH(R'"foo bar"', R'"foo Bar"', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+# Errors whose messages the documentation does not give, from BigQuery's answers.
+
+SELECT SEARCH('foobarexample', NULL)
+=> error: The 2nd argument of SEARCH() must not be null
+
+SELECT SEARCH('foobarexample', '')
+=> error: Search query parser error: error at position 0: mismatched input '<EOF>' expecting {'(', BacktickToken, DoubleQuoteToken, SingleTermToken, WhiteSpace}
+
+SELECT SEARCH('foo', '...')
+=> error: Search query '...' results in 0 tokens.
+
+SELECT SEARCH('foo', 'foo', json_scope => 'invalid')
+=> error: Invalid json_scope value 'invalid'.
+
+SELECT SEARCH('foo', 'foo', analyzer => 'invalid')
+=> error: Invalid analyzer_name 'invalid'
+
+SELECT SEARCH('foo', 'foo', analyzer_options => '{"delimiters": 1}')
+=> error contains: Invalid Argument Error: At /delimiters of 1 - unexpected instance type
+
+
+SELECT SEARCH('foo', s) FROM UNNEST(['foo']) AS s
+=> error: Argument 2 to BIGQUERYGOOGLESQL:SEARCH must be a constant expression at [1:22]
+
+SELECT SEARCH('foo', 'foo', analyzer => s) FROM UNNEST(['LOG_ANALYZER']) AS s
+=> error: 'analyzer' of SEARCH() must be a constant
+
+# NULL named arguments.
+
+SELECT SEARCH('foo', 'foo', json_scope => NULL)
+=> error: 'json_scope' of SEARCH() must not be null
+
+SELECT SEARCH('foo', 'foo', analyzer => NULL)
+=> error: 'analyzer' of SEARCH() must not be null
+
+SELECT SEARCH('foo', 'foo', analyzer_options => NULL)
+=> error: 'analyzer_options' of SEARCH() must not be null
+
+# SAFE.
+
+SELECT SAFE.SEARCH('foo', '')
+=> error: SAFE with function search is not supported.
+
+# A NULL STRUCT or ARRAY makes its STRING fields NULL.
+
+SELECT SEARCH(CAST(NULL AS STRUCT<a STRING>), 'foo')
+=> null
+
+SELECT SEARCH(CAST(NULL AS ARRAY<STRING>), 'foo')
+=> null
+
+SELECT SEARCH([CAST(NULL AS STRUCT<a STRING>)], 'foo')
+=> null
+
+SELECT SEARCH(CAST(NULL AS STRUCT<a INT64>), 'foo')
+=> "false"
+
+SELECT SEARCH(['bar', NULL], 'foo')
+=> null
+
+# JSON data: each JSON string, or object key in json_scope, is a field of its own.
+
+SELECT SEARCH(JSON '{"foo": "bar"}', 'bar')
+=> "true"
+
+SELECT SEARCH(JSON '{"foo": "bar"}', 'foo')
+=> "false"
+
+SELECT SEARCH(JSON '{"foo": "bar"}', 'foo', json_scope => 'JSON_KEYS')
+=> "true"
+
+SELECT SEARCH(JSON '{"foo": "bar"}', 'bar', json_scope => 'JSON_KEYS')
+=> "false"
+
+SELECT SEARCH(JSON '{"foo": "bar"}', 'foo bar', json_scope => 'JSON_KEYS_AND_VALUES')
+=> "false"
+
+SELECT SEARCH(JSON '{"a": 123, "b": true, "c": null}', '123')
+=> "false"
+
+SELECT SEARCH(JSON '{"a": 123, "b": true, "c": null}', 'true')
+=> "false"
+
+SELECT SEARCH(JSON '{"a": ["x", {"b": "y"}]}', 'y')
+=> "true"
+
+SELECT SEARCH(JSON '{"a": "x", "b": "y"}', 'x y')
+=> "false"
+
+SELECT SEARCH(JSON 'null', 'foo')
+=> "false"
+
+SELECT SEARCH(CAST(NULL AS JSON), 'foo')
+=> null
+
+SELECT SEARCH(STRUCT(JSON '{"a": "x"}' AS j, 'y' AS s), 'x')
+=> "true"
+
+# Search query syntax: BigQuery's parser is an ANTLR grammar, whose errors name the position in
+# characters. Reserved words are reserved only in upper case.
+
+SELECT SEARCH('foo and bar', 'foo and bar')
+=> "true"
+
+SELECT SEARCH('foo', 'foo or bar')
+=> "false"
+
+SELECT SEARCH('not', 'not')
+=> "true"
+
+SELECT SEARCH('foo not bar', 'foo NOT bar')
+=> error: Search query parser error: Search query contains the reserved keyword 'NOT'.
+
+SELECT SEARCH('in', 'IN')
+=> error: Search query parser error: Search query contains the reserved keyword 'IN'.
+
+SELECT SEARCH('near', 'NEAR')
+=> error: Search query parser error: Search query contains the reserved keyword 'NEAR'.
+
+SELECT SEARCH('AND', '`AND`')
+=> "true"
+
+SELECT SEARCH('foo-bar', 'foo-bar')
+=> error: Search query parser error: error at position 3: token recognition error at: '-'
+
+SELECT SEARCH('foo:bar', 'foo:bar')
+=> error: Search query parser error: error at position 3: token recognition error at: ':'
+
+SELECT SEARCH('foo*', 'foo*')
+=> error: Search query parser error: error at position 3: token recognition error at: '*'
+
+SELECT SEARCH('foobar', R'foo\bar')
+=> error: Search query parser error: error at position 3: token recognition error at: '\b'
+
+SELECT SEARCH('foo bar', 'foo(bar)')
+=> error: Search query parser error: error at position 3: mismatched input '(' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo bar', '"foo""bar"')
+=> error: Search query parser error: error at position 5: extraneous input '"bar"' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo bar', 'foo"bar"')
+=> error: Search query parser error: error at position 3: extraneous input '"bar"' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo`bar`', 'foo`bar`')
+=> error: Search query parser error: error at position 3: extraneous input '`bar`' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo bar', '(foo)(bar)')
+=> error: Search query parser error: error at position 5: mismatched input '(' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo', '(foo')
+=> error: Search query parser error: error at position 4: mismatched input '<EOF>' expecting {')', WhiteSpace}
+
+SELECT SEARCH('foo', 'foo)')
+=> error: Search query parser error: error at position 3: extraneous input ')' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo', '()')
+=> error: Search query parser error: error at position 1: mismatched input ')' expecting {'(', BacktickToken, DoubleQuoteToken, SingleTermToken, WhiteSpace}
+
+SELECT SEARCH('foo', 'foo AND')
+=> error: Search query parser error: error at position 7: mismatched input '<EOF>' expecting WhiteSpace
+
+SELECT SEARCH('foo', 'OR foo')
+=> error: Search query parser error: error at position 0: extraneous input 'OR' expecting {'(', BacktickToken, DoubleQuoteToken, SingleTermToken, WhiteSpace}
+
+SELECT SEARCH('foo', '""')
+=> error: Search query parser error: error at position 0: token recognition error at: '""'
+
+SELECT SEARCH('foo', '``')
+=> error: Search query parser error: error at position 0: token recognition error at: '``'
+
+SELECT SEARCH('foo', '"foo')
+=> error: Search query parser error: error at position 0: token recognition error at: '"foo'
+
+SELECT SEARCH('foo	bar', 'foo	bar')
+=> "true"
+
+# How OR and AND combine without parentheses.
+
+SELECT SEARCH('foo', 'foo OR bar baz')
+=> "true"
+
+SELECT SEARCH('baz', 'foo OR bar baz')
+=> "false"
+
+SELECT SEARCH('bar baz', 'foo OR bar AND baz')
+=> "true"
+
+SELECT SEARCH('foo', 'foo OR bar AND baz')
+=> "true"
+
+# Terms without search tokens among terms with them, such as a stop word or only delimiters, are
+# left out.
+
+SELECT SEARCH('read the book', 'read the book', analyzer_options => '{"token_filters": [{"stop_words": ["the"]}]}')
+=> "true"
+
+SELECT SEARCH('foo', 'foo ...')
+=> "true"
+
+SELECT SEARCH('foo', 'foo OR ...')
+=> "true"
+
+SELECT SEARCH('foo', '"..." foo')
+=> "true"
+
+# Backtick terms with custom delimiters.
+
+SELECT SEARCH('foo@bar', '`foo`', analyzer_options => '{"delimiters": ["@"]}')
+=> "true"
+
+SELECT SEARCH('foo.bar', '`foo`', analyzer_options => '{"delimiters": ["@"]}')
+=> "false"
+
+# Backtick terms that begin or end with a delimiter, and that need the text before the
+# match to end with a multi-character delimiter.
+
+SELECT SEARCH('foo bar', '`.bar`')
+=> "false"
+
+SELECT SEARCH('foo.bar', '`.bar`')
+=> "false"
+
+SELECT SEARCH('foo%20bar', '`bar`')
+=> "true"
+
+# The order of the analyzer's token filters and backtick terms.
+
+SELECT SEARCH('The Fox', '`the`', analyzer_options => '{"token_filters": [{"stop_words": ["the"]}]}')
+=> "false"
+
+SELECT SEARCH('the fox', '`the`', analyzer_options => '{"token_filters": [{"stop_words": ["the"]}]}')
+=> "true"
+
+# A phrase with one token, and a single term with several.
+
+SELECT SEARCH('foo bar', '"foo"')
+=> "true"
+
+SELECT SEARCH('bar foo', 'foo.bar')
+=> "true"
+
+SELECT SEARCH('foo-x-bar', 'foo.bar')
+=> "true"
+
+# ICU_NORMALIZE.
+
+SELECT SEARCH('Foo', 'foo', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}]}')
+=> "true"
+
+SELECT SEARCH('ﬀ', 'ff', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}]}')
+=> "true"
+
+# Types of data_to_search other than STRING, ARRAY, STRUCT and JSON.
+
+SELECT SEARCH(b'foo', 'foo')
+=> "false"
+
+SELECT SEARCH(DATE '2024-01-01', '2024')
+=> "false"
+
+SELECT SEARCH([1, 2], '1')
+=> "false"
+
+# A collated STRING.
+
+SELECT SEARCH(COLLATE('Foo', 'und:ci'), 'foo')
+=> "true"

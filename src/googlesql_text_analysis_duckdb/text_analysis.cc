@@ -10,12 +10,18 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "duckdb.h"
+#include "googlesql/base/status_macros.h"
+#include "googlesql/public/value.h"
 #include "src/backend_error.h"
 #include "src/duckdb_functions/register.h"
 #include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_functions_duckdb/any_arguments.h"
+#include "src/googlesql_text_analysis/search.h"
 #include "src/googlesql_text_analysis/text_analysis.h"
 
 namespace bigquery_emulator_duckdb::text_analysis_duckdb {
@@ -40,8 +46,8 @@ void TextAnalyze(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
             std::pair<std::string, std::string> arguments_key(arguments.String(1),
                                                               arguments.String(2));
             if (key != arguments_key) {
-              analyzer =
-                  googlesql_text_analysis::ParseAnalyzer(arguments_key.first, arguments_key.second);
+              analyzer = googlesql_text_analysis::ParseAnalyzer(
+                  arguments_key.first, arguments_key.second, "TEXT_ANALYZE");
               key = std::move(arguments_key);
             }
             if (!analyzer.ok()) {
@@ -49,6 +55,54 @@ void TextAnalyze(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
             }
             return googlesql_text_analysis::Analyze(**analyzer, arguments.String(0));
           });
+}
+
+// SEARCH(data_to_search, search_query, json_scope, analyzer, analyzer_options), whose data comes
+// paired with its STRUCT names. The query is parsed again only when its arguments change from one
+// row to the next.
+void Search(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  const functions_duckdb::AnyArguments values(input, {0});
+  std::optional<std::array<std::string, 3>> key;
+  absl::StatusOr<std::shared_ptr<const googlesql_text_analysis::SearchQuery>> query;
+  EachRow(
+      info, input, output,
+      [&](const Arguments& arguments) -> absl::StatusOr<std::optional<bool>> {
+        if (arguments.IsNull(1)) {
+          return absl::OutOfRangeError("The 2nd argument of SEARCH() must not be null");
+        }
+        constexpr std::array<std::string_view, 3> kNames = {
+            "json_scope",
+            "analyzer",
+            "analyzer_options",
+        };
+        for (idx_t column = 2; column < 5; ++column) {
+          if (arguments.IsNull(column)) {
+            return absl::OutOfRangeError(
+                absl::StrCat("'", kNames.at(column - 2), "' of SEARCH() must not be null"));
+          }
+        }
+        GOOGLESQL_ASSIGN_OR_RETURN(const auto scope,
+                                   googlesql_text_analysis::ParseJsonScope(arguments.String(2)));
+        std::array<std::string, 3> arguments_key = {
+            arguments.String(1),
+            arguments.String(3),
+            arguments.String(4),
+        };
+        if (key != arguments_key) {
+          auto analyzer =
+              googlesql_text_analysis::ParseAnalyzer(arguments_key.at(1), arguments_key.at(2), "");
+          query = analyzer.ok() ? googlesql_text_analysis::ParseSearchQuery(arguments_key.at(0),
+                                                                            *std::move(analyzer))
+                                : analyzer.status();
+          key = std::move(arguments_key);
+        }
+        if (!query.ok()) {
+          return query.status();
+        }
+        GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::Value data, values.Get(0, arguments.Row()));
+        return googlesql_text_analysis::Search(data, **query, scope);
+      },
+      /*nulls=*/false);
 }
 
 // The terms of a document, where NULL is an element without one.
@@ -208,6 +262,9 @@ void RegisterTextAnalysisFunctions(duckdb_connection connection) {
   LogicalType const varchar(duckdb_create_logical_type(kVarchar));
   LogicalType const list(duckdb_create_list_type(varchar.get()));
   Register(connection, "bq_text_analyze", {kVarchar, kVarchar, kVarchar}, list.get(), TextAnalyze);
+  Register(connection, "bq_search",
+           std::vector<duckdb_type>{kAny, kVarchar, kVarchar, kVarchar, kVarchar}, kBoolean, Search,
+           /*nulls=*/false);
 
   LogicalType const bigint(duckdb_create_logical_type(kBigint));
   LogicalType const blob(duckdb_create_logical_type(kBlob));
