@@ -465,16 +465,16 @@ Graph DDL rejects:
 - Views as element tables and graph options.
 - Edges whose endpoint nodes do not exist when the graph is created.
 
-`GRAPH_EXPAND` rejects arguments that are not literals, `flatten_results => FALSE`, node tables
-related to more than one node table, and edge tables that are not inlined into a node table
-because they have rows or properties of their own.
+`GRAPH_EXPAND` rejects arguments that are not literals and `flatten_results => FALSE`. It rejects
+a node table related to more than one node table unless every related node table but the last is
+related to no further node table.
 
 `GRAPH_TABLE` and GQL queries reject:
 
 - Repetition bounds that are not literals.
 - GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
   `COLUMNS` clause.
-- Graph elements or paths in query results.
+- Graph paths in query results.
 - Graph element comparisons other than `=` and `!=` (`<>`); graph path comparisons.
 - Graph values in aggregate or analytic functions other than `COUNT`, `ANY_VALUE`, `MIN_BY`,
   `MAX_BY`, `ARRAY_AGG`, `ARRAY_CONCAT_AGG`, `FIRST_VALUE`, `LAST_VALUE`, `NTH_VALUE`, `LAG` and `LEAD`.
@@ -483,6 +483,8 @@ because they have rows or properties of their own.
   and `BIT_XOR`; horizontal aggregates with collation; and `ORDER BY` or `LIMIT` on horizontal
   aggregates other than `ARRAY_AGG`, `ARRAY_CONCAT_AGG` and `STRING_AGG`.
 - `ELEMENT_ID`, `SOURCE_NODE_ID` and `DESTINATION_NODE_ID`.
-- NULL operands of `IS [NOT] SOURCE [OF]` and `IS [NOT] DESTINATION [OF]`, until their BigQuery
-  behavior is verified.
-- `SAFE.` calls of `SAME` and `ALL_DIFFERENT`, and calls that mix nodes and edges.
+- Calls of `SAME` and `ALL_DIFFERENT` that mix nodes and edges.
+
+`ANY CHEAPEST` fails on a NULL, zero, negative, infinite or NaN `COST`, as documented, and on a
+path whose total cost overflows its type, even where the query's result does not depend on which
+path it selects, such as `COUNT(*)`; BigQuery raises these errors only where it does.

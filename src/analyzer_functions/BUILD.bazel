@@ -22,7 +22,6 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:analyzer_options",
-        "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:parse_resume_location",
         "@googlesql//googlesql/public:simple_catalog",
@@ -32,4 +31,11 @@ cc_library(
         "@googlesql//googlesql/public:value",
     ],
     visibility = ["//:__pkg__"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:span",
+        "@googlesql//googlesql/public:catalog",
+    ],
 )

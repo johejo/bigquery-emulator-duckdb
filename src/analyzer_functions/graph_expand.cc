@@ -27,6 +27,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "src/analyzer_functions/declarations.h"
+#include "src/analyzer_functions/functions.h"
 
 namespace bigquery_emulator_duckdb::analyzer_functions {
 namespace {
@@ -130,8 +131,14 @@ std::optional<SchemaEdge> RelationshipEdge(const googlesql::GraphEdgeTable& tabl
   };
 }
 
-// Whether the edge's rows are those of its `from` table, whose properties include its own.
-absl::StatusOr<bool> Inlined(const SchemaEdge& edge) {
+// Whether the edge's rows are those of its `from` table, whose properties include its own: an
+// edge the documentation inlines, omitting its columns. BigQuery inlined such an edge only where
+// its table has no columns other than those that reference its node tables (HasOtherColumns),
+// whichever endpoint references the `from` table, whether a foreign key relates the tables and
+// whatever the other node table's properties, and joined it otherwise, as observed in
+// tests/e2e/goclient/testdata/scalars/graph/graph_expand.txt.
+// third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
+absl::StatusOr<bool> SharesNodeRows(const SchemaEdge& edge) {
   if (edge.table->GetTable() != edge.from->GetTable() ||
       edge.from_reference->GetEdgeTableColumns() != edge.from_reference->GetNodeTableColumns()) {
     return false;
@@ -142,6 +149,15 @@ absl::StatusOr<bool> Inlined(const SchemaEdge& edge) {
     return edge_properties.ok() ? node_properties.status() : edge_properties.status();
   }
   return std::ranges::includes(*node_properties, *edge_properties);
+}
+
+// Whether the edge table has columns other than those that reference its node tables.
+bool HasOtherColumns(const SchemaEdge& edge) {
+  std::set<int> references(edge.from_reference->GetEdgeTableColumns().begin(),
+                           edge.from_reference->GetEdgeTableColumns().end());
+  references.insert(edge.to_reference->GetEdgeTableColumns().begin(),
+                    edge.to_reference->GetEdgeTableColumns().end());
+  return std::cmp_greater(edge.table->GetTable()->NumColumns(), references.size());
 }
 
 // The prefix of an element table's columns: its default label, the only label it may have.
@@ -156,6 +172,95 @@ absl::StatusOr<std::string> DefaultLabel(const googlesql::GraphElementTable& tab
                                       " to use only its default label");
   }
   return (*labels.begin())->Name();
+}
+
+// A table of the expansion, LEFT JOINed to the table of step `parent` where its `referenced`
+// columns equal that table's `referencing` columns. `with_key` adds an edge table's key columns
+// to its properties.
+struct Step {
+  const googlesql::GraphElementTable* table;
+  std::size_t parent = 0;
+  std::vector<int> referenced;
+  std::vector<int> referencing;
+  bool with_key = false;
+};
+
+using Children = std::map<const googlesql::GraphNodeTable*, std::vector<const SchemaEdge*>>;
+
+// Orders the edges that relate a node table to others as BigQuery joins them: in the order the
+// graph defines the edge tables, whatever the order of their node tables. Each related table but
+// the last must have none of its own, where joining depth-first and breadth-first agree, since
+// BigQuery's choice is unverified.
+absl::Status OrderRelated(std::vector<const SchemaEdge*>& related, const Children& children,
+                          const std::vector<std::string>& order) {
+  if (related.size() < 2) {
+    return absl::OkStatus();
+  }
+  const auto position = [&](const googlesql::GraphElementTable* table) {
+    return std::ranges::find_if(order,
+                                [&](const std::string& name) {
+                                  return absl::EqualsIgnoreCase(name, table->Name());
+                                }) -
+           order.begin();
+  };
+  const auto missing = static_cast<std::ptrdiff_t>(order.size());
+  if (std::ranges::any_of(
+          related, [&](const SchemaEdge* edge) { return position(edge->table) == missing; })) {
+    return Unsupported("of a node table related to more than one node table");
+  }
+  std::ranges::sort(related, {}, [&](const SchemaEdge* edge) { return position(edge->table); });
+  if (std::any_of(related.begin(), std::prev(related.end()),
+                  [&](const SchemaEdge* edge) { return children.contains(edge->to); })) {
+    return Unsupported(
+        "of a node table related to more than one node table, other than the last of which are "
+        "related to further node tables");
+  }
+  return absl::OkStatus();
+}
+
+// Adds to `steps` the tables joined from the node table of step `index`, depth-first.
+absl::Status AddRelated(const googlesql::GraphNodeTable* node, std::size_t index,
+                        const Children& children, const std::vector<std::string>& order,
+                        std::vector<Step>& steps) {
+  const auto found = children.find(node);
+  if (found == children.end()) {
+    return absl::OkStatus();
+  }
+  auto related = found->second;
+  if (auto status = OrderRelated(related, children, order); !status.ok()) {
+    return status;
+  }
+  for (const SchemaEdge* edge : related) {
+    const auto shares = SharesNodeRows(*edge);
+    if (!shares.ok()) {
+      return shares.status();
+    }
+    std::size_t parent = index;
+    if (!*shares || HasOtherColumns(*edge)) {
+      steps.push_back({
+          .table = edge->table,
+          .parent = index,
+          .referenced = edge->from_reference->GetEdgeTableColumns(),
+          .referencing = edge->from_reference->GetNodeTableColumns(),
+          .with_key = true,
+      });
+      parent = steps.size() - 1;
+    }
+    // The next node table joins the edge table's columns that reference it, which, since an
+    // inlined edge's rows are its `from` table's, are that table's own columns.
+    steps.push_back({
+        .table = edge->to,
+        .parent = parent,
+        .referenced = edge->to_reference->GetNodeTableColumns(),
+        .referencing = edge->to_reference->GetEdgeTableColumns(),
+        .with_key = false,
+    });
+    if (auto status = AddRelated(edge->to, steps.size() - 1, children, order, steps);
+        !status.ok()) {
+      return status;
+    }
+  }
+  return absl::OkStatus();
 }
 
 std::string ColumnName(const googlesql::GraphElementTable& table, int column) {
@@ -215,9 +320,11 @@ absl::StatusOr<std::string> ExpansionQuery(
   }
   std::vector<SchemaEdge> edges;
   for (const googlesql::GraphElementTable* table : edge_tables) {
-    if (const auto label = DefaultLabel(*table); !label.ok()) {
+    auto label = DefaultLabel(*table);
+    if (!label.ok()) {
       return label.status();
     }
+    labels.emplace(table, *std::move(label));
     if (auto edge = RelationshipEdge(*table->AsEdgeTable())) {
       edges.push_back(*edge);
     }
@@ -282,7 +389,7 @@ absl::StatusOr<std::string> ExpansionQuery(
         "GRAPH_EXPAND requires every node table to be reachable from the root node table");
   }
   std::map<const googlesql::GraphNodeTable*, int> in_degree;
-  std::map<const googlesql::GraphNodeTable*, std::vector<const SchemaEdge*>> children;
+  Children children;
   for (const SchemaEdge& edge : edges) {
     if (reachable.contains(edge.from)) {
       ++in_degree[edge.to];
@@ -297,71 +404,76 @@ absl::StatusOr<std::string> ExpansionQuery(
         "GRAPH_EXPAND requires every node table to have at most one incoming relationship");
   }
 
-  // BigQuery documents the columns of a chain of tables joined through inlined edges.
-  std::vector<const googlesql::GraphNodeTable*> chain = {root};
-  std::vector<const SchemaEdge*> joins;
-  for (auto next = children.find(root); next != children.end();
-       next = children.find(chain.back())) {
-    if (next->second.size() > 1) {
-      return Unsupported("of a node table related to more than one node table");
-    }
-    const SchemaEdge& edge = *next->second.front();
-    const auto inlined = Inlined(edge);
-    if (!inlined.ok()) {
-      return inlined.status();
-    }
-    if (!*inlined) {
-      return Unsupported("of an edge table with rows or properties of its own");
-    }
-    joins.push_back(&edge);
-    chain.push_back(edge.to);
+  // The tables joined from the root, each edge table that is not inlined between its two node
+  // tables.
+  const auto* ordered = dynamic_cast<const OrderedPropertyGraph*>(graph);
+  const auto order =
+      ordered == nullptr ? std::vector<std::string>{} : ordered->element_table_order();
+  std::vector<Step> steps = {
+      {.table = root, .parent = 0, .referenced = {}, .referencing = {}, .with_key = false},
+  };
+  if (auto status = AddRelated(root, 0, children, order, steps); !status.ok()) {
+    return status;
+  }
+  // The columns of each table that joins compare.
+  std::vector<std::set<int>> joined(steps.size());
+  for (std::size_t i = 1; i < steps.size(); ++i) {
+    joined.at(i).insert(steps.at(i).referenced.begin(), steps.at(i).referenced.end());
+    joined.at(steps.at(i).parent)
+        .insert(steps.at(i).referencing.begin(), steps.at(i).referencing.end());
   }
 
   // Each table's subquery exposes its properties as p<i> and the columns its joins compare as
   // c<i>, so that property and column names cannot collide.
   std::vector<std::string> outputs;
   std::vector<std::string> from;
-  for (std::size_t i = 0; i < chain.size(); ++i) {
-    const googlesql::GraphNodeTable& node = *chain.at(i);
+  for (std::size_t i = 0; i < steps.size(); ++i) {
+    const Step& step = steps.at(i);
+    const googlesql::GraphElementTable& element = *step.table;
     const std::string alias = "t" + std::to_string(i);
     std::vector<std::string> projections;
-    const auto properties = Properties(node);
+    auto properties = Properties(element);
     if (!properties.ok()) {
       return properties.status();
+    }
+    if (step.with_key) {
+      // BigQuery answers an edge's key columns among its properties, but not the other columns
+      // that reference the previous table.
+      for (const int column : element.GetKeyColumns()) {
+        const std::string name = ColumnName(element, column);
+        const auto same = std::ranges::find_if(
+            *properties, [&](const Property& p) { return absl::EqualsIgnoreCase(p.name, name); });
+        if (same == properties->end()) {
+          properties->push_back({.name = name, .sql = googlesql::ToIdentifierLiteral(name)});
+        } else if (!absl::EqualsIgnoreCase(same->sql, name)) {
+          return Unsupported("of an edge table with a property named after a key column");
+        }
+      }
+      std::ranges::sort(*properties);
     }
     for (std::size_t p = 0; p < properties->size(); ++p) {
       projections.push_back("(" + properties->at(p).sql + ") AS p" + std::to_string(p));
       outputs.push_back(
           alias + ".p" + std::to_string(p) + " AS " +
-          googlesql::ToIdentifierLiteral(labels.at(&node) + "_" + properties->at(p).name));
+          googlesql::ToIdentifierLiteral(labels.at(&element) + "_" + properties->at(p).name));
     }
-    std::set<int> columns;
+    const std::set<int>& columns = joined.at(i);
     std::vector<std::string> conditions;
-    if (i > 0) {
-      // The joined table's referenced columns equal the columns of the previous table that
-      // reference them, since the edge's rows are the previous table's.
-      const SchemaEdge& edge = *joins.at(i - 1);
-      const auto& referenced = edge.to_reference->GetNodeTableColumns();
-      const auto& referencing = edge.to_reference->GetEdgeTableColumns();
-      for (std::size_t c = 0; c < referenced.size(); ++c) {
-        columns.insert(referenced.at(c));
-        conditions.push_back(alias + ".c" + std::to_string(referenced.at(c)) + " = t" +
-                             std::to_string(i - 1) + ".c" + std::to_string(referencing.at(c)));
-      }
-    }
-    if (i + 1 < chain.size()) {
-      const auto& referencing = joins.at(i)->to_reference->GetEdgeTableColumns();
-      columns.insert(referencing.begin(), referencing.end());
+    conditions.reserve(step.referenced.size());
+    for (std::size_t c = 0; c < step.referenced.size(); ++c) {
+      conditions.push_back(alias + ".c" + std::to_string(step.referenced.at(c)) + " = t" +
+                           std::to_string(step.parent) + ".c" +
+                           std::to_string(step.referencing.at(c)));
     }
     std::ranges::transform(columns, std::back_inserter(projections), [&](int column) {
-      return googlesql::ToIdentifierLiteral(ColumnName(node, column)) + " AS c" +
+      return googlesql::ToIdentifierLiteral(ColumnName(element, column)) + " AS c" +
              std::to_string(column);
     });
     if (projections.empty()) {
       projections.emplace_back("1 AS unit");
     }
     const std::string table = "(SELECT " + absl::StrJoin(projections, ", ") + " FROM " +
-                              googlesql::ToIdentifierLiteral(node.GetTable()->FullName()) +
+                              googlesql::ToIdentifierLiteral(element.GetTable()->FullName()) +
                               ") AS " + alias;
     from.push_back(i == 0 ? table
                           : "LEFT JOIN " + table + " ON " + absl::StrJoin(conditions, " AND "));

@@ -697,9 +697,6 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
       {.argument = 1, .types = kElementTypes},
       {.argument = 2, .types = kElementTypes},
   };
-  static constexpr std::string_view kEndpointErrors[] = {
-      "'The emulator does not support graph endpoint predicates with NULL operands'",
-  };
   static constexpr googlesql::TypeKind kStringTypes[] = {TYPE_STRING};
   static constexpr googlesql::TypeKind kBytesTypes[] = {TYPE_BYTES};
   static constexpr googlesql::TypeKind kInt64Types[] = {TYPE_INT64};
@@ -1406,30 +1403,27 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
              {
                  {
                      .arity = 2,
-                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                                 "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
+                     // A NULL node or edge gives NULL, as BigQuery answers.
+                     .spelling = "struct_extract($1, '$id') = struct_extract($2, '$source_id')",
                      .conditions = kEndpoints,
-                     .errors = kEndpointErrors,
                  },
              },
              {
                  .uses = {TypeUse::kGraphValues},
              }),
 
-      Define("$IS_DEST_NODE",
-             {
-                 {
-                     .arity = 2,
-                     .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                                 "struct_extract($1, '$id') = struct_extract($2, "
-                                 "'$destination_id') END",
-                     .conditions = kEndpoints,
-                     .errors = kEndpointErrors,
-                 },
-             },
-             {
-                 .uses = {TypeUse::kGraphValues},
-             }),
+      Define(
+          "$IS_DEST_NODE",
+          {
+              {
+                  .arity = 2,
+                  .spelling = "struct_extract($1, '$id') = struct_extract($2, '$destination_id')",
+                  .conditions = kEndpoints,
+              },
+          },
+          {
+              .uses = {TypeUse::kGraphValues},
+          }),
 
       Define("LABELS",
              {

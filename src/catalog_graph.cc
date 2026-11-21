@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -8,7 +10,10 @@
 #include "absl/types/span.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/function.h"
+#include "googlesql/public/property_graph.h"
 #include "googlesql/public/simple_catalog_util.h"
+#include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/analyzer_functions/functions.h"
 #include "src/catalog.h"
 #include "src/language_options.h"
 #include "src/table_path.h"
@@ -51,8 +56,7 @@ absl::Status BigQueryCatalog::FindPropertyGraph(absl::Span<const std::string> pa
   if (parts.size() != 3) {
     return absl::NotFoundError("Property graph name requires a dataset");
   }
-  auto found = graphs_.find(parts);
-  if (found == graphs_.end()) {
+  if (!graphs_.contains(parts)) {
     const auto ddl = source_.FindPropertyGraph(
         {.project_id = parts.at(0), .dataset_id = parts.at(1), .table_id = parts.at(2)});
     if (!ddl) {
@@ -61,13 +65,31 @@ absl::Status BigQueryCatalog::FindPropertyGraph(absl::Span<const std::string> pa
     auto catalog = std::make_unique<GraphCatalog>(*this, type_factory_);
     const googlesql::AnalyzerOptions analyzer_options(
         AnalyzerLanguageOptions(timestamp_precision_));
-    const auto status = googlesql::AddPropertyGraphFromCreatePropertyGraphStmt(
+    // The statement's analysis comes first among the artifacts it adds.
+    const auto statement_index = graph_artifacts_.size();
+    auto status = googlesql::AddPropertyGraphFromCreatePropertyGraphStmt(
         *ddl, analyzer_options, graph_artifacts_, *catalog);
     if (!status.ok()) {
       return status;
     }
-    found = graphs_.emplace(parts, std::move(catalog)).first;
+    const googlesql::PropertyGraph* added = nullptr;
+    if (auto found = catalog->FindPropertyGraph({parts.back()}, added, options); !found.ok()) {
+      return found;
+    }
+    std::vector<std::string> order;
+    if (const auto* statement = graph_artifacts_.at(statement_index)->resolved_statement();
+        statement != nullptr && statement->Is<googlesql::ResolvedCreatePropertyGraphStmt>()) {
+      const auto* create = statement->GetAs<googlesql::ResolvedCreatePropertyGraphStmt>();
+      for (const auto* list : {&create->node_table_list(), &create->edge_table_list()}) {
+        std::ranges::transform(*list, std::back_inserter(order),
+                               [](const auto& table) { return table->alias(); });
+      }
+    }
+    ordered_graphs_.emplace(parts, std::make_unique<analyzer_functions::OrderedPropertyGraph>(
+                                       *added, std::move(order)));
+    graphs_.emplace(parts, std::move(catalog));
   }
-  return found->second->FindPropertyGraph({parts.back()}, graph, options);
+  graph = ordered_graphs_.at(parts).get();
+  return absl::OkStatus();
 }
 }  // namespace bigquery_emulator_duckdb

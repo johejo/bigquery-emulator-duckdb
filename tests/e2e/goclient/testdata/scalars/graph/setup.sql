@@ -189,7 +189,74 @@ CREATE PROPERTY GRAPH scalar_graph.StoreGraph
   NODE TABLES (scalar_graph.Stores AS S, scalar_graph.Locations AS L PROPERTIES (id, name, population))
   EDGE TABLES (scalar_graph.Stores AS SL SOURCE KEY (location_id) REFERENCES L (id)
     DESTINATION KEY (name) REFERENCES S (name));
+CREATE PROPERTY GRAPH scalar_graph.StoreGraphReversed
+  NODE TABLES (scalar_graph.Stores AS S, scalar_graph.Locations AS L PROPERTIES (id, name, population))
+  EDGE TABLES (scalar_graph.Stores AS SL SOURCE KEY (name) REFERENCES S (name)
+    DESTINATION KEY (location_id) REFERENCES L (id));
+CREATE TABLE scalar_graph.SizedStores (name STRING PRIMARY KEY NOT ENFORCED, location_id INT64,
+  size INT64)
+AS (SELECT 'Store 1' AS name, 101 AS location_id, 3 AS size UNION ALL SELECT 'Store 2', 101, 3);
+CREATE PROPERTY GRAPH scalar_graph.SizedStoreGraph
+  NODE TABLES (scalar_graph.SizedStores AS S, scalar_graph.Locations AS L PROPERTIES (id, name, population))
+  EDGE TABLES (scalar_graph.SizedStores AS SL SOURCE KEY (location_id) REFERENCES L (id)
+    DESTINATION KEY (name) REFERENCES S (name));
 CREATE PROPERTY GRAPH scalar_graph.StoreLocations
   NODE TABLES (scalar_graph.Stores AS S, scalar_graph.Locations AS L);
 CREATE PROPERTY GRAPH scalar_graph.LabeledStores
   NODE TABLES (scalar_graph.Stores AS S LABEL Store);
+-- An edge table with a property of its own.
+CREATE TABLE scalar_graph.Places (id INT64 PRIMARY KEY NOT ENFORCED, name STRING)
+AS SELECT 1 AS id, 'p' AS name UNION ALL SELECT 2, 'q';
+CREATE TABLE scalar_graph.Shops (id INT64 PRIMARY KEY NOT ENFORCED, place_id INT64,
+  other_place_id INT64, size INT64)
+AS SELECT 1 AS id, 1 AS place_id, 2 AS other_place_id, 3 AS size UNION ALL SELECT 2, NULL, NULL, 4;
+CREATE PROPERTY GRAPH scalar_graph.ShopPlaces
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS P)
+  EDGE TABLES (scalar_graph.Shops AS SP SOURCE KEY (id) REFERENCES S (id)
+    DESTINATION KEY (place_id) REFERENCES P (id) PROPERTIES (size AS edge_size));
+-- Endpoints that reference columns other than the node key: each row of KindTransfers relates
+-- every checking account to every savings account, and the other way round.
+CREATE TABLE scalar_graph.KindAccounts AS
+SELECT 1 AS id, 'checking' AS kind UNION ALL SELECT 2, 'savings' UNION ALL SELECT 3, 'checking';
+CREATE TABLE scalar_graph.KindTransfers AS
+SELECT 'checking' AS src_kind, 'savings' AS dst_kind UNION ALL SELECT 'savings', 'checking';
+CREATE PROPERTY GRAPH scalar_graph.KindGraph
+  NODE TABLES (scalar_graph.KindAccounts AS Account KEY (id))
+  EDGE TABLES (scalar_graph.KindTransfers AS CanTransfer KEY (src_kind, dst_kind)
+    SOURCE KEY (src_kind) REFERENCES Account (kind)
+    DESTINATION KEY (dst_kind) REFERENCES Account (kind));
+-- Edge tables with their source node's table and properties, which GRAPH_EXPAND joins between
+-- their node tables, in the order the graph defines them.
+CREATE PROPERTY GRAPH scalar_graph.ShopsNear
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS Near)
+  EDGE TABLES (scalar_graph.Shops AS SN SOURCE KEY (id) REFERENCES S (id)
+    DESTINATION KEY (place_id) REFERENCES Near (id));
+CREATE PROPERTY GRAPH scalar_graph.ShopsNearFar
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS Near, scalar_graph.Places AS Far)
+  EDGE TABLES (scalar_graph.Shops AS SN SOURCE KEY (id) REFERENCES S (id)
+      DESTINATION KEY (place_id) REFERENCES Near (id),
+    scalar_graph.Shops AS SF SOURCE KEY (id) REFERENCES S (id)
+      DESTINATION KEY (other_place_id) REFERENCES Far (id));
+CREATE PROPERTY GRAPH scalar_graph.ShopsFarNear
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS Far, scalar_graph.Places AS Near)
+  EDGE TABLES (scalar_graph.Shops AS SF SOURCE KEY (id) REFERENCES S (id)
+      DESTINATION KEY (other_place_id) REFERENCES Far (id),
+    scalar_graph.Shops AS SN SOURCE KEY (id) REFERENCES S (id)
+      DESTINATION KEY (place_id) REFERENCES Near (id));
+CREATE PROPERTY GRAPH scalar_graph.ShopsFarNearEdges
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS Far, scalar_graph.Places AS Near)
+  EDGE TABLES (scalar_graph.Shops AS SN SOURCE KEY (id) REFERENCES S (id)
+      DESTINATION KEY (place_id) REFERENCES Near (id),
+    scalar_graph.Shops AS SF SOURCE KEY (id) REFERENCES S (id)
+      DESTINATION KEY (other_place_id) REFERENCES Far (id));
+-- An edge that references its node table's table as its destination, as the documented
+-- StoreGraph's edge does, over a table with other columns.
+CREATE PROPERTY GRAPH scalar_graph.ShopsNearInlined
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS Near)
+  EDGE TABLES (scalar_graph.Shops AS NS SOURCE KEY (place_id) REFERENCES Near (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+-- An edge whose key is fewer columns than those that reference its source node.
+CREATE PROPERTY GRAPH scalar_graph.ShopSizes
+  NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS P)
+  EDGE TABLES (scalar_graph.Shops AS SP KEY (id) SOURCE KEY (id, size) REFERENCES S (id, size)
+    DESTINATION KEY (place_id) REFERENCES P (id) PROPERTIES (size AS edge_size));

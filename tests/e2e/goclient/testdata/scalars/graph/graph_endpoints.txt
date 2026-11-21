@@ -81,19 +81,19 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1) OPTIONAL MATCH (a:Person)-[e:Owns]->(b:Account) RETURN b IS DESTINATION OF e AS result)
 => "true"
 
-# Until BigQuery NULL behavior is verified, reject NULL operands explicitly.
+# A NULL node or edge gives NULL, as observed on BigQuery with tools/bqanswers.
 
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, a, NULL) IS SOURCE OF e AS result)
-=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+=> null
 
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS SOURCE OF IF(FALSE, e, NULL) AS result)
-=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+=> null
 
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, a, NULL) IS DESTINATION OF e AS result)
-=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+=> null
 
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS DESTINATION OF IF(FALSE, e, NULL) AS result)
-=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+=> null
 
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, IF(FALSE, a, NULL) IS SOURCE OF e, TRUE) AS result)
 => "true"

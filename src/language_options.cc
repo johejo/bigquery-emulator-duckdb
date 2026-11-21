@@ -39,6 +39,9 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // BigQuery cannot group or partition by graph paths, including with DISTINCT, as "Groupable
     // data types" in third_party/bigquery_docs/reference/standard-sql/data-types.md lists.
     options->DisableLanguageFeature(googlesql::FEATURE_GROUP_BY_GRAPH_PATH);
+    // BigQuery rejects SAFE.SAME and SAFE.ALL_DIFFERENT: "Function SAME does not support SAFE
+    // error mode", as observed in tests/e2e/goclient/testdata/scalars/graph/graph_identity.txt.
+    options->DisableLanguageFeature(googlesql::FEATURE_SQL_GRAPH_SAFE_SAME_ALL_DIFFERENT);
     // BigQuery rejects JSONPath wildcard and descendant operators, including in lax mode.
     options->DisableLanguageFeature(googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT);
     // BigQuery rejects LookupTable with literal, quoted and constant-expression table names.

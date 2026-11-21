@@ -158,3 +158,9 @@ CALL (p) {
 }
 RETURN p
 => error contains: already exists
+
+# A CALL inside GRAPH_TABLE can list a column of the enclosing query in its variable scope list,
+# which the documentation describes only for graph variables; observed on BigQuery with
+# tools/bqanswers.
+SELECT (SELECT STRING_AGG(FORMAT('%s:%d', name, correlated), ',' ORDER BY name) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (p:Person) CALL (p, k) { RETURN p.name AS name, k AS correlated } RETURN name, correlated)) FROM (SELECT 7 AS k)
+=> "Alex:7,Dana:7,Lee:7"

@@ -1,10 +1,5 @@
 [
   {
-    "file": "tests/e2e/goclient/testdata/unverified/graph.api.json",
-    "contains": "BigQuery Graph queries require a reservation",
-    "reason": "Recorded BigQuery error messages, including their URLs, are expected responses, not citations."
-  },
-  {
     "file": "src/analyzer.cc",
     "contains": "https://cloud.google.com/bigquery/docs/schemas#column_names",
     "reason": "Client-visible error message must match BigQuery. This is not a documentation citation."

@@ -1,6 +1,7 @@
 #include "src/translator/graph.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <format>
 #include <iterator>
@@ -505,20 +506,35 @@ std::optional<Relation> FlatGraphPath(
                                     QuoteIdentifier(key->Name()), output));
       keys.push_back("q." + output);
     }
-    const auto identity = ElementIdentity(*element_table, keys);
     std::string endpoints;
     if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
       const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
       const auto& left = *elements.at(index - 1);
       const auto& right = *elements.at(index + 1);
+      // A row whose endpoints reference columns other than a node's key can match several
+      // nodes, and is one edge for each pair of endpoint nodes, as BigQuery answers TRAIL and
+      // SAME in tests/e2e/goclient/testdata/scalars/graph/graph_edge_references.txt.
+      const auto* edge_table = element_table->AsEdgeTable();
+      const bool per_pair = std::ranges::any_of(
+          std::array{edge_table->GetSourceNodeTable(), edge_table->GetDestNodeTable()},
+          [](const googlesql::GraphNodeTableReference* reference) {
+            const auto& referenced = reference->GetNodeTableColumns();
+            return !std::ranges::all_of(
+                reference->GetReferencedNodeTable()->GetKeyColumns(),
+                [&](int key) { return std::ranges::find(referenced, key) != referenced.end(); });
+          });
       for (const bool source : {true, false}) {
         const auto endpoint = EndpointIdentity(edge, left, right, source);
         const std::string field = source ? "$source_id" : "$destination_id";
         const auto output = QuoteIdentifier(field + "_" + std::to_string(column.column_id()));
         outputs.push_back(std::format("{} AS {}", endpoint, output));
         endpoints += ", " + QuoteIdentifier(field) + " := q." + output;
+        if (per_pair) {
+          keys.push_back("q." + output);
+        }
       }
     }
+    const auto identity = ElementIdentity(*element_table, keys);
     absl::flat_hash_set<const googlesql::GraphElementLabel*> labels;
     if (!element_table->GetLabels(labels).ok() || labels.empty()) {
       return Unsupported(scope, "graph element tables without static labels");
