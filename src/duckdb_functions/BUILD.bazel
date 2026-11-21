@@ -3,6 +3,23 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 package(features = ["layering_check"])
 
 cc_library(
+    name = "float_range",
+    srcs = ["float_range.cc"],
+    hdrs = ["float_range.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":register",
+        ":scalar",
+        "//:duckdb_handle",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
     name = "register",
     srcs = ["register.cc"],
     hdrs = ["register.h"],

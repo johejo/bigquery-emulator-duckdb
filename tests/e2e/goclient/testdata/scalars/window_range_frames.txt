@@ -37,3 +37,31 @@ SELECT ARRAY_AGG(s ORDER BY k) FROM (SELECT k, SUM(v) OVER (ORDER BY k RANGE BET
 
 SELECT ARRAY_AGG(s ORDER BY k) FROM (SELECT k, SUM(v) OVER (ORDER BY k DESC RANGE BETWEEN 9223372036854775807 PRECEDING AND CURRENT ROW) AS s FROM UNNEST([STRUCT(-9223372036854775808 AS k, 1 AS v), (0, 2), (9223372036854775807, 4)]))
 => [{"v":"1"},{"v":"6"},{"v":"4"}]
+
+## RANGE window frames ordered by FLOAT64
+
+# NaN sorts below -inf; an offset must not change that order (analytic_sum_test).
+# third_party/bigquery_docs/reference/standard-sql/data-types.md
+SELECT n FROM (SELECT id, COUNT(*) OVER (ORDER BY x RANGE BETWEEN UNBOUNDED PRECEDING AND 0 FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64))])) WHERE id = 3
+=> "2"
+
+# The same ordering applies descending, with NULLs first or last. NaN, infinity and NULL
+# each form a peer group, while finite offsets move only within the finite keys.
+# Expectations follow the documented ordering and RANGE frame definition.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (SELECT id, COUNT(*) OVER (ORDER BY x DESC NULLS FIRST RANGE BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, CAST(NULL AS FLOAT64) AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (4, -1.0), (5, 0.0), (6, 1.0), (7, CAST('inf' AS FLOAT64))]))
+=> [{"v":"1"},{"v":"7"},{"v":"6"},{"v":"5"},{"v":"5"},{"v":"4"},{"v":"2"}]
+
+SELECT ARRAY_AGG(n ORDER BY id) FROM (SELECT id, COUNT(*) OVER (ORDER BY x NULLS LAST RANGE BETWEEN 1 PRECEDING AND UNBOUNDED FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, CAST(NULL AS FLOAT64) AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64)), (4, -1.0), (5, 0.0), (6, 1.0), (7, CAST('inf' AS FLOAT64))]))
+=> [{"v":"1"},{"v":"7"},{"v":"6"},{"v":"5"},{"v":"5"},{"v":"4"},{"v":"2"}]
+
+# Signed zeroes remain peers; applying an offset uses FLOAT64 distances, not integer key distances.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (SELECT id, COUNT(*) OVER (ORDER BY x RANGE BETWEEN 0.5 PRECEDING AND 0.5 FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, -0.0 AS x), (2, 0.0), (3, 0.5), (4, 1.0)]))
+=> [{"v":"3"},{"v":"3"},{"v":"4"},{"v":"2"}]
+
+# A zero offset keeps special values in distinct peer groups, including duplicate NaNs.
+SELECT ARRAY_AGG(n ORDER BY id) FROM (SELECT id, COUNT(*) OVER (ORDER BY x RANGE BETWEEN 0 PRECEDING AND 0 FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, CAST('nan' AS FLOAT64) AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST(NULL AS FLOAT64)), (4, CAST(NULL AS FLOAT64)), (5, CAST('-inf' AS FLOAT64)), (6, CAST('inf' AS FLOAT64)), (7, -0.0), (8, 0.0)]))
+=> [{"v":"2"},{"v":"2"},{"v":"2"},{"v":"2"},{"v":"1"},{"v":"1"},{"v":"2"},{"v":"2"}]
+
+DECLARE n FLOAT64 DEFAULT NULL;
+SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN CURRENT ROW AND n FOLLOWING) FROM UNNEST([1.0]) AS x
+=> error: The boundary offset value cannot be null

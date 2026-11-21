@@ -55,13 +55,16 @@ class Arguments {
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
   }
 
-  // A DECIMAL(38, s) as its 128-bit integer of units of 10^-s.
-  [[nodiscard]] __int128 Decimal(idx_t column) const {
+  // A HUGEINT or DECIMAL(38, s) in its native 128-bit representation.
+  [[nodiscard]] __int128 Int128(idx_t column) const {
     const auto value = static_cast<duckdb_hugeint*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
     return std::bit_cast<__int128>((static_cast<unsigned __int128>(value.upper) << 64U) |
                                    value.lower);
   }
+
+  // A DECIMAL(38, s) as its 128-bit integer of units of 10^-s.
+  [[nodiscard]] __int128 Decimal(idx_t column) const { return Int128(column); }
 
   // A list of VARCHAR without NULL elements.
   [[nodiscard]] std::vector<std::string> Strings(idx_t column) const {

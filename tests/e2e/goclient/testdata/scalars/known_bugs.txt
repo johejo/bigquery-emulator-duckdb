@@ -80,10 +80,3 @@ SELECT APPROX_QUANTILES(r, 2 RESPECT NULLS) FROM UNNEST([
   RANGE<DATE> '[2020-01-01, 2020-02-01)', CAST(NULL AS RANGE<DATE>),
   RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']) AS r
 !> error: Array cannot have a null element; error in writing field f0_
-
-# A RANGE frame with an offset, ordered by FLOAT64, still sorts NaN after +inf, so the frame of
-# -inf leaves out the NaN that precedes it (analytic_sum_test). The documentation orders NaN
-# below -inf.
-# third_party/bigquery_docs/reference/standard-sql/data-types.md
-SELECT n FROM (SELECT id, COUNT(*) OVER (ORDER BY x RANGE BETWEEN UNBOUNDED PRECEDING AND 0 FOLLOWING) AS n FROM UNNEST([STRUCT(1 AS id, 1.0 AS x), (2, CAST('nan' AS FLOAT64)), (3, CAST('-inf' AS FLOAT64))])) WHERE id = 3
-!> "2"
