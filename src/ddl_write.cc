@@ -477,14 +477,12 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       ValidateForeignKey(
           stored, schema,
           self ? TableDescription{.schema = schema, .metadata = metadata} : foreign->referenced);
-      if (std::ranges::any_of(metadata.foreign_keys, [&](const ForeignKey& existing) {
-            return existing.generated_name != stored.generated_name;
-          })) {
-        throw ApiError::Unsupported("generated names for mixed named and unnamed foreign keys");
-      }
       if (stored.generated_name) {
         size_t maximum = 0;
         for (const ForeignKey& existing : metadata.foreign_keys) {
+          if (!existing.generated_name) {
+            continue;
+          }
           if (!existing.name.starts_with("fk$")) {
             throw ApiError::Unsupported("this generated foreign key name");
           }

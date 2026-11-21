@@ -1,0 +1,8 @@
+# BigQuery rejects a generated-style name when it is specified explicitly in CREATE TABLE
+# (bqanswers, johejo-sandbox, run kmscjotrjyjxjykmntohxhme6z, create_collision).
+CREATE SCHEMA IF NOT EXISTS bqa_fk_create_collision;
+CREATE OR REPLACE TABLE bqa_fk_create_collision.parent (id INT64 PRIMARY KEY NOT ENFORCED);
+CREATE TABLE bqa_fk_create_collision.child (a INT64, b INT64,
+  FOREIGN KEY (b) REFERENCES bqa_fk_create_collision.parent(id) NOT ENFORCED,
+  CONSTRAINT `fk$1` FOREIGN KEY (a) REFERENCES bqa_fk_create_collision.parent(id) NOT ENFORCED)
+=> error contains: Invalid field name "fk$1". Fields must contain only letters, numbers, and underscores, start with a letter or underscore, and be at most 300 characters long.

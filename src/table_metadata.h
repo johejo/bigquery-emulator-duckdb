@@ -304,9 +304,9 @@ void ValidateResourceTags(const std::map<std::string, std::string>& tags);
 void RejectEncryptionConfiguration(const nlohmann::json& body, const char* key,
                                    const std::string& what);
 
-// Assigns fk$1, fk$2, ... to an entirely unnamed list, in declaration order.
-// Mixing named and unnamed constraints remains unsupported until its numbering is verified.
-void AssignForeignKeyNames(std::vector<ForeignKey>& keys);
+// Assigns fk$1, fk$2, ... to unnamed keys in declaration order.
+// REST creation does not allow mixed names until its numbering is verified.
+void AssignForeignKeyNames(std::vector<ForeignKey>& keys, bool allow_mixed_names);
 
 // Validates a foreign key against the local and referenced schema. Forms whose validation
 // behavior is not established are rejected as unsupported rather than approximated.

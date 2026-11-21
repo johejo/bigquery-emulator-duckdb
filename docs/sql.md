@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 2 | 3 |
 | [Queries](#queries) | 36 | 2 |
 | [DML](#dml) | 9 | 0 |
-| [DDL](#ddl) | 25 | 8 |
+| [DDL](#ddl) | 26 | 7 |
 | [Collation](#collation) | 15 | 0 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
 | [INFORMATION_SCHEMA](#information_schema) | 13 | 0 |
@@ -108,7 +108,7 @@ rejected.
 | Column rounding modes | Supported |  |
 | Default rounding modes | Supported |  |
 | Partitioning and clustering | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
-| Primary and foreign keys | Partial | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). Unsupported: generated names for mixed named and unnamed foreign keys. |
+| Primary and foreign keys | Supported | See [Primary and foreign keys](compatibility.md#primary-and-foreign-keys). |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `CREATE TABLE LIKE` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
 | `CREATE TABLE COPY` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |

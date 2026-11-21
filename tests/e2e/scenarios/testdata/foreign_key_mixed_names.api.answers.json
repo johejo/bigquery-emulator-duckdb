@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "cases": {
+    "alter_add_named": {
+      "project": "johejo-sandbox",
+      "run": "kmscjotrjyjxjykmntohxhme6z",
+      "steps": {
+        "constraint_names": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.fk$1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "child.named_fk"
+                }
+              ]
+            }
+          ]
+        },
+        "create_parent": {
+          "jobComplete": true
+        },
+        "define_keys": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "b"
+                  }
+                ],
+                "name": "fk$1",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_alter_add_named",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              },
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "a"
+                  }
+                ],
+                "name": "named_fk",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_alter_add_named",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "alter_add_unnamed": {
+      "project": "johejo-sandbox",
+      "run": "kmscjotrjyjxjykmntohxhme6z",
+      "steps": {
+        "constraint_names": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.fk$1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "child.named_fk"
+                }
+              ]
+            }
+          ]
+        },
+        "create_parent": {
+          "jobComplete": true
+        },
+        "define_keys": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "a"
+                  }
+                ],
+                "name": "named_fk",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_alter_add_unnamed",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              },
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "b"
+                  }
+                ],
+                "name": "fk$1",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_alter_add_unnamed",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "create_named_first": {
+      "project": "johejo-sandbox",
+      "run": "kmscjotrjyjxjykmntohxhme6z",
+      "steps": {
+        "constraint_names": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.fk$1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "child.named_fk"
+                }
+              ]
+            }
+          ]
+        },
+        "create_parent": {
+          "jobComplete": true
+        },
+        "define_keys": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "a"
+                  }
+                ],
+                "name": "named_fk",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_create_named_first",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              },
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "b"
+                  }
+                ],
+                "name": "fk$1",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_create_named_first",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "create_unnamed_first": {
+      "project": "johejo-sandbox",
+      "run": "kmscjotrjyjxjykmntohxhme6z",
+      "steps": {
+        "constraint_names": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "child.fk$1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "child.named_fk"
+                }
+              ]
+            }
+          ]
+        },
+        "create_parent": {
+          "jobComplete": true
+        },
+        "define_keys": {
+          "jobComplete": true
+        },
+        "table": {
+          "tableConstraints": {
+            "foreignKeys": [
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "b"
+                  }
+                ],
+                "name": "fk$1",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_create_unnamed_first",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              },
+              {
+                "columnReferences": [
+                  {
+                    "referencedColumn": "id",
+                    "referencingColumn": "a"
+                  }
+                ],
+                "name": "named_fk",
+                "referencedTable": {
+                  "datasetId": "bqa_kmscjotrjyjxjykmntohxhme6z_create_unnamed_first",
+                  "projectId": "johejo-sandbox",
+                  "tableId": "parent"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

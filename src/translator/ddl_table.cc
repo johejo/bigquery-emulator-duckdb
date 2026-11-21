@@ -510,6 +510,12 @@ bool ForeignKeys(const googlesql::ResolvedCreateTableStmtBase& create, TableDefi
       Unsupported(scope, "this foreign key definition");
       return false;
     }
+    if (ToLowerAscii(key->constraint_name()).starts_with("fk$")) {
+      throw ApiError::Invalid(std::format(
+          "Invalid field name \"{}\". Fields must contain only letters, numbers, and underscores, "
+          "start with a letter or underscore, and be at most 300 characters long.",
+          key->constraint_name()));
+    }
     const auto description = referenced->Describe();
     if (!description) {
       Unsupported(scope, "foreign keys referencing views");
@@ -531,7 +537,7 @@ bool ForeignKeys(const googlesql::ResolvedCreateTableStmtBase& create, TableDefi
     ValidateForeignKey(stored, table.schema, *description);
     table.metadata.foreign_keys.push_back(std::move(stored));
   }
-  AssignForeignKeyNames(table.metadata.foreign_keys);
+  AssignForeignKeyNames(table.metadata.foreign_keys, /*allow_mixed_names=*/true);
   return true;
 }
 
