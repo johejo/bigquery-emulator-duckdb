@@ -289,9 +289,8 @@ Value tables are unsupported.
 
 ### GAP_FILL
 
-Value tables and nanosecond `TIMESTAMP` values are unsupported. Linear interpolation supports
-`INT64` and `FLOAT64` columns. A query fails when a partition has rows of one time point with
-different values, since which one BigQuery uses depends on row order.
+A query fails when a bucket reads a time point whose rows have different values, since which one
+BigQuery uses depends on row order.
 
 ### EXTERNAL_QUERY
 

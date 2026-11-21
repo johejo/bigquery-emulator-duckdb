@@ -71,7 +71,7 @@ functions.
 | [String functions](#string-functions) | 53 | 0 | 0 | 0 |
 | [Text analysis functions](#text-analysis-functions) | 3 | 0 | 0 | 0 |
 | [Time functions](#time-functions) | 8 | 0 | 0 | 0 |
-| [Time series functions](#time-series-functions) | 3 | 1 | 2 | 0 |
+| [Time series functions](#time-series-functions) | 4 | 0 | 2 | 0 |
 | [Timestamp functions](#timestamp-functions) | 15 | 0 | 0 | 0 |
 | [Utility functions](#utility-functions) | 2 | 0 | 0 | 0 |
 | [Vector index functions](#vector-index-functions) | 0 | 0 | 1 | 0 |
@@ -627,7 +627,7 @@ functions.
 | [`CHANGES`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Unsupported |  |  |
 | [`DATETIME_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | GoogleSQL function |  |
 | [`DATE_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | GoogleSQL function |  |
-| [`GAP_FILL`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Partial |  | See [GAP_FILL](compatibility.md#gap_fill) for limits. Unsupported: GAP_FILL linear gap filling of NUMERIC. |
+| [`GAP_FILL`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported |  | See [GAP_FILL](compatibility.md#gap_fill) for limits. |
 | [`TIMESTAMP_BUCKET`](../third_party/bigquery_docs/reference/standard-sql/time-series-functions.md) | Supported | GoogleSQL function |  |
 
 ## Timestamp functions

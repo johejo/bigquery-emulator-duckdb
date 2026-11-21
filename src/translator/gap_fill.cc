@@ -171,32 +171,41 @@ std::optional<Relation> GapFillScan(const googlesql::ResolvedTVFScan& tvf, const
 
   std::vector<std::string> keys;
   std::vector<std::string> data = {};
-  std::vector<std::string> row;
   for (size_t i = 1; i < sources.size(); ++i) {
     const std::string name = "_gf_" + std::to_string(i);
     data.push_back(sources.at(i) + " AS " + name);
     if (i <= partition_count) {
       keys.push_back(name);
-    } else {
-      row.push_back(IntervalKey(result.column(static_cast<int>(i)).type, name));
     }
   }
   const std::string partition = keys.empty() ? "" : "PARTITION BY " + Join(keys, ", ") + " ";
   const std::string key_list = keys.empty() ? "" : Join(keys, ", ") + ", ";
-  // A time point's rows must have equal values, which are condensed into one observation.
-  const std::string condensed = row.empty() ? "" : "row(" + Join(row, ", ") + ")";
   data.push_back(time.Key(sources.at(0)) + " AS _gf_raw");
+  // Rows of a time point with equal values are condensed into one observation. Which of
+  // different values BigQuery takes depends on the order rows arrive in, so a column marks them
+  // ambiguous, _gf_a, and fails where a bucket reads them.
+  const std::string point = "OVER (PARTITION BY " + key_list + "_gf_t)";
+  std::vector<std::string> ambiguous = {"*"};
+  for (size_t i = partition_count + 1; i < sources.size(); ++i) {
+    const std::string name = "_gf_" + std::to_string(i);
+    const std::string key = IntervalKey(result.column(static_cast<int>(i)).type, name);
+    ambiguous.push_back(std::format(
+        "min({0}) {2} IS DISTINCT FROM max({0}) {2} OR (count({1}) {2} > 0 AND count({1}) {2} < "
+        "count(*) {2}) AS _gf_a{3}",
+        key, name, point, i));
+  }
   // Rows without a time point are ignored.
   const std::string observed = std::format(
-      "SELECT * EXCLUDE (_gf_raw), {} AS _gf_t FROM (SELECT {}{}) AS q WHERE _gf_raw IS NOT NULL",
-      condensed.empty()
-          ? "_gf_raw"
-          : std::format("CASE WHEN min({0}) OVER (PARTITION BY {1}_gf_raw) IS DISTINCT FROM "
-                        "max({0}) OVER (PARTITION BY {1}_gf_raw) THEN error('The emulator does "
-                        "not support GAP_FILL different values at one time point') ELSE _gf_raw "
-                        "END",
-                        condensed, key_list),
-      Join(data, ", "), input->From());
+      "SELECT {} FROM (SELECT * EXCLUDE (_gf_raw), _gf_raw AS _gf_t FROM (SELECT {}{}) AS q WHERE "
+      "_gf_raw IS NOT NULL) AS q",
+      Join(ambiguous, ", "), Join(data, ", "), input->From());
+  // The value of an observation, which fails when it is ambiguous.
+  const auto read = [](const std::string& observation) {
+    return std::format(
+        "CASE WHEN {0}.a THEN error('The emulator does not support GAP_FILL different values at "
+        "one time point') ELSE {0}.v END",
+        observation);
+  };
   // Buckets lie at the origin plus a multiple of the width, from the earliest to the latest
   // time point of each partition. A month bucket is the origin plus whole months, on the last day
   // of a month shorter than the origin's day; the range of months may include points outside the
@@ -242,19 +251,20 @@ std::optional<Relation> GapFillScan(const googlesql::ResolvedTVFScan& tvf, const
     }
     std::string output = name;
     // An observation is a data row, which skips NULL values when ignore_null_values is TRUE.
-    const std::string observation =
-        std::format("CASE WHEN _gf_kind = 0{} THEN struct_pack(t := _gf_t, v := {}) END",
-                    ignore_nulls ? " AND " + name + " IS NOT NULL" : "", name);
+    const std::string observation = std::format(
+        "CASE WHEN _gf_kind = 0{} THEN struct_pack(t := _gf_t, v := {}, a := _gf_a{}) END",
+        ignore_nulls ? " AND " + name + " IS NOT NULL" : "", name, i);
     if (i <= partition_count) {
       windows.push_back(name);
     } else if (method == "null") {
       windows.push_back(std::format(
-          "(max(CASE WHEN _gf_kind = 0 THEN struct_pack(v := {0}) END) OVER (PARTITION BY "
-          "{1}_gf_t)).v AS {0}",
-          name, key_list));
+          "max(CASE WHEN _gf_kind = 0 THEN struct_pack(v := {0}, a := _gf_a{1}) END) {2} AS {0}",
+          name, i, point));
+      output = read(name);
     } else if (method == "locf") {
       windows.push_back(
-          std::format("(last_value({} IGNORE NULLS) {}).v AS {}", observation, preceding, name));
+          std::format("last_value({} IGNORE NULLS) {} AS {}", observation, preceding, name));
+      output = read(name);
     } else {
       windows.push_back(
           std::format("last_value({} IGNORE NULLS) {} AS {}_p", observation, preceding, name));
@@ -263,11 +273,29 @@ std::optional<Relation> GapFillScan(const googlesql::ResolvedTVFScan& tvf, const
       const std::string p = name + "_p";
       const std::string n = name + "_n";
       std::string interpolated;
-      if (result.column(static_cast<int>(i)).type->IsDouble()) {
+      // FLOAT64, NUMERIC and BIGNUMERIC add to the earlier value its difference to the later one
+      // times the fraction of the time between them that has elapsed, with their arithmetic,
+      // which rounds the fraction first.
+      const auto* type = result.column(static_cast<int>(i)).type;
+      if (type->IsDouble()) {
         interpolated = std::format(
-            "{0}.v + ({1}.v - {0}.v) * CAST(_gf_t - {0}.t AS DOUBLE) / CAST({1}.t - {0}.t AS "
-            "DOUBLE)",
+            "{0}.v + ({1}.v - {0}.v) * (CAST(_gf_t - {0}.t AS DOUBLE) / CAST({1}.t - {0}.t AS "
+            "DOUBLE))",
             p, n);
+      } else if (type->IsNumericType()) {
+        interpolated = std::format(
+            "{0}.v + bq_multiply_numeric({1}.v - {0}.v, bq_divide_numeric(CAST(_gf_t - {0}.t AS "
+            "DECIMAL(38,9)), CAST({1}.t - {0}.t AS DECIMAL(38,9))))",
+            p, n);
+      } else if (type->IsBigNumericType()) {
+        // A BIGNUMERIC crosses as the decimal text of its units of 10^-38.
+        const std::string units = "'" + std::string(38, '0') + "'";
+        interpolated = std::format(
+            "CAST(bq_bignumeric_add(CAST({0}.v AS VARCHAR), bq_bignumeric_multiply("
+            "bq_bignumeric_subtract(CAST({1}.v AS VARCHAR), CAST({0}.v AS VARCHAR)), "
+            "bq_bignumeric_divide(CAST(_gf_t - {0}.t AS VARCHAR) || {2}, CAST({1}.t - {0}.t AS "
+            "VARCHAR) || {2}))) AS BIGNUM)",
+            p, n, units);
       } else {
         // An INT64 rounds to the nearest integer, and a halfway value toward the later point's
         // value.
@@ -283,10 +311,11 @@ std::optional<Relation> GapFillScan(const googlesql::ResolvedTVFScan& tvf, const
             "WHEN {4}.v > {3}.v THEN 1 ELSE 0 END AS BIGINT)",
             numerator, denominator, remainder, p, n);
       }
+      // The later observation is read only between two values.
       output = std::format(
-          "CASE WHEN {0}.t = _gf_t THEN {0}.v WHEN {0}.v IS NULL OR {1}.v IS NULL THEN NULL ELSE "
-          "{2} END",
-          p, n, interpolated);
+          "CASE WHEN {0}.a THEN {2} WHEN {0}.t = _gf_t OR {0}.v IS NULL THEN {0}.v WHEN {1}.a THEN "
+          "{3} WHEN {1}.v IS NULL THEN NULL ELSE {4} END",
+          p, n, read(p), read(n), interpolated);
     }
     outputs.push_back(output);
   }

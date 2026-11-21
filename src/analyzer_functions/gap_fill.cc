@@ -4,6 +4,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -41,9 +42,6 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> GapFillSchema(
     const std::vector<googlesql::TVFInputArgumentType>& arguments,
     const googlesql::AnalyzerOptions& /*options*/) {
   const auto& input = arguments.at(0).relation();
-  if (input.is_value_table()) {
-    return Unsupported("value table");
-  }
   // The literal of each scalar argument, absent for an omitted one. GoogleSQL resolves an INTERVAL
   // literal as an expression, which the translation checks.
   constexpr size_t kWidth = 1;
@@ -88,22 +86,30 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> GapFillSchema(
   if (!ts_name || ts_name->is_null()) {
     return Unsupported("NULL argument");
   }
-  const auto find = [&](const std::string& name) -> const googlesql::TVFRelation::Column* {
+  // The input column of a name, of which BigQuery finds none in a value table.
+  const auto find =
+      [&](const std::string& name) -> absl::StatusOr<const googlesql::TVFRelation::Column*> {
     const googlesql::TVFRelation::Column* found = nullptr;
-    for (const auto& column : input.columns()) {
+    for (const auto& column : input.is_value_table()
+                                  ? std::span<const googlesql::TVFRelation::Column>()
+                                  : std::span(input.columns())) {
       if (absl::EqualsIgnoreCase(column.name, name)) {
         if (found != nullptr) {
-          return nullptr;
+          return Unsupported("ambiguous column " + name);
         }
         found = &column;
       }
     }
+    if (found == nullptr) {
+      return Invalid("Unrecognized column " + name);
+    }
     return found;
   };
-  const auto* ts = find(ts_name->string_value());
-  if (ts == nullptr) {
-    return absl::InvalidArgumentError("GAP_FILL requires an unambiguous time series column");
+  const auto found_ts = find(ts_name->string_value());
+  if (!found_ts.ok()) {
+    return found_ts.status();
   }
+  const auto* ts = *found_ts;
   if (!ts->type->IsDate() && !ts->type->IsDatetime() && !ts->type->IsTimestamp()) {
     return absl::InvalidArgumentError(
         "GAP_FILL requires a time series column of type DATE, DATETIME or TIMESTAMP");
@@ -132,10 +138,14 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> GapFillSchema(
     partition_names.assign(elements->begin(), elements->end());
   }
   for (const auto& name : partition_names) {
-    const auto* column = name.is_null() ? nullptr : find(name.string_value());
-    if (column == nullptr) {
-      return absl::InvalidArgumentError("GAP_FILL requires unambiguous partitioning columns");
+    if (name.is_null()) {
+      return Unsupported("NULL partitioning column");
     }
+    const auto found = find(name.string_value());
+    if (!found.ok()) {
+      return found.status();
+    }
+    const auto* column = *found;
     if (column->type->IsInterval() || column->type->IsStruct() || column->type->IsArray() ||
         !column->type->SupportsPartitioning(GoogleSqlLanguageOptions())) {
       return Unsupported("partitioning column type " +
@@ -157,10 +167,11 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> GapFillSchema(
       if (pair.is_null() || pair.field(0).is_null() || pair.field(1).is_null()) {
         return Unsupported("NULL value column");
       }
-      const auto* column = find(pair.field(0).string_value());
-      if (column == nullptr) {
-        return absl::InvalidArgumentError("GAP_FILL requires unambiguous value columns");
+      const auto found = find(pair.field(0).string_value());
+      if (!found.ok()) {
+        return found.status();
       }
+      const auto* column = *found;
       // Method names are case-insensitive.
       const std::string& method = pair.field(1).string_value();
       const bool linear = absl::EqualsIgnoreCase(method, "linear");
@@ -173,10 +184,6 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> GapFillSchema(
         return Invalid("Column " + column->name + " (" + type +
                        ") is not allowed for linear interpolation. Only columns with numeric "
                        "types are allowed");
-      }
-      // Linear interpolation of NUMERIC and BIGNUMERIC needs their rounded arithmetic.
-      if (linear && !column->type->IsInt64() && !column->type->IsDouble()) {
-        return Unsupported("linear gap filling of " + type);
       }
       if (auto status = add(column); !status.ok()) {
         return status;
@@ -226,7 +233,8 @@ void AddGapFill(googlesql::SimpleCatalog& catalog) {
   googlesql::FunctionArgumentTypeOptions origin(googlesql::FunctionArgumentType::OPTIONAL);
   origin.set_argument_name("origin", googlesql::kNamedOnly);
   catalog.AddOwnedTableValuedFunction(std::make_unique<googlesql::TableValuedFunction>(
-      std::vector<std::string>{"gap_fill"}, kBigQueryGroup,
+      // BigQuery names it GAP_FILL in errors, without a group.
+      std::vector<std::string>{"gap_fill"}, /*group=*/"",
       std::vector<googlesql::FunctionSignature>{
           googlesql::FunctionSignature(
               googlesql::ARG_KIND_RELATION,

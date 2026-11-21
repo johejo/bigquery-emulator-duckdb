@@ -30,15 +30,32 @@ SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTE
 SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 1 DAY, origin => DATE_ADD(DATE '2023-11-01', INTERVAL 0 DAY))
 => error contains: Argument 6 must a literal
 
-# BigQuery names the function GAP_FILL, without the emulator's function group.
 SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t), time_series_column => 't', bucket_width => INTERVAL 1 DAY)
-=> error contains: Named argument time_series_column not found in signature for call to function
+=> error contains: Named argument time_series_column not found in signature for call to function GAP_FILL
+
+# Columns the input does not have.
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 'x', INTERVAL 1 DAY)
+=> error contains: Unrecognized column x
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 1 DAY, partitioning_columns => ['x'])
+=> error contains: Unrecognized column x
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 1 DAY, value_columns => [('x', 'locf')])
+=> error contains: Unrecognized column x
+
+# BigQuery finds no columns in a value table.
+SELECT STRING_AGG(TO_JSON_STRING(g), ';') FROM GAP_FILL((SELECT AS STRUCT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT AS STRUCT DATE '2023-11-03', 3), 't', INTERVAL 1 DAY) AS g
+=> error contains: Unrecognized column t
 
 # Forms the emulator rejects. BigQuery's answers to them are in scalars/known_bugs.txt, or
 # unverified in unverified/gap_fill.txt.
 
-SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', 2), 't', INTERVAL 1 DAY)
+SELECT STRING_AGG(CAST(v AS STRING)) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', 2), 't', INTERVAL 1 DAY)
 => error contains: The emulator does not support GAP_FILL different values at one time point
 
-SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '1.5' AS v), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
-=> error contains: The emulator does not support GAP_FILL linear gap filling of NUMERIC
+SELECT STRING_AGG(CAST(v AS STRING)) FROM GAP_FILL((SELECT DATETIME '2023-11-01 00:00:00' AS t, 1 AS v UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 2 UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 4 UNION ALL SELECT DATETIME '2023-11-01 00:01:30', 5), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'locf')])
+=> error contains: The emulator does not support GAP_FILL different values at one time point
+
+SELECT STRING_AGG(CAST(v AS STRING)) FROM GAP_FILL((SELECT DATETIME '2023-11-01 00:00:00' AS t, 1 AS v UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 2 UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 4 UNION ALL SELECT DATETIME '2023-11-01 00:01:30', 5), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'linear')])
+=> error contains: The emulator does not support GAP_FILL different values at one time point
+
