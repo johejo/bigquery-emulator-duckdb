@@ -123,9 +123,13 @@ absl::Status Engine::Exception(std::string_view name, int line, int column) {
   JSValue const exception = JS_GetException(context_);
   std::string message = String(exception).value_or("JavaScript exception");
   // The generated function header occupies the first line, before the SQL UDF body.
-  if (JS_IsError(exception) && line > 1 && column > 0) {
-    message += " at " + std::string(name) + "() line " + std::to_string(line - 1) + ", column " +
-               std::to_string(column);
+  if (line > 1 && column > 0) {
+    message += " at " + std::string(name) + "() line " + std::to_string(line - 1);
+    if (column == 1) {
+      message += ", column 1";
+    } else {
+      message += ", columns " + std::to_string(column - 1) + "-" + std::to_string(column);
+    }
   }
   JS_FreeValue(context_, exception);
   return absl::OutOfRangeError(message);

@@ -5,7 +5,7 @@ diff --git a/quickjs.h b/quickjs.h
  
  JS_EXTERN JSValue JS_Call(JSContext *ctx, JSValueConst func_obj,
                            JSValueConst this_obj, int argc, JSValueConst *argv);
-+/* Like JS_Call, with the source location of a pending explicit throw in func_obj.
++/* Like JS_Call, with the source location of a pending explicit throw in the same source as func_obj.
 +   Both outputs are zero if there is no such location. */
 +JS_EXTERN JSValue JS_CallWithThrowLocation(JSContext *ctx, JSValueConst func_obj,
 +                                           JSValueConst this_obj, int argc, JSValueConst *argv,
@@ -16,11 +16,13 @@ diff --git a/quickjs.h b/quickjs.h
 diff --git a/quickjs-opcode.h b/quickjs-opcode.h
 --- a/quickjs-opcode.h
 +++ b/quickjs-opcode.h
-@@ -116,6 +116,7 @@
+@@ -116,6 +116,9 @@
  DEF(      add_brand, 1, 2, 0, none) /* this_obj home_obj -> */
  DEF(   return_async, 1, 1, 0, none)
  DEF(          throw, 1, 1, 0, none)
 +DEF(   throw_at_loc, 9, 1, 0, u32x2) /* explicit throw, with source line and column */
++DEF(    caught_loc, 1, 0, 2, none) /* push the location consumed by the catch handler */
++DEF(   rethrow_loc, 1, 3, 0, none) /* exception line column -> */
  DEF(    throw_error, 6, 0, 0, atom_u8)
  DEF(           eval, 5, 1, 1, npop_u16) /* func args... -> ret_val */
  DEF(     apply_eval, 3, 2, 1, u16) /* func array -> ret_eval */
@@ -32,7 +34,7 @@ diff --git a/quickjs.c b/quickjs.c
  
      JSValue current_exception;
 +    struct JSThrowLocation {
-+        JSValueConst function;
++        JSAtom filename;
 +        int line, column;
 +    } *throw_location;
      /* true if inside an out of memory error, to avoid recursing */
@@ -60,23 +62,45 @@ diff --git a/quickjs.c b/quickjs.c
      return val;
  }
  
-@@ -18189,6 +18201,15 @@
+@@ -17558,6 +17570,7 @@
+     JSStackFrame sf_s, *sf = &sf_s;
+     uint8_t *pc;
+     int opcode, arg_allocated_size, i;
++    int caught_line = 0, caught_column = 0;
+     JSValue *local_buf, *stack_buf, *var_buf, *arg_buf, *sp, ret_val, *pval;
+     JSVarRef **var_refs;
+     size_t alloca_size;
+@@ -18189,6 +18202,29 @@
          CASE(OP_throw):
              JS_Throw(ctx, *--sp);
              goto exception;
 +        CASE(OP_throw_at_loc):
 +            JS_Throw(ctx, *--sp);
-+            if (rt->throw_location && js_same_value(ctx, sf->cur_func,
-+                                                    rt->throw_location->function)) {
++            if (rt->throw_location && b->filename &&
++                b->filename == rt->throw_location->filename) {
 +                rt->throw_location->line = get_u32(pc);
 +                rt->throw_location->column = get_u32(pc + 4);
 +            }
 +            pc += 8;
 +            goto exception;
++        CASE(OP_caught_loc):
++            *sp++ = JS_NewInt32(ctx, caught_line);
++            *sp++ = JS_NewInt32(ctx, caught_column);
++            BREAK;
++        CASE(OP_rethrow_loc): {
++            int column = JS_VALUE_GET_INT(*--sp);
++            int line = JS_VALUE_GET_INT(*--sp);
++            JS_Throw(ctx, *--sp);
++            if (rt->throw_location) {
++                rt->throw_location->line = line;
++                rt->throw_location->column = column;
++            }
++            goto exception;
++        }
  
          CASE(OP_throw_error):
  #define JS_THROW_VAR_RO             0
-@@ -20321,9 +20342,13 @@
+@@ -20321,9 +20357,13 @@
   exception:
      if (needs_backtrace(rt->current_exception)
      || JS_IsUndefined(ctx->error_back_trace)) {
@@ -90,7 +114,7 @@ diff --git a/quickjs.c b/quickjs.c
      }
      if (!JS_IsUncatchableError(rt->current_exception)) {
          while (sp > stack_buf) {
-@@ -20335,10 +20360,12 @@
+@@ -20335,10 +20375,14 @@
                      /* enumerator: close it with a throw */
                      JS_FreeValue(ctx, sp[-1]); /* drop the next method */
                      sp--;
@@ -101,11 +125,13 @@ diff --git a/quickjs.c b/quickjs.c
                  } else {
 -                    *sp++ = rt->current_exception;
 -                    rt->current_exception = JS_UNINITIALIZED;
++                    caught_line = rt->throw_location ? rt->throw_location->line : 0;
++                    caught_column = rt->throw_location ? rt->throw_location->column : 0;
 +                    *sp++ = JS_GetException(ctx);
                      JS_FreeValueRT(rt, ctx->error_back_trace);
                      ctx->error_back_trace = JS_UNDEFINED;
                      pc = b->byte_code_buf + pos;
-@@ -20375,6 +20402,21 @@
+@@ -20375,6 +20419,26 @@
  {
      return JS_CallInternal(ctx, func_obj, this_obj, JS_UNDEFINED,
                             argc, argv, JS_CALL_FLAG_COPY_ARGV);
@@ -116,7 +142,12 @@ diff --git a/quickjs.c b/quickjs.c
 +                                 int *line, int *column)
 +{
 +    JSRuntime *rt = ctx->rt;
-+    struct JSThrowLocation location = { func_obj, 0, 0 };
++    struct JSThrowLocation location = { JS_ATOM_NULL, 0, 0 };
++    if (JS_IsObject(func_obj)) {
++        JSObject *p = JS_VALUE_GET_OBJ(func_obj);
++        if (js_class_has_bytecode(p->class_id))
++            location.filename = p->u.func.function_bytecode->filename;
++    }
 +    struct JSThrowLocation *previous = rt->throw_location;
 +    rt->throw_location = &location;
 +    JSValue result = JS_Call(ctx, func_obj, this_obj, argc, argv);
@@ -127,15 +158,16 @@ diff --git a/quickjs.c b/quickjs.c
  }
  
  static JSValue JS_CallFree(JSContext *ctx, JSValue func_obj, JSValueConst this_obj,
-@@ -23369,6 +23411,7 @@
+@@ -23369,6 +23433,8 @@
      case OP_return_undef:
      case OP_return_async:
      case OP_throw:
 +    case OP_throw_at_loc:
++    case OP_rethrow_loc:
      case OP_throw_error:
      case OP_goto:
      case OP_goto8:
-@@ -28794,7 +28837,9 @@
+@@ -28794,7 +28860,9 @@
          if (js_parse_expect_semi(s))
              goto fail;
          break;
@@ -146,7 +178,7 @@ diff --git a/quickjs.c b/quickjs.c
          if (next_token(s))
              goto fail;
          if (s->got_lf) {
-@@ -28804,10 +28849,13 @@
+@@ -28804,10 +28872,13 @@
          emit_source_loc(s);
          if (js_parse_expr(s))
              goto fail;
@@ -161,36 +193,92 @@ diff --git a/quickjs.c b/quickjs.c
      case TOK_AWAIT:
          /* Check for 'await using' declaration */
          if (s->cur_func->func_kind & JS_FUNC_ASYNC) {
-@@ -34437,6 +34485,7 @@
+@@ -29326,6 +29397,7 @@
+     case TOK_TRY:
+         {
+             int label_catch, label_catch2, label_finally, label_end;
++            int rethrow_label;
+             JSAtom name;
+             BlockEnv block_env;
+ 
+@@ -29423,22 +29495,36 @@
+                 }
+                 /* catch exceptions thrown in the catch block to execute the
+                  * finally clause and rethrow the exception */
+-                emit_label(s, label_catch2);
+-                /* catch value is at TOS, no need to push undefined */
+-                emit_goto(s, OP_gosub, label_finally);
+-                emit_op(s, OP_throw);
++                rethrow_label = label_catch2;
+ 
+             } else if (s->token.val == TOK_FINALLY) {
+                 /* finally without catch : execute the finally clause
+                  * and rethrow the exception */
+-                emit_label(s, label_catch);
+-                /* catch value is at TOS, no need to push undefined */
+-                emit_goto(s, OP_gosub, label_finally);
+-                emit_op(s, OP_throw);
++                rethrow_label = label_catch;
+             } else {
+                 js_parse_error(s, "expecting catch or finally");
+                 goto fail;
+             }
++            /* Save the caught location in hidden locals while finally runs. A throw
++               caught inside finally must not replace the original location. */
++            int throw_line = add_var(ctx, s->cur_func, JS_ATOM_NULL);
++            int throw_column = add_var(ctx, s->cur_func, JS_ATOM_NULL);
++            if (throw_line < 0 || throw_column < 0)
++                goto fail;
++            emit_label(s, rethrow_label);
++            emit_op(s, OP_caught_loc);
++            emit_op(s, OP_put_loc);
++            emit_u16(s, throw_column);
++            emit_op(s, OP_put_loc);
++            emit_u16(s, throw_line);
++            /* catch value is at TOS, no need to push undefined */
++            emit_goto(s, OP_gosub, label_finally);
++            emit_op(s, OP_get_loc);
++            emit_u16(s, throw_line);
++            emit_op(s, OP_get_loc);
++            emit_u16(s, throw_column);
++            emit_op(s, OP_rethrow_loc);
++
+             emit_label(s, label_finally);
+             if (s->token.val == TOK_FINALLY) {
+                 int saved_eval_ret_idx = 0; /* avoid warning */
+@@ -34437,6 +34523,8 @@
          case OP_return:
          case OP_return_undef:
          case OP_throw:
 +        case OP_throw_at_loc:
++        case OP_rethrow_loc:
          case OP_throw_error:
          case OP_ret:
              {
-@@ -35072,6 +35121,7 @@
+@@ -35072,6 +35160,8 @@
          case OP_return_undef:
          case OP_return_async:
          case OP_throw:
 +        case OP_throw_at_loc:
++        case OP_rethrow_loc:
          case OP_throw_error:
              pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next,
                                        &line_num, &col_num);
-@@ -35951,6 +36001,7 @@
+@@ -35951,6 +36041,8 @@
          case OP_return_undef:
          case OP_return_async:
          case OP_throw:
 +        case OP_throw_at_loc:
++        case OP_rethrow_loc:
          case OP_throw_error:
          case OP_ret:
              goto done_insn;
-@@ -37653,7 +37704,8 @@
+@@ -37653,7 +37745,8 @@
      BC_TAG_SYMBOL,
  } BCTagEnum;
  
 -#define BC_VERSION 26
-+/* Local bytecode differs from upstream because of OP_throw_at_loc. */
++/* Local bytecode differs from upstream because of the throw-location opcodes. */
 +#define BC_VERSION (0x80 | 26)
  
  typedef struct BCWriterState {

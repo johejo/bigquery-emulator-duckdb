@@ -8,7 +8,7 @@ Keeping the symbols distinct avoids duplicate symbols or binding calls to the wr
 implementation when the emulator statically links both libraries, regardless of link order.
 
 `throw_location.patch` records the source position of an explicit `throw` separately from
-`Error.stack`. The parser saves the `throw` token's location in a dedicated opcode so that
-compiler-generated rethrows do not get attributed to a source statement. The host can read the
-location of a pending throw from the function it called without relying on JavaScript stack
-formatting or changing the `Error` object.
+`Error.stack`. The parser saves the `throw` token's location in a dedicated opcode. A rethrow
+after `finally` restores that location, even if the `finally` block handled another exception.
+The host can read the location of a pending throw from the same source as the function it
+called, including its nested functions, without relying on JavaScript stack formatting.
