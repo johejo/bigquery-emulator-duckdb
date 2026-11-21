@@ -185,11 +185,8 @@ struct Step {
 
 using Children = std::map<const googlesql::GraphNodeTable*, std::vector<const SchemaEdge*>>;
 
-// Orders the edges that relate a node table to others as BigQuery joins them: in the order the
-// graph defines the edge tables, whatever the order of their node tables. Each related table but
-// the last must have none of its own, where joining depth-first and breadth-first agree, since
-// BigQuery's choice is unverified.
-absl::Status OrderRelated(std::vector<const SchemaEdge*>& related, const Children& children,
+// BigQuery joins siblings in edge declaration order, regardless of node declaration order.
+absl::Status OrderRelated(std::vector<const SchemaEdge*>& related,
                           const std::vector<std::string>& order) {
   if (related.size() < 2) {
     return absl::OkStatus();
@@ -207,16 +204,10 @@ absl::Status OrderRelated(std::vector<const SchemaEdge*>& related, const Childre
     return Unsupported("of a node table related to more than one node table");
   }
   std::ranges::sort(related, {}, [&](const SchemaEdge* edge) { return position(edge->table); });
-  if (std::any_of(related.begin(), std::prev(related.end()),
-                  [&](const SchemaEdge* edge) { return children.contains(edge->to); })) {
-    return Unsupported(
-        "of a node table related to more than one node table, other than the last of which are "
-        "related to further node tables");
-  }
   return absl::OkStatus();
 }
 
-// Adds to `steps` the tables joined from the node table of step `index`, depth-first.
+// Adds the immediately related tables, keeping each non-inlined edge next to its destination.
 absl::Status AddRelated(const googlesql::GraphNodeTable* node, std::size_t index,
                         const Children& children, const std::vector<std::string>& order,
                         std::vector<Step>& steps) {
@@ -225,7 +216,7 @@ absl::Status AddRelated(const googlesql::GraphNodeTable* node, std::size_t index
     return absl::OkStatus();
   }
   auto related = found->second;
-  if (auto status = OrderRelated(related, children, order); !status.ok()) {
+  if (auto status = OrderRelated(related, order); !status.ok()) {
     return status;
   }
   for (const SchemaEdge* edge : related) {
@@ -253,10 +244,6 @@ absl::Status AddRelated(const googlesql::GraphNodeTable* node, std::size_t index
         .referencing = edge->to_reference->GetEdgeTableColumns(),
         .with_key = false,
     });
-    if (auto status = AddRelated(edge->to, steps.size() - 1, children, order, steps);
-        !status.ok()) {
-      return status;
-    }
   }
   return absl::OkStatus();
 }
@@ -408,9 +395,6 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
         "GRAPH_EXPAND requires every node table to have at most one incoming relationship");
   }
 
-  if (!flatten && reachable.size() > 2) {
-    return Unsupported("with flatten_results => FALSE and more than one relationship");
-  }
   const bool nested = !flatten && children.contains(root);
 
   // The tables joined from the root, each edge table that is not inlined between its two node
@@ -421,8 +405,15 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
   std::vector<Step> steps = {
       {.table = root, .parent = 0, .referenced = {}, .referencing = {}, .with_key = false},
   };
-  if (auto status = AddRelated(root, 0, children, order, steps); !status.ok()) {
-    return status;
+  // BigQuery emits all siblings before proceeding to their descendants. Appending to the list
+  // while visiting it produces that breadth-first order and keeps every parent before its child.
+  for (std::size_t i = 0; i < steps.size(); ++i) {
+    const auto* node = steps.at(i).table->AsNodeTable();
+    if (node != nullptr) {
+      if (auto status = AddRelated(node, i, children, order, steps); !status.ok()) {
+        return status;
+      }
+    }
   }
   // The columns of each table that joins compare.
   std::vector<std::set<int>> joined(steps.size());
@@ -448,8 +439,8 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
       return properties.status();
     }
     if (step.with_key) {
-      // BigQuery answers an edge's key columns among its properties, but not the other columns
-      // that reference the previous table.
+      // BigQuery appends an edge's key columns not already exposed as properties, but not the
+      // other columns that reference the previous table.
       for (const int column : element.GetKeyColumns()) {
         const std::string name = ColumnName(element, column);
         const auto same = std::ranges::find_if(
@@ -460,7 +451,6 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
           return Unsupported("of an edge table with a property named after a key column");
         }
       }
-      std::ranges::sort(*properties);
     }
     for (std::size_t p = 0; p < properties->size(); ++p) {
       projections.push_back("(" + properties->at(p).sql + ") AS p" + std::to_string(p));
@@ -502,6 +492,7 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
   }
   if (nested) {
     for (std::size_t i = steps.size() - 1; i > 0; --i) {
+      // Prepend siblings as we walk backward so the nested layout follows declaration order.
       const Step& step = steps.at(i);
       auto& parent = columns.at(step.parent);
       const std::string& name = labels.at(step.table);
@@ -511,12 +502,13 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
         return Unsupported(
             "with flatten_results => FALSE and a property named after a joined table");
       }
-      parent.push_back({
-          .name = name,
-          .body_index = presence.at(i),
-          .is_row = true,
-          .fields = std::move(columns.at(i)),
-      });
+      const auto first_row = std::ranges::find_if(parent, &GraphExpandColumn::is_row);
+      parent.insert(first_row, GraphExpandColumn{
+                                   .name = name,
+                                   .body_index = presence.at(i),
+                                   .is_row = true,
+                                   .fields = std::move(columns.at(i)),
+                               });
     }
   } else {
     for (std::size_t i = 1; i < steps.size(); ++i) {

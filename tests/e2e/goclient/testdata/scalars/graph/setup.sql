@@ -280,3 +280,27 @@ CREATE PROPERTY GRAPH scalar_graph.ShopSizes
   NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS P)
   EDGE TABLES (scalar_graph.Shops AS SP KEY (id) SOURCE KEY (id, size) REFERENCES S (id, size)
     DESTINATION KEY (place_id) REFERENCES P (id) PROPERTIES (size AS edge_size));
+
+-- The first branch has a descendant; the second branch survives when the first is missing.
+CREATE TABLE scalar_graph.ExpandRoots (id INT64 PRIMARY KEY NOT ENFORCED)
+AS SELECT id FROM UNNEST([1, 2, 3]) AS id;
+CREATE TABLE scalar_graph.ExpandBranches (id INT64 PRIMARY KEY NOT ENFORCED, leaf_id INT64)
+AS SELECT 10 AS id, 100 AS leaf_id UNION ALL SELECT 20, NULL;
+CREATE TABLE scalar_graph.ExpandLeaves (id INT64 PRIMARY KEY NOT ENFORCED, name STRING)
+AS SELECT 100 AS id, 'leaf' AS name;
+CREATE TABLE scalar_graph.ExpandSiblings (id INT64 PRIMARY KEY NOT ENFORCED, name STRING)
+AS SELECT 200 AS id, 'sibling' AS name;
+CREATE TABLE scalar_graph.ExpandRootBranch (id INT64 PRIMARY KEY NOT ENFORCED, target_id INT64, score INT64)
+AS SELECT 1 AS id, 10 AS target_id, 11 AS score UNION ALL SELECT 2, 20, 22;
+CREATE TABLE scalar_graph.ExpandRootSibling (id INT64 PRIMARY KEY NOT ENFORCED, target_id INT64, score INT64)
+AS SELECT id, 200 AS target_id, id * 2 AS score FROM UNNEST([1, 2, 3]) AS id;
+CREATE PROPERTY GRAPH scalar_graph.ExpandTree
+  NODE TABLES (scalar_graph.ExpandRoots AS A, scalar_graph.ExpandBranches AS B,
+    scalar_graph.ExpandLeaves AS C, scalar_graph.ExpandSiblings AS D)
+  EDGE TABLES (
+    scalar_graph.ExpandRootBranch AS AB SOURCE KEY (id) REFERENCES A (id)
+      DESTINATION KEY (target_id) REFERENCES B (id) PROPERTIES (score AS branch_score),
+    scalar_graph.ExpandRootSibling AS AD SOURCE KEY (id) REFERENCES A (id)
+      DESTINATION KEY (target_id) REFERENCES D (id) PROPERTIES (score AS sibling_score),
+    scalar_graph.ExpandBranches AS BC SOURCE KEY (id) REFERENCES B (id)
+      DESTINATION KEY (leaf_id) REFERENCES C (id));

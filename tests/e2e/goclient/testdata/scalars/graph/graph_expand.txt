@@ -74,6 +74,25 @@ SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scala
 SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopSizes') AS t
 => "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SP_edge_size\":3,\"SP_id\":1,\"P_id\":1,\"P_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SP_edge_size\":4,\"SP_id\":2,\"P_id\":null,\"P_name\":null}"
 
+# BigQuery answers collected with tools/bqanswers: flattened output puts the second branch
+# before the first branch's descendants. In nested output, C is reached through B without BC.
+# A missing AB or C does not remove the unrelated AD branch.
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY A_id) FROM GRAPH_EXPAND('scalar_graph.ExpandTree') AS t
+=> "{\"A_id\":1,\"AB_branch_score\":11,\"AB_id\":1,\"B_id\":10,\"B_leaf_id\":100,\"AD_sibling_score\":2,\"AD_id\":1,\"D_id\":200,\"D_name\":\"sibling\",\"C_id\":100,\"C_name\":\"leaf\"},{\"A_id\":2,\"AB_branch_score\":22,\"AB_id\":2,\"B_id\":20,\"B_leaf_id\":null,\"AD_sibling_score\":4,\"AD_id\":2,\"D_id\":200,\"D_name\":\"sibling\",\"C_id\":null,\"C_name\":null},{\"A_id\":3,\"AB_branch_score\":null,\"AB_id\":null,\"B_id\":null,\"B_leaf_id\":null,\"AD_sibling_score\":6,\"AD_id\":3,\"D_id\":200,\"D_name\":\"sibling\",\"C_id\":null,\"C_name\":null}"
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT id, AB.branch_score, AB.B.id AS branch_id,
+    AD.sibling_score, AD.D.name AS sibling_name
+  FROM GRAPH_EXPAND('scalar_graph.ExpandTree', flatten_results => FALSE) ORDER BY id
+))
+=> "[{\"id\":1,\"branch_score\":11,\"branch_id\":10,\"sibling_score\":2,\"sibling_name\":\"sibling\"},{\"id\":2,\"branch_score\":22,\"branch_id\":20,\"sibling_score\":4,\"sibling_name\":\"sibling\"},{\"id\":3,\"branch_score\":null,\"branch_id\":null,\"sibling_score\":6,\"sibling_name\":\"sibling\"}]"
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT id, AB.B.C.name AS leaf_name
+  FROM GRAPH_EXPAND('scalar_graph.ExpandTree', flatten_results => FALSE) ORDER BY id
+))
+=> "[{\"id\":1,\"leaf_name\":\"leaf\"},{\"id\":2,\"leaf_name\":null},{\"id\":3,\"leaf_name\":null}]"
+SELECT * FROM GRAPH_EXPAND('scalar_graph.ExpandTree', flatten_results => FALSE) ORDER BY id
+=> error contains: Returning expressions of type ROW is not allowed
+
 # Graphs that the documented input limitations exclude: multiple root node tables without
 # start_node, and a label other than the default one.
 SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreLocations')

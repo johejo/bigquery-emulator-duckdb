@@ -34,7 +34,7 @@ rejected.
 | --- | --- | --- |
 | `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: measures, property options or computed properties that call user-defined functions or read parameters, variables or constants. |
 | `DROP PROPERTY GRAPH` | Supported |  |
-| `GRAPH_EXPAND` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: GRAPH_EXPAND with flatten_results => FALSE and more than one relationship. |
+| `GRAPH_EXPAND` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: measures, property options or computed properties that call user-defined functions or read parameters, variables or constants. |
 | `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: function $EQUAL with graph values. |
 | GQL queries | Supported | [Graph limits](compatibility.md#graphs). |
 
