@@ -104,7 +104,9 @@ TEST_F(DuckDbTableSourceTest, DeferredReadOutlivesProviderAndKeepsFilesWithRows)
   }
   auto resources = std::make_shared<StatementResources>(StatementResources::Mode::kExecute);
   const auto sql = StatementResources::ReadQuery(kTable, definition, resources.get());
-  ASSERT_TRUE(sql.has_value());
+  if (!sql.has_value()) {
+    GTEST_FAIL() << "no read query";
+  }
   auto result = backend.Execute(*sql);
   result.rows.KeepResources(resources);
   resources.reset();

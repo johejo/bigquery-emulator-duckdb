@@ -1,7 +1,7 @@
 diff --git a/googlesql/compliance/sql_test_base.cc b/googlesql/compliance/sql_test_base.cc
 --- a/googlesql/compliance/sql_test_base.cc
 +++ b/googlesql/compliance/sql_test_base.cc
-@@ -1674,6 +1674,18 @@
+@@ -1675,6 +1675,18 @@ void SQLTestBase::RunSQLOnFeaturesAndValidateResult(
      }
      SCOPED_TRACE(sql);
      // TODO: Should we do something with 'is_deterministic_output'?

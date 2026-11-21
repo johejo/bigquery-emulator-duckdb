@@ -212,7 +212,9 @@ TEST(StatementResourcesTest, ScalarExpressionKeepsItsOwnExecutionScope) {
                                                .resources = resources,
                                            },
                                            &unsupported, nullptr);
-    ASSERT_TRUE(query.has_value()) << unsupported;
+    if (!query.has_value()) {
+      GTEST_FAIL() << unsupported;
+    }
     EXPECT_NO_THROW(backend.Execute(*query));
     EXPECT_TRUE(std::filesystem::exists(path));
   }
@@ -228,7 +230,9 @@ TEST(StatementResourcesTest, StorageSnapshotRetainsFilesThroughConsumption) {
       path = files.Write("value\n7\n");
       return FileQuery(files, path);
     });
-    ASSERT_TRUE(statement.result_schema.has_value());
+    if (!statement.result_schema.has_value()) {
+      GTEST_FAIL() << "no result schema";
+    }
     snapshot =
         backend.ExecuteStorageRead(statement.sql, *statement.result_schema, statement.resources);
   }

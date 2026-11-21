@@ -1,19 +1,30 @@
 diff --git a/MODULE.bazel b/MODULE.bazel
 --- a/MODULE.bazel
 +++ b/MODULE.bazel
-@@ -53,7 +53,7 @@
- bazel_dep(name = "bazel_features", version = "1.33.0")
- bazel_dep(name = "bazel_skylib", version = "1.8.1")
+@@ -53,7 +53,7 @@ bazel_dep(name = "aspect_rules_esbuild", version = "0.27.1")
+ bazel_dep(name = "bazel_features", version = "1.51.0")
+ bazel_dep(name = "bazel_skylib", version = "1.9.2")
  bazel_dep(name = "boost.variant", version = "1.89.0")
--bazel_dep(name = "boringssl", version = "0.20250818.0")
+-bazel_dep(name = "boringssl", version = "0.20260413.0")
 +bazel_dep(name = "openssl", version = "3.5.5.bcr.4")
- bazel_dep(name = "civetweb", version = "1.16.bcr.3")
- bazel_dep(name = "gazelle", version = "0.46.0", repo_name = "bazel_gazelle")
- bazel_dep(name = "google_bazel_common", version = "0.0.1")
+ bazel_dep(name = "c-ares", version = "1.34.9.bcr.1", repo_name = "com_github_cares_cares")
+ bazel_dep(name = "civetweb", version = "1.16.bcr.4")
+ bazel_dep(name = "gazelle", version = "0.47.0", repo_name = "bazel_gazelle")
+diff --git a/bazel/http_archive_deps.bzl b/bazel/http_archive_deps.bzl
+--- a/bazel/http_archive_deps.bzl
++++ b/bazel/http_archive_deps.bzl
+@@ -33,6 +33,7 @@ def _http_archive_deps_impl(_):
+     http_archive(
+         name = "com_google_cc_differential_privacy",
+         patch_cmds = [
++            "sed -i.bak 's|@boringssl//|@openssl//|g' algorithms/BUILD",
+             "for f in $(find . -name BUILD); do " +
+             "grep -q '@rules_cc' \"$f\" || { { printf 'load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")\\n'; cat \"$f\"; } > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; }; " +
+             "done",
 diff --git a/googlesql/base/BUILD b/googlesql/base/BUILD
 --- a/googlesql/base/BUILD
 +++ b/googlesql/base/BUILD
-@@ -719,7 +719,7 @@
+@@ -689,7 +689,7 @@ cc_library(
          "exactfloat.h",
      ],
      deps = [
@@ -25,7 +36,7 @@ diff --git a/googlesql/base/BUILD b/googlesql/base/BUILD
 diff --git a/googlesql/public/functions/BUILD b/googlesql/public/functions/BUILD
 --- a/googlesql/public/functions/BUILD
 +++ b/googlesql/public/functions/BUILD
-@@ -1274,7 +1274,7 @@
+@@ -1275,7 +1275,7 @@ cc_library(
          "//googlesql/base",
          "//googlesql/base:check",
          "//googlesql/base:endian",
@@ -34,14 +45,3 @@ diff --git a/googlesql/public/functions/BUILD b/googlesql/public/functions/BUILD
          "@com_google_absl//absl/base",
          "@com_google_absl//absl/base:core_headers",
          "@com_google_absl//absl/numeric:int128",
-diff --git a/bazel/http_archive_deps.bzl b/bazel/http_archive_deps.bzl
---- a/bazel/http_archive_deps.bzl
-+++ b/bazel/http_archive_deps.bzl
-@@ -26,6 +26,7 @@
- 
-     http_archive(
-         name = "com_google_cc_differential_privacy",
-+        patch_cmds = ["sed -i.bak 's|@boringssl//|@openssl//|g' algorithms/BUILD"],
-         sha256 = "1a8612290740bd0bacc7052df7accb4f3368e2c2cb3de8eb608f58522c2e1891",
-         strip_prefix = "differential-privacy-4.0.0/cc",
-         url = "https://github.com/google/differential-privacy/archive/refs/tags/v4.0.0.tar.gz",

@@ -3,14 +3,14 @@ module(
     version = "0.0.0",
 )
 
-bazel_dep(name = "abseil-cpp", version = "20260526.0")
+bazel_dep(name = "abseil-cpp", version = "20260817.0")
 bazel_dep(name = "openssl", version = "3.5.5.bcr.4")
 bazel_dep(name = "curl", version = "8.22.0")
 bazel_dep(name = "google_cloud_cpp", version = "3.12.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
 bazel_dep(name = "grpc", version = "1.84.0")
-bazel_dep(name = "googlesql", version = "2026.11.1")
-bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
+bazel_dep(name = "googlesql", version = "2026.11.3")
+bazel_dep(name = "googletest", version = "1.18.0", repo_name = "com_google_googletest")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "cli11", version = "2.7.2")
 bazel_dep(name = "core_math")
@@ -22,15 +22,15 @@ bazel_dep(name = "linenoise", version = "2.0.0.bcr.1")
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "postgres", version = "18.4")
-bazel_dep(name = "protobuf", version = "35.1")
+bazel_dep(name = "protobuf", version = "37.0-rc3")
 bazel_dep(name = "quickjs-ng", version = "0.15.1.bcr.1")
-bazel_dep(name = "re2", version = "2025-08-12.bcr.1")
+bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_cc", version = "0.2.22")
 bazel_dep(name = "rules_go", version = "0.60.0")
 bazel_dep(name = "rules_python", version = "2.4.1")
 bazel_dep(name = "s2geometry", version = "0.14.0")
 bazel_dep(name = "zlib", version = "1.3.2")
-bazel_dep(name = "lz4", version = "1.9.4.bcr.2")
+bazel_dep(name = "lz4", version = "1.10.0.bcr.1")
 bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
 
 # Gazelle must use a recent host Go too: gRPC's transitive Envoy module otherwise selects
@@ -90,7 +90,7 @@ archive_override(
 
 archive_override(
     module_name = "googlesql",
-    integrity = "sha256-6FHgy+ax6tNVNJqE7n25XQY3DPcV9kJYpqt91A8PJuk=",
+    integrity = "sha256-ogEX6e38nRP7xt54xmqCowwZOyXodu/R7GnbD/Jzah0=",
     patch_strip = 1,
     patches = [
         # Lets //:compliance_test use GoogleSQL's compliance test cases.
@@ -98,8 +98,8 @@ archive_override(
         "//third_party/googlesql:compliance_expected_results.patch",
         "//third_party/googlesql:openssl.patch",
     ],
-    strip_prefix = "googlesql-2026.11.1",
-    urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.11.1.tar.gz"],
+    strip_prefix = "googlesql-2026.11.3",
+    urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.11.3.tar.gz"],
 )
 
 # The embedded CPython's SSL and hash modules are compiled against OpenSSL 3.5 headers but link
@@ -109,9 +109,14 @@ single_version_override(
     version = "3.5.5.bcr.4",
 )
 
-# OpenSSL's public headers belong to its crypto target, even for SSL clients.
+# OpenSSL's public headers belong to its crypto target, even for SSL clients. Protobuf 37 moves
+# the C++ upb reflection headers that gRPC uses to //upb/reflection:reflection_cc, as GoogleSQL's
+# own override of gRPC adds.
 single_version_override(
     module_name = "grpc",
+    patch_cmds = [
+        "sed -i.bak 's|\"@com_google_protobuf//upb/reflection\"|\"@com_google_protobuf//upb/reflection\", \"@com_google_protobuf//upb/reflection:reflection_cc\"|g' BUILD src/core/BUILD test/core/xds/BUILD && rm -f BUILD.bak src/core/BUILD.bak test/core/xds/BUILD.bak",
+    ],
     patch_strip = 1,
     patches = ["//third_party/grpc:openssl.patch"],
 )
