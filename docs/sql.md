@@ -21,7 +21,7 @@ rejected.
 | Section | Supported | Partial |
 | --- | --- | --- |
 | [Graphs](#graphs) | 2 | 3 |
-| [Queries](#queries) | 36 | 2 |
+| [Queries](#queries) | 36 | 3 |
 | [DML](#dml) | 9 | 0 |
 | [DDL](#ddl) | 26 | 7 |
 | [Collation](#collation) | 15 | 0 |
@@ -57,6 +57,7 @@ rejected.
 | Subqueries | Supported |  |
 | Correlated subqueries | Supported |  |
 | Aggregates and `GROUP BY` | Supported |  |
+| Multi-level aggregation | Partial | Unsupported: multi-level aggregation nested more than once. |
 | `GROUP BY ALL` | Supported |  |
 | `GROUPING SETS`, `ROLLUP`, `CUBE` | Supported |  |
 | Aggregate `ORDER BY` | Supported |  |
