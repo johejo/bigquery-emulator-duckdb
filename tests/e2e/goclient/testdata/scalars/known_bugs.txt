@@ -71,10 +71,20 @@ SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f00000000000000
 
 # Observed BigQuery answers collected with tools/bqanswers.
 # GAP_FILL rows of one time point with different values, which the emulator rejects. BigQuery
-# returned the later row of the UNION ALL at a bucket, and its NULL for the null method; which
-# row it takes may depend on the order rows arrive in.
+# returned the later row of the UNION ALL for locf in either order, but the earlier one when two
+# columns differ, so its choice follows neither the query's order nor the values. The null
+# method returned NULL of a NULL and a value in either order.
 SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', 2 UNION ALL SELECT DATE '2023-11-02', 3), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf')])
 !> "2023-11-01=2;2023-11-02=3"
 
 SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', NULL UNION ALL SELECT DATE '2023-11-02', 3), 't', INTERVAL 1 DAY)
 !> "2023-11-01=NULL;2023-11-02=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 2 AS v UNION ALL SELECT DATE '2023-11-01', 1 UNION ALL SELECT DATE '2023-11-02', 3), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf')])
+!> "2023-11-01=1;2023-11-02=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NULL AS v UNION ALL SELECT DATE '2023-11-01', 1 UNION ALL SELECT DATE '2023-11-02', 3), 't', INTERVAL 1 DAY)
+!> "2023-11-01=NULL;2023-11-02=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t,%t', t, v, w), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v, 'b' AS w UNION ALL SELECT DATE '2023-11-01', 2, 'a' UNION ALL SELECT DATE '2023-11-02', 3, 'c'), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf'), ('w', 'locf')])
+!> "2023-11-01=1,b;2023-11-02=3,c"
