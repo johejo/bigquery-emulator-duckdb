@@ -214,6 +214,26 @@ CREATE PROPERTY GRAPH scalar_graph.ShopPlaces
   NODE TABLES (scalar_graph.Shops AS S, scalar_graph.Places AS P)
   EDGE TABLES (scalar_graph.Shops AS SP SOURCE KEY (id) REFERENCES S (id)
     DESTINATION KEY (place_id) REFERENCES P (id) PROPERTIES (size AS edge_size));
+-- Unflattened outputs from a non-inlined edge: a match, a match with a NULL property,
+-- a NULL join key and an orphan key. The edge stays non-inlined without a custom property
+-- because size is not a reference column.
+CREATE TABLE scalar_graph.NestedPlaces (id INT64 PRIMARY KEY NOT ENFORCED, name STRING)
+AS SELECT 1 AS id, 'p' AS name UNION ALL SELECT 2, NULL;
+CREATE TABLE scalar_graph.NestedShops (id INT64 PRIMARY KEY NOT ENFORCED, place_id INT64, size INT64)
+AS SELECT 1 AS id, 1 AS place_id, 3 AS size
+UNION ALL SELECT 2, 2, 4
+UNION ALL SELECT 3, NULL, 5;
+CREATE PROPERTY GRAPH scalar_graph.NestedShopPlaces
+  NODE TABLES (scalar_graph.NestedShops AS S, scalar_graph.NestedPlaces AS P)
+  EDGE TABLES (scalar_graph.NestedShops AS SP SOURCE KEY (id) REFERENCES S (id)
+    DESTINATION KEY (place_id) REFERENCES P (id) PROPERTIES (size AS edge_size));
+CREATE PROPERTY GRAPH scalar_graph.NestedShopPlacesDefaultEdge
+  NODE TABLES (scalar_graph.NestedShops AS S, scalar_graph.NestedPlaces AS P)
+  EDGE TABLES (scalar_graph.NestedShops AS SP SOURCE KEY (id) REFERENCES S (id)
+    DESTINATION KEY (place_id) REFERENCES P (id));
+-- The emulator rejects an existing orphan at CREATE PROPERTY GRAPH time. Add it afterward
+-- so the expansion starts with the same input rows as the recorded BigQuery query.
+INSERT scalar_graph.NestedShops VALUES (4, 99, 6);
 -- Endpoints that reference columns other than the node key: each row of KindTransfers relates
 -- every checking account to every savings account, and the other way round.
 CREATE TABLE scalar_graph.KindAccounts AS

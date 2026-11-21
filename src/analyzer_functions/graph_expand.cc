@@ -405,8 +405,8 @@ absl::StatusOr<std::string> ExpansionQuery(
         "GRAPH_EXPAND requires every node table to have at most one incoming relationship");
   }
 
-  // BigQuery uses ROW-typed columns for joined tables in unflattened output, not ordinary
-  // STRUCTs. Only the root's properties can be exposed without those columns.
+  // BigQuery lets queries select scalar fields of joined ROWs but rejects returning the ROW
+  // itself. A STRUCT would allow returning it, so do not expose joined columns as STRUCTs.
   if (!flatten && children.contains(root)) {
     return Unsupported("with flatten_results => FALSE and joined tables");
   }

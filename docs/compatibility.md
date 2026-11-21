@@ -464,7 +464,8 @@ Graph DDL rejects:
 - Edges whose endpoint nodes do not exist when the graph is created.
 
 `GRAPH_EXPAND` requires literal arguments. With `flatten_results => FALSE`, it supports only
-expansions that do not join any tables from the starting node. It rejects a node table related to
+expansions that do not join any tables from the starting node. Scalar fields within joined
+`ROW` values cannot yet be selected as they can in BigQuery. It rejects a node table related to
 more than one node table unless every related node table but the last is related to no further
 node table.
 
