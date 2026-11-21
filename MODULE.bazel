@@ -210,51 +210,51 @@ http_archive(
 http_archive(
     name = "duckdb_prebuilt_macos_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    sha256 = "c3a571e6d4a0da97534c631df463ab13c07f8cf78049625f5df936b7beaab9ce",
+    sha256 = "adaada35202db67d010b06277320aa700f1313d9997b549a948349c9fd749a41",
     urls = [
-        "https://install.duckdb.org/v2.0.0/duckdb-static-libs-osx-arm64.tar.gz",
-        "https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-static-libs-osx-arm64.tar.gz",
+        "https://install.duckdb.org/v2.0.1/duckdb-static-libs-osx-arm64.tar.gz",
+        "https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-static-libs-osx-arm64.tar.gz",
     ],
 )
 
 http_archive(
     name = "duckdb_prebuilt_linux_amd64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    sha256 = "112d62c980f5447cd303a70b3dacbc09acd41ccb4ef6d154e8629f543a0f8568",
+    sha256 = "2d5655fd5948dfb0cd16df5fc8f7cdf0b37948374cf0629af995cf4a5e3a4c82",
     urls = [
-        "https://install.duckdb.org/v2.0.0/duckdb-static-libs-linux-amd64.tar.gz",
-        "https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-static-libs-linux-amd64.tar.gz",
+        "https://install.duckdb.org/v2.0.1/duckdb-static-libs-linux-amd64.tar.gz",
+        "https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-static-libs-linux-amd64.tar.gz",
     ],
 )
 
 http_archive(
     name = "duckdb_prebuilt_linux_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    sha256 = "8171b4842e68a85b2e82b342d3bf7b542a88fd6666e0c18438d7b459012494ee",
+    sha256 = "3d581ff935f1836363cc459e640737cdc1892ab3ed69e74853e93f01d9d071f0",
     urls = [
-        "https://install.duckdb.org/v2.0.0/duckdb-static-libs-linux-arm64.tar.gz",
-        "https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-static-libs-linux-arm64.tar.gz",
+        "https://install.duckdb.org/v2.0.1/duckdb-static-libs-linux-arm64.tar.gz",
+        "https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-static-libs-linux-arm64.tar.gz",
     ],
 )
 
 # DuckDB's postgres_scanner extension, compiled against the C++ headers of the same DuckDB release
 # as the prebuilt libraries and linked into the binary; see third_party/duckdb_postgres. The
-# extension and database-connector commits are those DuckDB v2.0.0 pins in
+# extension and database-connector commits are those DuckDB v2.0.1 pins in
 # .github/config/extensions/postgres_scanner.cmake and in the extension's submodule.
 http_archive(
     name = "duckdb_source",
     build_file = "//third_party/duckdb_postgres:BUILD.duckdb_source.bazel",
-    sha256 = "7e89053255046bfb26afbd7f524a2fb84df7dbef496aa911ea35e4a1182fdc00",
-    strip_prefix = "duckdb-2.0.0",
-    urls = ["https://github.com/duckdb/duckdb/archive/refs/tags/v2.0.0.tar.gz"],
+    sha256 = "1deae9d4917bd069c46c25c6ddbe51a2ef06cc7c12e6a10132af4fa0fb834a14",
+    strip_prefix = "duckdb-2.0.1",
+    urls = ["https://github.com/duckdb/duckdb/archive/refs/tags/v2.0.1.tar.gz"],
 )
 
 http_archive(
     name = "duckdb_postgres",
     build_file = "//third_party/duckdb_postgres:BUILD.duckdb_postgres.bazel",
-    sha256 = "f887a835e224e2b3134d9bc67f77efbca6a5a09f7d575aac13df91cfd26a84f3",
-    strip_prefix = "duckdb-postgres-c0f5a3c0c4b68b02afbf669d36d7f0e503985c88",
-    urls = ["https://github.com/duckdb/duckdb-postgres/archive/c0f5a3c0c4b68b02afbf669d36d7f0e503985c88.tar.gz"],
+    sha256 = "c82c751bfbdc60f89f63c5bb69f89be4ed4d755270895c97f2775c67fcc683a4",
+    strip_prefix = "duckdb-postgres-8b9d0bbe8de4c57fb90d9e2530f9ce39f8c4baf3",
+    urls = ["https://github.com/duckdb/duckdb-postgres/archive/8b9d0bbe8de4c57fb90d9e2530f9ce39f8c4baf3.tar.gz"],
 )
 
 http_archive(
@@ -265,7 +265,7 @@ http_archive(
     urls = ["https://github.com/duckdb/database-connector/archive/c305670b5729cc6dbda8d395eeb63b4d1487c064.tar.gz"],
 )
 
-# MySQL extension pinned by DuckDB v2.0.0. Keep decimals lossless until BigQuery conversion.
+# MySQL extension pinned by DuckDB v2.0.1. Keep decimals lossless until BigQuery conversion.
 http_archive(
     name = "duckdb_mysql",
     build_file = "//third_party/duckdb_mysql:BUILD.duckdb_mysql.bazel",
@@ -274,9 +274,9 @@ http_archive(
         "//third_party/duckdb_mysql:bigquery_types.patch",
         "//third_party/duckdb_mysql:static_symbols.patch",
     ],
-    sha256 = "a4d3c1c924852304987dcf108edab0956ceefe63ff7f5cf802d247421245bf59",
-    strip_prefix = "duckdb-mysql-f7fc0d42716534aa5ad48626d21ced9807b33967",
-    urls = ["https://github.com/duckdb/duckdb-mysql/archive/f7fc0d42716534aa5ad48626d21ced9807b33967.tar.gz"],
+    sha256 = "1da4a178c9ddadfa77c8a8d7676f877abb10b2fd95b8e27c501f2370b21bb054",
+    strip_prefix = "duckdb-mysql-e04d8eef94c94e70c5d5663895610b1bb475d506",
+    urls = ["https://github.com/duckdb/duckdb-mysql/archive/e04d8eef94c94e70c5d5663895610b1bb475d506.tar.gz"],
 )
 
 http_archive(

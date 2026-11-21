@@ -11,7 +11,7 @@ let
   # The DuckDB CLI, for trying a query against the engine the emulator embeds without building
   # anything. Keep it at the version of the duckdb_prebuilt_* archives in MODULE.bazel;
   # `just duckdb-version-check` fails when they differ.
-  version = "2.0.0";
+  version = "2.0.1";
   fetch =
     name: hash:
     fetchurl {
@@ -22,9 +22,9 @@ let
       inherit hash;
     };
   sources = {
-    aarch64-darwin = fetch "duckdb-cli-osx-universal.tar.gz" "sha256-io9n58f30TkvpjujlxlIOROS/iol/KY+cAjjPFC+tMI=";
-    x86_64-linux = fetch "duckdb-cli-linux-amd64.tar.gz" "sha256-xlByBrr3eTxgE9vYI2hGmkXyDcDhem+S8gRgL2Uu0rw=";
-    aarch64-linux = fetch "duckdb-cli-linux-arm64.tar.gz" "sha256-hZ4YddKpUV+7S/iHEGFDehSvgjINpox1PwlMS3djSP4=";
+    aarch64-darwin = fetch "duckdb-cli-osx-universal.tar.gz" "sha256-nW6geejDtWmPVZ/GTn5eQ90hpR6KYYspsY3kcWKZykA=";
+    x86_64-linux = fetch "duckdb-cli-linux-amd64.tar.gz" "sha256-tnYmi+TTnk5BqQRELJeWyZFOZFzAhcdQXwSPLJkrXso=";
+    aarch64-linux = fetch "duckdb-cli-linux-arm64.tar.gz" "sha256-hON4kfzEXIh+MCIPUaSRSZXNgXQTnof479MRrIPJVqc=";
   };
 in
 stdenvNoCC.mkDerivation {

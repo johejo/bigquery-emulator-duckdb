@@ -307,6 +307,18 @@ SELECT INSTR(b'abcb', b'b', -1)
 SELECT ARRAY_LENGTH(SPLIT(b'', b','))
 => "1"
 
+# "Splitting an empty STRING returns an ARRAY with a single empty STRING", also on an empty
+# delimiter: third_party/bigquery_docs/reference/standard-sql/string_functions.md
+SELECT ARRAY_LENGTH(SPLIT('', '')) = 1 AND SPLIT('', '')[OFFSET(0)] = ''
+=> "true"
+
+SELECT ARRAY_LENGTH(SPLIT(value, delimiter)) = 1 AND SPLIT(value, delimiter)[OFFSET(0)] = ''
+FROM UNNEST([STRUCT('' AS value, '' AS delimiter)])
+=> "true"
+
+SELECT ARRAY_LENGTH(SPLIT('', ',')) = 1 AND SPLIT('', ',')[OFFSET(0)] = ''
+=> "true"
+
 SELECT TO_HEX(ARRAY_TO_STRING([b'a', NULL, b'\xff'], b'-'))
 => "612dff"
 
