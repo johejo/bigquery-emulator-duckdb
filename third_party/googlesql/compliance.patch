@@ -1,3 +1,15 @@
+diff --git a/bazel/http_archive_deps.bzl b/bazel/http_archive_deps.bzl
+--- a/bazel/http_archive_deps.bzl
++++ b/bazel/http_archive_deps.bzl
+@@ -69,6 +69,8 @@ def _http_archive_deps_impl(_):
+         # -Wnullability-completeness warnings.
+         patch_cmds = [
+             "sed -i.bak 's/absl::Nonnull<\\([^>]*\\)>/\\1/g' file_based_test_driver/file_based_test_driver.h file_based_test_driver/file_based_test_driver.cc && rm -f file_based_test_driver/*.bak",
++            # Match and GetContents stat() the data of a string_view that is not NUL-terminated.
++            "sed -i.bak -e 's/stat(filespec\\.data()/stat(filespec_str.c_str()/' -e 's/stat(filename\\.data()/stat(filename_str.c_str()/' file_based_test_driver/base/file_util_oss.h && rm -f file_based_test_driver/base/file_util_oss.h.bak",
+             "for f in file_based_test_driver/BUILD file_based_test_driver/base/BUILD; do " +
+             "{ printf 'load(\"@rules_cc//cc:defs.bzl\", \"cc_library\", \"cc_test\")\\n'; cat \"$f\"; } > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; " +
+             "done",
 diff --git a/googlesql/base/BUILD b/googlesql/base/BUILD
 --- a/googlesql/base/BUILD
 +++ b/googlesql/base/BUILD
@@ -9,21 +21,10 @@ diff --git a/googlesql/base/BUILD b/googlesql/base/BUILD
          "//third_party/googlesql/zetasql/...",
      ],
  )
-diff --git a/googlesql/compliance/BUILD b/googlesql/compliance/BUILD
---- a/googlesql/compliance/BUILD
-+++ b/googlesql/compliance/BUILD
-@@ -390,6 +390,7 @@ cc_library(
-     testonly = 1,
-     srcs = ["compliance_test_cases.cc"],
-     hdrs = ["compliance_test_cases.h"],
-+    alwayslink = 1,
-     deps = [
-         # Required runtime dependency
-         # buildcleaner: keep
 diff --git a/googlesql/base/file_util_oss.h b/googlesql/base/file_util_oss.h
 --- a/googlesql/base/file_util_oss.h
 +++ b/googlesql/base/file_util_oss.h
-@@ -162,7 +162,7 @@
+@@ -162,7 +162,7 @@ inline absl::Status SetContents(absl::string_view filename,
  
  // The path in blaze where we expect to find inputs like `.test` files.
  inline std::string TestSrcRootDir() {
@@ -35,28 +36,30 @@ diff --git a/googlesql/base/file_util_oss.h b/googlesql/base/file_util_oss.h
 diff --git a/googlesql/common/testing/testing_proto_util.h b/googlesql/common/testing/testing_proto_util.h
 --- a/googlesql/common/testing/testing_proto_util.h
 +++ b/googlesql/common/testing/testing_proto_util.h
-@@ -65,14 +65,14 @@
-         "type_proto",
-         "wrappers_proto"}) {
-     source_tree->MapPath("",
--      googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "protobuf~",
-+      googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "protobuf+",
-                              "src", "google", "protobuf", "_virtual_imports",
-                              vproto));
-   }
+@@ -72,7 +72,7 @@ CreateProtoSourceTree() {
    source_tree->MapPath(
--      "", googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "googleapis~"));
-+      "", googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "googleapis+"));
+       "", googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "googleapis+"));
    source_tree->MapPath(
 -      "", googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "_main"));
 +      "", googlesql_base::JoinPath(getenv("TEST_SRCDIR"), "googlesql+"));
    // clang-format on
    return source_tree;
  }
+diff --git a/googlesql/compliance/BUILD b/googlesql/compliance/BUILD
+--- a/googlesql/compliance/BUILD
++++ b/googlesql/compliance/BUILD
+@@ -394,6 +394,7 @@ cc_library(
+     testonly = 1,
+     srcs = ["compliance_test_cases.cc"],
+     hdrs = ["compliance_test_cases.h"],
++    alwayslink = 1,
+     deps = [
+         # Required runtime dependency
+         # buildcleaner: keep
 diff --git a/googlesql/compliance/compliance_test_cases.cc b/googlesql/compliance/compliance_test_cases.cc
 --- a/googlesql/compliance/compliance_test_cases.cc
 +++ b/googlesql/compliance/compliance_test_cases.cc
-@@ -3731,7 +3731,7 @@
+@@ -3773,7 +3773,7 @@ class ComplianceFilebasedTests : public SQLTestBase {
      std::vector<std::string> test_filenames;
      std::string file_path =
          googlesql_base::JoinPath(absl::NullSafeStringView(getenv("TEST_SRCDIR")),
@@ -65,22 +68,10 @@ diff --git a/googlesql/compliance/compliance_test_cases.cc b/googlesql/complianc
                         absl::GetFlag(FLAGS_file_pattern));
      GOOGLESQL_CHECK_OK(googlesql::internal::Match(file_path, &test_filenames));
      ABSL_CHECK(!test_filenames.empty()) << "No test files found at " << file_path;
-diff --git a/bazel/http_archive_deps.bzl b/bazel/http_archive_deps.bzl
---- a/bazel/http_archive_deps.bzl
-+++ b/bazel/http_archive_deps.bzl
-@@ -58,6 +58,8 @@
-         # -Wnullability-completeness warnings.
-         patch_cmds = [
-             "sed -i.bak 's/absl::Nonnull<\\([^>]*\\)>/\\1/g' file_based_test_driver/file_based_test_driver.h file_based_test_driver/file_based_test_driver.cc && rm -f file_based_test_driver/*.bak",
-+            # Match and GetContents stat() the data of a string_view that is not NUL-terminated.
-+            "sed -i.bak -e 's/stat(filespec\\.data()/stat(filespec_str.c_str()/' -e 's/stat(filename\\.data()/stat(filename_str.c_str()/' file_based_test_driver/base/file_util_oss.h && rm -f file_based_test_driver/base/file_util_oss.h.bak",
-         ],
-         sha256 = "de4a12e88731198ef89ce3438b8c57ccea9185ac30ece9da1165f224ec02c8b1",
-         strip_prefix = "file-based-test-driver-ec67daf4282c1bbe025e1b88512d540b03687efd",
 diff --git a/googlesql/compliance/test_driver.h b/googlesql/compliance/test_driver.h
 --- a/googlesql/compliance/test_driver.h
 +++ b/googlesql/compliance/test_driver.h
-@@ -343,7 +343,7 @@
+@@ -370,7 +370,7 @@ absl::StatusOr<TestDatabase> DeserializeTestDatabase(
      const TestDatabaseProto& proto, TypeFactory* type_factory,
      const ::google::protobuf::DescriptorPool* descriptor_pool);
  
