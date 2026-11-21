@@ -35,6 +35,12 @@ class TableSource {
                                                             const std::string& dataset,
                                                             const std::string& table) = 0;
 
+  // The diagnostic for a resolved table name that FindTable did not find.
+  [[nodiscard]] virtual absl::Status MissingTableError(const TableReference& table) const {
+    return absl::NotFoundError("Table not found: " + table.project_id + "." + table.dataset_id +
+                               "." + table.table_id);
+  }
+
   virtual std::optional<std::string> FindPropertyGraph(const TableReference& /*graph*/) {
     return std::nullopt;
   }

@@ -30,10 +30,18 @@ cases:
             location: US
             timeoutMs: 200000
         expectFailure: true
-        observe: {code: /body/error/code}
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
     cleanup:
       - name: cleanup
         rest:
           method: DELETE
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
-    expect: {fixture: {jobComplete: true}, statement: {code: 404}}
+    expect:
+      fixture: {jobComplete: true}
+      statement:
+        status: 404
+        reason: notFound
+        message: 'Not found: Table ${project}:${dataset}.child was not found in location US'

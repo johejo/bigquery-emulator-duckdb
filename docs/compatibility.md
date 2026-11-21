@@ -178,8 +178,7 @@ Replacing or expiring a referenced table, changing its schema or primary key thr
 deleting a dataset referenced from outside it are unsupported.
 
 Foreign keys on views and `tableConstraints` on materialized views are unsupported until
-BigQuery's behavior is verified. A self-referencing `CREATE TABLE` returns HTTP 400 rather than
-BigQuery's HTTP 404 for the missing referenced table.
+BigQuery's behavior is verified.
 
 ### Time travel
 
