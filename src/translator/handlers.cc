@@ -1,6 +1,7 @@
 #include "src/translator/handlers.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <iterator>
 #include <optional>
@@ -412,6 +413,42 @@ std::optional<std::string> TextAnalyze(const ScalarCall& call) {
     }
   }
   return "bq_text_analyze(" + Join(Sqls(call), ", ") + ")";
+}
+
+// SEARCH, whose search_query and named arguments BigQuery requires to be constant and not NULL.
+// The catalog checks that search_query is constant. The backend reads data_to_search as a
+// GoogleSQL value, whose NULL STRUCTs, ARRAYs and JSON make their STRING fields NULL.
+std::optional<std::string> Search(const ScalarCall& call) {
+  constexpr std::array<std::string_view, 5> kNames = {
+      "", "", "json_scope", "analyzer", "analyzer_options",
+  };
+  if (call.arguments.size() != kNames.size()) {
+    return std::nullopt;
+  }
+  for (std::size_t i = 1; i < call.arguments.size(); ++i) {
+    const std::string name = "'" + std::string(kNames.at(i)) + "' of SEARCH()";
+    if (function_catalog::IsNullLiteral(call.Argument(i))) {
+      throw std::invalid_argument(i == 1 ? "The 2nd argument of SEARCH() must not be null"
+                                         : name + " must not be null");
+    }
+    const auto constant = function_catalog::IsConstantExpression(call.Argument(i));
+    if (!constant) {
+      return std::nullopt;
+    }
+    if (!*constant) {
+      if (i == 1) {
+        return std::nullopt;
+      }
+      throw std::invalid_argument(name + " must be a constant");
+    }
+  }
+  const auto data = ValueArgument(call, 0);
+  if (!data) {
+    return std::nullopt;
+  }
+  std::vector<std::string> arguments = Sqls(call);
+  arguments.front() = *data;
+  return "bq_search(" + Join(arguments, ", ") + ")";
 }
 
 // OBJ.MAKE_REF from a URI, with the authorizer, version and details GoogleSQL passes as NULL when

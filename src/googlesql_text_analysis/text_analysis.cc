@@ -50,8 +50,6 @@ constexpr std::string_view kDefaultPattern = R"(\b\w{2,}\b)";
 // BigQuery limits a delimiter to 16 characters.
 constexpr std::size_t kMaxDelimiterLength = 16;
 
-constexpr std::string_view kErrorSuffix = "; error in TEXT_ANALYZE expression";
-
 struct Normalizer {
   enum class Mode : std::uint8_t { kNone, kLower, kUnicodeLower, kIcuNormalize };
   Mode mode = Mode::kLower;
@@ -82,17 +80,26 @@ struct Analyzer {
 
 namespace {
 
-absl::Status Failed(std::string_view message) {
-  return absl::OutOfRangeError(absl::StrCat(message, kErrorSuffix));
+// BigQuery names some functions, such as TEXT_ANALYZE, whose analyzer arguments are invalid;
+// SEARCH's errors name none, which an empty `function` stands for.
+absl::Status Failed(std::string_view function, std::string_view message) {
+  if (function.empty()) {
+    return absl::OutOfRangeError(message);
+  }
+  return absl::OutOfRangeError(absl::StrCat(message, "; error in ", function, " expression"));
+}
+
+std::string Context(std::string_view function) {
+  return function.empty() ? "." : absl::StrCat(". Error in ", function, " expression");
 }
 
 // BigQuery checks analyzer_options against a JSON Schema and reports the first violation, at
 // the JSON Pointer `pointer` to the value `instance`, as the JSON Schema validator for nlohmann
 // JSON words it.
-absl::Status SchemaError(std::string_view pointer, const nlohmann::json& instance,
-                         std::string_view message) {
-  return Failed(absl::StrCat("Invalid Argument Error: At ", pointer, " of ", instance.dump(), " - ",
-                             message, "\n"));
+absl::Status SchemaError(std::string_view function, std::string_view pointer,
+                         const nlohmann::json& instance, std::string_view message) {
+  return Failed(function, absl::StrCat("Invalid Argument Error: At ", pointer, " of ",
+                                       instance.dump(), " - ", message, "\n"));
 }
 
 std::size_t CodePoints(std::string_view text) {
@@ -108,32 +115,32 @@ struct StringsSchema {
   std::size_t max_length = std::numeric_limits<std::size_t>::max();
 };
 
-absl::Status ValidateStrings(const std::string& pointer, const nlohmann::json& value,
-                             const StringsSchema& schema) {
+absl::Status ValidateStrings(std::string_view function, const std::string& pointer,
+                             const nlohmann::json& value, const StringsSchema& schema) {
   if (!value.is_array()) {
-    return SchemaError(pointer, value, "unexpected instance type");
+    return SchemaError(function, pointer, value, "unexpected instance type");
   }
   if (value.size() > schema.max_items) {
-    return SchemaError(pointer, value, "array has too many items");
+    return SchemaError(function, pointer, value, "array has too many items");
   }
   if (value.size() < schema.min_items) {
-    return SchemaError(pointer, value, "array has too few items");
+    return SchemaError(function, pointer, value, "array has too few items");
   }
   for (std::size_t i = 0; i < value.size(); ++i) {
     const std::string element_pointer = absl::StrCat(pointer, "/", i);
     const nlohmann::json& element = value.at(i);
     if (!element.is_string()) {
-      return SchemaError(element_pointer, element, "unexpected instance type");
+      return SchemaError(function, element_pointer, element, "unexpected instance type");
     }
     const std::size_t length = CodePoints(element.get_ref<const std::string&>());
     if (length > schema.max_length) {
       return SchemaError(
-          element_pointer, element,
+          function, element_pointer, element,
           absl::StrCat("instance is too long as per maxLength: ", schema.max_length));
     }
     if (length < schema.min_length) {
       return SchemaError(
-          element_pointer, element,
+          function, element_pointer, element,
           absl::StrCat("instance is too short as per minLength:", schema.min_length));
     }
   }
@@ -151,7 +158,7 @@ std::optional<TokenFilter> ParseTokenFilter(const nlohmann::json& filter) {
   }
   if (filter.contains("stop_words")) {
     const nlohmann::json& words = filter.at("stop_words");
-    if (!ValidateStrings("", words, {.min_length = 1}).ok()) {
+    if (!ValidateStrings("", "", words, {.min_length = 1}).ok()) {
       return std::nullopt;
     }
     const std::vector<std::string> strings = Strings(words);
@@ -183,18 +190,19 @@ std::optional<TokenFilter> ParseTokenFilter(const nlohmann::json& filter) {
   return normalizer;
 }
 
-absl::StatusOr<std::vector<TokenFilter>> TokenFilters(const nlohmann::json& value) {
+absl::StatusOr<std::vector<TokenFilter>> TokenFilters(std::string_view function,
+                                                      const nlohmann::json& value) {
   if (!value.is_array()) {
-    return SchemaError("/token_filters", value, "unexpected instance type");
+    return SchemaError(function, "/token_filters", value, "unexpected instance type");
   }
   if (value.empty()) {
-    return SchemaError("/token_filters", value, "array has too few items");
+    return SchemaError(function, "/token_filters", value, "array has too few items");
   }
   std::vector<TokenFilter> filters;
   for (std::size_t i = 0; i < value.size(); ++i) {
     std::optional<TokenFilter> filter = ParseTokenFilter(value.at(i));
     if (!filter) {
-      return SchemaError(absl::StrCat("/token_filters/", i), value.at(i),
+      return SchemaError(function, absl::StrCat("/token_filters/", i), value.at(i),
                          "no subschema has succeeded, but one of them is required to validate. "
                          "Type: oneOf, number of failed subschemas: 2");
     }
@@ -203,25 +211,27 @@ absl::StatusOr<std::vector<TokenFilter>> TokenFilters(const nlohmann::json& valu
   return filters;
 }
 
-absl::StatusOr<std::unique_ptr<const fn::RegExp>> Pattern(const std::string& pattern) {
+absl::StatusOr<std::unique_ptr<const fn::RegExp>> Pattern(std::string_view function,
+                                                          const std::string& pattern) {
   auto regexp = fn::MakeRegExpUtf8(pattern);
   if (!regexp.ok()) {
-    return absl::OutOfRangeError(absl::StrCat("Invalid regular expression pattern '", pattern,
-                                              "'. Error in TEXT_ANALYZE expression"));
+    return absl::OutOfRangeError(
+        absl::StrCat("Invalid regular expression pattern '", pattern, "'", Context(function)));
   }
   if (const int groups = (*regexp)->re().NumberOfCapturingGroups(); groups > 0) {
     return absl::OutOfRangeError(
         absl::StrCat("Capturing groups are not allowed for pattern analyzer. Found ", groups,
-                     " in pattern '", pattern, "'. Error in TEXT_ANALYZE expression"));
+                     " in pattern '", pattern, "'", Context(function)));
   }
   return regexp;
 }
 
 }  // namespace
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): TEXT_ANALYZE's analyzer and options.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the function's analyzer and options.
 absl::StatusOr<std::shared_ptr<const Analyzer>> ParseAnalyzer(std::string_view name,
-                                                              std::string_view options) {
+                                                              std::string_view options,
+                                                              std::string_view function) {
   Analyzer analyzer;
   if (name == "LOG_ANALYZER") {
     analyzer.kind = Analyzer::Kind::kLog;
@@ -230,15 +240,16 @@ absl::StatusOr<std::shared_ptr<const Analyzer>> ParseAnalyzer(std::string_view n
   } else if (name == "PATTERN_ANALYZER") {
     analyzer.kind = Analyzer::Kind::kPattern;
   } else {
-    return Failed(absl::StrCat("Invalid analyzer_name '", name, "'"));
+    return Failed(function, absl::StrCat("Invalid analyzer_name '", name, "'"));
   }
   const auto json = nlohmann::json::parse(options, nullptr, false);
   if (json.is_discarded()) {
     return Failed(
+        function,
         absl::StrCat("Analyzer options must be a valid JSON-formatted string, got: ", options));
   }
   if (!json.is_object()) {
-    return SchemaError("", json, "unexpected instance type");
+    return SchemaError(function, "", json, "unexpected instance type");
   }
   std::optional<std::vector<std::string>> delimiters;
   std::string pattern(kDefaultPattern);
@@ -246,15 +257,15 @@ absl::StatusOr<std::shared_ptr<const Analyzer>> ParseAnalyzer(std::string_view n
   for (const auto& [key, value] : json.items()) {
     if (key == "delimiters" && analyzer.kind == Analyzer::Kind::kLog) {
       GOOGLESQL_RETURN_IF_ERROR(ValidateStrings(
-          "/delimiters", value, {.min_length = 1, .max_length = kMaxDelimiterLength}));
+          function, "/delimiters", value, {.min_length = 1, .max_length = kMaxDelimiterLength}));
       delimiters = Strings(value);
     } else if (key == "patterns" && analyzer.kind == Analyzer::Kind::kPattern) {
-      GOOGLESQL_RETURN_IF_ERROR(ValidateStrings("/patterns", value, {.max_items = 1}));
+      GOOGLESQL_RETURN_IF_ERROR(ValidateStrings(function, "/patterns", value, {.max_items = 1}));
       pattern = value.at(0).get<std::string>();
     } else if (key == "token_filters" && analyzer.kind != Analyzer::Kind::kNoOp) {
-      GOOGLESQL_ASSIGN_OR_RETURN(analyzer.filters, TokenFilters(value));
+      GOOGLESQL_ASSIGN_OR_RETURN(analyzer.filters, TokenFilters(function, value));
     } else {
-      return SchemaError("", json,
+      return SchemaError(function, "", json,
                          absl::StrCat("validation failed for additional property '", key,
                                       "': instance invalid as per false-schema"));
     }
@@ -264,7 +275,7 @@ absl::StatusOr<std::shared_ptr<const Analyzer>> ParseAnalyzer(std::string_view n
       analyzer.filters.clear();
       break;
     case Analyzer::Kind::kPattern: {
-      GOOGLESQL_ASSIGN_OR_RETURN(analyzer.pattern, Pattern(pattern));
+      GOOGLESQL_ASSIGN_OR_RETURN(analyzer.pattern, Pattern(function, pattern));
       break;
     }
     case Analyzer::Kind::kLog:
@@ -280,6 +291,7 @@ absl::StatusOr<std::shared_ptr<const Analyzer>> ParseAnalyzer(std::string_view n
                                    });
           non_ascii != delimiters->end()) {
         return Failed(
+            function,
             absl::StrCat("delimiter ", *non_ascii,
                          " in custom LOG_ANALYZER config contains a non-ascii character"));
       }
@@ -392,6 +404,32 @@ absl::StatusOr<std::vector<std::string>> Analyze(const Analyzer& analyzer, std::
     }
   }
   return terms;
+}
+
+AnalyzerKind KindOf(const Analyzer& analyzer) {
+  switch (analyzer.kind) {
+    case Analyzer::Kind::kLog:
+      return AnalyzerKind::kLog;
+    case Analyzer::Kind::kNoOp:
+      return AnalyzerKind::kNoOp;
+    case Analyzer::Kind::kPattern:
+      return AnalyzerKind::kPattern;
+  }
+  return AnalyzerKind::kLog;
+}
+
+bool BetweenDelimiters(const Analyzer& analyzer, std::string_view text, std::size_t begin,
+                       std::size_t end) {
+  const auto ends_with_delimiter = [&](std::string_view before) {
+    return std::ranges::any_of(analyzer.delimiters,
+                               [&](const std::string& d) { return before.ends_with(d); });
+  };
+  const auto starts_with_delimiter = [&](std::string_view after) {
+    return std::ranges::any_of(analyzer.delimiters,
+                               [&](const std::string& d) { return after.starts_with(d); });
+  };
+  return (begin == 0 || ends_with_delimiter(text.substr(0, begin))) &&
+         (end == text.size() || starts_with_delimiter(text.substr(end)));
 }
 
 absl::Status AddDocument(DocumentCounts& counts, std::vector<std::optional<std::string>> terms,

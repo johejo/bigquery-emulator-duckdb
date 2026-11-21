@@ -444,6 +444,12 @@ DATE_BUCKET(DATE, literal INTERVAL = INTERVAL 2 DAY[, DATE = '2000-12-31']) -> D
 DATETIME_BUCKET(DATETIME, literal INTERVAL = INTERVAL 2 HOUR[, DATETIME = '2000-12-31 00:00:00']) -> DATETIME
 TIMESTAMP_BUCKET(TIMESTAMP, literal INTERVAL = INTERVAL 2 HOUR[, TIMESTAMP = '2000-12-31 00:00:00+00']) -> TIMESTAMP
 
+page search_functions
+for $T in @all
+  SEARCH($T, literal STRING = 'b') -> BOOL
+end
+note SEARCH Table references and the named json_scope, analyzer and analyzer_options arguments are not yet enumerated.
+
 page text-analysis-functions
 TEXT_ANALYZE(STRING) -> ARRAY<STRING>
 note TEXT_ANALYZE The named analyzer and analyzer_options arguments are not yet enumerated.

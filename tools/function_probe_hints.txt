@@ -360,6 +360,17 @@ query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'NO_OP_ANALYZER')
 query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]+"]}')
 query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer_options => '{"delimiters": ["b"], "token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}, {"stop_words": ["a"]}]}')
 
+# SEARCH searches STRING fields of any type; named arguments choose its analyzer and its options.
+values search | 'abc' | b'abc' | 2 | DATE '2024-01-15' | STRUCT('abc' AS s, [1, 2] AS a) | STRUCT() | JSON '{"a":"abc"}' | INTERVAL 1 DAY | RANGE<DATE> '[2024-01-01, 2024-02-01)' | ST_GEOGPOINT(1, 2) | [STRUCT('abc' AS s)]
+elements ^SEARCH\( | search
+extra_query SEARCH SELECT SEARCH('abc', 'abc OR "a b" AND `abc`')
+extra_query SEARCH SELECT SEARCH('abc', 'abc', analyzer => 'NO_OP_ANALYZER')
+extra_query SEARCH SELECT SEARCH('abc', 'abc', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]+"]}')
+extra_query SEARCH SELECT SEARCH('abc', 'abc', analyzer_options => '{"delimiters": ["b"], "token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}, {"stop_words": ["a"]}]}')
+extra_query SEARCH SELECT SEARCH(JSON '{"a":"abc"}', 'a', json_scope => 'JSON_KEYS')
+extra_query SEARCH SELECT SEARCH('abc', '`abc`', analyzer => 'PATTERN_ANALYZER')
+extra_query SEARCH SELECT SEARCH(t, 'abc') FROM (SELECT 'abc' AS s, 1 AS n) AS t
+
 # TF_IDF takes only an empty OVER clause.
 # tools/restprobe connects us.postgres to an empty PostgreSQL server. BigQuery reads bit strings
 # as BYTES, which the emulator rejects.

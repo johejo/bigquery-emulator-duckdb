@@ -87,7 +87,7 @@ valid sample, not every possible argument value. Rounding-mode calls use `ROUND_
 Function-level results, including probes beyond the types enumerated here, are in
 [functions.md](functions.md). A Supported coverage summary applies only to the enumerated forms.
 
-Type signatures are enumerated for **361 of 407 functions**. The remaining **46** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
+Type signatures are enumerated for **362 of 407 functions**. The remaining **45** are not enumerated; their function-level probes are listed in [functions.md](functions.md).
 
 ## Details by domain
 
@@ -111,6 +111,7 @@ Type signatures are enumerated for **361 of 407 functions**. The remaining **46*
 - [net](function-types/net.md)
 - [numbering](function-types/numbering.md)
 - [range](function-types/range.md)
+- [search](function-types/search.md)
 - [security](function-types/security.md)
 - [statistical-aggregate](function-types/statistical-aggregate.md)
 - [string](function-types/string.md)
@@ -399,7 +400,7 @@ Type signatures are enumerated for **361 of 407 functions**. The remaining **46*
 | [SAFE_MULTIPLY](function-types/mathematical.md#safe_multiply) | 16 | Supported |
 | [SAFE_NEGATE](function-types/mathematical.md#safe_negate) | 4 | Supported |
 | [SAFE_SUBTRACT](function-types/mathematical.md#safe_subtract) | 16 | Supported |
-| `SEARCH` | 0 | Not enumerated |
+| [SEARCH](function-types/search.md#search) | 40 | Supported |
 | [SEC](function-types/mathematical.md#sec) | 4 | Supported |
 | [SECH](function-types/mathematical.md#sech) | 4 | Supported |
 | [SESSION_USER](function-types/security.md#session_user) | 1 | Supported |

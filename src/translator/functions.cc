@@ -361,6 +361,23 @@ constexpr auto kHandlers =
                     .uses = {TypeUse::kRejectsSafe},
                 },
             },
+            {
+                "SEARCH",
+                {
+                    .handler = Search,
+                    .implementation = Implementation::kGoogleSQL,
+                    // Only STRING leaves are searched; the backend reads the others as values.
+                    .uses =
+                        {
+                            TypeUse::kRejectsSafe,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kBuildsOrReadsGeography,
+                        },
+                },
+            },
             {"OBJ.MAKE_REF", {.handler = MakeRef, .implementation = Implementation::kCustom}},
             {
                 "OBJ.FETCH_METADATA",

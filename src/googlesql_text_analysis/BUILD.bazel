@@ -4,8 +4,14 @@ package(features = ["layering_check"])
 
 cc_library(
     name = "googlesql_text_analysis",
-    srcs = ["text_analysis.cc"],
-    hdrs = ["text_analysis.h"],
+    srcs = [
+        "search.cc",
+        "text_analysis.cc",
+    ],
+    hdrs = [
+        "search.h",
+        "text_analysis.h",
+    ],
     copts = ["-std=c++20"],
     implementation_deps = [
         "@abseil-cpp//absl/strings",
@@ -14,6 +20,8 @@ cc_library(
         "@googlesql//googlesql/public/functions:normalize_mode_cc_proto",
         "@googlesql//googlesql/public/functions:regexp",
         "@googlesql//googlesql/public/functions:string",
+        "@googlesql//googlesql/public:json_value",
+        "@googlesql//googlesql/public/types",
         # GoogleSQL's regexp brings in the single-header copy, which the include finds first.
         "@nlohmann_json//:singleheader-json",
         "@re2",
@@ -23,5 +31,6 @@ cc_library(
     deps = [
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:value",
     ],
 )

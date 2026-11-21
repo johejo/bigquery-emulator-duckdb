@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -15,9 +16,19 @@
 namespace googlesql_text_analysis {
 
 struct Analyzer;
+// `function`, such as TEXT_ANALYZE, names the call in error messages; empty names none.
 absl::StatusOr<std::shared_ptr<const Analyzer>> ParseAnalyzer(std::string_view name,
-                                                              std::string_view options);
+                                                              std::string_view options,
+                                                              std::string_view function);
 absl::StatusOr<std::vector<std::string>> Analyze(const Analyzer& analyzer, std::string text);
+
+enum class AnalyzerKind : std::uint8_t { kLog, kNoOp, kPattern };
+AnalyzerKind KindOf(const Analyzer& analyzer);
+
+// Whether text[begin, end) starts at the start of `text` or right after one of LOG_ANALYZER's
+// delimiters, and ends at the end of `text` or right before one.
+bool BetweenDelimiters(const Analyzer& analyzer, std::string_view text, std::size_t begin,
+                       std::size_t end);
 
 // NULL and empty documents both count toward the window's document count.
 struct DocumentCounts {

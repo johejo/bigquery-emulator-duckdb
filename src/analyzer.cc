@@ -699,7 +699,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     const std::string_view message = status.message();
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
-        std::array<std::string_view, 12>{
+        std::array<std::string_view, 13>{
             "Unsupported primary key column ",
             "Duplicate column name ",
             "column attributes are unsupported for columns in WITH PARTITION COLUMNS clause",
@@ -709,6 +709,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
             "Metadata argument is not supported for key type '",
             "Argument 2 to BIGQUERYGOOGLESQL:TF_IDF ",
             "Argument 3 to BIGQUERYGOOGLESQL:TF_IDF ",
+            "Argument 2 to BIGQUERYGOOGLESQL:SEARCH must be a constant expression",
             "Analytic function BIGQUERYGOOGLESQL:TF_IDF ",
             "Window ORDER BY is not allowed for analytic function tf_idf",
             "Window framing clause is not allowed for analytic function tf_idf",
