@@ -8,6 +8,8 @@ namespace bigquery_emulator_duckdb::translator {
 
 std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
 Aggregates();
+function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule> ApproxQuantiles(
+    bool null_on_all_null);
 std::span<const function_catalog::StaticNamedDefinition<function_catalog::StaticAggregateRule>>
 Analytics();
 

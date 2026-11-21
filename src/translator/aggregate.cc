@@ -129,6 +129,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
            candidate.collated == !collation->empty() &&
            (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
            (candidate.distinct != AggregateRule::Distinct::kRequired || call.distinct()) &&
+           (candidate.nulls != AggregateRule::Nulls::kRequiresRespect ||
+            call.null_handling_modifier() ==
+                googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS) &&
            std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
              return std::ranges::find(condition.types, type_of(condition.argument - 1)) !=
                     condition.types.end();
