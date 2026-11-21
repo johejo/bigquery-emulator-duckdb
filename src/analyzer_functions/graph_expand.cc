@@ -268,7 +268,7 @@ std::string ColumnName(const googlesql::GraphElementTable& table, int column) {
 }
 
 // The GoogleSQL query that expands the graph: its node tables LEFT JOINed from the root along
-// the schema relationship graph, with each table's properties prefixed by its label.
+// the schema relationship graph. Flattened output prefixes each table's properties by its label.
 absl::StatusOr<std::string> ExpansionQuery(
     googlesql::Catalog* catalog, const googlesql::AnalyzerOptions& options,
     const std::vector<googlesql::TVFInputArgumentType>& arguments) {
@@ -283,9 +283,10 @@ absl::StatusOr<std::string> ExpansionQuery(
   if (literals.at(0).is_null()) {
     return absl::InvalidArgumentError("GRAPH_EXPAND requires a graph name");
   }
-  if (literals.at(2).is_null() || !literals.at(2).bool_value()) {
-    return Unsupported("with flatten_results => FALSE");
+  if (literals.at(2).is_null()) {
+    return Unsupported("with flatten_results => NULL");
   }
+  const bool flatten = literals.at(2).bool_value();
   const googlesql::PropertyGraph* graph = nullptr;
   if (auto status = catalog->FindPropertyGraph({literals.at(0).string_value()}, graph,
                                                options.find_options());
@@ -404,6 +405,12 @@ absl::StatusOr<std::string> ExpansionQuery(
         "GRAPH_EXPAND requires every node table to have at most one incoming relationship");
   }
 
+  // BigQuery uses ROW-typed columns for joined tables in unflattened output, not ordinary
+  // STRUCTs. Only the root's properties can be exposed without those columns.
+  if (!flatten && children.contains(root)) {
+    return Unsupported("with flatten_results => FALSE and joined tables");
+  }
+
   // The tables joined from the root, each edge table that is not inlined between its two node
   // tables.
   const auto* ordered = dynamic_cast<const OrderedPropertyGraph*>(graph);
@@ -453,9 +460,10 @@ absl::StatusOr<std::string> ExpansionQuery(
     }
     for (std::size_t p = 0; p < properties->size(); ++p) {
       projections.push_back("(" + properties->at(p).sql + ") AS p" + std::to_string(p));
-      outputs.push_back(
-          alias + ".p" + std::to_string(p) + " AS " +
-          googlesql::ToIdentifierLiteral(labels.at(&element) + "_" + properties->at(p).name));
+      const std::string& property = properties->at(p).name;
+      const std::string name = flatten ? labels.at(&element) + "_" + property : property;
+      outputs.push_back(alias + ".p" + std::to_string(p) + " AS " +
+                        googlesql::ToIdentifierLiteral(name));
     }
     const std::set<int>& columns = joined.at(i);
     std::vector<std::string> conditions;
