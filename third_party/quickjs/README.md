@@ -1,4 +1,11 @@
-# QuickJS patches
+# QuickJS-NG
+
+`MODULE.bazel` pins the upstream release archive until the release is available in the Bazel
+Central Registry. `BUILD.quickjs.bazel` uses the upstream `qjsc` at build time to regenerate
+the engine's built-in bytecode with the patched opcode table. The emulator links only the core
+engine, not the CLI or the host I/O library.
+
+## Local patches
 
 `unicode_symbol.patch` namespaces QuickJS's `unicode_normalize` as
 `quickjs_unicode_normalize` through its internal header, covering the definition and all

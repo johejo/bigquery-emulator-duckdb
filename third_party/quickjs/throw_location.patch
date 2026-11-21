@@ -1,7 +1,7 @@
 diff --git a/quickjs.h b/quickjs.h
 --- a/quickjs.h
 +++ b/quickjs.h
-@@ -994,6 +994,11 @@
+@@ -1025,6 +1025,11 @@ JS_EXTERN void JS_FreePropertyEnum(JSContext *ctx, JSPropertyEnum *tab,
  
  JS_EXTERN JSValue JS_Call(JSContext *ctx, JSValueConst func_obj,
                            JSValueConst this_obj, int argc, JSValueConst *argv);
@@ -16,7 +16,7 @@ diff --git a/quickjs.h b/quickjs.h
 diff --git a/quickjs-opcode.h b/quickjs-opcode.h
 --- a/quickjs-opcode.h
 +++ b/quickjs-opcode.h
-@@ -116,6 +116,9 @@
+@@ -116,6 +116,9 @@ DEF(    check_brand, 1, 2, 2, none) /* this_obj func -> this_obj func */
  DEF(      add_brand, 1, 2, 0, none) /* this_obj home_obj -> */
  DEF(   return_async, 1, 1, 0, none)
  DEF(          throw, 1, 1, 0, none)
@@ -29,7 +29,7 @@ diff --git a/quickjs-opcode.h b/quickjs-opcode.h
 diff --git a/quickjs.c b/quickjs.c
 --- a/quickjs.c
 +++ b/quickjs.c
-@@ -302,6 +302,10 @@
+@@ -370,6 +370,10 @@ struct JSRuntime {
      uintptr_t stack_limit; /* lower stack limit */
  
      JSValue current_exception;
@@ -40,7 +40,7 @@ diff --git a/quickjs.c b/quickjs.c
      /* true if inside an out of memory error, to avoid recursing */
      bool in_out_of_memory;
      /* true if inside build_backtrace, to avoid recursing */
-@@ -7596,6 +7600,10 @@
+@@ -8004,6 +8008,10 @@ JSValue JS_Throw(JSContext *ctx, JSValue obj)
      JSRuntime *rt = ctx->rt;
      JS_FreeValue(ctx, rt->current_exception);
      rt->current_exception = obj;
@@ -51,7 +51,7 @@ diff --git a/quickjs.c b/quickjs.c
      return JS_EXCEPTION;
  }
  
-@@ -7606,6 +7614,10 @@
+@@ -8014,6 +8022,10 @@ JSValue JS_GetException(JSContext *ctx)
      JSRuntime *rt = ctx->rt;
      val = rt->current_exception;
      rt->current_exception = JS_UNINITIALIZED;
@@ -62,7 +62,21 @@ diff --git a/quickjs.c b/quickjs.c
      return val;
  }
  
-@@ -17558,6 +17570,7 @@
+@@ -8940,7 +8952,13 @@
+ }
+
++#ifdef QJS_REBUILT_BUILTINS
++#include "rebuilt-builtin-array-fromasync.h"
++#include "rebuilt-builtin-iterator-zip-keyed.h"
++#include "rebuilt-builtin-iterator-zip.h"
++#else
+ #include "builtin-array-fromasync.h"
+ #include "builtin-iterator-zip-keyed.h"
+ #include "builtin-iterator-zip.h"
++#endif
+
+ // like Function.prototype.call but monkey patch-proof
+@@ -18062,6 +18080,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
      JSStackFrame sf_s, *sf = &sf_s;
      uint8_t *pc;
      int opcode, arg_allocated_size, i;
@@ -70,7 +84,7 @@ diff --git a/quickjs.c b/quickjs.c
      JSValue *local_buf, *stack_buf, *var_buf, *arg_buf, *sp, ret_val, *pval;
      JSVarRef **var_refs;
      size_t alloca_size;
-@@ -18189,6 +18202,29 @@
+@@ -18696,6 +18715,29 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
          CASE(OP_throw):
              JS_Throw(ctx, *--sp);
              goto exception;
@@ -100,7 +114,7 @@ diff --git a/quickjs.c b/quickjs.c
  
          CASE(OP_throw_error):
  #define JS_THROW_VAR_RO             0
-@@ -20321,9 +20357,13 @@
+@@ -20937,9 +20979,13 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
   exception:
      if (needs_backtrace(rt->current_exception)
      || JS_IsUndefined(ctx->error_back_trace)) {
@@ -114,7 +128,7 @@ diff --git a/quickjs.c b/quickjs.c
      }
      if (!JS_IsUncatchableError(rt->current_exception)) {
          while (sp > stack_buf) {
-@@ -20335,10 +20375,14 @@
+@@ -20951,10 +20997,14 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                      /* enumerator: close it with a throw */
                      JS_FreeValue(ctx, sp[-1]); /* drop the next method */
                      sp--;
@@ -131,7 +145,7 @@ diff --git a/quickjs.c b/quickjs.c
                      JS_FreeValueRT(rt, ctx->error_back_trace);
                      ctx->error_back_trace = JS_UNDEFINED;
                      pc = b->byte_code_buf + pos;
-@@ -20375,6 +20419,26 @@
+@@ -20991,6 +21041,26 @@ JSValue JS_Call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj,
  {
      return JS_CallInternal(ctx, func_obj, this_obj, JS_UNDEFINED,
                             argc, argv, JS_CALL_FLAG_COPY_ARGV);
@@ -158,7 +172,7 @@ diff --git a/quickjs.c b/quickjs.c
  }
  
  static JSValue JS_CallFree(JSContext *ctx, JSValue func_obj, JSValueConst this_obj,
-@@ -23369,6 +23433,8 @@
+@@ -24018,6 +24088,8 @@ static bool js_is_live_code(JSParseState *s) {
      case OP_return_undef:
      case OP_return_async:
      case OP_throw:
@@ -167,7 +181,7 @@ diff --git a/quickjs.c b/quickjs.c
      case OP_throw_error:
      case OP_goto:
      case OP_goto8:
-@@ -28794,7 +28860,9 @@
+@@ -29451,7 +29523,9 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
          if (js_parse_expect_semi(s))
              goto fail;
          break;
@@ -178,7 +192,7 @@ diff --git a/quickjs.c b/quickjs.c
          if (next_token(s))
              goto fail;
          if (s->got_lf) {
-@@ -28804,10 +28872,13 @@
+@@ -29461,10 +29535,13 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
          emit_source_loc(s);
          if (js_parse_expr(s))
              goto fail;
@@ -193,7 +207,7 @@ diff --git a/quickjs.c b/quickjs.c
      case TOK_AWAIT:
          /* Check for 'await using' declaration */
          if (s->cur_func->func_kind & JS_FUNC_ASYNC) {
-@@ -29326,6 +29397,7 @@
+@@ -29983,6 +30060,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
      case TOK_TRY:
          {
              int label_catch, label_catch2, label_finally, label_end;
@@ -201,7 +215,7 @@ diff --git a/quickjs.c b/quickjs.c
              JSAtom name;
              BlockEnv block_env;
  
-@@ -29423,22 +29495,36 @@
+@@ -30080,22 +30158,36 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
                  }
                  /* catch exceptions thrown in the catch block to execute the
                   * finally clause and rethrow the exception */
@@ -246,7 +260,7 @@ diff --git a/quickjs.c b/quickjs.c
              emit_label(s, label_finally);
              if (s->token.val == TOK_FINALLY) {
                  int saved_eval_ret_idx = 0; /* avoid warning */
-@@ -34437,6 +34523,8 @@
+@@ -35347,6 +35439,8 @@ static __exception int resolve_variables(JSContext *ctx, JSFunctionDef *s)
          case OP_return:
          case OP_return_undef:
          case OP_throw:
@@ -255,7 +269,7 @@ diff --git a/quickjs.c b/quickjs.c
          case OP_throw_error:
          case OP_ret:
              {
-@@ -35072,6 +35160,8 @@
+@@ -35982,6 +36076,8 @@ static __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s)
          case OP_return_undef:
          case OP_return_async:
          case OP_throw:
@@ -264,7 +278,7 @@ diff --git a/quickjs.c b/quickjs.c
          case OP_throw_error:
              pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next,
                                        &line_num, &col_num);
-@@ -35951,6 +36041,8 @@
+@@ -36861,6 +36957,8 @@ static __exception int compute_stack_size(JSContext *ctx,
          case OP_return_undef:
          case OP_return_async:
          case OP_throw:
@@ -273,13 +287,13 @@ diff --git a/quickjs.c b/quickjs.c
          case OP_throw_error:
          case OP_ret:
              goto done_insn;
-@@ -37653,7 +37745,8 @@
+@@ -38564,7 +38662,8 @@ typedef enum BCTagEnum {
      BC_TAG_SYMBOL,
  } BCTagEnum;
  
--#define BC_VERSION 26
+-#define BC_VERSION 29
 +/* Local bytecode differs from upstream because of the throw-location opcodes. */
-+#define BC_VERSION (0x80 | 26)
++#define BC_VERSION (0x80 | 29)
  
  typedef struct BCWriterState {
      JSContext *ctx;
