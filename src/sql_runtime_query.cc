@@ -502,6 +502,8 @@ TranslatedStatement SqlRuntime::Translate(
       .restrict_struct_results = functions_.restrictions().restrict_struct_results,
       .cast_without_type_parameters = functions_.restrictions().cast_without_type_parameters,
       .restrict_pivot_aggregates = functions_.restrictions().restrict_pivot_aggregates,
+      .literal_window_frame_offsets_only =
+          functions_.restrictions().literal_window_frame_offsets_only,
   };
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {

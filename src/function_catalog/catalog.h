@@ -86,7 +86,7 @@ struct FunctionEntry {
 // The application assembles a catalog before passing it to the translator.
 class Catalog {
  public:
-  Catalog(TimestampPrecision precision, QueryRestrictions restrictions)
+  Catalog(TimestampPrecision precision, const QueryRestrictions& restrictions)
       : timestamp_precision_(precision), restrictions_(restrictions) {}
   [[nodiscard]] TimestampPrecision timestamp_precision() const { return timestamp_precision_; }
   [[nodiscard]] const QueryRestrictions& restrictions() const { return restrictions_; }
