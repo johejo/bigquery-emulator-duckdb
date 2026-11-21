@@ -462,3 +462,118 @@ SELECT SEARCH([1, 2], '1')
 
 SELECT SEARCH(COLLATE('Foo', 'und:ci'), 'foo')
 => "true"
+
+SELECT SEARCH('foo bar', '`foo`', analyzer => 'PATTERN_ANALYZER')
+=> "true"
+
+SELECT SEARCH('foo bar', '`foo bar`', analyzer => 'PATTERN_ANALYZER')
+=> "true"
+
+# PATTERN_ANALYZER's queries have no backtick terms: a backtick is part of a single term, which
+# the pattern leaves out of the tokens.
+
+SELECT SEARCH('foobar', '`oob`', analyzer => 'PATTERN_ANALYZER')
+=> "false"
+
+SELECT SEARCH('xfoo bar', '`foo`', analyzer => 'PATTERN_ANALYZER')
+=> "false"
+
+SELECT SEARCH('foo-bar', '`o-b`', analyzer => 'PATTERN_ANALYZER')
+=> error: Search query parser error: error at position 2: token recognition error at: '-'
+
+SELECT SEARCH('foo bar', '`Foo`', analyzer => 'PATTERN_ANALYZER')
+=> "true"
+
+SELECT SEARCH('foo bar', '`foo  bar`', analyzer => 'PATTERN_ANALYZER')
+=> "true"
+
+SELECT SEARCH('ab12cd', '`12`', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]+"]}')
+=> error: Search query '`12`' results in 0 tokens.
+
+# OR leaves out a term without search tokens too.
+
+SELECT SEARCH('foo', 'bar OR ...')
+=> "false"
+
+SELECT SEARCH('foo', '(bar ...) OR (... ...)')
+=> "false"
+
+# Whitespace around parentheses, after the query and twice around AND. After whitespace, a
+# term must follow, and ANTLR reports whitespace missing before one after AND.
+
+SELECT SEARCH('foo', 'foo ')
+=> "true"
+
+SELECT SEARCH('foo', ' foo')
+=> "true"
+
+SELECT SEARCH('foo', '( foo )')
+=> "true"
+
+SELECT SEARCH('foo bar', 'foo  AND  bar')
+=> "true"
+
+SELECT SEARCH('foo bar', 'foo AND(bar)')
+=> error: Search query parser error: error at position 7: missing WhiteSpace at '('
+
+SELECT SEARCH('foo bar', '(foo)AND bar')
+=> error: Search query parser error: error at position 5: extraneous input 'AND' expecting {<EOF>, WhiteSpace}
+
+SELECT SEARCH('foo bar', 'foo AND ')
+=> error: Search query parser error: error at position 8: mismatched input '<EOF>' expecting {'(', BacktickToken, DoubleQuoteToken, SingleTermToken}
+
+SELECT SEARCH('foo', 'foo OR ')
+=> error: Search query parser error: error at position 7: mismatched input '<EOF>' expecting {'(', BacktickToken, DoubleQuoteToken, SingleTermToken}
+
+# Positions after multibyte characters.
+
+SELECT SEARCH('é', 'é-')
+=> error: Search query parser error: error at position 1: token recognition error at: '-'
+
+SELECT SEARCH('é', 'éé)')
+=> error: Search query parser error: error at position 2: extraneous input ')' expecting {<EOF>, WhiteSpace}
+
+# Escaped characters that are also delimiters.
+
+SELECT SEARCH('foo bar', 'foo\\(')
+=> "true"
+
+SELECT SEARCH('foo', 'foo\\"')
+=> "true"
+
+SELECT SEARCH('a"b', '`a"b`')
+=> "true"
+
+SELECT SEARCH('a`b', R'`a\`b`')
+=> "true"
+
+# A collation does not change what SEARCH matches.
+
+SELECT SEARCH(COLLATE('Foo', 'und:ci'), '`foo`')
+=> "false"
+
+SELECT SEARCH(COLLATE('Foo', 'und:ci'), 'foo', analyzer => 'NO_OP_ANALYZER')
+=> "false"
+
+SELECT SEARCH(COLLATE('Foo', 'und:ci'), 'foo', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "NONE"}}]}')
+=> "false"
+
+# Pattern errors, without the function's name that TEXT_ANALYZE's have.
+
+SELECT SEARCH('foo', 'foo', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["("]}')
+=> error: Invalid regular expression pattern '('.
+
+SELECT SEARCH('foo', 'foo', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["(a)"]}')
+=> error: Capturing groups are not allowed for pattern analyzer. Found 1 in pattern '(a)'.
+
+# A search_query that is constant but neither a literal nor a parameter, and errors of constant
+# arguments without rows to search.
+
+SELECT SEARCH('foo', CONCAT('f', 'oo'), analyzer => CONCAT('LOG', '_ANALYZER'))
+=> "true"
+
+SELECT SEARCH(s, '') FROM UNNEST(CAST([] AS ARRAY<STRING>)) AS s
+=> error: Search query parser error: error at position 0: mismatched input '<EOF>' expecting {'(', BacktickToken, DoubleQuoteToken, SingleTermToken, WhiteSpace}
+
+SELECT SEARCH(s, 'foo-') FROM UNNEST(CAST([] AS ARRAY<STRING>)) AS s
+=> error: Search query parser error: error at position 3: token recognition error at: '-'

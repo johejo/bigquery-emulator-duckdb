@@ -312,11 +312,6 @@ ARRAY, STRUCT, annotated PostgreSQL types and all nonempty options, including
 `query_execution_priority`, are unsupported. Queries run as single-use, strong, read-only
 transactions; query partitioning and Data Boost are not implemented.
 
-### SEARCH
-
-Backtick terms with `PATTERN_ANALYZER` are unsupported, as is a search query term without search
-tokens, such as a stop word, under `OR` when no other term of the `OR` matches.
-
 ### ObjectRef functions
 
 `OBJ.FETCH_METADATA` reads objects from the Cloud Storage endpoint that loads read; see the

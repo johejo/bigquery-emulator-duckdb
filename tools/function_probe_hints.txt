@@ -370,7 +370,6 @@ extra_query SEARCH SELECT SEARCH('abc', 'abc', analyzer_options => '{"delimiters
 extra_query SEARCH SELECT SEARCH(JSON '{"a":"abc"}', 'a', json_scope => 'JSON_KEYS')
 extra_query SEARCH SELECT SEARCH('abc', '`abc`', analyzer => 'PATTERN_ANALYZER')
 extra_query SEARCH SELECT SEARCH(t, 'abc') FROM (SELECT 'abc' AS s, 1 AS n) AS t
-note SEARCH See [SEARCH](compatibility.md#search) for limits.
 
 # TF_IDF takes only an empty OVER clause.
 # tools/restprobe connects us.postgres to an empty PostgreSQL server. BigQuery reads bit strings

@@ -90,7 +90,7 @@ absl::Status Failed(std::string_view function, std::string_view message) {
 }
 
 std::string Context(std::string_view function) {
-  return function.empty() ? "" : absl::StrCat(". Error in ", function, " expression");
+  return function.empty() ? "." : absl::StrCat(". Error in ", function, " expression");
 }
 
 // BigQuery checks analyzer_options against a JSON Schema and reports the first violation, at

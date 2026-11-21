@@ -68,12 +68,3 @@ SELECT COUNT(*) FROM committed
 # BigQuery adds the planar edge's midpoints until it is close enough to the geodesic one.
 SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040'), planar => TRUE)
 => "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
-
-# Observed BigQuery answers collected with tools/bqanswers. Backtick terms with PATTERN_ANALYZER
-# stay unsupported until cases settle what they match: these two match neither one token nor
-# the text between LOG_ANALYZER's delimiters only.
-SELECT SEARCH('foo bar', '`foo`', analyzer => 'PATTERN_ANALYZER')
-!> "true"
-
-SELECT SEARCH('foo bar', '`foo bar`', analyzer => 'PATTERN_ANALYZER')
-!> "true"

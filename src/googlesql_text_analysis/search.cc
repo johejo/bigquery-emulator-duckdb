@@ -47,8 +47,8 @@ struct Term {
 };
 
 struct Node {
-  // kEmpty is a term without search tokens, or a combination of only such terms. AND leaves it
-  // out; BigQuery's answer settles OR only when another of its terms matches.
+  // kEmpty is a term without search tokens, or a combination of only such terms, which AND and
+  // OR leave out.
   enum class Op : std::uint8_t { kTerm, kEmpty, kAnd, kOr };
   Op op = Op::kTerm;
   Term term;
@@ -95,11 +95,6 @@ absl::Status ParserError(std::string_view message) {
   return absl::OutOfRangeError(absl::StrCat("Search query parser error: ", message));
 }
 
-absl::Status Unsupported(std::string_view detail) {
-  return absl::UnimplementedError(
-      absl::StrCat("The emulator does not support ", detail, " in SEARCH"));
-}
-
 bool IsSpace(char c) { return absl::ascii_isspace(static_cast<unsigned char>(c)); }
 
 bool IsReserved(char c) { return kReserved.find(c) != std::string_view::npos; }
@@ -114,9 +109,11 @@ bool Contains(const Range& range, const Value& value) {
   return std::ranges::find(range, value) != std::ranges::end(range);
 }
 
+// Only LOG_ANALYZER's queries have backtick terms; PATTERN_ANALYZER's single terms include
+// backticks, which its patterns leave out of the tokens.
 class Lexer {
  public:
-  explicit Lexer(std::string_view query) : query_(query) {}
+  Lexer(std::string_view query, bool backticks) : query_(query), backticks_(backticks) {}
 
   absl::StatusOr<std::vector<Token>> Tokens() {
     std::vector<Token> tokens;
@@ -132,7 +129,7 @@ class Lexer {
       } else if (c == '(' || c == ')') {
         token.kind = c == '(' ? Token::Kind::kOpen : Token::Kind::kClose;
         ++i_;
-      } else if (c == '"' || c == '`') {
+      } else if (c == '"' || (c == '`' && backticks_)) {
         token.kind = c == '"' ? Token::Kind::kPhrase : Token::Kind::kBacktick;
         GOOGLESQL_ASSIGN_OR_RETURN(token.value, Quoted(c));
       } else {
@@ -188,7 +185,7 @@ class Lexer {
     std::string value;
     while (i_ < query_.size()) {
       const char c = query_.at(i_);
-      if (IsSpace(c) || c == '(' || c == ')' || c == '"' || c == '`') {
+      if (IsSpace(c) || c == '(' || c == ')' || c == '"' || (c == '`' && backticks_)) {
         break;
       }
       if (c == '\\') {
@@ -208,11 +205,16 @@ class Lexer {
   }
 
   std::string_view query_;
+  bool backticks_;
   std::size_t i_ = 0;
 };
 
-constexpr std::string_view kTermStart =
-    "{'(', BacktickToken, DoubleQuoteToken, SingleTermToken, WhiteSpace}";
+constexpr std::array kTermStart = {
+    Token::Kind::kOpen,
+    Token::Kind::kBacktick,
+    Token::Kind::kPhrase,
+    Token::Kind::kSingle,
+};
 
 // Recursive descent over the grammar of the search query rules, where OR binds more loosely than
 // AND and whitespace, and both operators need whitespace on either side.
@@ -236,23 +238,31 @@ class Parser {
     return tokens_.at(std::min(next_ + 1, tokens_.size() - 1));
   }
 
+  [[nodiscard]] std::string_view Display() const {
+    return Current().kind == Token::Kind::kEof ? "<EOF>" : std::string_view(Current().text);
+  }
+
   // ANTLR's error at the current token: extraneous when the token after it is one of `expected`,
   // so that deleting it would recover, otherwise mismatched.
   [[nodiscard]] absl::Status Expected(const Kinds& expected, std::string_view description) const {
-    const Token& token = Current();
-    const bool eof = token.kind == Token::Kind::kEof;
-    const bool extraneous = !eof && Contains(expected, Following().kind);
-    return ParserError(absl::StrCat("error at position ", token.position, ": ",
-                                    extraneous ? "extraneous" : "mismatched", " input '",
-                                    eof ? "<EOF>" : token.text, "' expecting ", description));
+    const bool extraneous =
+        Current().kind != Token::Kind::kEof && Contains(expected, Following().kind);
+    return ParserError(absl::StrCat("error at position ", Current().position, ": ",
+                                    extraneous ? "extraneous" : "mismatched", " input '", Display(),
+                                    "' expecting ", description));
   }
 
+  // The whitespace after AND and OR, which ANTLR reports missing when a term follows instead.
   absl::Status RequireSpace() {
-    if (Current().kind != Token::Kind::kSpace) {
-      return Expected({Token::Kind::kSpace}, "WhiteSpace");
+    if (Current().kind == Token::Kind::kSpace) {
+      ++next_;
+      return absl::OkStatus();
     }
-    ++next_;
-    return absl::OkStatus();
+    if (Following().kind != Token::Kind::kSpace && Contains(kTermStart, Current().kind)) {
+      return ParserError(absl::StrCat("error at position ", Current().position,
+                                      ": missing WhiteSpace at '", Display(), "'"));
+    }
+    return Expected({Token::Kind::kSpace}, "WhiteSpace");
   }
 
   absl::StatusOr<Node> Or(int depth) {
@@ -318,6 +328,8 @@ class Parser {
     if (Current().kind == Token::Kind::kSpace) {
       ++next_;
     }
+    // Whitespace before a term is one token, so a term must follow it.
+    const bool spaced = next_ > 0 && tokens_.at(next_ - 1).kind == Token::Kind::kSpace;
     const Token& token = Current();
     switch (token.kind) {
       case Token::Kind::kOpen: {
@@ -331,9 +343,6 @@ class Parser {
       }
       case Token::Kind::kBacktick:
         ++next_;
-        if (KindOf(analyzer_) != AnalyzerKind::kLog) {
-          return Unsupported("backtick terms with PATTERN_ANALYZER");
-        }
         return TermNode({.kind = Term::Kind::kExact, .tokens = {}, .text = token.value});
       case Token::Kind::kSingle:
       case Token::Kind::kPhrase: {
@@ -354,16 +363,16 @@ class Parser {
             .text = {},
         });
       }
-      default:
-        return Expected(
-            {
-                Token::Kind::kOpen,
-                Token::Kind::kBacktick,
-                Token::Kind::kPhrase,
-                Token::Kind::kSingle,
-                Token::Kind::kSpace,
-            },
-            kTermStart);
+      default: {
+        if (spaced) {
+          return Expected(Kinds(kTermStart.begin(), kTermStart.end()),
+                          "{'(', BacktickToken, DoubleQuoteToken, SingleTermToken}");
+        }
+        Kinds expected(kTermStart.begin(), kTermStart.end());
+        expected.push_back(Token::Kind::kSpace);
+        return Expected(expected,
+                        "{'(', BacktickToken, DoubleQuoteToken, SingleTermToken, WhiteSpace}");
+      }
     }
   }
 
@@ -410,7 +419,7 @@ absl::StatusOr<bool> Evaluate(const Node& node, Field& field) {
     case Node::Op::kTerm:
       return field.Matches(node.term);
     case Node::Op::kEmpty:
-      return Unsupported("OR over a term without search tokens when no other term matches");
+      return false;
     case Node::Op::kAnd:
       for (const Node& child : node.children) {
         GOOGLESQL_ASSIGN_OR_RETURN(const bool matches, Evaluate(child, field));
@@ -419,23 +428,14 @@ absl::StatusOr<bool> Evaluate(const Node& node, Field& field) {
         }
       }
       return true;
-    case Node::Op::kOr: {
-      bool empty = false;
+    case Node::Op::kOr:
       for (const Node& child : node.children) {
-        if (child.op == Node::Op::kEmpty) {
-          empty = true;
-          continue;
-        }
         GOOGLESQL_ASSIGN_OR_RETURN(const bool matches, Evaluate(child, field));
         if (matches) {
           return true;
         }
       }
-      if (empty) {
-        return Unsupported("OR over a term without search tokens when no other term matches");
-      }
       return false;
-    }
   }
   return false;
 }
@@ -475,7 +475,8 @@ absl::StatusOr<std::shared_ptr<const SearchQuery>> ParseSearchQuery(
     search->analyzer = std::move(analyzer);
     return search;
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<Token> tokens, Lexer(query).Tokens());
+  GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<Token> tokens,
+                             Lexer(query, KindOf(*analyzer) == AnalyzerKind::kLog).Tokens());
   GOOGLESQL_ASSIGN_OR_RETURN(search->root, Parser(tokens, *analyzer).Parse());
   if (search->root.op == Node::Op::kEmpty) {
     return absl::OutOfRangeError(absl::StrCat("Search query '", query, "' results in 0 tokens."));
