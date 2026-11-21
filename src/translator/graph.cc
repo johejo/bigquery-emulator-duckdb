@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -200,6 +201,20 @@ bool PortableProperty(const googlesql::ResolvedNode& node) {
   return std::ranges::all_of(children, [](const auto* child) { return PortableProperty(*child); });
 }
 
+// BigQuery allows COUNT(column) in graph measures but rejects the COUNT(*) overload.
+void CheckMeasure(const googlesql::ResolvedExpr& expr) {
+  std::vector<const googlesql::ResolvedNode*> calls;
+  expr.GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_FUNCTION_CALL}, &calls);
+  for (const auto* node : calls) {
+    const auto* function = node->GetAs<googlesql::ResolvedAggregateFunctionCall>()->function();
+    if (function->IsGoogleSQLBuiltin() && function->Name() == "$count_star") {
+      throw std::invalid_argument(
+          "COUNT(*) is not allowed in a measure expression in BigQuery. "
+          "Please specify a column, e.g., COUNT(<column_name>).");
+    }
+  }
+}
+
 }  // namespace
 
 std::optional<std::string> CreatePropertyGraph(
@@ -211,6 +226,16 @@ std::optional<std::string> CreatePropertyGraph(
   if (std::ranges::any_of(create.label_list(),
                           [](const auto& label) { return !label->options_list().empty(); })) {
     return Unsupported(scope, "graph label options");
+  }
+  // Diagnose invalid measures before the support check for otherwise valid measures.
+  for (const auto* elements : {&create.node_table_list(), &create.edge_table_list()}) {
+    for (const auto& element : *elements) {
+      for (const auto& property : element->property_definition_list()) {
+        if (property->is_measure()) {
+          CheckMeasure(*property->expr());
+        }
+      }
+    }
   }
   const auto parts =
       NormalizeTablePath(create.name_path(), scope.context.defaults.project,

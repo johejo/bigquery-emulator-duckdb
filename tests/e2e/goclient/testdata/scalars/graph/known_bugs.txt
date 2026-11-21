@@ -32,12 +32,6 @@ SELECT TO_JSON_STRING(STRUCT(AGG(L_total_population) AS total, SUM(L_population)
 FROM GRAPH_EXPAND('scalar_graph.StoreGraphWithMeasure') GROUP BY S_location_id;
 !> "{\"total\":1000,\"ordinary_sum\":2000}"
 
-# Observed with tools/bqanswers: a graph measure must use COUNT(column), not COUNT(*).
-CREATE PROPERTY GRAPH scalar_graph.StoreGraphWithCountStarMeasure
-  NODE TABLES (scalar_graph.Locations AS L
-    PROPERTIES (id, MEASURE(COUNT(*)) AS location_count));
-!> error contains: COUNT(*) is not allowed in a measure expression in BigQuery
-
 # Observed with tools/bqanswers in both modes. AGG counts a matched key with NULL amount once,
 # skips absent keys, and sums equal amounts for distinct keys while removing join duplicates.
 CREATE TABLE scalar_graph.MeasureLocations (id INT64 PRIMARY KEY NOT ENFORCED, amount INT64)

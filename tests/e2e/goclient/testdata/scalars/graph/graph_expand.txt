@@ -8,6 +8,13 @@ SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreGraph')
 SELECT SUM(L_population) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') GROUP BY S_location_id
 => "2000"
 
+# BigQuery rejects COUNT(*) in a graph measure; use COUNT(column) instead (tools/bqanswers).
+CREATE PROPERTY GRAPH scalar_graph.StoreGraphWithCountStarMeasure
+  NODE TABLES (scalar_graph.Locations AS L
+    PROPERTIES (id, population, MEASURE(SUM(population)) AS total_population,
+      MEASURE(COUNT(*)) AS location_count));
+=> error contains: COUNT(*) is not allowed in a measure expression in BigQuery. Please specify a column, e.g., COUNT(<column_name>).
+
 # BigQuery inlines an edge table with its node table's table and properties only where the table
 # has no columns other than those the edge references, whichever endpoint references the node
 # table and whether a foreign key relates the tables; observed BigQuery answers collected with
