@@ -38,18 +38,18 @@ func TestBigtableExternal(t *testing.T) {
 	tableID := "go-external-bigtable"
 	source := parent + "/tables/" + tableID
 	_, err = admin.CreateTable(ctx, &adminpb.CreateTableRequest{
-		Parent: parent, TableId: tableID, Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}}},
+		Parent: parent, TableId: tableID, Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _, _ = admin.DeleteTable(ctx, &adminpb.DeleteTableRequest{Name: source}) })
 	data := btpb.NewBigtableClient(conn)
-	put := func(key string) {
+	put := func(key, family string) {
 		t.Helper()
 		_, err := data.MutateRow(ctx, &btpb.MutateRowRequest{TableName: source, RowKey: []byte(key), Mutations: []*btpb.Mutation{
-			{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{FamilyName: "family", ColumnQualifier: []byte("qualifier"), TimestampMicros: 1000, Value: []byte{0, 0xff, '\'', '\\'}}}},
-			{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{FamilyName: "family", ColumnQualifier: []byte("qualifier"), TimestampMicros: 2000, Value: []byte("world")}}},
+			{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{FamilyName: family, ColumnQualifier: []byte("qualifier"), TimestampMicros: 1000, Value: []byte{0, 0xff, '\'', '\\'}}}},
+			{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{FamilyName: family, ColumnQualifier: []byte("qualifier"), TimestampMicros: 2000, Value: []byte("world")}}},
 		}})
 		if err != nil {
 			t.Fatal(err)
@@ -101,9 +101,9 @@ func TestBigtableExternal(t *testing.T) {
 		}
 	}
 	readKeys()
-	put("first")
+	put("first", "family")
 	readKeys("first")
-	put("second")
+	put("second", "family")
 	readKeys("first", "second")
 	rawValues, err := client.Query("SELECT c.value FROM go_bigtable_external.raw, UNNEST(family.column) col, UNNEST(col.cell) c WHERE rowkey = b'first' ORDER BY c.timestamp").Read(ctx)
 	if err != nil {
@@ -143,7 +143,11 @@ func TestBigtableExternal(t *testing.T) {
 	if !options.ReadRowkeyAsString || !options.IgnoreUnspecifiedColumnFamilies || !options.ColumnFamilies[0].OnlyReadLatest {
 		t.Fatalf("options = %+v", options)
 	}
-	latest, err := client.Query("SELECT rowkey, col.cell.value, col.cell.timestamp FROM go_bigtable_external.text, UNNEST(family.column) col ORDER BY rowkey").Read(ctx)
+	// Verified on BigQuery (run nedc75o5ucmak3pzj56nlvwqin).
+	// Do not UNNEST: that could also discard missing families.
+	put("other", "other_family")
+	latest, err := client.Query(`SELECT rowkey, family.column[SAFE_OFFSET(0)].cell.value,
+		family.column[SAFE_OFFSET(0)].cell.timestamp FROM go_bigtable_external.text ORDER BY rowkey`).Read(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,6 +164,47 @@ func TestBigtableExternal(t *testing.T) {
 	if err := latest.Next(&extra); err != iterator.Done {
 		t.Fatalf("extra latest row: %v, %v", extra, err)
 	}
+
+	if err := dataset.Table("both").Create(ctx, &bigquery.TableMetadata{ExternalDataConfig: &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.Bigtable,
+		SourceURIs:   []string{uri},
+		Options: &bigquery.BigtableOptions{
+			ReadRowkeyAsString:              true,
+			IgnoreUnspecifiedColumnFamilies: true,
+			ColumnFamilies: []*bigquery.BigtableColumnFamily{
+				{FamilyID: "family", Type: "STRING", OnlyReadLatest: true},
+				{FamilyID: "other_family", Type: "STRING", OnlyReadLatest: true},
+			},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		query string
+		rows  [][]bigquery.Value
+	}{
+		{"SELECT rowkey FROM go_bigtable_external.text ORDER BY rowkey",
+			[][]bigquery.Value{{"first"}, {"other"}, {"second"}}},
+		{"SELECT rowkey, family IS NULL FROM go_bigtable_external.both ORDER BY rowkey",
+			[][]bigquery.Value{{"first", false}, {"second", false}}},
+		{"SELECT rowkey, family IS NULL, other_family IS NULL FROM go_bigtable_external.both ORDER BY rowkey",
+			[][]bigquery.Value{{"first", false, true}, {"other", true, false}, {"second", false, true}}},
+	} {
+		it, err := client.Query(tc.query).Read(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.query, err)
+		}
+		for _, want := range tc.rows {
+			var row []bigquery.Value
+			if err := it.Next(&row); err != nil || !reflect.DeepEqual(row, want) {
+				t.Fatalf("%s: row = %v, err = %v, want %v", tc.query, row, err, want)
+			}
+		}
+		if err := it.Next(&extra); err != iterator.Done {
+			t.Fatalf("%s: extra row = %v, err = %v", tc.query, extra, err)
+		}
+	}
+
 	for _, options := range []string{
 		`{"outputColumnFamiliesAsJson":true}`,
 		`{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}`,
