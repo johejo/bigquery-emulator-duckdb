@@ -67,8 +67,8 @@ void RangeAdd(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
     // An infinite offset cannot move an infinity of the opposite sign in a single direction.
     if (std::isinf(offset) && (kSubtract ? value > 0 : value < 0) && std::isinf(value)) {
       return absl::OutOfRangeError(
-          "Offset value cannot be positive infinity when there exists "
-          "an infinity order key in the opposite direction");
+          "Offset value in OVER(RANGE ... <offset> PRECEDING|FOLLOWING) cannot be infinity "
+          "when there exists an infinity order key making the window boundary value NaN.");
     }
     if (std::isfinite(value) && std::isfinite(offset)) {
       constexpr double max = std::numeric_limits<double>::max();

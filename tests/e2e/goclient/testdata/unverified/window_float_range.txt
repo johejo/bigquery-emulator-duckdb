@@ -1,9 +1,0 @@
-# Use query parameters: BigQuery rejects script variables as window frame offsets before
-# inspecting their values. Record its exact messages for NaN and infinite offsets.
-SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN CURRENT ROW AND @offset_value FOLLOWING) FROM UNNEST([1.0]) AS x
-param> {"name":"offset_value","parameterType":{"type":"FLOAT64"},"parameterValue":{"value":"NaN"}}
-?>
-
-SELECT COUNT(*) OVER (ORDER BY x RANGE BETWEEN @offset_value PRECEDING AND CURRENT ROW) FROM UNNEST([1.0, CAST('inf' AS FLOAT64)]) AS x
-param> {"name":"offset_value","parameterType":{"type":"FLOAT64"},"parameterValue":{"value":"Infinity"}}
-?>
