@@ -19,6 +19,7 @@ struct GraphExpandColumn {
   std::string name;
   int body_index;
   bool is_row = false;
+  bool is_pseudo = false;
   std::vector<GraphExpandColumn> fields;
 };
 

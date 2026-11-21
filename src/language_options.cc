@@ -19,6 +19,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // from BigQuery are turned off below.
     options->EnableMaximumLanguageFeatures();
     options->EnableReservableKeyword("GRAPH_TABLE").IgnoreError();
+    // The measure rewriter checks this when AGG reads a GRAPH_EXPAND ROW field.
+    options->EnableLanguageFeature(googlesql::FEATURE_ROW_TYPE);
     // Some of those features add types and precision that BigQuery lacks rather than syntax, so
     // they are turned off again: BigQuery has no MAP, UUID or FLOAT32, and its timestamps hold
     // microseconds, not nanoseconds or picoseconds. BigQuery also rejects explicit casts between

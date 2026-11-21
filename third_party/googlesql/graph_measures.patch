@@ -1,0 +1,71 @@
+--- a/googlesql/public/simple_catalog_util.cc
++++ b/googlesql/public/simple_catalog_util.cc
+@@ -370,16 +370,3 @@
+-static absl::Status ValidatePropertyDefinition(
+-    const GraphPropertyDeclaration& property_decl) {
+-  GOOGLESQL_RET_CHECK(property_decl.kind() != GraphPropertyDeclaration::Kind::kInvalid)
+-      << property_decl.Name();
+-  if (property_decl.kind() == GraphPropertyDeclaration::Kind::kMeasure) {
+-    return absl::UnimplementedError(
+-        absl::StrFormat("Measure property definitions are not yet supported. "
+-                        "Property: %s",
+-                        property_decl.Name()));
+-  }
+-  return absl::OkStatus();
+-}
+-
+ template <typename ElementTableType>
+ static absl::Status AddElementTable(
+     const ResolvedGraphElementTable* resolved_element_table,
+@@ -396,7 +383,8 @@
+     const GraphPropertyDeclaration* property_decl;
+     GOOGLESQL_RETURN_IF_ERROR(graph.FindPropertyDeclarationByName(
+         def->property_declaration_name(), property_decl));
+-    GOOGLESQL_RETURN_IF_ERROR(ValidatePropertyDefinition(*property_decl));
++    GOOGLESQL_RET_CHECK(property_decl->kind() != GraphPropertyDeclaration::Kind::kInvalid)
++        << property_decl->Name();
+     auto property_def = std::make_unique<SimpleGraphPropertyDefinition>(
+         property_decl, def->sql());
+     property_defs.push_back(std::move(property_def));
+@@ -511,12 +499,27 @@
+   auto graph =
+       std::make_unique<SimplePropertyGraph>(create_graph_stmt->name_path());
+   // Add all property declarations.
++  absl::flat_hash_set<std::string> measures;
++  for (const auto* tables : {&create_graph_stmt->node_table_list(),
++                             &create_graph_stmt->edge_table_list()}) {
++    for (const auto& table : *tables) {
++      for (const auto& definition : table->property_definition_list()) {
++        if (definition->is_measure()) {
++          measures.insert(definition->property_declaration_name());
++        }
++      }
++    }
++  }
+   for (const auto& resolved_property_decl :
+        create_graph_stmt->property_declaration_list()) {
+     graph->AddPropertyDeclaration(
+         std::make_unique<SimpleGraphPropertyDeclaration>(
+             resolved_property_decl->name(), graph->NamePath(),
+-            resolved_property_decl->type()));
++            resolved_property_decl->type(),
++            resolved_property_decl->type_annotation_map(),
++            measures.contains(resolved_property_decl->name())
++                ? GraphPropertyDeclaration::Kind::kMeasure
++                : GraphPropertyDeclaration::Kind::kScalar));
+   }
+   // Add all labels.
+   for (const auto& resolved_label : create_graph_stmt->label_list()) {
+@@ -589,6 +592,12 @@
+     // serialization/deserialization in SimpleCatalogProto.
+     for (const GraphPropertyDefinition* definition : property_definitions) {
+       GOOGLESQL_RET_CHECK(definition->Is<SimpleGraphPropertyDefinition>());
++      // Measure expressions are aggregates, not scalar graph property values.
++      // GRAPH_EXPAND resolves them against its own result schema and grain.
++      if (definition->GetDeclaration().kind() ==
++          GraphPropertyDeclaration::Kind::kMeasure) {
++        continue;
++      }
+       std::unique_ptr<const AnalyzerOutput> analyzer_output;
+       GOOGLESQL_RETURN_IF_ERROR(AnalyzeExpression(definition->expression_sql(), options,
+                                         catalog, catalog->type_factory(),

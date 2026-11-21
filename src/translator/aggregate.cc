@@ -905,12 +905,11 @@ std::optional<Relation> AggregateRelation(const googlesql::ResolvedAggregateScan
 std::optional<std::string> MultiLevelAggregate(const googlesql::ResolvedAggregateFunctionCall& call,
                                                const Scope& scope, const Columns& input,
                                                std::vector<std::string>& intermediates) {
-  if (call.where_expr() != nullptr || call.having_expr() != nullptr ||
-      call.having_modifier() != nullptr ||
+  if (call.having_expr() != nullptr || call.having_modifier() != nullptr ||
       std::ranges::any_of(call.group_by_list(), [](const auto& key) {
         return HasCollation(key->expr()->type_annotation_map());
       })) {
-    return Unsupported(scope, "multi-level aggregation with filters or collated keys");
+    return Unsupported(scope, "multi-level aggregation with HAVING or collated keys");
   }
   std::vector<const googlesql::ResolvedNode*> refs;
   call.GetDescendantsWithKinds({googlesql::RESOLVED_COLUMN_REF}, &refs);
@@ -971,6 +970,7 @@ std::optional<std::string> MultiLevelAggregate(const googlesql::ResolvedAggregat
   if (!outer.ok()) {
     return std::nullopt;
   }
+  (*outer)->set_where_expr(nullptr);
   (*outer)->set_group_by_list({});
   (*outer)->set_group_by_aggregate_list({});
   std::vector<std::string> outer_intermediates;
@@ -979,7 +979,17 @@ std::optional<std::string> MultiLevelAggregate(const googlesql::ResolvedAggregat
   if (!sql) {
     return std::nullopt;
   }
-  intermediates.push_back("list(struct_pack(" + Join(fields, ", ") + ")) AS " + batch);
+  std::string collect = "list(struct_pack(" + Join(fields, ", ") + "))";
+  if (call.where_expr() != nullptr) {
+    // The filter applies to original rows, before the inner groups are formed. In particular,
+    // a missing outer-join row must not form a grain group for a measure.
+    const auto filter = Expression(*call.where_expr(), scope, input);
+    if (!filter) {
+      return std::nullopt;
+    }
+    collect.append(" FILTER (WHERE ").append(*filter).append(")");
+  }
+  intermediates.push_back(std::move(collect).append(" AS ").append(batch));
   if (outer_intermediates.empty()) {
     return "(SELECT " + *sql + groups->From() + ")";
   }

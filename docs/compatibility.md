@@ -458,12 +458,15 @@ Graph DDL rejects:
 
 - Keys of type FLOAT64, BIGNUMERIC, INTERVAL, RANGE, GEOGRAPHY, JSON, ARRAY or STRUCT, and keys
   other than columns.
-- Measures, property options, and computed properties that call user-defined functions or read
-  query parameters, system variables or named constants.
+- Measures other than `SUM(column)` and `COUNT(column)` over one physical column, without
+  aggregate modifiers.
+- Property options and computed properties that call user-defined functions or read query
+  parameters, system variables or named constants.
 - Views as element tables and graph options.
 - Edges whose endpoint nodes do not exist when the graph is created.
 
-`GRAPH_EXPAND` requires literal arguments.
+`GRAPH_EXPAND` requires literal arguments. It supports `AGG` over the supported graph measures in
+both flattened and nested results. Other graph query forms do not support reading measures.
 
 `GRAPH_TABLE` and GQL queries reject:
 

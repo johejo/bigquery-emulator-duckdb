@@ -17,10 +17,12 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/simple_catalog.h"
@@ -67,6 +69,7 @@ bool Includes(const std::vector<int>& all, const std::vector<int>& some) {
 struct Property {
   std::string name;
   std::string sql;
+  bool is_measure = false;
   auto operator<=>(const Property&) const = default;
 };
 
@@ -79,7 +82,12 @@ absl::StatusOr<std::vector<Property>> Properties(const googlesql::GraphElementTa
   }
   std::vector<Property> properties;
   std::ranges::transform(definitions, std::back_inserter(properties), [](const auto* definition) {
-    return Property{definition->GetDeclaration().Name(), std::string(definition->expression_sql())};
+    const auto& declaration = definition->GetDeclaration();
+    return Property{
+        .name = declaration.Name(),
+        .sql = std::string(definition->expression_sql()),
+        .is_measure = declaration.kind() == googlesql::GraphPropertyDeclaration::Kind::kMeasure,
+    };
   });
   std::ranges::sort(properties);
   return properties;
@@ -252,15 +260,69 @@ std::string ColumnName(const googlesql::GraphElementTable& table, int column) {
   return table.GetTable()->GetColumn(column)->Name();
 }
 
+struct MeasureDefinition {
+  std::string function;
+  int input;
+  std::vector<int> keys;
+};
+
+void AllowMeasureExpression(googlesql::AnalyzerOptions& options) {
+  options.set_enabled_rewrites({});
+  options.set_allow_aggregate_standalone_expression(true);
+}
+
+absl::StatusOr<MeasureDefinition> ResolveMeasure(const Property& property,
+                                                 const googlesql::GraphElementTable& element,
+                                                 const googlesql::AnalyzerOptions& options,
+                                                 googlesql::Catalog& catalog,
+                                                 googlesql::TypeFactory& type_factory) {
+  googlesql::AnalyzerOptions measure_options(options.language());
+  AllowMeasureExpression(measure_options);
+  const auto& table = *element.GetTable();
+  measure_options.SetLookupCatalogColumnCallback(
+      [&](absl::string_view name) -> absl::StatusOr<const googlesql::Column*> {
+        return table.FindColumnByName(std::string(name));
+      });
+  std::unique_ptr<const googlesql::AnalyzerOutput> expression;
+  if (auto status = googlesql::AnalyzeExpression(property.sql, measure_options, &catalog,
+                                                 &type_factory, &expression);
+      !status.ok()) {
+    return status;
+  }
+  const auto* expr = expression->resolved_expr();
+  if (!expr->Is<googlesql::ResolvedAggregateFunctionCall>()) {
+    return Unsupported("with a non-aggregate measure expression");
+  }
+  const auto* call = expr->GetAs<googlesql::ResolvedAggregateFunctionCall>();
+  if (call->argument_list_size() != 1 ||
+      !call->argument_list(0)->Is<googlesql::ResolvedCatalogColumnRef>()) {
+    return Unsupported("with a measure not aggregating a source column");
+  }
+  const auto* input =
+      call->argument_list(0)->GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
+  for (int i = 0; i < table.NumColumns(); ++i) {
+    if (table.GetColumn(i) == input) {
+      return MeasureDefinition{
+          .function = call->function()->Name(),
+          .input = i,
+          .keys = element.GetKeyColumns(),
+      };
+    }
+  }
+  return Unsupported("with a measure not aggregating a source column");
+}
+
 // The GoogleSQL query that expands the graph: its node tables LEFT JOINed from the root along
 // the schema relationship graph. Flattened output prefixes each table's properties by its label.
 struct ExpansionQuery {
   std::string sql;
   std::vector<GraphExpandColumn> columns;
+  std::map<int, MeasureDefinition> measures;
 };
 
 absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
     googlesql::Catalog* catalog, const googlesql::AnalyzerOptions& options,
+    googlesql::TypeFactory& type_factory,
     const std::vector<googlesql::TVFInputArgumentType>& arguments) {
   std::vector<googlesql::Value> literals;
   for (const auto& argument : arguments) {
@@ -429,6 +491,7 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
   std::vector<std::string> from;
   std::vector<std::vector<GraphExpandColumn>> columns(steps.size());
   std::vector<int> presence(steps.size());
+  std::map<int, MeasureDefinition> measures;
   for (std::size_t i = 0; i < steps.size(); ++i) {
     const Step& step = steps.at(i);
     const googlesql::GraphElementTable& element = *step.table;
@@ -452,17 +515,57 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
         }
       }
     }
+    std::vector<int> measure_outputs;
+    std::set<int> captured;
     for (std::size_t p = 0; p < properties->size(); ++p) {
-      projections.push_back("(" + properties->at(p).sql + ") AS p" + std::to_string(p));
+      const auto& definition = properties->at(p);
+      if (!definition.is_measure) {
+        projections.push_back("(" + definition.sql + ") AS p" + std::to_string(p));
+      }
       const std::string& property = properties->at(p).name;
       const std::string name = flatten ? labels.at(&element) + "_" + property : property;
       columns.at(i).push_back(
           {.name = name, .body_index = static_cast<int>(outputs.size()), .fields = {}});
       const std::string body_name = nested ? "v" + std::to_string(outputs.size()) : name;
-      outputs.push_back(alias + ".p" + std::to_string(p) + " AS " +
-                        googlesql::ToIdentifierLiteral(body_name));
+      if (definition.is_measure) {
+        const int index = static_cast<int>(outputs.size());
+        auto measure = ResolveMeasure(definition, element, options, *catalog, type_factory);
+        if (!measure.ok()) {
+          return measure.status();
+        }
+        captured.insert(measure->input);
+        captured.insert(measure->keys.begin(), measure->keys.end());
+        measure_outputs.push_back(index);
+        measures.emplace(index, std::move(*measure));
+        // The measure rewriter replaces AGG calls with aggregates over captured
+        // columns. This slot has no runtime value but keeps the layout indexed.
+        outputs.push_back("NULL AS " + googlesql::ToIdentifierLiteral(body_name));
+      } else {
+        outputs.push_back(alias + ".p" + std::to_string(p) + " AS " +
+                          googlesql::ToIdentifierLiteral(body_name));
+      }
     }
-    const std::set<int>& join_columns = joined.at(i);
+    auto& join_columns = joined.at(i);
+    if (!measure_outputs.empty()) {
+      std::map<int, int> sources;
+      for (const int j : captured) {
+        join_columns.insert(j);
+        const int index = static_cast<int>(outputs.size());
+        const std::string name = "$graph_expand_" + std::to_string(index);
+        columns.at(i).push_back(
+            {.name = name, .body_index = index, .is_pseudo = true, .fields = {}});
+        outputs.push_back(alias + ".c" + std::to_string(j) + " AS " +
+                          googlesql::ToIdentifierLiteral(name));
+        sources.emplace(j, index);
+      }
+      // Convert physical source indices into the corresponding execution output indices.
+      for (const int index : measure_outputs) {
+        auto& measure = measures.at(index);
+        measure.input = sources.at(measure.input);
+        std::ranges::transform(measure.keys, measure.keys.begin(),
+                               [&](int key) { return sources.at(key); });
+      }
+    }
     std::vector<std::string> conditions;
     conditions.reserve(step.referenced.size());
     for (std::size_t c = 0; c < step.referenced.size(); ++c) {
@@ -518,43 +621,95 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
   return ExpansionQuery{
       .sql = "SELECT " + absl::StrJoin(outputs, ", ") + " FROM " + absl::StrJoin(from, " "),
       .columns = std::move(columns.front()),
+      .measures = std::move(measures),
   };
 }
 
 struct ResolvedExpansion {
   std::unique_ptr<const googlesql::AnalyzerOutput> body;
   std::vector<GraphExpandColumn> columns;
+  // Catalog measure metadata borrows the resolved expression from these outputs.
+  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> measure_expressions;
   // Each ROW refers to a table describing its fields. Keep those tables with the call, not in
   // the catalog: the schema may differ for two calls to the same TVF in one statement.
   std::vector<std::unique_ptr<googlesql::SimpleTable>> row_tables;
+  std::unique_ptr<googlesql::SimpleTable> result_table;
 
   [[nodiscard]] const googlesql::ResolvedQueryStmt& query() const {
     return *body->resolved_statement()->GetAs<googlesql::ResolvedQueryStmt>();
   }
 
-  absl::StatusOr<googlesql::AnnotatedType> ColumnType(const GraphExpandColumn& column,
-                                                      googlesql::TypeFactory& type_factory) {
-    if (!column.is_row) {
-      return query().output_column_list(column.body_index)->column().annotated_type();
+  absl::StatusOr<std::unique_ptr<googlesql::SimpleTable>> TableSchema(
+      const std::string& name, const std::vector<GraphExpandColumn>& fields,
+      const std::map<int, MeasureDefinition>& measures, const googlesql::AnalyzerOptions& options,
+      googlesql::Catalog& catalog, googlesql::TypeFactory& type_factory) {
+    auto table = std::make_unique<googlesql::SimpleTable>(name);
+    std::map<int, int> field_indices;
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+      if (fields.at(i).is_pseudo) {
+        field_indices.emplace(fields.at(i).body_index, static_cast<int>(i));
+      }
     }
-    auto table = std::make_unique<googlesql::SimpleTable>(column.name);
-    for (const auto& field : column.fields) {
-      const auto type = ColumnType(field, type_factory);
-      if (!type.ok()) {
-        return type.status();
+    for (const auto& field : fields) {
+      auto type = query().output_column_list(field.body_index)->column().annotated_type();
+      googlesql::SimpleColumn::Attributes attributes;
+      attributes.is_pseudo_column = field.is_pseudo;
+      if (field.is_row) {
+        auto child =
+            TableSchema(field.name, field.fields, measures, options, catalog, type_factory);
+        if (!child.ok()) {
+          return child.status();
+        }
+        const googlesql::RowType* row = nullptr;
+        if (auto status = type_factory.MakeRowType(child->get(), field.name, &row); !status.ok()) {
+          return status;
+        }
+        row_tables.push_back(std::move(*child));
+        type = googlesql::AnnotatedType(row, nullptr);
+      } else if (const auto measure = measures.find(field.body_index); measure != measures.end()) {
+        const auto& definition = measure->second;
+        googlesql::AnalyzerOptions measure_options(options.language());
+        AllowMeasureExpression(measure_options);
+        // The measure rewriter binds expression columns by name in this result schema,
+        // not by the physical column name in the graph definition.
+        const auto& input = fields.at(field_indices.at(definition.input));
+        const auto* input_type = query().output_column_list(definition.input)->column().type();
+        if (auto status = measure_options.AddExpressionColumn(input.name, input_type);
+            !status.ok()) {
+          return status;
+        }
+        const std::string sql =
+            definition.function + "(" + googlesql::ToIdentifierLiteral(input.name) + ")";
+        std::unique_ptr<const googlesql::AnalyzerOutput> expression;
+        if (auto status = googlesql::AnalyzeExpression(sql, measure_options, &catalog,
+                                                       &type_factory, &expression);
+            !status.ok()) {
+          return status;
+        }
+        const auto measure_type = type_factory.MakeMeasureType(expression->resolved_expr()->type());
+        if (!measure_type.ok()) {
+          return measure_type.status();
+        }
+        type = googlesql::AnnotatedType(*measure_type, nullptr);
+        std::vector<int> keys;
+        std::ranges::transform(definition.keys, std::back_inserter(keys),
+                               [&](int index) { return field_indices.at(index); });
+        auto metadata = googlesql::Column::ExpressionAttributes::Create(
+            googlesql::Column::ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION, sql,
+            expression->resolved_expr(), std::move(keys));
+        if (!metadata.ok()) {
+          return metadata.status();
+        }
+        attributes.column_expression = std::move(*metadata);
+        measure_expressions.push_back(std::move(expression));
       }
       if (auto status = table->AddColumn(
-              std::make_unique<googlesql::SimpleColumn>(column.name, field.name, *type));
+              std::make_unique<googlesql::SimpleColumn>(name, field.name, type, attributes));
           !status.ok()) {
         return status;
       }
     }
-    const googlesql::RowType* row = nullptr;
-    if (auto status = type_factory.MakeRowType(table.get(), column.name, &row); !status.ok()) {
-      return status;
-    }
-    row_tables.push_back(std::move(table));
-    return googlesql::AnnotatedType(row, nullptr);
+    return table;
   }
 };
 
@@ -563,7 +718,7 @@ class ExpansionSignature : public googlesql::TVFSignature {
   ExpansionSignature(const std::vector<googlesql::TVFInputArgumentType>& arguments,
                      const googlesql::TVFRelation& relation,
                      std::shared_ptr<const ResolvedExpansion> expansion)
-      : TVFSignature(arguments, relation, /*result_table_schema=*/nullptr, Options()),
+      : TVFSignature(arguments, relation, expansion->result_table.get(), Options()),
         expansion_(std::move(expansion)) {}
 
   [[nodiscard]] const ResolvedExpansion& expansion() const { return *expansion_; }
@@ -593,7 +748,7 @@ class GraphExpand : public googlesql::TableValuedFunction {
                        const googlesql::FunctionSignature& /*concrete_signature*/,
                        googlesql::Catalog* catalog, googlesql::TypeFactory* type_factory,
                        std::shared_ptr<googlesql::TVFSignature>* tvf_signature) const final {
-    auto query = BuildExpansionQuery(catalog, *analyzer_options, input_arguments);
+    auto query = BuildExpansionQuery(catalog, *analyzer_options, *type_factory, input_arguments);
     if (!query.ok()) {
       return query.status();
     }
@@ -604,13 +759,21 @@ class GraphExpand : public googlesql::TableValuedFunction {
       return status;
     }
     expansion->columns = std::move(query->columns);
+    auto result = expansion->TableSchema("graph_expand", expansion->columns, query->measures,
+                                         *analyzer_options, *catalog, *type_factory);
+    if (!result.ok()) {
+      return result.status();
+    }
     std::vector<googlesql::TVFSchemaColumn> schema;
-    for (const auto& column : expansion->columns) {
-      const auto type = expansion->ColumnType(column, *type_factory);
-      if (!type.ok()) {
-        return type.status();
-      }
-      schema.emplace_back(column.name, *type);
+    for (int i = 0; i < (*result)->NumColumns(); ++i) {
+      const auto* column = (*result)->GetColumn(i);
+      schema.emplace_back(
+          column->Name(),
+          googlesql::AnnotatedType(column->GetType(), column->GetTypeAnnotationMap()),
+          column->IsPseudoColumn());
+    }
+    if (!query->measures.empty()) {
+      expansion->result_table = std::move(*result);
     }
     *tvf_signature = std::make_shared<ExpansionSignature>(
         input_arguments, googlesql::TVFRelation(std::move(schema)), std::move(expansion));
