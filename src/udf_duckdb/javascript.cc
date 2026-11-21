@@ -21,7 +21,7 @@
 #include "src/udf/javascript/limits.h"
 
 // JavaScript UDFs, run by QuickJS. The translator passes the UDF as the source of a function
-// expression, `(function(x, y) {body})`, followed by its arguments; see
+// expression, `(function(x, y) {body})`, followed by its SQL name and its arguments; see
 // src/translator/function.cc. Each DuckDB thread that runs a call of a query keeps a runtime of
 // its own, since a QuickJS runtime must not be used by two threads, and compiles each source once
 // in it; no state outlives the query.
@@ -192,7 +192,7 @@ absl::StatusOr<std::optional<ResultType<R>>> Convert(Engine& engine, JSValue val
   }
 }
 
-// Calls the UDF whose source is argument 0 with the remaining arguments.
+// Calls the UDF whose source and SQL name are arguments 0 and 1.
 template <Result R>
 void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   auto* state = static_cast<Engine*>(duckdb_scalar_function_get_state(info));
@@ -210,7 +210,7 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
           return function.status();
         }
         std::vector<JSValue> values;
-        for (idx_t column = 1; column < columns; ++column) {
+        for (idx_t column = 2; column < columns; ++column) {
           auto value = Argument(engine, arguments.Vector(column), arguments.Row());
           if (!value.ok()) {
             for (JSValue const converted : values) {
@@ -220,7 +220,7 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
           }
           values.push_back(*value);
         }
-        const auto result = engine.Call(*function, values);
+        const auto result = engine.Call(*function, arguments.String(1), values);
         if (!result.ok()) {
           return result.status();
         }
@@ -240,6 +240,7 @@ void RegisterJavaScriptFunctions(duckdb_connection connection,
         duckdb_create_scalar_function());
     duckdb_scalar_function_set_name(scalar.get(), name);
     LogicalType const source(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
+    duckdb_scalar_function_add_parameter(scalar.get(), source.get());
     duckdb_scalar_function_add_parameter(scalar.get(), source.get());
     LogicalType const any(duckdb_create_logical_type(DUCKDB_TYPE_ANY));
     duckdb_scalar_function_set_varargs(scalar.get(), any.get());

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -24,12 +25,14 @@ class Engine {
 
   [[nodiscard]] JSContext* context() const { return context_; }
   absl::StatusOr<JSValue> Function(const std::string& source);
-  absl::StatusOr<JSValue> Call(JSValue function, std::vector<JSValue>& arguments);
+  absl::StatusOr<JSValue> Call(JSValue function, std::string_view name,
+                               std::vector<JSValue>& arguments);
   std::optional<std::string> String(JSValue value);
   // Consume the pending JavaScript exception, including a deadline interrupt.
   absl::Status Exception();
 
  private:
+  absl::Status Exception(std::string_view name, int line, int column);
   static JSRuntime* NewRuntime(const JavaScriptLimits& limits, Engine* engine);
   void Start();
   static int Interrupt(JSRuntime* runtime, void* opaque);

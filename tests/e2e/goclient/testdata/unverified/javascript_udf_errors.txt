@@ -1,0 +1,30 @@
+# A multiline throw of an Error created elsewhere.
+CREATE TEMP FUNCTION raise_later() RETURNS STRING LANGUAGE js AS """const err = new Error('boom');
+  throw err;
+""";
+SELECT raise_later()
+?>
+
+# A throw from a helper rather than directly from the UDF body.
+CREATE TEMP FUNCTION raise_nested() RETURNS STRING LANGUAGE js AS """function helper() {
+  throw new Error('nested');
+}
+return helper();
+""";
+SELECT raise_nested()
+?>
+
+# The original throw crosses a finally block before escaping the UDF.
+CREATE TEMP FUNCTION raise_with_finally() RETURNS STRING LANGUAGE js AS """try {
+  throw new Error('boom');
+} finally {
+  void 0;
+}
+""";
+SELECT raise_with_finally()
+?>
+
+# JavaScript also permits throwing values that are not Error objects.
+CREATE TEMP FUNCTION raise_string() RETURNS STRING LANGUAGE js AS "throw 'boom';";
+SELECT raise_string()
+?>

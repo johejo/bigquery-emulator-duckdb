@@ -340,6 +340,9 @@ std::optional<std::string> ExternalCall(const googlesql::ResolvedFunctionCall& c
         scope, std::string(python ? "Python" : "JavaScript") + " UDF " + name + " result type");
   }
   std::vector<std::string> args = {QuoteLiteral(source)};
+  if (!python) {
+    args.push_back(QuoteLiteral(name));
+  }
   for (const auto& argument : call.argument_list()) {
     const auto sql = Expression(*argument, scope, columns);
     if (scope.context.timestamp_precision == TimestampPrecision::kNanoseconds &&

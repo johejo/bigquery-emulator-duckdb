@@ -1,0 +1,197 @@
+diff --git a/quickjs.h b/quickjs.h
+--- a/quickjs.h
++++ b/quickjs.h
+@@ -994,6 +994,11 @@
+ 
+ JS_EXTERN JSValue JS_Call(JSContext *ctx, JSValueConst func_obj,
+                           JSValueConst this_obj, int argc, JSValueConst *argv);
++/* Like JS_Call, with the source location of a pending explicit throw in func_obj.
++   Both outputs are zero if there is no such location. */
++JS_EXTERN JSValue JS_CallWithThrowLocation(JSContext *ctx, JSValueConst func_obj,
++                                           JSValueConst this_obj, int argc, JSValueConst *argv,
++                                           int *line, int *column);
+ JS_EXTERN JSValue JS_Invoke(JSContext *ctx, JSValueConst this_val, JSAtom atom,
+                             int argc, JSValueConst *argv);
+ JS_EXTERN JSValue JS_CallConstructor(JSContext *ctx, JSValueConst func_obj,
+diff --git a/quickjs-opcode.h b/quickjs-opcode.h
+--- a/quickjs-opcode.h
++++ b/quickjs-opcode.h
+@@ -116,6 +116,7 @@
+ DEF(      add_brand, 1, 2, 0, none) /* this_obj home_obj -> */
+ DEF(   return_async, 1, 1, 0, none)
+ DEF(          throw, 1, 1, 0, none)
++DEF(   throw_at_loc, 9, 1, 0, u32x2) /* explicit throw, with source line and column */
+ DEF(    throw_error, 6, 0, 0, atom_u8)
+ DEF(           eval, 5, 1, 1, npop_u16) /* func args... -> ret_val */
+ DEF(     apply_eval, 3, 2, 1, u16) /* func array -> ret_eval */
+diff --git a/quickjs.c b/quickjs.c
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -302,6 +302,10 @@
+     uintptr_t stack_limit; /* lower stack limit */
+ 
+     JSValue current_exception;
++    struct JSThrowLocation {
++        JSValueConst function;
++        int line, column;
++    } *throw_location;
+     /* true if inside an out of memory error, to avoid recursing */
+     bool in_out_of_memory;
+     /* true if inside build_backtrace, to avoid recursing */
+@@ -7596,6 +7600,10 @@
+     JSRuntime *rt = ctx->rt;
+     JS_FreeValue(ctx, rt->current_exception);
+     rt->current_exception = obj;
++    if (rt->throw_location) {
++        rt->throw_location->line = 0;
++        rt->throw_location->column = 0;
++    }
+     return JS_EXCEPTION;
+ }
+ 
+@@ -7606,6 +7614,10 @@
+     JSRuntime *rt = ctx->rt;
+     val = rt->current_exception;
+     rt->current_exception = JS_UNINITIALIZED;
++    if (rt->throw_location) {
++        rt->throw_location->line = 0;
++        rt->throw_location->column = 0;
++    }
+     return val;
+ }
+ 
+@@ -18189,6 +18201,15 @@
+         CASE(OP_throw):
+             JS_Throw(ctx, *--sp);
+             goto exception;
++        CASE(OP_throw_at_loc):
++            JS_Throw(ctx, *--sp);
++            if (rt->throw_location && js_same_value(ctx, sf->cur_func,
++                                                    rt->throw_location->function)) {
++                rt->throw_location->line = get_u32(pc);
++                rt->throw_location->column = get_u32(pc + 4);
++            }
++            pc += 8;
++            goto exception;
+ 
+         CASE(OP_throw_error):
+ #define JS_THROW_VAR_RO             0
+@@ -20321,9 +20342,13 @@
+  exception:
+     if (needs_backtrace(rt->current_exception)
+     || JS_IsUndefined(ctx->error_back_trace)) {
++        struct JSThrowLocation *location = rt->throw_location;
++        /* Backtrace construction can run JS, but preserves the pending exception. */
++        rt->throw_location = NULL;
+         sf->cur_pc = pc;
+         build_backtrace(ctx, rt->current_exception, JS_UNDEFINED,
+                         NULL, 0, 0, 0);
++        rt->throw_location = location;
+     }
+     if (!JS_IsUncatchableError(rt->current_exception)) {
+         while (sp > stack_buf) {
+@@ -20335,10 +20360,12 @@
+                     /* enumerator: close it with a throw */
+                     JS_FreeValue(ctx, sp[-1]); /* drop the next method */
+                     sp--;
++                    struct JSThrowLocation *location = rt->throw_location;
++                    rt->throw_location = NULL;
+                     JS_IteratorClose(ctx, sp[-1], true);
++                    rt->throw_location = location;
+                 } else {
+-                    *sp++ = rt->current_exception;
+-                    rt->current_exception = JS_UNINITIALIZED;
++                    *sp++ = JS_GetException(ctx);
+                     JS_FreeValueRT(rt, ctx->error_back_trace);
+                     ctx->error_back_trace = JS_UNDEFINED;
+                     pc = b->byte_code_buf + pos;
+@@ -20375,6 +20402,21 @@
+ {
+     return JS_CallInternal(ctx, func_obj, this_obj, JS_UNDEFINED,
+                            argc, argv, JS_CALL_FLAG_COPY_ARGV);
++}
++
++JSValue JS_CallWithThrowLocation(JSContext *ctx, JSValueConst func_obj,
++                                 JSValueConst this_obj, int argc, JSValueConst *argv,
++                                 int *line, int *column)
++{
++    JSRuntime *rt = ctx->rt;
++    struct JSThrowLocation location = { func_obj, 0, 0 };
++    struct JSThrowLocation *previous = rt->throw_location;
++    rt->throw_location = &location;
++    JSValue result = JS_Call(ctx, func_obj, this_obj, argc, argv);
++    rt->throw_location = previous;
++    *line = JS_IsException(result) ? location.line : 0;
++    *column = JS_IsException(result) ? location.column : 0;
++    return result;
+ }
+ 
+ static JSValue JS_CallFree(JSContext *ctx, JSValue func_obj, JSValueConst this_obj,
+@@ -23369,6 +23411,7 @@
+     case OP_return_undef:
+     case OP_return_async:
+     case OP_throw:
++    case OP_throw_at_loc:
+     case OP_throw_error:
+     case OP_goto:
+     case OP_goto8:
+@@ -28794,7 +28837,9 @@
+         if (js_parse_expect_semi(s))
+             goto fail;
+         break;
+-    case TOK_THROW:
++    case TOK_THROW: {
++        int line = s->token.line_num;
++        int column = s->token.col_num;
+         if (next_token(s))
+             goto fail;
+         if (s->got_lf) {
+@@ -28804,10 +28849,13 @@
+         emit_source_loc(s);
+         if (js_parse_expr(s))
+             goto fail;
+-        emit_op(s, OP_throw);
++        emit_op(s, OP_throw_at_loc);
++        emit_u32(s, line);
++        emit_u32(s, column);
+         if (js_parse_expect_semi(s))
+             goto fail;
+         break;
++    }
+     case TOK_AWAIT:
+         /* Check for 'await using' declaration */
+         if (s->cur_func->func_kind & JS_FUNC_ASYNC) {
+@@ -34437,6 +34485,7 @@
+         case OP_return:
+         case OP_return_undef:
+         case OP_throw:
++        case OP_throw_at_loc:
+         case OP_throw_error:
+         case OP_ret:
+             {
+@@ -35072,6 +35121,7 @@
+         case OP_return_undef:
+         case OP_return_async:
+         case OP_throw:
++        case OP_throw_at_loc:
+         case OP_throw_error:
+             pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next,
+                                       &line_num, &col_num);
+@@ -35951,6 +36001,7 @@
+         case OP_return_undef:
+         case OP_return_async:
+         case OP_throw:
++        case OP_throw_at_loc:
+         case OP_throw_error:
+         case OP_ret:
+             goto done_insn;
+@@ -37653,7 +37704,8 @@
+     BC_TAG_SYMBOL,
+ } BCTagEnum;
+ 
+-#define BC_VERSION 26
++/* Local bytecode differs from upstream because of OP_throw_at_loc. */
++#define BC_VERSION (0x80 | 26)
+ 
+ typedef struct BCWriterState {
+     JSContext *ctx;

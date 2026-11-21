@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -47,15 +48,19 @@ absl::StatusOr<JSValue> Engine::Function(const std::string& source) {
   return function;
 }
 
-absl::StatusOr<JSValue> Engine::Call(JSValue function, std::vector<JSValue>& arguments) {
+absl::StatusOr<JSValue> Engine::Call(JSValue function, std::string_view name,
+                                     std::vector<JSValue>& arguments) {
   Start();
-  JSValue result = JS_Call(context_, function, JS_UNDEFINED, static_cast<int>(arguments.size()),
-                           arguments.data());
+  int line = 0;
+  int column = 0;
+  JSValue result =
+      JS_CallWithThrowLocation(context_, function, JS_UNDEFINED, static_cast<int>(arguments.size()),
+                               arguments.data(), &line, &column);
   for (JSValue const argument : arguments) {
     JS_FreeValue(context_, argument);
   }
   if (JS_IsException(result)) {
-    return Exception();
+    return Exception(name, line, column);
   }
   if (!JS_IsPromise(result)) {
     return result;
@@ -108,13 +113,20 @@ int Engine::Interrupt(JSRuntime* /*runtime*/, void* opaque) {
   return engine->timed_out_ ? 1 : 0;
 }
 
-absl::Status Engine::Exception() {
+absl::Status Engine::Exception() { return Exception({}, 0, 0); }
+
+absl::Status Engine::Exception(std::string_view name, int line, int column) {
   if (timed_out_) {
     JS_FreeValue(context_, JS_GetException(context_));
     return absl::OutOfRangeError("JavaScript UDF timed out");
   }
   JSValue const exception = JS_GetException(context_);
-  std::string const message = String(exception).value_or("JavaScript exception");
+  std::string message = String(exception).value_or("JavaScript exception");
+  // The generated function header occupies the first line, before the SQL UDF body.
+  if (JS_IsError(exception) && line > 1 && column > 0) {
+    message += " at " + std::string(name) + "() line " + std::to_string(line - 1) + ", column " +
+               std::to_string(column);
+  }
   JS_FreeValue(context_, exception);
   return absl::OutOfRangeError(message);
 }
