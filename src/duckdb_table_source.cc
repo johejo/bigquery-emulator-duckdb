@@ -103,6 +103,15 @@ class DuckDbTableSource : public TableSource {
     }
   }
 
+  [[nodiscard]] absl::Status MissingTableError(const TableReference& table) const override {
+    if (location_ == nullptr) {
+      return TableSource::MissingTableError(table);
+    }
+    return absl::NotFoundError("Not found: Table " + TableName(table) +
+                               " was not found in location " +
+                               location_->settled().value_or(kDefaultLocation));
+  }
+
   std::optional<std::string> FindPropertyGraph(const TableReference& graph) override {
     if (IsDuckDbSchema(graph.dataset_id) || !HasProject(graph.project_id)) {
       return std::nullopt;
