@@ -4,6 +4,7 @@ cc_library(
         "declarations.h",
         "external_query.cc",
         "functions.cc",
+        "gap_fill.cc",
         "graph_expand.cc",
         "objectref.cc",
         "range_sessionize.cc",

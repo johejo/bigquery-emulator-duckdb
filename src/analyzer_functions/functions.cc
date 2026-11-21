@@ -50,6 +50,7 @@ void AddBigQueryFunctionDeclarations(googlesql::SimpleCatalog& catalog) {
   AddTextAnalysisFunctions(catalog);
   AddObjectRefFunctions(catalog);
   AddRangeSessionize(catalog);
+  AddGapFill(catalog);
   AddGraphExpand(catalog);
 }
 

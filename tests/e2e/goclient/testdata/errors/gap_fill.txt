@@ -1,0 +1,44 @@
+# GAP_FILL errors that BigQuery gives, from answers collected with tools/bqanswers.
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 'a' AS v), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> error contains: Column v (STRING) is not allowed for linear interpolation. Only columns with numeric types are allowed
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATETIME '2023-11-01 00:00:00' AS t, 1 AS v), 't', INTERVAL '1 1' DAY TO HOUR)
+=> error contains: Exactly one non-zero INTERVAL part in bucket width is required
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 0 DAY)
+=> error contains: Exactly one non-zero INTERVAL part in bucket width is required
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 12 HOUR)
+=> error contains: Only MONTH and DAY parts are allowed in bucket width INTERVAL
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 1 DAY, ignore_null_values => NULL)
+=> error contains: Argument 7 must be non-NULL
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', CAST(NULL AS INTERVAL))
+=> error contains: Argument 3 must be non-NULL
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT TIMESTAMP '2023-01-15 00:00:00+00' AS t, 1 AS v), 't', INTERVAL 1 MONTH)
+=> error contains: Bucket width INTERVAL with non-zero MONTH part is not allowed
+
+# -INTERVAL 1 DAY is an expression rather than a literal.
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', -INTERVAL 1 DAY)
+=> error contains: Argument 3 must be a valid INTERVAL literal
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL -1 DAY)
+=> error contains: Negative bucket width INTERVAL is not allowed
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v), 't', INTERVAL 1 DAY, origin => DATE_ADD(DATE '2023-11-01', INTERVAL 0 DAY))
+=> error contains: Argument 6 must a literal
+
+# BigQuery names the function GAP_FILL, without the emulator's function group.
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t), time_series_column => 't', bucket_width => INTERVAL 1 DAY)
+=> error contains: Named argument time_series_column not found in signature for call to function
+
+# Forms the emulator rejects. BigQuery's answers to them are in scalars/known_bugs.txt, or
+# unverified in unverified/gap_fill.txt.
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', 2), 't', INTERVAL 1 DAY)
+=> error contains: The emulator does not support GAP_FILL different values at one time point
+
+SELECT COUNT(*) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '1.5' AS v), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+=> error contains: The emulator does not support GAP_FILL linear gap filling of NUMERIC

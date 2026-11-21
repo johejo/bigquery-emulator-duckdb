@@ -389,6 +389,17 @@ note SESSION_USER Requires --session-user; returns the configured identity for e
 note RANGE_SESSIONIZE See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits.
 note EXTERNAL_QUERY For external database support and limits, see [EXTERNAL_QUERY](compatibility.md#external_query).
 
+# GAP_FILL over each time series type and gap-filling method. Linear interpolation is documented
+# for numeric columns.
+query GAP_FILL WITH input AS (SELECT DATETIME '2024-01-01 00:00:00' AS t, 1 AS k, 1 AS v) SELECT * FROM GAP_FILL(TABLE input, ts_column => 't', bucket_width => INTERVAL 1 MINUTE)
+query GAP_FILL SELECT * FROM GAP_FILL((SELECT DATE '2024-01-01' AS t, 1 AS v), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf')], origin => DATE '2024-01-01')
+query GAP_FILL SELECT * FROM GAP_FILL((SELECT TIMESTAMP '2024-01-01 00:00:00+00' AS t, 1 AS k, 1 AS v), 't', INTERVAL 1 HOUR, partitioning_columns => ['k'], value_columns => [('v', 'linear')], ignore_null_values => FALSE)
+query GAP_FILL SELECT * FROM GAP_FILL((SELECT DATETIME '2024-01-01 00:00:00' AS t, 1 AS v), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'null')])
+query GAP_FILL SELECT * FROM GAP_FILL((SELECT DATE '2024-01-01' AS t, 1 AS v), 't', INTERVAL 1 MONTH)
+query GAP_FILL SELECT * FROM GAP_FILL((SELECT DATETIME '2024-01-01 00:00:00' AS t, 1.5 AS v), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'linear')])
+query GAP_FILL SELECT * FROM GAP_FILL((SELECT DATETIME '2024-01-01 00:00:00' AS t, NUMERIC '1.5' AS v), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'linear')])
+note GAP_FILL See [GAP_FILL](compatibility.md#gap_fill) for limits.
+
 # ObjectRef functions, over BigQuery's documented URI. OBJ.MAKE_REF's JSON form is unsupported.
 query OBJ.MAKE_REF SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg')
 query OBJ.MAKE_REF SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg', 'us.conn', version => '1', details => JSON '{"gcs_metadata": {"size": 23000}}')

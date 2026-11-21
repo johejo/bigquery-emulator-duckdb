@@ -68,3 +68,24 @@ SELECT COUNT(*) FROM committed
 # BigQuery adds the planar edge's midpoints until it is close enough to the geodesic one.
 SELECT ST_GEOGFROMWKB(FROM_HEX('010200000002000000000000000000f03f000000000000004000000000000008400000000000001040'), planar => TRUE)
 => "LINESTRING(1 2, 1.5 2.5, 2 3, 2.5 3.5, 3 4)"
+
+# Observed BigQuery answers collected with tools/bqanswers. GAP_FILL interpolates NUMERIC and
+# BIGNUMERIC with their rounding, which the emulator does not implement yet.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, NUMERIC '1' AS v UNION ALL SELECT DATE '2023-11-04', NUMERIC '2'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+!> "2023-11-01=1;2023-11-02=1.333333333;2023-11-03=1.666666667;2023-11-04=2"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, BIGNUMERIC '1' AS v UNION ALL SELECT DATE '2023-11-04', BIGNUMERIC '2'), 't', INTERVAL 1 DAY, value_columns => [('v', 'linear')])
+!> "2023-11-01=1;2023-11-02=1.33333333333333333333333333333333333333;2023-11-03=1.66666666666666666666666666666666666667;2023-11-04=2"
+
+# GAP_FILL rows of one time point with different values, which the emulator rejects. BigQuery
+# returned the later row of the UNION ALL at a bucket, and its NULL for the null method; which
+# row it takes may depend on the order rows arrive in. Values between buckets that no bucket
+# reads did not affect the result.
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', 2 UNION ALL SELECT DATE '2023-11-02', 3), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf')])
+!> "2023-11-01=2;2023-11-02=3"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATETIME '2023-11-01 00:00:00' AS t, 1 AS v UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 2 UNION ALL SELECT DATETIME '2023-11-01 00:00:30', 4 UNION ALL SELECT DATETIME '2023-11-01 00:01:00', 5), 't', INTERVAL 1 MINUTE, value_columns => [('v', 'locf')])
+!> "2023-11-01 00:00:00=1;2023-11-01 00:01:00=5"
+
+SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v UNION ALL SELECT DATE '2023-11-01', NULL UNION ALL SELECT DATE '2023-11-02', 3), 't', INTERVAL 1 DAY)
+!> "2023-11-01=NULL;2023-11-02=3"
