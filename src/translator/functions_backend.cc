@@ -462,12 +462,14 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       Define("ENDS_WITH", StringBytes(2, "ends_with($1, $2)", "bq_ends_with_bytes($1, $2)", {},
                                       "bq_collation_ends_with($3, $1, $2)")),
 
-      // CASE avoids DuckDB v2's IF macro binder.
+      // CASE avoids DuckDB v2's IF macro binder. Since v2.0.1, DuckDB splits an empty string on
+      // an empty delimiter into an empty list, where BigQuery returns one empty string.
       Define("SPLIT",
              {
                  {
                      .arity = {1, 2},
-                     .spelling = "CASE WHEN $2 IS NULL THEN NULL ELSE split($1, $2) END",
+                     .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN $1 = '' THEN [''] "
+                                 "ELSE split($1, $2) END",
                      .collated_spelling = "bq_collation_split($3, $1, $2)",
                      .conditions = ArgumentType<TYPE_STRING>::kFirst,
                      .defaults = kCommaDefault,
