@@ -1,0 +1,92 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "quickjs_hdrs",
+    hdrs = ["quickjs.h"],
+)
+
+_CORE_SRCS = [
+    "cutils.h",
+    "dtoa.c",
+    "dtoa.h",
+    "libregexp.c",
+    "libregexp.h",
+    "libregexp-opcode.h",
+    "libunicode.c",
+    "libunicode.h",
+    "libunicode-table.h",
+    "list.h",
+    "quickjs.c",
+    "quickjs-atom.h",
+    "quickjs-c-atomics.h",
+    "quickjs-opcode.h",
+]
+
+_LINKOPTS = select({
+    "@platforms//os:linux": [
+        "-lm",
+        "-pthread",
+    ],
+    "//conditions:default": [],
+})
+
+# qjsc compiles the builtins without evaluating them. Its copy of the engine uses
+# the archived headers only to bootstrap the build; none are read as bytecode.
+cc_binary(
+    name = "qjsc",
+    srcs = _CORE_SRCS + [
+        "builtin-array-fromasync.h",
+        "builtin-iterator-zip.h",
+        "builtin-iterator-zip-keyed.h",
+        "qjsc.c",
+        "quickjs-libc.c",
+        "quickjs-libc.h",
+    ],
+    copts = ["-funsigned-char"],
+    linkopts = _LINKOPTS + select({
+        "@platforms//os:linux": ["-ldl"],
+        "//conditions:default": [],
+    }),
+    local_defines = ["_GNU_SOURCE"],
+    visibility = ["//visibility:private"],
+    deps = [":quickjs_hdrs"],
+)
+
+# The throw-location patch changes the bytecode format, including opcode numbers.
+genrule(
+    name = "rebuilt_builtins",
+    srcs = [
+        "builtin-array-fromasync.js",
+        "builtin-iterator-zip.js",
+        "builtin-iterator-zip-keyed.js",
+    ],
+    outs = [
+        "rebuilt-builtin-array-fromasync.h",
+        "rebuilt-builtin-iterator-zip.h",
+        "rebuilt-builtin-iterator-zip-keyed.h",
+    ],
+    cmd = """
+        for src in $(SRCS); do
+            name=$${src##*/}
+            $(execpath :qjsc) -C -ss -o "$(@D)/rebuilt-$${name%.js}.h" "$$src" || exit
+        done
+    """,
+    tools = [":qjsc"],
+    visibility = ["//visibility:private"],
+)
+
+# The emulator links only the core engine, not the CLI or the host I/O library.
+cc_library(
+    name = "quickjs",
+    srcs = _CORE_SRCS + [":rebuilt_builtins"],
+    copts = ["-funsigned-char"],
+    linkopts = _LINKOPTS,
+    linkstatic = True,
+    local_defines = [
+        "QJS_REBUILT_BUILTINS",
+        "_GNU_SOURCE",
+    ],
+    deps = [":quickjs_hdrs"],
+)

@@ -1,4 +1,5 @@
 exports_files([
+    "BUILD.quickjs.bazel",
     "throw_location.patch",
     "unicode_symbol.patch",
 ])

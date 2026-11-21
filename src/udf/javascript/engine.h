@@ -35,7 +35,7 @@ class Engine {
   absl::Status Exception(std::string_view name, int line, int column);
   static JSRuntime* NewRuntime(const JavaScriptLimits& limits, Engine* engine);
   void Start();
-  static int Interrupt(JSRuntime* runtime, void* opaque);
+  static int Interrupt(JSContext* context, void* opaque);
 
   JavaScriptLimits limits_;
   JSRuntime* runtime_;

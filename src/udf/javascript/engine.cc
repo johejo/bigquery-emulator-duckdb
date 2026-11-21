@@ -107,7 +107,7 @@ void Engine::Start() {
   timed_out_ = false;
 }
 
-int Engine::Interrupt(JSRuntime* /*runtime*/, void* opaque) {
+int Engine::Interrupt(JSContext* /*context*/, void* opaque) {
   auto* engine = static_cast<Engine*>(opaque);
   engine->timed_out_ = std::chrono::steady_clock::now() > engine->deadline_;
   return engine->timed_out_ ? 1 : 0;

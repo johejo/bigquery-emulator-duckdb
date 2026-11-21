@@ -23,7 +23,7 @@ bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "postgres", version = "18.4")
 bazel_dep(name = "protobuf", version = "35.1")
-bazel_dep(name = "quickjs-ng", version = "0.15.1.bcr.1")
+bazel_dep(name = "quickjs-ng", version = "0.18.0")
 bazel_dep(name = "re2", version = "2025-08-12.bcr.1")
 bazel_dep(name = "rules_cc", version = "0.2.22")
 bazel_dep(name = "rules_go", version = "0.60.0")
@@ -123,14 +123,21 @@ single_version_override(
     patches = ["//third_party/google_cloud_cpp:openssl.patch"],
 )
 
-# See third_party/quickjs/README.md for the symbol and UDF diagnostic patches.
-single_version_override(
+# v0.18.0 is not yet in the Bazel Central Registry; see third_party/quickjs/README.md.
+archive_override(
     module_name = "quickjs-ng",
+    build_file = "//third_party/quickjs:BUILD.quickjs.bazel",
+    integrity = "sha256-KLzYmqNoP9KpRlN+XOPxHMRrXL8zg8dWGq7z31/58d0=",
+    patch_cmds = [
+        "printf 'module(name = \"quickjs-ng\", version = \"0.18.0\")\\nbazel_dep(name = \"rules_cc\", version = \"0.2.22\")\\nbazel_dep(name = \"platforms\", version = \"1.1.0\")\\n' > MODULE.bazel",
+    ],
     patch_strip = 1,
     patches = [
         "//third_party/quickjs:unicode_symbol.patch",
         "//third_party/quickjs:throw_location.patch",
     ],
+    strip_prefix = "quickjs-0.18.0",
+    urls = ["https://github.com/quickjs-ng/quickjs/archive/refs/tags/v0.18.0.tar.gz"],
 )
 
 single_version_override(
