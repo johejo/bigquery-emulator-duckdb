@@ -23,6 +23,12 @@ SELECT STRING_AGG(L_name ORDER BY L_id) FROM GRAPH_EXPAND('scalar_graph.StoreGra
 SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreLocations', start_node => 'S')
 => "2"
 
+# Unflattened output exposes the selected start node's properties without label prefixes.
+# Starting at L in the documented StoreGraph leaves no adjacent tables to join.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
+SELECT STRING_AGG(name ORDER BY id) FROM GRAPH_EXPAND('scalar_graph.StoreGraph', start_node => 'L', flatten_results => FALSE)
+=> "Anytown,Sometown"
+
 # An edge table joins between its node tables and adds its properties and key columns, ordered by
 # name; a shop without a place keeps its edge row. Observed on BigQuery with tools/bqanswers.
 SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopPlaces') AS t

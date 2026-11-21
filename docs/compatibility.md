@@ -464,9 +464,10 @@ Graph DDL rejects:
 - Views as element tables and graph options.
 - Edges whose endpoint nodes do not exist when the graph is created.
 
-`GRAPH_EXPAND` rejects arguments that are not literals and `flatten_results => FALSE`. It rejects
-a node table related to more than one node table unless every related node table but the last is
-related to no further node table.
+`GRAPH_EXPAND` requires literal arguments. With `flatten_results => FALSE`, it supports only
+expansions that do not join any tables from the starting node. It rejects a node table related to
+more than one node table unless every related node table but the last is related to no further
+node table.
 
 `GRAPH_TABLE` and GQL queries reject:
 
