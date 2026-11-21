@@ -1,23 +1,18 @@
 version: 1
-# Maintainer prerequisite: in the answer project's Bigtable instance bqanswers, create table
-# bigtable-external with families family_a and family_b. Write row a with family_a:q = hello
-# and row b with family_b:q = world, leaving the other family absent in each row.
-# No expected values below are taken from cbtemulator or the emulator.
-description: Bigtable sparse-family results and generated metadata; requires the Bigtable source described above.
+# Recorded on BigQuery in run nedc75o5ucmak3pzj56nlvwqin. The displayed DDL uses
+# the REST format and URI list, not the spelling accepted by CREATE EXTERNAL TABLE.
+description: INFORMATION_SCHEMA displays Bigtable external table metadata without bigtableOptions.
 vars:
   dataset: bqa_${run}_${case}
   uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-external
 cases:
-  - name: sparse_family
+  - name: bigtable_metadata
     steps:
       - name: dataset
         rest:
           method: POST
           path: /bigquery/v2/projects/${project}/datasets
-          body:
-            datasetReference:
-              datasetId: ${dataset}
-            location: US
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
       - name: create
         rest:
           method: POST
@@ -27,7 +22,7 @@ cases:
               tableId: t
             externalDataConfiguration:
               sourceFormat: BIGTABLE
-              sourceUris: ["${uri}"]
+              sourceUris: ['${uri}']
               bigtableOptions:
                 readRowkeyAsString: true
                 ignoreUnspecifiedColumnFamilies: true
@@ -35,31 +30,15 @@ cases:
                   - familyId: family_a
                     type: STRING
                     onlyReadLatest: true
-        observe:
-          status: /status
-          schema: /body/schema
-          external: /body/externalDataConfiguration
-      - name: rows
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            useLegacySql: false
-            query: SELECT rowkey, TO_JSON_STRING(family_a) AS family FROM `${project}.${dataset}.t` ORDER BY rowkey
-        observe:
-          status: /status
-          errors: /body/errors
-          rows: /body/rows
-      - name: metadata
+        observe: {status: /status, external: /body/externalDataConfiguration}
+      - name: ddl
         rest:
           method: POST
           path: /bigquery/v2/projects/${project}/queries
           body:
             useLegacySql: false
             query: SELECT ddl FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
-        observe:
-          errors: /body/errors
-          rows: /body/rows
+        observe: {rows: /body/rows}
       - name: options
         rest:
           method: POST
@@ -67,11 +46,39 @@ cases:
           body:
             useLegacySql: false
             query: SELECT option_name, option_type, option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS` WHERE table_name = 't' ORDER BY option_name
-        observe:
-          errors: /body/errors
-          rows: /body/rows
+        observe: {rows: /body/rows}
     cleanup:
       - name: delete
         rest:
           method: DELETE
           path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create:
+        status: 200
+        external:
+          sourceFormat: BIGTABLE
+          sourceUris: ['${uri}']
+          bigtableOptions:
+            readRowkeyAsString: true
+            ignoreUnspecifiedColumnFamilies: true
+            columnFamilies:
+              - familyId: family_a
+                type: STRING
+                onlyReadLatest: true
+      ddl:
+        rows:
+          - f:
+              - v: |-
+                  CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+                  (
+                    rowkey STRING,
+                    family_a STRUCT<column ARRAY<STRUCT<name STRING, cell STRUCT<timestamp TIMESTAMP, value STRING>>>>
+                  )
+                  OPTIONS(
+                    format="BIGTABLE",
+                    uris=["${uri}"]
+                  );
+      options:
+        rows:
+          - f: [{v: format}, {v: STRING}, {v: '"BIGTABLE"'}]
+          - f: [{v: uris}, {v: 'ARRAY<STRING>'}, {v: '["${uri}"]'}]
