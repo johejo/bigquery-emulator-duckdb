@@ -1,3 +1,5 @@
+#include "src/analyzer_functions/graph_expand.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -15,28 +17,24 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function_signature.h"
-#include "googlesql/public/parse_resume_location.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/table_valued_function.h"
-#include "googlesql/public/templated_sql_tvf.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
+#include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer_functions/declarations.h"
 #include "src/analyzer_functions/functions.h"
 
 namespace bigquery_emulator_duckdb::analyzer_functions {
 namespace {
-
-const std::vector<std::string>& ArgumentNames() {
-  static const auto* const kNames =
-      new std::vector<std::string>{"graph_name", "start_node", "flatten_results"};
-  return *kNames;
-}
 
 googlesql::FunctionSignature Signature() {
   googlesql::FunctionArgumentTypeOptions start_node(googlesql::FunctionArgumentType::OPTIONAL);
@@ -269,7 +267,12 @@ std::string ColumnName(const googlesql::GraphElementTable& table, int column) {
 
 // The GoogleSQL query that expands the graph: its node tables LEFT JOINed from the root along
 // the schema relationship graph. Flattened output prefixes each table's properties by its label.
-absl::StatusOr<std::string> ExpansionQuery(
+struct ExpansionQuery {
+  std::string sql;
+  std::vector<GraphExpandColumn> columns;
+};
+
+absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
     googlesql::Catalog* catalog, const googlesql::AnalyzerOptions& options,
     const std::vector<googlesql::TVFInputArgumentType>& arguments) {
   std::vector<googlesql::Value> literals;
@@ -405,11 +408,10 @@ absl::StatusOr<std::string> ExpansionQuery(
         "GRAPH_EXPAND requires every node table to have at most one incoming relationship");
   }
 
-  // BigQuery lets queries select scalar fields of joined ROWs but rejects returning the ROW
-  // itself. A STRUCT would allow returning it, so do not expose joined columns as STRUCTs.
-  if (!flatten && children.contains(root)) {
-    return Unsupported("with flatten_results => FALSE and joined tables");
+  if (!flatten && reachable.size() > 2) {
+    return Unsupported("with flatten_results => FALSE and more than one relationship");
   }
+  const bool nested = !flatten && children.contains(root);
 
   // The tables joined from the root, each edge table that is not inlined between its two node
   // tables.
@@ -434,6 +436,8 @@ absl::StatusOr<std::string> ExpansionQuery(
   // c<i>, so that property and column names cannot collide.
   std::vector<std::string> outputs;
   std::vector<std::string> from;
+  std::vector<std::vector<GraphExpandColumn>> columns(steps.size());
+  std::vector<int> presence(steps.size());
   for (std::size_t i = 0; i < steps.size(); ++i) {
     const Step& step = steps.at(i);
     const googlesql::GraphElementTable& element = *step.table;
@@ -462,10 +466,13 @@ absl::StatusOr<std::string> ExpansionQuery(
       projections.push_back("(" + properties->at(p).sql + ") AS p" + std::to_string(p));
       const std::string& property = properties->at(p).name;
       const std::string name = flatten ? labels.at(&element) + "_" + property : property;
+      columns.at(i).push_back(
+          {.name = name, .body_index = static_cast<int>(outputs.size()), .fields = {}});
+      const std::string body_name = nested ? "v" + std::to_string(outputs.size()) : name;
       outputs.push_back(alias + ".p" + std::to_string(p) + " AS " +
-                        googlesql::ToIdentifierLiteral(name));
+                        googlesql::ToIdentifierLiteral(body_name));
     }
-    const std::set<int>& columns = joined.at(i);
+    const std::set<int>& join_columns = joined.at(i);
     std::vector<std::string> conditions;
     conditions.reserve(step.referenced.size());
     for (std::size_t c = 0; c < step.referenced.size(); ++c) {
@@ -473,11 +480,15 @@ absl::StatusOr<std::string> ExpansionQuery(
                            std::to_string(step.parent) + ".c" +
                            std::to_string(step.referencing.at(c)));
     }
-    std::ranges::transform(columns, std::back_inserter(projections), [&](int column) {
+    std::ranges::transform(join_columns, std::back_inserter(projections), [&](int column) {
       return googlesql::ToIdentifierLiteral(ColumnName(element, column)) + " AS c" +
              std::to_string(column);
     });
-    if (projections.empty()) {
+    if (nested && i > 0) {
+      projections.emplace_back("1 AS unit");
+      presence.at(i) = static_cast<int>(outputs.size());
+      outputs.push_back(alias + ".unit AS v" + std::to_string(outputs.size()));
+    } else if (projections.empty()) {
       projections.emplace_back("1 AS unit");
     }
     const std::string table = "(SELECT " + absl::StrJoin(projections, ", ") + " FROM " +
@@ -486,42 +497,144 @@ absl::StatusOr<std::string> ExpansionQuery(
     from.push_back(i == 0 ? table
                           : "LEFT JOIN " + table + " ON " + absl::StrJoin(conditions, " AND "));
   }
-  if (outputs.empty()) {
+  if (std::ranges::all_of(columns, [](const auto& fields) { return fields.empty(); })) {
     return absl::InvalidArgumentError("GRAPH_EXPAND requires a property on an expanded table");
   }
-  return "SELECT " + absl::StrJoin(outputs, ", ") + " FROM " + absl::StrJoin(from, " ");
+  if (nested) {
+    for (std::size_t i = steps.size() - 1; i > 0; --i) {
+      const Step& step = steps.at(i);
+      auto& parent = columns.at(step.parent);
+      const std::string& name = labels.at(step.table);
+      if (std::ranges::any_of(parent, [&](const GraphExpandColumn& column) {
+            return absl::EqualsIgnoreCase(column.name, name);
+          })) {
+        return Unsupported(
+            "with flatten_results => FALSE and a property named after a joined table");
+      }
+      parent.push_back({
+          .name = name,
+          .body_index = presence.at(i),
+          .is_row = true,
+          .fields = std::move(columns.at(i)),
+      });
+    }
+  } else {
+    for (std::size_t i = 1; i < steps.size(); ++i) {
+      std::ranges::move(columns.at(i), std::back_inserter(columns.front()));
+    }
+  }
+  return ExpansionQuery{
+      .sql = "SELECT " + absl::StrJoin(outputs, ", ") + " FROM " + absl::StrJoin(from, " "),
+      .columns = std::move(columns.front()),
+  };
 }
 
-// BigQuery's GRAPH_EXPAND, which GoogleSQL does not declare. Each call resolves the query that
-// ExpansionQuery builds for its graph as the body of a templated SQL TVF, which the analyzer's
-// SQL TVF inliner then puts in place of the call.
-class GraphExpand : public googlesql::TemplatedSQLTVF {
- public:
-  GraphExpand()
-      : TemplatedSQLTVF({"graph_expand"}, Signature(), ArgumentNames(),
-                        googlesql::ParseResumeLocation::FromStringView("")) {}
+struct ResolvedExpansion {
+  std::unique_ptr<const googlesql::AnalyzerOutput> body;
+  std::vector<GraphExpandColumn> columns;
+  // Each ROW refers to a table describing its fields. Keep those tables with the call, not in
+  // the catalog: the schema may differ for two calls to the same TVF in one statement.
+  std::vector<std::unique_ptr<googlesql::SimpleTable>> row_tables;
 
- protected:
-  absl::Status ResolveInternal(
-      const googlesql::AnalyzerOptions* analyzer_options,
-      const std::vector<googlesql::TVFInputArgumentType>& input_arguments,
-      const googlesql::FunctionSignature& concrete_signature, googlesql::Catalog* catalog,
-      googlesql::TypeFactory* type_factory,
-      std::shared_ptr<googlesql::TVFSignature>* tvf_signature) const final {
-    auto query = ExpansionQuery(catalog, *analyzer_options, input_arguments);
+  [[nodiscard]] const googlesql::ResolvedQueryStmt& query() const {
+    return *body->resolved_statement()->GetAs<googlesql::ResolvedQueryStmt>();
+  }
+
+  absl::StatusOr<googlesql::AnnotatedType> ColumnType(const GraphExpandColumn& column,
+                                                      googlesql::TypeFactory& type_factory) {
+    if (!column.is_row) {
+      return query().output_column_list(column.body_index)->column().annotated_type();
+    }
+    auto table = std::make_unique<googlesql::SimpleTable>(column.name);
+    for (const auto& field : column.fields) {
+      const auto type = ColumnType(field, type_factory);
+      if (!type.ok()) {
+        return type.status();
+      }
+      if (auto status = table->AddColumn(
+              std::make_unique<googlesql::SimpleColumn>(column.name, field.name, *type));
+          !status.ok()) {
+        return status;
+      }
+    }
+    const googlesql::RowType* row = nullptr;
+    if (auto status = type_factory.MakeRowType(table.get(), column.name, &row); !status.ok()) {
+      return status;
+    }
+    row_tables.push_back(std::move(table));
+    return googlesql::AnnotatedType(row, nullptr);
+  }
+};
+
+class ExpansionSignature : public googlesql::TVFSignature {
+ public:
+  ExpansionSignature(const std::vector<googlesql::TVFInputArgumentType>& arguments,
+                     const googlesql::TVFRelation& relation,
+                     std::shared_ptr<const ResolvedExpansion> expansion)
+      : TVFSignature(arguments, relation, /*result_table_schema=*/nullptr, Options()),
+        expansion_(std::move(expansion)) {}
+
+  [[nodiscard]] const ResolvedExpansion& expansion() const { return *expansion_; }
+
+ private:
+  static googlesql::TVFSignatureOptions Options() {
+    googlesql::TVFSignatureOptions options;
+    options.row_type_rewrite_callback = RewriteRows;
+    return options;
+  }
+
+  static absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> RewriteRows(
+      const googlesql::TVFSignature& signature, const googlesql::TVFRelation& relation) {
+    return std::make_shared<ExpansionSignature>(signature.input_arguments(), relation,
+                                                signature.GetAs<ExpansionSignature>()->expansion_);
+  }
+
+  std::shared_ptr<const ResolvedExpansion> expansion_;
+};
+
+class GraphExpand : public googlesql::TableValuedFunction {
+ public:
+  GraphExpand() : TableValuedFunction({"graph_expand"}, "", {Signature()}) {}
+
+  absl::Status Resolve(const googlesql::AnalyzerOptions* analyzer_options,
+                       const std::vector<googlesql::TVFInputArgumentType>& input_arguments,
+                       const googlesql::FunctionSignature& /*concrete_signature*/,
+                       googlesql::Catalog* catalog, googlesql::TypeFactory* type_factory,
+                       std::shared_ptr<googlesql::TVFSignature>* tvf_signature) const final {
+    auto query = BuildExpansionQuery(catalog, *analyzer_options, input_arguments);
     if (!query.ok()) {
       return query.status();
     }
-    // The catalog shares this declaration across statements, so each call resolves its own body.
-    const googlesql::TemplatedSQLTVF body(
-        {"graph_expand"}, Signature(), ArgumentNames(),
-        googlesql::ParseResumeLocation::FromString(*std::move(query)));
-    return body.Resolve(analyzer_options, input_arguments, concrete_signature, catalog,
-                        type_factory, tvf_signature);
+    auto expansion = std::make_shared<ResolvedExpansion>();
+    if (auto status = googlesql::AnalyzeStatement(query->sql, *analyzer_options, catalog,
+                                                  type_factory, &expansion->body);
+        !status.ok()) {
+      return status;
+    }
+    expansion->columns = std::move(query->columns);
+    std::vector<googlesql::TVFSchemaColumn> schema;
+    for (const auto& column : expansion->columns) {
+      const auto type = expansion->ColumnType(column, *type_factory);
+      if (!type.ok()) {
+        return type.status();
+      }
+      schema.emplace_back(column.name, *type);
+    }
+    *tvf_signature = std::make_shared<ExpansionSignature>(
+        input_arguments, googlesql::TVFRelation(std::move(schema)), std::move(expansion));
+    return absl::OkStatus();
   }
 };
 
 }  // namespace
+
+std::optional<GraphExpandBody> GetGraphExpandBody(const googlesql::TVFSignature& signature) {
+  if (!signature.Is<ExpansionSignature>()) {
+    return std::nullopt;
+  }
+  const auto& expansion = signature.GetAs<ExpansionSignature>()->expansion();
+  return GraphExpandBody{.query = expansion.query(), .columns = expansion.columns};
+}
 
 void AddGraphExpand(googlesql::SimpleCatalog& catalog) {
   catalog.AddOwnedTableValuedFunction(std::make_unique<GraphExpand>());

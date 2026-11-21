@@ -463,11 +463,10 @@ Graph DDL rejects:
 - Views as element tables and graph options.
 - Edges whose endpoint nodes do not exist when the graph is created.
 
-`GRAPH_EXPAND` requires literal arguments. With `flatten_results => FALSE`, it supports only
-expansions that do not join any tables from the starting node. Scalar fields within joined
-`ROW` values cannot yet be selected as they can in BigQuery. It rejects a node table related to
-more than one node table unless every related node table but the last is related to no further
-node table.
+`GRAPH_EXPAND` requires literal arguments. With `flatten_results => FALSE`, it supports at most
+one relationship from the starting node. Select scalar fields from joined `ROW` values rather
+than returning the whole `ROW`. Flattened expansion rejects a node table related to more than
+one node table unless every related node table but the last is related to no further node table.
 
 `GRAPH_TABLE` and GQL queries reject:
 

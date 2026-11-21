@@ -387,6 +387,8 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision pr
   options.set_prune_unused_columns(true);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
+  // GRAPH_EXPAND uses ROW for name resolution and returnability, then executes as STRUCT.
+  options.enable_rewrite(googlesql::REWRITE_ROW_TYPE);
   // The null-masking rewrite rejects HAVING and aggregates that retain NULLs.
   // GoogleSQL mode translates PIVOT directly, filtering rows before aggregation.
   if (!settings.restrict_pivot_aggregates) {
