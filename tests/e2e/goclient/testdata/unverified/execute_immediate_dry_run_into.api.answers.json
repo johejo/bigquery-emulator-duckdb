@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "cases": {
+    "into_declared_target": {
+      "project": "johejo-sandbox",
+      "run": "dkwaogjseqxcvs2mjfepvqpqtn",
+      "steps": {
+        "dry_run": {
+          "status": 200
+        }
+      }
+    },
+    "into_undeclared_target": {
+      "project": "johejo-sandbox",
+      "run": "dkwaogjseqxcvs2mjfepvqpqtn",
+      "steps": {
+        "dry_run": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Undeclared variable: missing_target at [2:36]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Undeclared variable: missing_target at [2:36]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

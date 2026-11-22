@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "cases": {
+    "using_mixed_aliases": {
+      "project": "johejo-sandbox",
+      "run": "dkwaogjseqxcvs2mjfepvqpqtn",
+      "steps": {
+        "dry_run": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "EXECUTE IMMEDIATE USING parameters must be all positional or all named. at [1:1]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "EXECUTE IMMEDIATE USING parameters must be all positional or all named. at [1:1]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "using_unresolved_name": {
+      "project": "johejo-sandbox",
+      "run": "dkwaogjseqxcvs2mjfepvqpqtn",
+      "steps": {
+        "dry_run": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Query error: Unrecognized name: missing_name at [1:37]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Query error: Unrecognized name: missing_name at [1:37]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "using_valid_expression": {
+      "project": "johejo-sandbox",
+      "run": "dkwaogjseqxcvs2mjfepvqpqtn",
+      "steps": {
+        "dry_run": {
+          "status": 200
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 version: 1
 # See third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 # for defaultDataset on CREATE/DROP PROCEDURE, and
-# third_party/bigquery_docs/multi-statement-queries.md for CALL dry runs.
+# third_party/bigquery_docs/multi-statement-queries.md for CALL and DML dry runs.
+# TRUNCATE TABLE is DML per third_party/bigquery_docs/reference/standard-sql/dml-syntax.md.
 # CALL takes expressions (reference/standard-sql/procedural-language.md), and
 # expressions can use positional parameters (reference/standard-sql/lexical.md).
 description: Procedure defaults, CALL dry runs, and positional parameters.
@@ -137,6 +138,45 @@ cases:
             query: 'SELECT COUNT(*) AS n FROM `${project}.${dataset}.dml_target`'
             useLegacySql: false
         observe: {n: /body/rows/0/f/0/v}
+      - name: seed_truncate_target
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'INSERT INTO `${project}.${dataset}.dml_target` (n) VALUES (42)'
+            useLegacySql: false
+      - name: call_after_truncate_dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              TRUNCATE TABLE `${project}.${dataset}.dml_target`;
+              CALL `${project}.${dataset}.p`(42);
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: invalid_select_after_truncate
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              TRUNCATE TABLE `${project}.${dataset}.dml_target`;
+              SELECT missing_column FROM `${project}.${dataset}.dml_target`;
+              CALL `${project}.${dataset}.p`(42);
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+      - name: dry_run_did_not_truncate
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'SELECT n FROM `${project}.${dataset}.dml_target`'
+            useLegacySql: false
+        observe: {n: /body/rows/0/f/0/v}
       - name: invalid_select_before_call
         rest:
           method: POST
@@ -255,6 +295,9 @@ cases:
       invalid_dml_before_call: {status: 400}
       invalid_select_after_dml_before_call: {status: 400}
       dry_run_did_not_insert: {n: '0'}
+      call_after_truncate_dry_run: {status: 200}
+      invalid_select_after_truncate: {status: 400}
+      dry_run_did_not_truncate: {n: '42'}
       invalid_select_before_call: {status: 400}
       missing_call_after_select: {status: 400}
       wrong_type: {status: 400}

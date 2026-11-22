@@ -758,7 +758,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
           skip_dry_run_stop = true;
           break;
         }
+        // Normal TRUNCATE takes the catalog lock, but it is DML for dry-run validation.
         if (!statement->Is<googlesql::ASTQueryStatement>() &&
+            !statement->Is<googlesql::ASTTruncateStatement>() &&
             StatementWritesOf(*statement) != StatementWrites::kRows) {
           break;
         }

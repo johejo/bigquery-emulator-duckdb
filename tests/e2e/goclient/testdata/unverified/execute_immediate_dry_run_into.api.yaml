@@ -1,0 +1,29 @@
+version: 1
+description: Determine how EXECUTE IMMEDIATE dry runs validate INTO targets.
+cases:
+  - name: into_declared_target
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE target INT64;
+              EXECUTE IMMEDIATE 'SELECT 42' INTO target;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+  - name: into_undeclared_target
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE target INT64;
+              EXECUTE IMMEDIATE 'SELECT 42' INTO missing_target;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
