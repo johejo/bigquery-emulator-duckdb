@@ -18,7 +18,7 @@ std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow
 
 // Initializes `out` as the record batch type of `schema`: a non-nullable struct of its fields,
 // each of the Arrow type Storage Read gives it. JSON and GEOGRAPHY use strings; Arrow output
-// marks GEOGRAPHY and RANGE fields with metadata and rejects JSON.
+// marks JSON, GEOGRAPHY and RANGE fields with metadata.
 void StorageReadArraySchema(ArrowSchema* out, const std::vector<FieldSchema>& schema, bool arrow);
 
 // Avro binary rows from the same arrays used for Arrow output.

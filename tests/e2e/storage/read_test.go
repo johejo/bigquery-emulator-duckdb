@@ -445,16 +445,6 @@ func TestReadAvroJSONAndGeography(t *testing.T) {
 			if rows[2]["value"] != nil || rows[2]["rec"] != nil || len(rows[2]["items"].([]any)) != 0 || len(rows[2]["records"].([]any)) != 0 {
 				t.Fatalf("NULL/empty: %v", rows[2])
 			}
-			if tc.kind != "JSON" {
-				return
-			}
-			_, err = read.CreateReadSession(t.Context(), &storagepb.CreateReadSessionRequest{
-				Parent:      "projects/test",
-				ReadSession: &storagepb.ReadSession{Table: path, DataFormat: storagepb.DataFormat_ARROW},
-			})
-			if status.Code(err) != codes.Unimplemented {
-				t.Fatalf("Arrow session error = %v", err)
-			}
 		})
 	}
 }

@@ -46,7 +46,7 @@ void ArrowCheck(int code) {
 }
 
 // Sets the metadata BigQuery gives a field of `type` whose Arrow type other types share:
-// GEOGRAPHY is WKT text of an extension type, and a RANGE is a struct marked as one.
+// JSON and GEOGRAPHY are text of extension types, and a RANGE is a marked struct.
 void SetTypeMetadata(ArrowSchema* out, FieldType type) {
   nanoarrow::UniqueBuffer metadata;
   ArrowCheck(ArrowMetadataBuilderInit(metadata.get(), nullptr));
@@ -57,6 +57,10 @@ void SetTypeMetadata(ArrowSchema* out, FieldType type) {
       ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(),
                                             ArrowCharView("ARROW:extension:metadata"),
                                             ArrowCharView(R"({"encoding": "WKT"})")));
+      break;
+    case FieldType::kJson:
+      ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
+                                            ArrowCharView("google:sqlType:json")));
       break;
     case FieldType::kRange:
       ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("google:sqlType"),
@@ -134,11 +138,6 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
       }
       break;
     case FieldType::kJson:
-      if (arrow) {
-        throw ApiError::Invalid("Storage Read does not support " +
-                                std::string(FieldTypeName(field.type)));
-      }
-      [[fallthrough]];
     case FieldType::kGeography:
     case FieldType::kString:
       ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
