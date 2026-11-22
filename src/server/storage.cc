@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -23,6 +24,7 @@
 #include "google/cloud/bigquery/storage/v1/table.pb.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/timestamp.pb.h"
+#include "google/protobuf/util/time_util.h"
 #include "grpc/impl/channel_arg_names.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
@@ -248,9 +250,14 @@ class ReadService final : public pb::BigQueryRead::Service {
       if (session.trace_id().size() > 256) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "trace_id exceeds 256 bytes");
       }
+      std::optional<int64_t> snapshot_micros;
       if (session.table_modifiers().has_snapshot_time()) {
-        Fail(grpc::StatusCode::UNIMPLEMENTED,
-             "Storage Read does not support historical snapshot_time");
+        using google::protobuf::util::TimeUtil;
+        const auto& time = session.table_modifiers().snapshot_time();
+        if (!TimeUtil::IsTimestampValid(time)) {
+          Fail(grpc::StatusCode::INVALID_ARGUMENT, "Invalid Storage Read snapshot_time");
+        }
+        snapshot_micros = TimeUtil::TimestampToMicroseconds(time);
       }
       const auto& options = session.read_options();
       if ((session.data_format() == pb::ARROW && options.has_avro_serialization_options()) ||
@@ -282,7 +289,7 @@ class ReadService final : public pb::BigQueryRead::Service {
       const auto snapshot = std::make_shared<Snapshot>();
       snapshot->rows = emulator_.ReadStorageTable(
           table, {options.selected_fields().begin(), options.selected_fields().end()},
-          options.row_restriction());
+          options.row_restriction(), snapshot_micros);
       snapshot->arrow = session.data_format() == pb::ARROW;
       snapshot->response_compression = response_codec != 0;
       snapshot->buffer_compression = buffer_codec == pb::ArrowSerializationOptions::LZ4_FRAME
@@ -302,6 +309,9 @@ class ReadService final : public pb::BigQueryRead::Service {
       response->set_table(TablePath(table));
       response->set_data_format(session.data_format());
       *response->mutable_read_options() = options;
+      if (session.has_table_modifiers()) {
+        *response->mutable_table_modifiers() = session.table_modifiers();
+      }
       response->set_trace_id(session.trace_id());
       Timestamp(response->mutable_expire_time(), snapshot->expiry);
       response->set_estimated_row_count(static_cast<int64_t>(snapshot->rows->row_count()));

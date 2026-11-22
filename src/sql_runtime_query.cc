@@ -461,7 +461,7 @@ QueryResult SqlRuntime::Prepare(const std::string& sql, const std::vector<std::s
 
 std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
     TableReference table, const std::vector<std::string>& selected_fields,
-    const std::string& restriction) {
+    const std::string& restriction, std::optional<int64_t> snapshot_micros) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   table = info.reference;
@@ -484,6 +484,18 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
                       " FROM " +
                       googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
                                                      "." + table.table_id);
+  QueryParameters parameters;
+  if (snapshot_micros) {
+    query += " FOR SYSTEM_TIME AS OF @snapshot_time";
+    parameters = QueryParameters::Parse(
+        nlohmann::json::array({{{"name", "snapshot_time"},
+                                {"parameterType", {{"type", "TIMESTAMP"}}},
+                                {"parameterValue",
+                                 {{"value", absl::FormatTime(absl::RFC3339_full,
+                                                             absl::FromUnixMicros(*snapshot_micros),
+                                                             absl::UTCTimeZone())}}}}}),
+        functions_.timestamp_precision());
+  }
   if (!restriction.empty()) {
     if (restriction.size() > size_t{1024} * 1024) {
       throw ApiError::Invalid("row_restriction exceeds 1 MB");
@@ -502,13 +514,17 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
           node->GetAsOrNull<googlesql::ASTQuery>() != nullptr) {
         throw ApiError::Invalid("Storage Read does not support subqueries in row_restriction");
       }
+      if (node->GetAsOrNull<googlesql::ASTParameterExpr>() != nullptr) {
+        throw ApiError::Invalid("Storage Read does not support parameters in row_restriction");
+      }
       for (int i = 0; i < node->num_children(); ++i) {
         nodes.push_back(node->child(i));
       }
     }
     query += " WHERE (" + restriction + ")";
   }
-  const TranslatedStatement translated = Translate(query, {}, table.project_id, table.dataset_id);
+  const TranslatedStatement translated =
+      Translate(query, parameters, table.project_id, table.dataset_id);
   std::shared_ptr<const StorageSnapshot> snapshot;
   try {
     snapshot = backend_.ExecuteStorageRead(translated.sql, std::move(schema), translated.resources);
