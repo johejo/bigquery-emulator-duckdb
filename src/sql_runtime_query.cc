@@ -550,10 +550,12 @@ TranslatedStatement SqlRuntime::Translate(
                          declarations_);
   const AnalyzerResult analyzed =
       AnalyzeGoogleSql(query, catalog, type_factory, functions_.timestamp_precision(), settings);
-  if (dry_run && analyzed.CheckStandaloneCall()) {
-    TranslatedStatement call;
-    call.statement_type = "CALL";
-    return call;
+  if (dry_run) {
+    if (auto type = analyzed.CheckScriptDryRun(); type.has_value()) {
+      TranslatedStatement checked;
+      checked.statement_type = *std::move(type);
+      return checked;
+    }
   }
   std::string unsupported;
   std::optional<TranslatedStatement> translated = TranslateStatement(
@@ -742,7 +744,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       for (const auto* statement : script->script()->statement_list()) {
-        if (statement->Is<googlesql::ASTCallStatement>() || statement->IsDdlStatement()) {
+        if (statement->Is<googlesql::ASTCallStatement>() || statement->IsDdlStatement() ||
+            statement->Is<googlesql::ASTExecuteImmediateStatement>()) {
           const auto* create_table = statement->GetAsOrNull<googlesql::ASTCreateTableStmtBase>();
           if (create_table != nullptr && create_table->is_temp()) {
             throw ApiError::UnsupportedQuery("dry runs of CREATE TEMP TABLE");
@@ -877,9 +880,10 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         TableMetadata(), /*copy=*/false, /*restore=*/false, std::nullopt, &statement_lock.catalog);
     result.rows.KeepResources(translation.resources);
   } else if (translation.statement_type != "CALL" &&
+             translation.statement_type != "EXECUTE_IMMEDIATE" &&
              !AlterationStatements(translation).has_value()) {
-    // CALL has no SQL to prepare; its signature was already checked by the analyzer.
-    // A dry run checks an alteration against the table or dataset without running it.
+    // CALL and EXECUTE IMMEDIATE need only analysis. A dry run checks an alteration against
+    // the table or dataset without running it.
     result = prepare(translation);
   }
   if (translation.result_schema.has_value()) {

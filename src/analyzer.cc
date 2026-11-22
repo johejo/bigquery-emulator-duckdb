@@ -74,9 +74,16 @@ const googlesql::Value* AnalyzerResult::literal_value() const {
              : nullptr;
 }
 
-bool AnalyzerResult::CheckStandaloneCall() const {
+std::optional<std::string> AnalyzerResult::CheckScriptDryRun() const {
+  if (statement().Is<googlesql::ResolvedExecuteImmediateStmt>()) {
+    const auto* dynamic = statement().GetAs<googlesql::ResolvedExecuteImmediateStmt>();
+    if (!dynamic->into_identifier_list().empty() || !dynamic->using_argument_list().empty()) {
+      throw ApiError::UnsupportedQuery("dry runs of EXECUTE IMMEDIATE with INTO or USING");
+    }
+    return "EXECUTE_IMMEDIATE";
+  }
   if (!statement().Is<googlesql::ResolvedCallStmt>()) {
-    return false;
+    return std::nullopt;
   }
   const auto& signature = statement().GetAs<googlesql::ResolvedCallStmt>()->signature();
   for (const auto& argument : signature.arguments()) {
@@ -85,7 +92,7 @@ bool AnalyzerResult::CheckStandaloneCall() const {
       throw ApiError::InvalidQuery("OUT and INOUT arguments must be variables");
     }
   }
-  return true;
+  return "CALL";
 }
 
 std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {

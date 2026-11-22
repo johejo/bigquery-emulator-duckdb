@@ -76,8 +76,9 @@ class AnalyzerResult {
   // The value belongs to this result and remains valid as long as the result does.
   [[nodiscard]] const googlesql::Value* literal_value() const;
 
-  // Whether this is a CALL. Throws if it needs output variables, which a standalone CALL lacks.
-  [[nodiscard]] bool CheckStandaloneCall() const;
+  // The statement type of a script statement whose dry run needs only analysis, if any.
+  // Throws for forms that require script variables or whose dry-run behavior is unsupported.
+  [[nodiscard]] std::optional<std::string> CheckScriptDryRun() const;
 
   // ResultSchema of the statement.
   [[nodiscard]] std::optional<std::vector<FieldSchema>> result_schema() const;

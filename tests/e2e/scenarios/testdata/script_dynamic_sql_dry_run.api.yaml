@@ -1,0 +1,70 @@
+version: 1
+# See “Dry-run a multi-statement query” in third_party/bigquery_docs/multi-statement-queries.md.
+description: EXECUTE IMMEDIATE dry runs validate the SQL expression without evaluating it.
+cases:
+  - name: execute_immediate
+    steps:
+      - name: does_not_parse_generated_sql
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "EXECUTE IMMEDIATE 'SELECT FROM'"
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: does_not_evaluate_expression
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT 1;
+              EXECUTE IMMEDIATE IF(TRUE, ERROR('must not execute'), 'SELECT 1');
+              SELECT missing_later_column;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: positional_expression_after_select
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT ?;
+              EXECUTE IMMEDIATE ?;
+            dryRun: true
+            useLegacySql: false
+            parameterMode: POSITIONAL
+            queryParameters:
+              - parameterType: {type: INT64}
+                parameterValue: {value: '1'}
+              - parameterType: {type: STRING}
+                parameterValue: {value: 'SELECT 1'}
+        observe: {status: /status}
+      - name: rejects_wrong_expression_type
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: EXECUTE IMMEDIATE 42
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+      - name: rejects_unresolved_name_in_expression
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "EXECUTE IMMEDIATE CONCAT('SELECT ', missing_name)"
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      does_not_parse_generated_sql: {status: 200}
+      does_not_evaluate_expression: {status: 200}
+      positional_expression_after_select: {status: 200}
+      rejects_wrong_expression_type: {status: 400}
+      rejects_unresolved_name_in_expression: {status: 400}
