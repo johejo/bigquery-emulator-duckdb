@@ -101,6 +101,19 @@ func TestVectorSearchParameters(t *testing.T) {
 			wantError:  "fraction_lists_to_search in options of VECTOR_SEARCH should be in the range of (0, 1]. Got 2.",
 		},
 		{
+			name:       "malformed_options_before_dimensions",
+			sql:        "SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE pair, 'e', query_value => [1.0], options => @o)",
+			parameters: []bigquery.QueryParameter{{Name: "o", Value: `{"x":1}`}},
+			wantError:  `Malformated options: {"x":1}`,
+		},
+		{
+			name: "malformed_options_before_batch_dimensions",
+			sql: "SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE pair, 'e', (SELECT [1.0] AS e), " +
+				"options => @o)",
+			parameters: []bigquery.QueryParameter{{Name: "o", Value: `{"x":1}`}},
+			wantError:  `Malformated options: {"x":1}`,
+		},
+		{
 			name:       "null_options",
 			sql:        "SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE one, 'e', query_value => [1.0], options => @o)",
 			parameters: []bigquery.QueryParameter{{Name: "o", Value: bigquery.NullString{}}},
