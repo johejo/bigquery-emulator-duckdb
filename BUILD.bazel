@@ -818,6 +818,7 @@ cc_library(
     srcs = ["src/interval.cc"],
     hdrs = ["src/interval.h"],
     copts = ["-std=c++20"],
+    implementation_deps = ["@abseil-cpp//absl/status"],
     deps = [
         "//third_party/duckdb",
         "@abseil-cpp//absl/status:statusor",

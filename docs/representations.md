@@ -15,6 +15,13 @@ Catalog reads use [dedicated functions](../src/catalog_functions.h) rather than
 `duckdb_tables()` or `information_schema`: those compute storage information and DDL for every
 relation and cannot push filters down. Logical-name searches must decode before filtering.
 
+## INTERVAL
+
+[`IntervalToDuckDb` and `IntervalFromDuckDb`](../src/interval.cc) keep microsecond values in
+DuckDB's native layout. For Arrow intervals with sub-microsecond precision, the stored months
+also encode the nanosecond remainder. Code that operates on a BigQuery interval must decode it
+first, and comparisons must use `bq_interval_key`, not DuckDB's native interval order.
+
 ## Query results and Storage Read
 
 [`ResultChunks`](../src/result_chunks.h) retains chunks and database lifetime independently

@@ -29,10 +29,10 @@ Parameterized STRING and BYTES columns are unsupported in both encodings. Protob
 custom annotations and INTERVAL input.
 
 Arrow accepts the documented [Storage Write Arrow mappings](../third_party/bigquery_docs/supported-data-types.md),
-as well as signed `Int64` for INT64 and `Time64(MICROSECOND)` for TIME. Unlike BigQuery, the
-emulator rejects INTERVAL values with sub-microsecond precision because DuckDB cannot store
-those values exactly. Compressed batches, dictionary encoding, field metadata, and missing-value
-interpretation options are unsupported.
+as well as signed `Int64` for INT64 and `Time64(MICROSECOND)` for TIME. The
+`MONTH_DAY_NANO` encoding preserves INTERVAL values to nanosecond precision. Compressed
+batches, dictionary encoding, field metadata, and missing-value interpretation options are
+unsupported.
 
 Existing streams support adding nullable or repeated columns and relaxing REQUIRED columns to
 NULLABLE, including within records. Open connections report changes through `updated_schema`,

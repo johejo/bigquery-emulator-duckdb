@@ -4,10 +4,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -181,13 +181,13 @@ void IntervalAggregate(duckdb_function_info info, duckdb_data_chunk input, duckd
             }
             duckdb_vector child = duckdb_list_vector_get_child(vector);
             googlesql::IntervalValue::SumAggregator sum;
-            std::unordered_set<int64_t> lengths;
+            absl::flat_hash_set<IntervalValue> lengths;
             int64_t count = 0;
             for (idx_t i = 0; i < entry.length; ++i) {
               GOOGLESQL_ASSIGN_OR_RETURN(
                   const auto value,
                   IntervalFromDuckDb(VectorElement<duckdb_interval>(child, entry.offset + i)));
-              if (kDistinct && !lengths.insert(value.GetAsMicros()).second) {
+              if (kDistinct && !lengths.insert(value).second) {
                 continue;
               }
               sum.Add(value);
@@ -211,7 +211,7 @@ void IntervalDistinct(duckdb_function_info info, duckdb_data_chunk input, duckdb
         duckdb_vector child = duckdb_list_vector_get_child(vector);
         uint64_t* validity = duckdb_vector_get_validity(child);
         std::vector<std::optional<duckdb_interval>> values;
-        std::unordered_set<int64_t> lengths;
+        absl::flat_hash_set<IntervalValue> lengths;
         bool null = false;
         for (idx_t i = 0; i < entry.length; ++i) {
           if (validity != nullptr && !duckdb_validity_row_is_valid(validity, entry.offset + i)) {
@@ -222,7 +222,7 @@ void IntervalDistinct(duckdb_function_info info, duckdb_data_chunk input, duckdb
           }
           const auto element = VectorElement<duckdb_interval>(child, entry.offset + i);
           GOOGLESQL_ASSIGN_OR_RETURN(const auto value, IntervalFromDuckDb(element));
-          if (lengths.insert(value.GetAsMicros()).second) {
+          if (lengths.insert(value).second) {
             values.emplace_back(element);
           }
         }
@@ -244,7 +244,21 @@ std::string IntervalString(const IntervalValue& value) { return value.ToString()
 
 // GoogleSQL compares, and so orders, INTERVAL values by their length with 30 days to a month and
 // 24 hours to a day, while DuckDB compares the components it carries the remainders into.
-int64_t IntervalKey(const IntervalValue& value) { return value.GetAsMicros(); }
+__int128 IntervalKey(const IntervalValue& value) { return value.GetAsNanos(); }
+
+absl::StatusOr<IntervalValue> IntervalPartsNanos(int64_t months, int64_t days, int64_t micros,
+                                                 int64_t fraction) {
+  return IntervalValue::FromMonthsDaysNanos(months, days,
+                                            (micros * IntervalValue::kNanosInMicro128) + fraction);
+}
+
+absl::StatusOr<int64_t> IntervalExtract(const IntervalValue& value, std::string_view part_name) {
+  fn::DateTimestampPart part = fn::DATE;
+  if (!fn::DateTimestampPart_Parse(part_name, &part)) {
+    return absl::InvalidArgumentError("Unsupported INTERVAL date part");
+  }
+  return value.Extract(part);
+}
 
 }  // namespace
 
@@ -253,6 +267,8 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            kInterval, Apply<MakeInterval>);
   Register(connection, "bq_interval_parts", {kBigint, kBigint, kBigint}, kInterval,
            Apply<IntervalValue::FromMonthsDaysMicros>);
+  Register(connection, "bq_interval_parts_nanos", {kBigint, kBigint, kBigint, kBigint}, kInterval,
+           Apply<IntervalPartsNanos>);
   Register(connection, "bq_interval", {kBigint, kVarchar}, kInterval, Apply<IntervalConstructor>);
   Register(connection, "bq_justify_hours", {kInterval}, kInterval, Apply<googlesql::JustifyHours>);
   Register(connection, "bq_justify_days", {kInterval}, kInterval, Apply<googlesql::JustifyDays>);
@@ -273,7 +289,9 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
   Register(connection, "bq_interval_from_string", {kVarchar, kBoolean}, kInterval,
            Apply<IntervalFromString, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_interval_from_csv", {kVarchar}, kInterval, Apply<IntervalFromCsv>);
-  Register(connection, "bq_interval_key", {kInterval}, kBigint, Apply<IntervalKey>);
+  Register(connection, "bq_interval_key", {kInterval}, DUCKDB_TYPE_HUGEINT, Apply<IntervalKey>);
+  Register(connection, "bq_interval_extract", {kInterval, kVarchar}, kBigint,
+           Apply<IntervalExtract>);
   Register(connection, "bq_add_intervals", {kInterval, kInterval}, kInterval,
            Apply<AddIntervals<false>>);
   Register(connection, "bq_subtract_intervals", {kInterval, kInterval}, kInterval,

@@ -131,6 +131,7 @@ std::optional<Relation> GapFillScan(const googlesql::ResolvedTVFScan& tvf, const
     return std::nullopt;
   }
   // BigQuery requires exactly one non-zero, positive part, of months only for DATE and DATETIME.
+  // These SQL literals have at most microsecond precision, so their INTERVAL layout is native.
   const auto* origin_expr = given(4);
   const std::string months = "(datepart('year', _gf_i) * 12 + datepart('month', _gf_i))";
   const std::string days = "datepart('day', _gf_i)";

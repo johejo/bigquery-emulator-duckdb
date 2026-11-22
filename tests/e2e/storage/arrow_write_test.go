@@ -174,10 +174,11 @@ func TestAppendArrowIntervals(t *testing.T) {
 		{Name: "dd", Type: arrow.FixedWidthTypes.DayTimeInterval},
 		{Name: "mdn", Type: arrow.FixedWidthTypes.MonthDayNanoInterval},
 		{Name: "text", Type: arrow.BinaryTypes.String},
-	}, [][]string{{"-13", `{"Days":2,"Milliseconds":-1723}`, `{"Months":-3,"Days":7,"Nanoseconds":54321000}`, "2-3 4 5:6:7.890123"}}, []string{
+	}, [][]string{{"-13", `{"Days":2,"Milliseconds":-1723}`, `{"Months":-3,"Days":7,"Nanoseconds":-54321001}`, "2-3 4 5:6:7.890123"}}, []string{
 		"EXTRACT(YEAR FROM ym) = -1 AND EXTRACT(MONTH FROM ym) = -1",
 		"EXTRACT(DAY FROM dd) = 2 AND EXTRACT(SECOND FROM dd) = -1 AND EXTRACT(MICROSECOND FROM dd) = -723000",
-		"EXTRACT(MONTH FROM mdn) = -3 AND EXTRACT(DAY FROM mdn) = 7 AND EXTRACT(MICROSECOND FROM mdn) = 54321",
+		"EXTRACT(MONTH FROM mdn) = -3 AND EXTRACT(DAY FROM mdn) = 7 AND EXTRACT(MICROSECOND FROM mdn) = -54321",
+		"mdn < INTERVAL '-0-3 7 -0:0:0.054321' YEAR TO SECOND",
 		"text = INTERVAL '2-3 4 5:6:7.890123' YEAR TO SECOND",
 	})
 }

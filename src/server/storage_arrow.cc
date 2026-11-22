@@ -227,12 +227,9 @@ std::string Interval(const ArrowArrayView* col, int64_t row, std::string_view na
   ArrowInterval interval{};
   ArrowIntervalInit(&interval, col->storage_type);
   ArrowArrayViewGetIntervalUnsafe(col, row, &interval);
-  if (interval.ns % 1000 != 0) {
-    throw ApiError::Unsupported("Arrow intervals with sub-microsecond precision");
-  }
-  const int64_t micros = (static_cast<int64_t>(interval.ms) * 1000) + (interval.ns / 1000);
-  const auto value =
-      googlesql::IntervalValue::FromMonthsDaysMicros(interval.months, interval.days, micros);
+  using googlesql::IntervalValue;
+  const __int128 nanos = (interval.ms * IntervalValue::kNanosInMilli) + interval.ns;
+  const auto value = IntervalValue::FromMonthsDaysNanos(interval.months, interval.days, nanos);
   Check(value.status());
   return value->ToString();
 }

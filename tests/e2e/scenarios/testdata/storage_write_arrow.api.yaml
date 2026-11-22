@@ -1,7 +1,8 @@
 version: 1
 description: >-
   The Storage Write Arrow mapping table in third_party/bigquery_docs/supported-data-types.md
-  omits TIME, but BigQuery accepts Time64(MICROSECOND).
+  omits TIME, but BigQuery accepts Time64(MICROSECOND). BigQuery also preserves
+  sub-microsecond precision in Arrow MONTH_DAY_NANO intervals.
 vars:
   dataset: bqa_${run}_${case}
   stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
@@ -62,3 +63,13 @@ cases:
     expect:
       append: {code: OK}
       query: {rows: [{f: [{v: '12:34:56.123456'}]}]}
+  # Arrow MonthDayNanoInterval with 1001 nanoseconds, no days or months.
+  - name: interval_nano
+    template: append_arrow
+    vars:
+      type: INTERVAL
+      schema: '/////3gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAUAAAAEAAUABAADwAOAAgAAAAEABAAAAAQAAAAGAAAAAAACwEYAAAAAAAAAAAABgAIAAYABgAAAAAAAgAFAAAAdmFsdWUAAAA='
+      batch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADpAwAAAAAAAA=='
+    expect:
+      append: {code: OK}
+      query: {rows: [{f: [{v: '0-0 0 0:0:0.000001001'}]}]}

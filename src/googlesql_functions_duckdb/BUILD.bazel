@@ -222,6 +222,7 @@ cc_library(
         "//src/duckdb_functions:register",
         "//src/duckdb_functions:scalar",
         "//src/googlesql_functions:datetime",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

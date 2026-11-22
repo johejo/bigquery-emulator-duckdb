@@ -428,22 +428,22 @@ std::vector<Rule> Extract() {
   std::vector<Rule> rules = {
       {
           .arity = 2,
-          .spelling = "date_part(#2, $1)",
+          .spelling = "bq_interval_extract($1, upper(#2))",
           .conditions =
               {
                   Is(1, {TYPE_INTERVAL}),
-                  Part(2, {"year", "month", "day", "hour", "minute", "second"}),
+                  Part(2,
+                       {
+                           "year",
+                           "month",
+                           "day",
+                           "hour",
+                           "minute",
+                           "second",
+                           "millisecond",
+                           "microsecond",
+                       }),
               },
-      },
-      {
-          .arity = 2,
-          .spelling = "(date_part(#2, $1) % 1000)",
-          .conditions = {Is(1, {TYPE_INTERVAL}), Part(2, {"millisecond"})},
-      },
-      {
-          .arity = 2,
-          .spelling = "(date_part(#2, $1) % 1000000)",
-          .conditions = {Is(1, {TYPE_INTERVAL}), Part(2, {"microsecond"})},
       },
   };
   for (const auto& [arity, value] :
