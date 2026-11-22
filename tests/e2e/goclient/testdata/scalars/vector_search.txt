@@ -1,0 +1,435 @@
+## VECTOR_SEARCH
+# The expected values are the examples of the search functions documentation, with its
+# base_table and query_table as temporary tables:
+# third_party/bigquery_docs/reference/standard-sql/search_functions.md
+
+# Batch search: each query row's top_k nearest base rows, by Euclidean distance.
+CREATE TEMP TABLE base_table AS SELECT * FROM UNNEST([STRUCT('dog' AS id, 'Man\'s best friend' AS description, [1.0, 2.0] AS my_embedding), ('wolf', 'The ultimate pack hunter', [2.0, 4.0]), ('snake', 'The slithering serpent', [-2.0, 3.0]), ('lion', 'King of the jungle', [2.0, -2.5]), ('tiger', 'The striped stalker', [3.0, -2.0]), ('otter', 'The river\'s playful acrobat', [-3.0, -1.0]), ('whale', 'The ocean\'s gentle giant', [-5.0, -1.0])]); CREATE TEMP TABLE query_table AS SELECT * FROM UNNEST([STRUCT('dog' AS query_id, [1.0, 2.0] AS embedding), ('cat', [1.0, -1.0])]); SELECT ARRAY_AGG(STRUCT(query.query_id, query.embedding, base.id, base.my_embedding, distance) ORDER BY query.query_id, distance) FROM VECTOR_SEARCH(TABLE base_table, 'my_embedding', (SELECT query_id, embedding FROM query_table), 'embedding', top_k => 2)
+=> [{"v":{"f":[{"v":"cat"},{"v":[{"v":"1.0"},{"v":"-1.0"}]},{"v":"lion"},{"v":[{"v":"2.0"},{"v":"-2.5"}]},{"v":"1.8027756377319946"}]}},{"v":{"f":[{"v":"cat"},{"v":[{"v":"1.0"},{"v":"-1.0"}]},{"v":"tiger"},{"v":[{"v":"3.0"},{"v":"-2.0"}]},{"v":"2.23606797749979"}]}},{"v":{"f":[{"v":"dog"},{"v":[{"v":"1.0"},{"v":"2.0"}]},{"v":"dog"},{"v":[{"v":"1.0"},{"v":"2.0"}]},{"v":"0.0"}]}},{"v":{"f":[{"v":"dog"},{"v":[{"v":"1.0"},{"v":"2.0"}]},{"v":"wolf"},{"v":[{"v":"2.0"},{"v":"4.0"}]},{"v":"2.23606797749979"}]}}]
+
+# A base table query filters the rows searched.
+CREATE TEMP TABLE base_table AS SELECT * FROM UNNEST([STRUCT('dog' AS id, 'Man\'s best friend' AS description, [1.0, 2.0] AS my_embedding), ('wolf', 'The ultimate pack hunter', [2.0, 4.0]), ('snake', 'The slithering serpent', [-2.0, 3.0]), ('lion', 'King of the jungle', [2.0, -2.5]), ('tiger', 'The striped stalker', [3.0, -2.0]), ('otter', 'The river\'s playful acrobat', [-3.0, -1.0]), ('whale', 'The ocean\'s gentle giant', [-5.0, -1.0])]); CREATE TEMP TABLE query_table AS SELECT * FROM UNNEST([STRUCT('dog' AS query_id, [1.0, 2.0] AS embedding), ('cat', [1.0, -1.0])]); SELECT ARRAY_AGG(STRUCT(query.query_id, base.id, distance) ORDER BY query.query_id, distance) FROM VECTOR_SEARCH((SELECT * FROM base_table WHERE id != 'wolf'), 'my_embedding', (SELECT query_id, embedding FROM query_table), 'embedding', top_k => 2)
+=> [{"v":{"f":[{"v":"cat"},{"v":"lion"},{"v":"1.8027756377319946"}]}},{"v":{"f":[{"v":"cat"},{"v":"tiger"},{"v":"2.23606797749979"}]}},{"v":{"f":[{"v":"dog"},{"v":"dog"},{"v":"0.0"}]}},{"v":{"f":[{"v":"dog"},{"v":"snake"},{"v":"3.1622776601683795"}]}}]
+
+# BigQuery's cosine distance of parallel vectors is exactly 0, and its last digits elsewhere are
+# those of 1 - x·y / sqrt(|x|² |y|²).
+CREATE TEMP TABLE base_table AS SELECT * FROM UNNEST([STRUCT('dog' AS id, 'Man\'s best friend' AS description, [1.0, 2.0] AS my_embedding), ('wolf', 'The ultimate pack hunter', [2.0, 4.0]), ('snake', 'The slithering serpent', [-2.0, 3.0]), ('lion', 'King of the jungle', [2.0, -2.5]), ('tiger', 'The striped stalker', [3.0, -2.0]), ('otter', 'The river\'s playful acrobat', [-3.0, -1.0]), ('whale', 'The ocean\'s gentle giant', [-5.0, -1.0])]); CREATE TEMP TABLE query_table AS SELECT * FROM UNNEST([STRUCT('dog' AS query_id, [1.0, 2.0] AS embedding), ('cat', [1.0, -1.0])]); SELECT ARRAY_AGG(STRUCT(query.query_id, base.id, distance) ORDER BY query.query_id, distance, base.id) FROM VECTOR_SEARCH(TABLE base_table, 'my_embedding', TABLE query_table, 'embedding', top_k => 2, distance_type => 'COSINE')
+=> [{"v":{"f":[{"v":"cat"},{"v":"lion"},{"v":"0.0061162653263812095"}]}},{"v":{"f":[{"v":"cat"},{"v":"tiger"},{"v":"0.019419324309079777"}]}},{"v":{"f":[{"v":"dog"},{"v":"dog"},{"v":"0.0"}]}},{"v":{"f":[{"v":"dog"},{"v":"wolf"},{"v":"0.0"}]}}]
+
+# Single search: the base rows nearest one embedding, without a query column.
+CREATE TEMP TABLE base_table AS SELECT * FROM UNNEST([STRUCT('dog' AS id, 'Man\'s best friend' AS description, [1.0, 2.0] AS my_embedding), ('wolf', 'The ultimate pack hunter', [2.0, 4.0]), ('snake', 'The slithering serpent', [-2.0, 3.0]), ('lion', 'King of the jungle', [2.0, -2.5]), ('tiger', 'The striped stalker', [3.0, -2.0]), ('otter', 'The river\'s playful acrobat', [-3.0, -1.0]), ('whale', 'The ocean\'s gentle giant', [-5.0, -1.0])]); SELECT ARRAY_AGG(STRUCT(base.id, base.my_embedding, distance) ORDER BY distance) FROM VECTOR_SEARCH(TABLE base_table, 'my_embedding', query_value => [1.0, -1.0], top_k => 2)
+=> [{"v":{"f":[{"v":"lion"},{"v":[{"v":"2.0"},{"v":"-2.5"}]},{"v":"1.8027756377319946"}]}},{"v":{"f":[{"v":"tiger"},{"v":[{"v":"3.0"},{"v":"-2.0"}]},{"v":"2.23606797749979"}]}}]
+
+# The definitions: base holds every base column, top_k defaults to 10 and a negative top_k
+# returns every base row.
+CREATE TEMP TABLE base_table AS SELECT * FROM UNNEST([STRUCT('dog' AS id, 'Man\'s best friend' AS description, [1.0, 2.0] AS my_embedding), ('lion', 'King of the jungle', [2.0, -2.5])]); SELECT base.description FROM VECTOR_SEARCH(TABLE base_table, 'my_embedding', query_value => [1.0, -1.0], top_k => 1)
+=> "King of the jungle"
+
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0])
+=> "10"
+
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0], top_k => -1)
+=> "12"
+
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; CREATE TEMP TABLE q AS SELECT [0.0] AS e UNION ALL SELECT [1.0]; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q, top_k => -1)
+=> "24"
+
+# The options are a JSON literal.
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT base.e FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [4.2], top_k => 1, options => '{"use_brute_force":true}')
+=> [{"v":"4.0"}]
+
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT base.e FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [4.2], top_k => 1, options => '{"fraction_lists_to_search":0.15}')
+=> [{"v":"4.0"}]
+
+# Observed BigQuery answers collected with tools/bqanswers: a base table query only selects
+# columns of a table and filters them.
+SELECT distance FROM VECTOR_SEARCH((SELECT [1.0, 2.0] AS e), 'e', query_value => [1.0, 1.0])
+=> error: Columns with functions or nested field expressions are not allowed in the 1st argument query for VECTOR_SEARCH.
+
+SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT 'a' AS id, [1.0, 2.0] AS e UNION ALL SELECT 'b', NULL), 'e', query_value => [1.0, 1.0])
+=> error: Only SELECT expressions and WHERE clauses are allowed in the 1st argument query for VECTOR_SEARCH.
+
+SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST([1, 2, 3]) AS x LIMIT 2), 'e', query_value => [1.0])
+=> error: Only SELECT expressions and WHERE clauses are allowed in the 1st argument query for VECTOR_SEARCH.
+
+SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT ARRAY_AGG(CAST(x AS FLOAT64)) AS e FROM UNNEST([1, 2, 3]) AS x GROUP BY x), 'e', query_value => [1.0])
+=> error: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+# More observed BigQuery answers collected with tools/bqanswers.
+
+# DOT_PRODUCT's distance is the negated dot product, so the largest product is nearest.
+CREATE TEMP TABLE b AS SELECT * FROM UNNEST([STRUCT('a' AS id, [1.0, 2.0] AS e), ('b', [3.0, 1.0]), ('c', [-1.0, -1.0])]); SELECT ARRAY_AGG(STRUCT(base.id, distance) ORDER BY distance) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], top_k => 2, distance_type => 'DOT_PRODUCT')
+=> [{"v":{"f":[{"v":"b"},{"v":"-4.0"}]}},{"v":{"f":[{"v":"a"},{"v":"-3.0"}]}}]
+
+# Distance types ignore case.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => 'cosine')
+=> "0.05131670194948623"
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => 'MANHATTAN')
+=> error contains: distance_type argument of VECTOR_SEARCH should be one of: EUCLIDEAN, COSINE, DOT_PRODUCT. Got MANHATTAN.
+
+# A NULL embedding is searched as an empty one, whose dimension differs; a NULL query_value literal
+# is rejected during analysis.
+CREATE TEMP TABLE b AS SELECT * FROM UNNEST([STRUCT('a' AS id, [1.0, 2.0] AS e), ('b', NULL)]); SELECT ARRAY_AGG(STRUCT(base.id, distance) ORDER BY base.id) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0])
+=> error contains: Array inputs are not equal in length
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; CREATE TEMP TABLE q AS SELECT * FROM UNNEST([STRUCT('a' AS id, [1.0, 1.0] AS e), ('b', NULL)]); SELECT ARRAY_AGG(STRUCT(query.id, distance) ORDER BY query.id) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q, 'e')
+=> error contains: Dimension of column `e` in the base table does not match the dimension of column `e` in the query data.
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => CAST(NULL AS ARRAY<FLOAT64>))
+=> error contains: One of the query data subquery or query_value of VECTOR_SEARCH must be specified.
+
+# Empty embeddings are at distance 0.
+CREATE TEMP TABLE b AS SELECT CAST([] AS ARRAY<FLOAT64>) AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => CAST([] AS ARRAY<FLOAT64>))
+=> "0.0"
+
+# Tables cannot hold NULL elements; the single and batch forms report differing dimensions
+# differently.
+CREATE TEMP TABLE b AS SELECT [1.0, NULL] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0])
+=> error contains: Array cannot have a null element; error in writing field e
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0, 1.0])
+=> error contains: Array inputs are not equal in length
+
+CREATE TEMP TABLE b AS SELECT * FROM UNNEST([STRUCT([1.0, 2.0] AS e), STRUCT([1.0, 2.0, 3.0])]); SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0])
+=> error contains: Array inputs are not equal in length
+
+# A zero vector's cosine distance fails, NaN distances are nearest, and Euclidean overflows fail.
+CREATE TEMP TABLE b AS SELECT [0.0, 0.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => 'COSINE')
+=> error contains: Cannot compute cosine distance against zero vector.
+
+CREATE TEMP TABLE b AS SELECT * FROM UNNEST([STRUCT('a' AS id, [CAST('NaN' AS FLOAT64), 1.0] AS e), ('b', [5.0, 5.0])]); SELECT ARRAY_AGG(STRUCT(base.id, distance) ORDER BY base.id) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], top_k => 1)
+=> [{"v":{"f":[{"v":"a"},{"v":"NaN"}]}}]
+
+CREATE TEMP TABLE b AS SELECT [1e300] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [-1e300])
+=> error contains: Compute overflow
+
+# top_k 0 returns no rows.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], top_k => 0)
+=> "0"
+
+# query_value does not coerce an ARRAY<INT64> literal.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1, 1])
+=> error contains: query_value must be of type ARRAY<FLOAT64>
+
+# A query table query is not limited like a base table query.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0, 1.0] AS e))
+=> "1.0"
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT ARRAY_AGG(distance ORDER BY distance) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0, 1.0] AS e UNION ALL SELECT [0.0, 0.0]))
+=> [{"v":"1.0"},{"v":"2.23606797749979"}]
+
+# Without query_column_to_search or a query column named like column_to_search, BigQuery searches
+# with the only ARRAY<FLOAT64> column.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; CREATE TEMP TABLE q AS SELECT 'a' AS id, [1.0, 1.0] AS f; SELECT ARRAY_AGG(distance) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q)
+=> [{"v":"1.0"}]
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; CREATE TEMP TABLE q AS SELECT [1.0, 1.0] AS f, [0.0, 0.0] AS g; SELECT ARRAY_AGG(distance) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q)
+=> error contains: One and only one column of ARRAY<FLOAT64> type should exist in 3rd argument of VECTOR_SEARCH when query_column_to_search is not specified and no ARRAY<FLOAT64> column with the same name as e exists in the 3rd argument.
+
+# Errors for a missing column, a column that is not ARRAY<FLOAT64> and a missing query column.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'x', query_value => [1.0, 1.0])
+=> error contains: Column x should exist in the 1st argument of VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT [1, 2] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0])
+=> error contains: column_to_search argument of VECTOR_SEARCH: e should be of type ARRAY<FLOAT64>, STRING, ObjectRef, or STRUCT<ARRAY<FLOAT64>, STRING>.
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; CREATE TEMP TABLE q AS SELECT [1.0, 1.0] AS f; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q, 'x')
+=> error contains: x should exist in 3rd argument of VECTOR_SEARCH.
+
+# Column names ignore case.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'E', query_value => [1.0, 1.0])
+=> "1.0"
+
+# Options are JSON with known fields; fraction_lists_to_search is in (0, 1], and use_brute_force
+# also takes a string.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => 'not json')
+=> error contains: Malformated options: not json
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"unknown":1}')
+=> error contains: Malformated options: {"unknown":1}
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":1.5}')
+=> error contains: fraction_lists_to_search in options of VECTOR_SEARCH should be in the range of (0, 1]. Got 1.5.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":true,"fraction_lists_to_search":0.5}')
+=> error contains: fraction_lists_to_search should not be specified when use_brute_force is set.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":"true"}')
+=> "1"
+
+# A base table query selects a table's columns without renaming them, and may filter them with
+# subqueries; WITH queries, joins, ORDER BY and DISTINCT are rejected.
+WITH b AS (SELECT [1.0, 2.0] AS e) SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0])
+=> error contains: Only SELECT expressions and WHERE clauses are allowed in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((WITH c AS (SELECT * FROM b) SELECT * FROM c), 'e', query_value => [1.0, 1.0])
+=> error contains: Only SELECT expressions and WHERE clauses are allowed in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT ARRAY_AGG(STRUCT(base.f, distance)) FROM VECTOR_SEARCH((SELECT e AS f FROM b), 'f', query_value => [1.0, 1.0])
+=> error contains: Column names in the 1st argument query for VECTOR_SEARCH cannot be renamed: f
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT TO_JSON_STRING(base) FROM VECTOR_SEARCH((SELECT * EXCEPT (id) FROM b), 'e', query_value => [1.0, 1.0])
+=> "{\"e\":[1,2]}"
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; CREATE TEMP TABLE c AS SELECT 1 AS id; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT b.* FROM b JOIN c USING (id)), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b WHERE id IN (SELECT 1)), 'e', query_value => [1.0, 1.0])
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b ORDER BY id), 'e', query_value => [1.0, 1.0])
+=> error contains: Only SELECT expressions and WHERE clauses are allowed in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT DISTINCT id, e FROM b), 'e', query_value => [1.0, 1.0])
+=> error contains: Only SELECT expressions and WHERE clauses are allowed in the 1st argument query for VECTOR_SEARCH.
+
+# Lexical search needs the single form.
+CREATE TEMP TABLE b AS SELECT 'a' AS d, [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0] AS e), lexical_search_columns => ['d'], lexical_search_query_value => 'a')
+=> error contains: lexical_search_columns is not supported when query_value is not specified.
+
+# A third round of observed BigQuery answers collected with tools/bqanswers.
+
+# A NULL top_k is the default, 10.
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0], top_k => NULL)
+=> "10"
+
+# A zero dot product's distance is -0.
+CREATE TEMP TABLE b AS SELECT [1.0, 0.0] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0, 1.0], distance_type => 'DOT_PRODUCT')
+=> "-0"
+
+# A NULL embedding is as empty as an empty query value.
+CREATE TEMP TABLE b AS SELECT CAST(NULL AS ARRAY<FLOAT64>) AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => CAST([] AS ARRAY<FLOAT64>))
+=> "0.0"
+
+# Query data, unlike tables, can hold NULL elements, which fail.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0, NULL] AS e))
+=> error contains: Unexpected NULL element in input array
+
+# Infinite elements give infinite Euclidean distances, NaN elements NaN distances, a cosine
+# distance's overflowing norms make it 1 and an overflowing dot product fails.
+CREATE TEMP TABLE b AS SELECT [CAST('inf' AS FLOAT64)] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> "Infinity"
+
+CREATE TEMP TABLE b AS SELECT [CAST('NaN' AS FLOAT64), 1.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => 'COSINE')
+=> "NaN"
+
+CREATE TEMP TABLE b AS SELECT [CAST('NaN' AS FLOAT64)] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], distance_type => 'DOT_PRODUCT')
+=> "NaN"
+
+CREATE TEMP TABLE b AS SELECT [1e200] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], distance_type => 'COSINE')
+=> "1.0"
+
+CREATE TEMP TABLE b AS SELECT [1e300] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1e300], distance_type => 'DOT_PRODUCT')
+=> error contains: Compute overflow
+
+# A named query column must be ARRAY<FLOAT64>.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; CREATE TEMP TABLE q AS SELECT [1, 1] AS f; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q, 'f')
+=> error contains: query_column_to_search argument of VECTOR_SEARCH: f should be of type ARRAY<FLOAT64>.
+
+# use_brute_force takes any string but no number, and fraction_lists_to_search a string.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":false,"fraction_lists_to_search":0.5}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":"yes"}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":1}')
+=> error contains: Malformated options: {"use_brute_force":1}
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":"0.5"}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":0}')
+=> error contains: fraction_lists_to_search in options of VECTOR_SEARCH should be in the range of (0, 1]. Got 0.
+
+# A base table query cannot read a subquery or group rows, and selects columns ignoring case.
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM (SELECT * FROM b)), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT id, e FROM b GROUP BY id, e), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT E FROM b), 'e', query_value => [1.0, 1.0])
+=> "1"
+
+# Lexical search needs the single form, for either argument.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0] AS e), lexical_search_query_value => 'a')
+=> error contains: lexical_search_query_value is not supported when query_value is not specified.
+
+# A fourth round of observed BigQuery answers collected with tools/bqanswers.
+
+# A NULL query value that is not a literal gives NULL distances.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => (SELECT CAST(NULL AS ARRAY<FLOAT64>)))
+=> null
+
+CREATE TEMP TABLE b AS SELECT CAST([] AS ARRAY<FLOAT64>) AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => (SELECT CAST(NULL AS ARRAY<FLOAT64>)))
+=> null
+
+# NULL elements fail in a single search too, before differing dimensions, and only when searched.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, NULL])
+=> error contains: Unexpected NULL element in input array
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0, NULL, 3.0] AS e))
+=> error contains: Unexpected NULL element in input array
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b WHERE FALSE), 'e', (SELECT [1.0, NULL] AS e))
+=> "0"
+
+# Infinite elements give what the arithmetic gives, while dot products that overflow fail, even
+# in cosine distances and to NaN.
+CREATE TEMP TABLE b AS SELECT [CAST('inf' AS FLOAT64)] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [CAST('inf' AS FLOAT64)])
+=> "nan"
+
+CREATE TEMP TABLE b AS SELECT [CAST('inf' AS FLOAT64)] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], distance_type => 'COSINE')
+=> "nan"
+
+CREATE TEMP TABLE b AS SELECT [CAST('inf' AS FLOAT64)] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], distance_type => 'DOT_PRODUCT')
+=> "-inf"
+
+CREATE TEMP TABLE b AS SELECT [1e200] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1e200], distance_type => 'COSINE')
+=> error contains: Compute overflow
+
+CREATE TEMP TABLE b AS SELECT [1e300, 1e300] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1e300, -1e300], distance_type => 'DOT_PRODUCT')
+=> error contains: Compute overflow
+
+# A fraction_lists_to_search string must be a number in range, and a use_brute_force string
+# sets it.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":"abc"}')
+=> error contains: Malformated options: {"fraction_lists_to_search":"abc"}
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":"2"}')
+=> error contains: fraction_lists_to_search in options of VECTOR_SEARCH should be in the range of (0, 1]. Got 2.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":"yes","fraction_lists_to_search":0.5}')
+=> error contains: fraction_lists_to_search should not be specified when use_brute_force is set.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":"TRUE","fraction_lists_to_search":0.5}')
+=> error contains: fraction_lists_to_search should not be specified when use_brute_force is set.
+
+# A fifth round of observed BigQuery answers collected with tools/bqanswers.
+
+# NaN elements give NaN distances even where terms overflow.
+CREATE TEMP TABLE b AS SELECT [CAST('NaN' AS FLOAT64), 1e300] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1e300], distance_type => 'DOT_PRODUCT')
+=> "nan"
+
+CREATE TEMP TABLE b AS SELECT [CAST('NaN' AS FLOAT64), 1e300] AS e; SELECT CAST(distance AS STRING) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, -1e300])
+=> "nan"
+
+# A "false" use_brute_force string does not set it, and an empty one is malformed;
+# fraction_lists_to_search takes a NaN string but no boolean.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":"false","fraction_lists_to_search":0.5}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":"","fraction_lists_to_search":0.5}')
+=> error contains: Malformated options: {"use_brute_force":"","fraction_lists_to_search":0.5}
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":"nan"}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":true}')
+=> error contains: Malformated options: {"fraction_lists_to_search":true}
+
+# A sixth round of observed BigQuery answers collected with tools/bqanswers: an empty
+# use_brute_force string is malformed, and fraction_lists_to_search ignores null but not an
+# array.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":""}')
+=> error contains: Malformated options: {"use_brute_force":""}
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":null}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":[0.5]}')
+=> error contains: Malformated options: {"fraction_lists_to_search":[0.5]}
+
+# A seventh round of observed BigQuery answers: a null fraction_lists_to_search is ignored even
+# with use_brute_force set, and an object is malformed.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"use_brute_force":true,"fraction_lists_to_search":null}')
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":{}}')
+=> error contains: Malformated options: {"fraction_lists_to_search":{}}
+
+# An eighth round of observed BigQuery answers collected with tools/bqanswers.
+
+# No emulator table has autonomous embedding generation, so STRING and STRUCT columns have no
+# embeddings to search, and query values and columns must be ARRAY<FLOAT64>.
+CREATE TEMP TABLE b AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => 'a')
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT 'a' AS e; CREATE TEMP TABLE q AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q)
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT STRUCT([1.0] AS result, 'ok' AS status) AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT STRUCT('gs://bucket/a' AS uri, CAST(NULL AS STRING) AS version, CAST(NULL AS STRING) AS authorizer, JSON '{}' AS details) AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => 'a')
+=> error contains: query_value must be of type ARRAY<FLOAT64>
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => STRUCT('gs://bucket/a' AS uri, CAST(NULL AS STRING) AS version, CAST(NULL AS STRING) AS authorizer, JSON '{}' AS details))
+=> error contains: query_value must be of type ARRAY<FLOAT64>
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; CREATE TEMP TABLE q AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q, 'e')
+=> error contains: query_column_to_search argument of VECTOR_SEARCH: e should be of type ARRAY<FLOAT64>.
+
+# top_k and distance_type are literals or query parameters, which vector_search_test.go covers.
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0], top_k => 1 + 1)
+=> error contains: Invalid top_k argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0], top_k => (SELECT 1))
+=> error contains: Invalid top_k argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => CONCAT('DOT_', 'PRODUCT'))
+=> error contains: Invalid distance_type argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+# Query data that is a value table has one column, $col1.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(query) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT AS STRUCT 'q' AS id, [1.0, 1.0] AS e))
+=> error contains: One and only one column of ARRAY<FLOAT64> type should exist in 3rd argument of VECTOR_SEARCH when query_column_to_search is not specified and no ARRAY<FLOAT64> column with the same name as e exists in the 3rd argument.
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(query) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT AS VALUE [1.0, 1.0]))
+=> "{\"$col1\":[1,1]}"
+
+# A ninth round of observed BigQuery answers: a base table query that is a value table renames
+# its column, to an empty name.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(base) FROM VECTOR_SEARCH((SELECT AS VALUE e FROM b), 'e', query_value => [1.0, 1.0])
+=> error contains: Column names in the 1st argument query for VECTOR_SEARCH cannot be renamed: 
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(base) FROM VECTOR_SEARCH((SELECT AS STRUCT e FROM b), 'e', query_value => [1.0, 1.0])
+=> error contains: Columns with functions or nested field expressions are not allowed in the 1st argument query for VECTOR_SEARCH.
+
+# A tenth round of observed BigQuery answers: a NULL distance_type is the default, and base table
+# queries cannot sample, pivot or unpivot. Query parameters are in vector_search_test.go.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => NULL)
+=> "1.0"
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b TABLESAMPLE SYSTEM (100 PERCENT)), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, 'x' AS k, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b PIVOT (ANY_VALUE(id) FOR k IN ('x'))), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS x, 2 AS y, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b UNPIVOT (v FOR k IN (x, y))), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+# An eleventh round of observed BigQuery answers: column_to_search has no default for a NULL,
+# while options ignores one, and every argument but the query is a literal or a query parameter.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, NULL, query_value => [1.0])
+=> error contains: 2nd argument of VECTOR_SEARCH must be specified.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => NULL)
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, CONCAT('', 'e'), query_value => [1.0])
+=> error contains: Invalid column_to_search argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0] AS e), CONCAT('', 'e'))
+=> error contains: Invalid query_column_to_search argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => CONCAT('{', '}'))
+=> error contains: Invalid options argument of VECTOR_SEARCH, should be a literal value or query parameter

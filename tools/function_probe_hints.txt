@@ -296,6 +296,16 @@ query RANGE_SESSIONIZE WITH input AS (SELECT 1 AS k, RANGE<TIMESTAMP> '[2024-01-
 query RANGE_SESSIONIZE WITH input AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT * FROM RANGE_SESSIONIZE(TABLE input, 'r', [])
 query RANGE_SESSIONIZE WITH input AS (SELECT CAST(NULL AS RANGE<DATE>) AS r) SELECT * FROM RANGE_SESSIONIZE(TABLE input, 'r', [])
 query RANGE_SESSIONIZE WITH input AS (SELECT INTERVAL 1 DAY AS k, RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT * FROM RANGE_SESSIONIZE(TABLE input, 'r', ['k'])
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', TABLE queries)
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', TABLE queries, 'e')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH((SELECT * FROM base WHERE id = 'a'), 'e', (SELECT e FROM queries), query_column_to_search => 'e', top_k => 1, distance_type => 'EUCLIDEAN', options => '{"use_brute_force":true}')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', TABLE queries, 'e', top_k => -1, distance_type => 'COSINE', options => '{"fraction_lists_to_search":0.5}')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', TABLE queries, 'e', distance_type => 'DOT_PRODUCT')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', query_value => [1.0, 1.0])
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', query_value => [1.0, 1.0], top_k => 1, distance_type => 'COSINE', options => '{}')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', query_value => [1.0, 1.0], distance_type => 'DOT_PRODUCT')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', query_value => [1.0, 1.0], top_k => NULL, options => '{"use_brute_force":"false","fraction_lists_to_search":"0.5"}')
+query VECTOR_SEARCH CREATE TEMP TABLE base AS SELECT 'a' AS id, 'abc' AS d, [1.0, 2.0] AS e; CREATE TEMP TABLE queries AS SELECT 'q' AS id, [1.0, 1.0] AS e; SELECT * FROM VECTOR_SEARCH(TABLE base, 'e', query_value => [1.0, 1.0], lexical_search_columns => ['d'], lexical_search_query_value => 'abc')
 
 # Expressions with syntax of their own, which the analyzer does not resolve as function calls.
 query ARRAY SELECT ARRAY(SELECT x FROM UNNEST([1, 2]) AS x)
@@ -398,6 +408,7 @@ extra_query CONTAINS_SUBSTR SELECT CONTAINS_SUBSTR(JSON '{"a":"abc"}', 'a', json
 note SESSION_USER Requires --session-user; returns the configured identity for every client.
 
 note RANGE_SESSIONIZE See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits.
+note VECTOR_SEARCH See [VECTOR_SEARCH](compatibility.md#vector_search) for limits.
 note EXTERNAL_QUERY For external database support and limits, see [EXTERNAL_QUERY](compatibility.md#external_query).
 
 # GAP_FILL over each time series type and gap-filling method. Linear interpolation is documented

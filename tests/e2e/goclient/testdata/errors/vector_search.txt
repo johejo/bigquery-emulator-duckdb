@@ -1,0 +1,5 @@
+# VECTOR_SEARCH's hybrid search ranks rows by fusing semantic and lexical rankings with an
+# undocumented lexical scoring, so it is unsupported; scalars/known_bugs.txt has BigQuery's
+# answer.
+CREATE TEMP TABLE b AS SELECT 'a' AS d, [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], lexical_search_columns => ['d'], lexical_search_query_value => 'a')
+=> error contains: The emulator does not support VECTOR_SEARCH hybrid search

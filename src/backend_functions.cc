@@ -27,6 +27,7 @@
 #include "src/googlesql_functions_duckdb/range.h"
 #include "src/googlesql_functions_duckdb/string.h"
 #include "src/googlesql_functions_duckdb/timestamp.h"
+#include "src/googlesql_functions_duckdb/vector_search.h"
 #include "src/googlesql_geography/options.h"
 #include "src/googlesql_geography_duckdb/geography.h"
 #include "src/googlesql_hll_duckdb/hll.h"
@@ -102,6 +103,7 @@ void RegisterBackendFunctions(duckdb::DuckDB& database,
   functions_duckdb::RegisterCastFunctions(connection);
   functions_duckdb::RegisterJsonFunctions(connection, functions);
   functions_duckdb::RegisterContainsSubstr(connection);
+  functions_duckdb::RegisterVectorSearch(connection);
   collation_duckdb::RegisterCollationFunctions(connection, functions.collation);
   functions_duckdb::RegisterIntervalFunctions(connection);
   functions_duckdb::RegisterRangeFunctions(connection);

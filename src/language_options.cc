@@ -48,6 +48,9 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     options->DisableLanguageFeature(googlesql::FEATURE_JSONPATH_WILDCARDS_AND_DESCENDANT);
     // BigQuery rejects LookupTable with literal, quoted and constant-expression table names.
     options->DisableLanguageFeature(googlesql::FEATURE_LOOKUP_TABLE_TVF);
+    // GoogleSQL's released VECTOR_SEARCH has only the batch form, with max_distance rather than
+    // BigQuery's STRING options and no negative top_k; analyzer_functions declares BigQuery's.
+    options->DisableLanguageFeature(googlesql::FEATURE_VECTOR_SEARCH_TVF);
     // GoogleSQL released JSON_EXISTS functions before BigQuery documented them. BigQuery casts
     // no other type to JSON, leaving that to TO_JSON and PARSE_JSON.
     options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);

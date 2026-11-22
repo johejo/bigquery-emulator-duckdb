@@ -492,10 +492,11 @@ int Main(int argc, char** argv) {
             .Find(known ? absl::AsciiStrToUpper(function->FullName(/*include_group=*/false))
                         : "$" + name);
     const googlesql::TableValuedFunction* table_function = nullptr;
-    // RANGE_SESSIONIZE and EXTERNAL_QUERY have scan translators rather than scalar registry
-    // entries.
-    const bool known_table_function = (name == "RANGE_SESSIONIZE" || name == "EXTERNAL_QUERY") &&
-                                      catalog.FindTableValuedFunction(path, &table_function).ok();
+    // RANGE_SESSIONIZE, VECTOR_SEARCH and EXTERNAL_QUERY have scan translators rather than scalar
+    // registry entries.
+    const bool known_table_function =
+        (name == "RANGE_SESSIONIZE" || name == "VECTOR_SEARCH" || name == "EXTERNAL_QUERY") &&
+        catalog.FindTableValuedFunction(path, &table_function).ok();
     const std::string implementation = Implementation(name, entry, known_table_function);
     nlohmann::json line = {
         {"name", name},

@@ -16,6 +16,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/time/time.h"
@@ -30,6 +31,7 @@
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/sql_view.h"
 #include "googlesql/public/strings.h"
+#include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/templated_sql_function.h"
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/simple_value.h"
@@ -238,6 +240,74 @@ const googlesql::ASTSystemVariableExpr* FindSystemVariable(const googlesql::ASTN
     }
   }
   return nullptr;
+}
+
+// BigQuery's VECTOR_SEARCH takes as its base table a table, or a query that selects its columns
+// without renaming them and may filter them, with the errors observed in
+// tests/e2e/goclient/testdata/scalars/vector_search.txt.
+absl::Status CheckVectorSearchBase(const googlesql::ResolvedNode& node) {
+  std::vector<const googlesql::ResolvedNode*> scans;
+  node.GetDescendantsWithKinds({googlesql::RESOLVED_TVFSCAN}, &scans);
+  for (const auto* descendant : scans) {
+    const auto& tvf = *descendant->GetAs<googlesql::ResolvedTVFScan>();
+    if (tvf.tvf()->function_name_path().size() != 1 || tvf.tvf()->Name() != "vector_search" ||
+        tvf.argument_list_size() == 0 || tvf.argument_list(0)->scan() == nullptr) {
+      continue;
+    }
+    const auto error = [](std::string_view message) {
+      return absl::InvalidArgumentError(
+          absl::StrCat(message, " in the 1st argument query for VECTOR_SEARCH."));
+    };
+    const auto only_select = [&] {
+      return error("Only SELECT expressions and WHERE clauses are allowed");
+    };
+    const googlesql::ResolvedScan* scan = tvf.argument_list(0)->scan();
+    if (scan->Is<googlesql::ResolvedSetOperationScan>() ||
+        scan->Is<googlesql::ResolvedLimitOffsetScan>() ||
+        scan->Is<googlesql::ResolvedOrderByScan>() || scan->Is<googlesql::ResolvedWithScan>() ||
+        scan->Is<googlesql::ResolvedWithRefScan>() ||
+        // SELECT DISTINCT, whose grouping GoogleSQL puts in place of the projection; GROUP BY's
+        // is under it.
+        scan->Is<googlesql::ResolvedAggregateScan>()) {
+      return only_select();
+    }
+    if (scan->Is<googlesql::ResolvedProjectScan>()) {
+      const auto& project = *scan->GetAs<googlesql::ResolvedProjectScan>();
+      if (project.expr_list_size() > 0) {
+        return error("Columns with functions or nested field expressions are not allowed");
+      }
+      scan = project.input_scan();
+      while (scan->Is<googlesql::ResolvedFilterScan>()) {
+        scan = scan->GetAs<googlesql::ResolvedFilterScan>()->input_scan();
+      }
+      if (scan->Is<googlesql::ResolvedWithRefScan>()) {
+        return only_select();
+      }
+    }
+    // BigQuery rejects reading anything else, such as a subquery, a join, a grouping, TABLESAMPLE,
+    // PIVOT and UNPIVOT.
+    if (!scan->Is<googlesql::ResolvedTableScan>()) {
+      return error("Unsupported query pattern");
+    }
+    const auto& schema = tvf.signature()->input_arguments().at(0).relation();
+    for (int i = 0; i < schema.num_columns(); ++i) {
+      if (!absl::EqualsIgnoreCase(schema.column(i).name,
+                                  tvf.argument_list(0)->argument_column_list(i).name())) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Column names in the 1st argument query for VECTOR_SEARCH cannot be "
+                         "renamed: ",
+                         schema.column(i).name));
+      }
+    }
+    // BigQuery rejects the value tables of the forms above; what it does with others is
+    // unverified.
+    if (schema.is_value_table()) {
+      return absl::InvalidArgumentError(
+          "The emulator does not support VECTOR_SEARCH over a base table query that is a value "
+          "table");
+    }
+  }
+  return absl::OkStatus();
 }
 
 // BigQuery rejects type parameters in CAST, which GoogleSQL accepts. Literal CASTs disappear
@@ -797,6 +867,10 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
       !temporary.ok()) {
     throw std::runtime_error(std::string(temporary.message()));
   }
+  if (const absl::Status search = CheckVectorSearchBase(*analyzer_output->resolved_statement());
+      !search.ok()) {
+    throw std::runtime_error(std::string(search.message()));
+  }
   if (const absl::Status distinct = CheckDistinctArguments(
           *analyzer_output->resolved_statement(), settings.distinct_aggregates_without_structs,
           settings.distinct_aggregates_without_arrays);
@@ -853,6 +927,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
     GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
   }
   GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
+  GOOGLESQL_RETURN_IF_ERROR(CheckVectorSearchBase(*analyzer_output->resolved_statement()));
   GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArguments(*analyzer_output->resolved_statement(),
                                                    settings.distinct_aggregates_without_structs,
                                                    settings.distinct_aggregates_without_arrays));

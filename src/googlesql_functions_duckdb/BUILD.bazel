@@ -376,3 +376,20 @@ cc_library(
         "//src/googlesql_collation:options",
     ],
 )
+
+cc_library(
+    name = "vector_search",
+    srcs = ["vector_search.cc"],
+    hdrs = ["vector_search.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
+        "//src/googlesql_functions:vector_search_options",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)

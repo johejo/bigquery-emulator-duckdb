@@ -88,3 +88,9 @@ SELECT STRING_AGG(FORMAT('%t=%t', t, v), ';' ORDER BY t) FROM GAP_FILL((SELECT D
 
 SELECT STRING_AGG(FORMAT('%t=%t,%t', t, v, w), ';' ORDER BY t) FROM GAP_FILL((SELECT DATE '2023-11-01' AS t, 1 AS v, 'b' AS w UNION ALL SELECT DATE '2023-11-01', 2, 'a' UNION ALL SELECT DATE '2023-11-02', 3, 'c'), 't', INTERVAL 1 DAY, value_columns => [('v', 'locf'), ('w', 'locf')])
 !> "2023-11-01=1,b;2023-11-02=3,c"
+
+# Observed BigQuery answers to VECTOR_SEARCH collected with tools/bqanswers. Hybrid search ranks
+# rows by a fusion of the semantic and lexical rankings whose lexical scoring is undocumented,
+# so it stays unsupported; here both distances look like 1 - 2 / (60 + rank).
+CREATE TEMP TABLE b AS SELECT * FROM UNNEST([STRUCT('a' AS id, 'striped hunter' AS d, [1.0, 2.0] AS e), ('b', 'gentle giant', [2.0, 1.0])]); SELECT ARRAY_AGG(STRUCT(base.id, CAST(distance AS STRING) AS distance) ORDER BY base.id) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], lexical_search_columns => ['d'], lexical_search_query_value => 'striped hunter')
+!> [{"v":{"f":[{"v":"a"},{"v":"0.96721311475409832"}]}},{"v":{"f":[{"v":"b"},{"v":"0.967741935483871"}]}}]

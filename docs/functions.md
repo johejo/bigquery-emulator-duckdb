@@ -65,7 +65,7 @@ functions.
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
 | [ObjectRef functions](#objectref-functions) | 1 | 1 | 3 | 0 |
 | [Range functions](#range-functions) | 8 | 0 | 0 | 0 |
-| [Search functions](#search-functions) | 1 | 0 | 1 | 0 |
+| [Search functions](#search-functions) | 1 | 1 | 0 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
 | [String functions](#string-functions) | 53 | 0 | 0 | 0 |
@@ -518,7 +518,7 @@ functions.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`SEARCH`](../third_party/bigquery_docs/reference/standard-sql/search_functions.md) | Supported | GoogleSQL function |  |
-| [`VECTOR_SEARCH`](../third_party/bigquery_docs/reference/standard-sql/search_functions.md) | Unsupported |  |  |
+| [`VECTOR_SEARCH`](../third_party/bigquery_docs/reference/standard-sql/search_functions.md) | Partial | Table function | See [VECTOR_SEARCH](compatibility.md#vector_search) for limits. Unsupported: VECTOR_SEARCH hybrid search. |
 
 ## Security functions
 
