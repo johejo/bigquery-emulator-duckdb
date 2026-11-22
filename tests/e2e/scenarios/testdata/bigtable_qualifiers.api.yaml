@@ -190,8 +190,9 @@ cases:
             location: US
             useLegacySql: false
             timeoutMs: 100000
-            # The DDL reference lists STRING, but the recorded run accepted a singleton array:
-            # ../../../../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md#external_table_option_list
+            # The external table option list in the DDL reference specifies STRING, but the
+            # recorded run accepted a singleton array.
+            # third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
             query: |
               CREATE EXTERNAL TABLE `${project}.${dataset}.ddl`
               OPTIONS (
