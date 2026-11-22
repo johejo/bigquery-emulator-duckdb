@@ -506,7 +506,10 @@ std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
     };
   }
   // BigQuery searches NULL embeddings as empty ones, whose dimension differs from the others',
-  // except that a NULL single query value that is not a literal gives NULL distances.
+  // except that a NULL single query value that is not a literal gives NULL distances. The
+  // distance's CASE evaluates the checks first, since DuckDB can evaluate the pairs before the
+  // checks' join below, and a pair's error would then replace the checks' error.
+  const std::string ok = "(" + Join(checks, " AND ") + ")";
   const std::string pairs = std::format(
       "SELECT vq.row AS query, vq.id AS query_id, vb.row AS base, d.distance FROM ({}) AS vq "
       "CROSS JOIN ({}) AS vb, LATERAL (SELECT "
@@ -515,10 +518,11 @@ std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
       "lambda x: x IS NULL)) > 0 AS null_query, len(e.b) <> len(e.q) AS mismatch) AS c, LATERAL "
       "(SELECT CASE WHEN NOT c.null_query AND NOT c.mismatch THEN {} END AS d, "
       "len(list_filter(e.b || e.q, lambda x: isinf(x))) > 0 AS inf, len(list_filter(e.b || e.q, "
-      "lambda x: isnan(x))) > 0 AS nan) AS r, LATERAL (SELECT CASE {}WHEN c.null_query THEN "
+      "lambda x: isnan(x))) > 0 AS nan) AS r, LATERAL (SELECT CASE WHEN NOT {} THEN NULL {}WHEN "
+      "c.null_query THEN "
       "error('Unexpected NULL element in input array') WHEN c.mismatch THEN error({}) ELSE {} END "
       "AS distance) AS d",
-      query, *base, distance.raw, batch ? "" : "WHEN vq.embedding IS NULL THEN NULL ", mismatch,
+      query, *base, distance.raw, ok, batch ? "" : "WHEN vq.embedding IS NULL THEN NULL ", mismatch,
       distance.checked);
   // A NULL top_k is the default, 10, and a negative one returns every base row.
   std::string top_k;
@@ -546,9 +550,9 @@ std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
   // The checks of parameters run once, before any row, as BigQuery's do when the search reads
   // none: the LEFT JOIN keeps their row.
   output.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
-               " FROM (SELECT " + Join(checks, " AND ") +
-               " AS ok) AS chk LEFT JOIN (SELECT * FROM (" + ranked + ") WHERE " + top_k +
-               " < 0 OR rank <= " + top_k + ") AS vs ON chk.ok WHERE vs.rank IS NOT NULL";
+               " FROM (SELECT " + ok + " AS ok) AS chk LEFT JOIN (SELECT * FROM (" + ranked +
+               ") WHERE " + top_k + " < 0 OR rank <= " + top_k +
+               ") AS vs ON chk.ok WHERE vs.rank IS NOT NULL";
   return output;
 }
 
