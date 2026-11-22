@@ -71,6 +71,7 @@ class AnalyzerResult {
   // The statement, or the expression, that was analyzed.
   [[nodiscard]] const googlesql::ResolvedStatement& statement() const;
   [[nodiscard]] const googlesql::ResolvedExpr& expression() const;
+  [[nodiscard]] const googlesql::Type* expression_type() const;
 
   // The analyzed expression's literal value, or nullptr when it is not a literal.
   // The value belongs to this result and remains valid as long as the result does.

@@ -1478,6 +1478,7 @@ cc_library(
         "@googlesql//googlesql/parser",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:error_helpers",
         "@googlesql//googlesql/public:multi_catalog",
         "@googlesql//googlesql/public:parse_location",
         "@googlesql//googlesql/public:simple_catalog",

@@ -26,6 +26,7 @@
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/error_helpers.h"
 #include "googlesql/public/multi_catalog.h"
 #include "googlesql/public/parse_location.h"
 #include "googlesql/public/simple_catalog.h"
@@ -230,9 +231,9 @@ std::string DryRunStatementSql(const std::string& sql, const googlesql::ASTState
   return result;
 }
 
-size_t CountPositionalParameters(const googlesql::ASTStatement& statement) {
+size_t CountPositionalParameters(const googlesql::ASTNode& node) {
   std::vector<const googlesql::ASTNode*> parameters;
-  statement.GetDescendantsWithKinds({googlesql::AST_PARAMETER_EXPR}, &parameters);
+  node.GetDescendantsWithKinds({googlesql::AST_PARAMETER_EXPR}, &parameters);
   return static_cast<size_t>(
       std::ranges::count_if(parameters, [](const googlesql::ASTNode* parameter) {
         return parameter->GetAsOrDie<googlesql::ASTParameterExpr>()->name() == nullptr;
@@ -522,32 +523,61 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
 }
 
 struct SqlRuntime::DryRunDeclarations {
-  std::string_view sql;
-  std::vector<const googlesql::ASTVariableDeclaration*> nodes;
+  const QueryParameters& parameters;
+  std::string_view sql = {};
+  std::vector<const googlesql::ASTVariableDeclaration*> nodes = {};
+  size_t positional_count = 0;
   const googlesql::ASTExecuteImmediateStatement* dynamic = nullptr;
 
   void AddVariables(googlesql::SimpleCatalog& variables, googlesql::Catalog& catalog,
                     googlesql::TypeFactory& types, TimestampPrecision precision,
                     const AnalyzerSettings& settings) const {
     std::set<std::string> names;
+    AnalyzerSettings declaration_settings = settings;
+    declaration_settings.positional_parameters.clear();
+    size_t next_parameter = 0;
     for (const auto* declaration : nodes) {
-      if (declaration->type() == nullptr || declaration->default_value() != nullptr) {
-        throw ApiError::UnsupportedQuery("DECLARE with DEFAULT in script dry runs");
+      const googlesql::Type* type = nullptr;
+      if (declaration->type() != nullptr) {
+        const auto resolved =
+            AnalyzeScriptType(googlesql::ScriptSegment::FromASTNode(sql, declaration->type()),
+                              catalog, types, precision, declaration_settings);
+        if (!resolved.ok()) {
+          throw ApiError::InvalidQuery(std::string(resolved.status().message()));
+        }
+        type = resolved->type;
       }
-      const auto type =
-          AnalyzeScriptType(googlesql::ScriptSegment::FromASTNode(sql, declaration->type()),
-                            catalog, types, precision, settings);
-      if (!type.ok()) {
-        throw ApiError::InvalidQuery(std::string(type.status().message()));
+      if (const auto* value = declaration->default_value()) {
+        const size_t count = CountPositionalParameters(*value);
+        const auto binding = parameters.SlicePositional(next_parameter, count);
+        next_parameter += count;
+        declaration_settings.positional_parameters.clear();
+        for (const auto& field : binding.positional_types()) {
+          declaration_settings.positional_parameters.push_back(ParameterType(field, types));
+        }
+        const auto segment = googlesql::ScriptSegment::FromASTNode(sql, value);
+        const auto analyzed =
+            AnalyzeScriptExpression(segment.GetSegmentText(), &segment, type, catalog, types,
+                                    precision, declaration_settings);
+        if (!analyzed.ok()) {
+          const auto error = googlesql::MaybeUpdateErrorFromPayload(
+              {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, sql, analyzed.status());
+          throw ApiError::InvalidQuery(std::string(error.message()));
+        }
+        type = analyzed->expression_type();
       }
+      if (type == nullptr) {
+        throw ApiError::InvalidQuery("DECLARE requires a type or a DEFAULT expression");
+      }
+      // Keep the variable's type in scope without evaluating its initializer.
       for (const auto* identifier : declaration->variable_list()->identifier_list()) {
         const auto name = identifier->GetAsString();
         if (!names.insert(ToUpperAscii(name)).second) {
           throw ApiError::InvalidQuery("Variable redeclaration: " + name);
         }
         std::unique_ptr<googlesql::SimpleConstant> constant;
-        const auto status = googlesql::SimpleConstant::Create(
-            {name}, googlesql::Value::Null(type->type), &constant);
+        const auto status =
+            googlesql::SimpleConstant::Create({name}, googlesql::Value::Null(type), &constant);
         if (!status.ok()) {
           throw ApiError::InvalidQuery(std::string(status.message()));
         }
@@ -812,7 +842,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   bool skip_dry_run_stop = false;
   bool dry_run_to_end = false;
   std::vector<const googlesql::ASTStatement*> dry_run_prefix;
-  DryRunDeclarations dry_run_declarations;
+  DryRunDeclarations dry_run_declarations{.parameters = request.parameters};
   if (script) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
@@ -826,6 +856,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         if (const auto* declaration = statement->GetAsOrNull<googlesql::ASTVariableDeclaration>();
             declaration != nullptr && dry_run_prefix.empty()) {
           dry_run_declarations.nodes.push_back(declaration);
+          dry_run_declarations.positional_count += CountPositionalParameters(*declaration);
           continue;
         }
         if (!dry_run_declarations.nodes.empty()) {
@@ -915,7 +946,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
                      &variables, stores_result, request.dry_run, session.get(),
                      &statement_lock.catalog, declarations);
   };
-  size_t next_parameter = 0;
+  size_t next_parameter = dry_run_declarations.positional_count;
   const auto translate_script_statement = [&](const googlesql::ASTStatement& statement,
                                               bool stores_result) {
     // Statement analysis numbers its parameters from 1 again. Advance only through the
