@@ -4,7 +4,7 @@ version: 1
 # third_party/bigquery_docs/multi-statement-queries.md for CALL dry runs.
 # CALL takes expressions (reference/standard-sql/procedural-language.md), and
 # expressions can use positional parameters (reference/standard-sql/lexical.md).
-description: Procedure defaults, CALL dry runs, and positional parameters in standalone CALL.
+description: Procedure defaults, CALL dry runs, and positional parameters.
 vars:
   dataset: bqa_${run}_${case}
 cases:
@@ -64,6 +64,27 @@ cases:
               - name: n
                 parameterType: {type: INT64}
                 parameterValue: {value: '42'}
+        observe: {status: /status}
+      - name: positional_call_after_select_dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT CONCAT('?', ?); -- ? in a comment
+              SELECT '?';
+              CALL `${project}.${dataset}.p`(? + ?);
+              SELECT missing_column;
+            dryRun: true
+            useLegacySql: false
+            parameterMode: POSITIONAL
+            queryParameters:
+              - parameterType: {type: STRING}
+                parameterValue: {value: example}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '17'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '25'}
         observe: {status: /status}
       - name: invalid_select_before_call
         rest:
@@ -178,6 +199,7 @@ cases:
       dry_run: {status: 200}
       leading_call_dry_run: {status: 200}
       call_after_select_dry_run: {status: 200}
+      positional_call_after_select_dry_run: {status: 200}
       invalid_select_before_call: {status: 400}
       missing_call_after_select: {status: 400}
       wrong_type: {status: 400}

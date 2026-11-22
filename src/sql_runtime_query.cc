@@ -225,6 +225,15 @@ std::string DryRunStatementSql(const std::string& sql, const googlesql::ASTState
   return result;
 }
 
+size_t CountPositionalParameters(const googlesql::ASTStatement& statement) {
+  std::vector<const googlesql::ASTNode*> parameters;
+  statement.GetDescendantsWithKinds({googlesql::AST_PARAMETER_EXPR}, &parameters);
+  return static_cast<size_t>(
+      std::ranges::count_if(parameters, [](const googlesql::ASTNode* parameter) {
+        return parameter->GetAsOrDie<googlesql::ASTParameterExpr>()->name() == nullptr;
+      }));
+}
+
 // TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
 std::string ScriptStatementType(const googlesql::ParserOutput& script) {
   const auto& statements = script.script()->statement_list();
@@ -736,9 +745,6 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         throw ApiError::UnsupportedQuery(
             "dry runs of scripts unless they start with CALL or SELECTs followed by CALL");
       }
-      if (!dry_run_selects.empty() && !request.parameters.positional_types().empty()) {
-        throw ApiError::UnsupportedQuery("positional parameters in dry runs of SELECT before CALL");
-      }
       // Do not consider anything after the first CALL, even for location inference.
       request.query.resize(static_cast<size_t>(dry_run_call->location().end().GetByteOffset()));
       writes = StatementWrites::kNothing;
@@ -786,18 +792,29 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     }
     return Prepare(statement.sql, setup);
   };
+  const auto translate = [&](const std::string& sql, const QueryParameters& parameters,
+                             bool stores_result) {
+    return Translate(sql, parameters, settings.default_project, settings.default_dataset, &location,
+                     &variables, stores_result, request.dry_run, session.get(),
+                     &statement_lock.catalog);
+  };
+  size_t next_parameter = 0;
+  const auto translate_script_statement = [&](const googlesql::ASTStatement& statement,
+                                              bool stores_result) {
+    // Statement analysis numbers its parameters from 1 again. Advance only through the
+    // validated prefix; nothing after CALL needs a binding.
+    const auto count = CountPositionalParameters(statement);
+    const auto parameters = request.parameters.SlicePositional(next_parameter, count);
+    next_parameter += count;
+    return translate(DryRunStatementSql(request.query, statement), parameters, stores_result);
+  };
   for (const auto* statement : dry_run_selects) {
-    const auto select =
-        Translate(DryRunStatementSql(request.query, *statement), request.parameters,
-                  settings.default_project, settings.default_dataset, &location, &variables,
-                  /*stores_result=*/false, /*dry_run=*/true, nullptr, &statement_lock.catalog);
-    prepare(select);
+    prepare(translate_script_statement(*statement, /*stores_result=*/false));
   }
-  const TranslatedStatement translation = Translate(
-      dry_run_selects.empty() ? request.query : DryRunStatementSql(request.query, *dry_run_call),
-      request.parameters, settings.default_project, settings.default_dataset, &location, &variables,
-      request.destination_table.has_value(), request.dry_run, session.get(),
-      &statement_lock.catalog);
+  const TranslatedStatement translation =
+      dry_run_selects.empty()
+          ? translate(request.query, request.parameters, request.destination_table.has_value())
+          : translate_script_statement(*dry_run_call, request.destination_table.has_value());
   if (!script) {
     query.statement_type = translation.statement_type;
   }
