@@ -298,12 +298,9 @@ The emulator has no vector indexes, so `VECTOR_SEARCH` always runs the exact bru
 and the `use_brute_force` and `fraction_lists_to_search` options are validated but change
 nothing. Job statistics carry no `vectorSearchStatistics`. Limits:
 
-- Only `ARRAY<FLOAT64>` embeddings are searched; STRING and ObjectRef columns and values need
-  autonomous embedding generation, which is unsupported, and so is hybrid search.
-- `column_to_search`, `query_column_to_search`, `top_k`, `distance_type` and `options` must be
-  literals, and only `top_k` can be NULL.
-- A base table query that reads no table, such as one over `UNNEST`, is unsupported.
-- Value tables are unsupported.
+- No table has autonomous embedding generation, so only `ARRAY<FLOAT64>` embeddings are
+  searched, and STRING and ObjectRef columns fail as they do in BigQuery without it.
+- Hybrid search is unsupported.
 
 ### EXTERNAL_QUERY
 

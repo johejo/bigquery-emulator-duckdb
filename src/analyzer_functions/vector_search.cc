@@ -12,7 +12,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "googlesql/public/function_signature.h"
@@ -21,7 +20,9 @@
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer_functions/declarations.h"
+#include "src/googlesql_functions/vector_search_options.h"
 #include "src/language_options.h"
 
 namespace bigquery_emulator_duckdb::analyzer_functions {
@@ -30,6 +31,7 @@ namespace {
 // The batch and single forms' signatures.
 constexpr int64_t kBatch = 0;
 constexpr int64_t kSingle = 1;
+constexpr absl::string_view kValueTableColumn = "$col1";
 
 // The column `name` selects, ignoring case as BigQuery does, or -1 if none or several do.
 int FindColumn(const googlesql::TVFRelation& relation, const std::string& name) {
@@ -47,6 +49,19 @@ int FindColumn(const googlesql::TVFRelation& relation, const std::string& name) 
 
 bool IsEmbedding(const googlesql::Type* type) {
   return type->IsArray() && type->AsArray()->element_type()->IsDouble();
+}
+
+bool IsDistanceType(absl::string_view name) {
+  const std::string upper = absl::AsciiStrToUpper(name);
+  return upper == "EUCLIDEAN" || upper == "COSINE" || upper == "DOT_PRODUCT";
+}
+
+// Query data as BigQuery searches it: a value table is one column, named $col1.
+googlesql::TVFRelation QueryRelation(const googlesql::TVFRelation& relation) {
+  if (!relation.is_value_table()) {
+    return relation;
+  }
+  return googlesql::TVFRelation({{kValueTableColumn, relation.column(0).type}});
 }
 
 googlesql::FunctionArgumentType Named(
@@ -119,7 +134,7 @@ std::optional<googlesql::Value> Literal(const googlesql::TVFInputArgumentType* a
 }
 
 // Only embeddings are searched: STRING and ObjectRef columns need autonomous embedding
-// generation, which the emulator does not have.
+// generation, which no emulator table has.
 absl::Status CheckBaseColumn(const googlesql::TVFRelation& relation, const std::string& name) {
   const int index = FindColumn(relation, name);
   if (index == -1) {
@@ -131,7 +146,8 @@ absl::Status CheckBaseColumn(const googlesql::TVFRelation& relation, const std::
     return absl::OkStatus();
   }
   if (column.type->IsString() || column.type->IsStruct()) {
-    return Unsupported("with autonomous embedding generation");
+    return absl::InvalidArgumentError(absl::StrCat(
+        "No generation expression found for the column_to_search: ", column.name, "."));
   }
   return absl::InvalidArgumentError(absl::StrCat(
       "column_to_search argument of VECTOR_SEARCH: ", column.name,
@@ -149,9 +165,6 @@ absl::Status CheckQueryColumn(const googlesql::TVFRelation& relation, const goog
           absl::StrCat(named.string_value(), " should exist in 3rd argument of VECTOR_SEARCH."));
     }
     const auto& column = relation.column(index);
-    if (column.type->IsString() || column.type->IsStruct()) {
-      return Unsupported("with autonomous embedding generation");
-    }
     if (!IsEmbedding(column.type)) {
       return absl::InvalidArgumentError(
           absl::StrCat("query_column_to_search argument of VECTOR_SEARCH: ", column.name,
@@ -174,71 +187,9 @@ absl::Status CheckQueryColumn(const googlesql::TVFRelation& relation, const goog
   return absl::OkStatus();
 }
 
-// BigQuery's options select how a vector index is searched. The emulator has no vector indexes,
-// so every search is the exact brute-force search that BigQuery falls back to without one.
-absl::Status CheckOptions(const std::string& text) {
-  const auto malformed = [&] {
-    return absl::InvalidArgumentError(absl::StrCat("Malformated options: ", text));
-  };
-  const auto parsed = googlesql::JSONValue::ParseJSONString(text);
-  if (!parsed.ok() || !parsed->GetConstRef().IsObject()) {
-    return malformed();
-  }
-  // Whether use_brute_force is set: true, or any string but "false" and the malformed "", and
-  // whether fraction_lists_to_search is given other than as the null that BigQuery ignores.
-  bool brute_force = false;
-  bool fraction = false;
-  for (const auto& [name, value] : parsed->GetConstRef().GetMembers()) {
-    if (name == "use_brute_force") {
-      // BigQuery also takes the boolean as any string.
-      if (value.IsBoolean()) {
-        brute_force = value.GetBoolean();
-      } else if (value.IsString()) {
-        if (value.GetString().empty()) {
-          return malformed();
-        }
-        brute_force = value.GetString() != "false";
-      } else {
-        return malformed();
-      }
-    } else if (name == "fraction_lists_to_search" && !value.IsNull()) {
-      // BigQuery also takes the number as a string, even NaN, which is in no range it rejects.
-      double number = 0;
-      if (value.IsString()) {
-        if (!absl::SimpleAtod(value.GetString(), &number)) {
-          return malformed();
-        }
-      } else if (!value.IsNumber()) {
-        return malformed();
-      } else {
-        number = value.IsInt64()    ? static_cast<double>(value.GetInt64())
-                 : value.IsUInt64() ? static_cast<double>(value.GetUInt64())
-                                    : value.GetDouble();
-      }
-      if (number <= 0 || number > 1) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("fraction_lists_to_search in options of VECTOR_SEARCH should be in the "
-                         "range of (0, 1]. Got ",
-                         number, "."));
-      }
-      fraction = true;
-    } else if (name != "fraction_lists_to_search") {
-      return malformed();
-    }
-  }
-  if (fraction && brute_force) {
-    return absl::InvalidArgumentError(
-        "fraction_lists_to_search should not be specified when use_brute_force is set.");
-  }
-  return absl::OkStatus();
-}
-
 absl::StatusOr<googlesql::TVFRelation::Column> StructColumn(googlesql::TypeFactory& type_factory,
                                                             const googlesql::TVFRelation& relation,
                                                             const std::string& name) {
-  if (relation.is_value_table()) {
-    return Unsupported("over a value table");
-  }
   std::vector<googlesql::StructField> fields;
   std::ranges::transform(relation.columns(), std::back_inserter(fields), [](const auto& column) {
     return googlesql::StructField(column.name, column.type);
@@ -262,18 +213,32 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SearchSchema(
   const auto literal = [&](absl::string_view name) {
     return Literal(Argument(signature, arguments, name));
   };
-  // These arguments must be literals, and only top_k can be NULL, for its default.
-  const auto required = [&](absl::string_view name) -> absl::StatusOr<googlesql::Value> {
+  // These arguments are literals or query parameters, whose values the catalog does not have,
+  // so the translator checks them; nullopt stands for a parameter. A NULL is the default, but
+  // column_to_search has none.
+  const auto literal_or_parameter =
+      [&](absl::string_view name) -> absl::StatusOr<std::optional<googlesql::Value>> {
     auto value = literal(name);
-    if (!value || (value->is_null() && name != "top_k")) {
-      return Unsupported(absl::StrCat("with a non-literal or NULL ", name));
+    if (value && value->is_null() && name == "column_to_search") {
+      return absl::InvalidArgumentError("2nd argument of VECTOR_SEARCH must be specified.");
     }
-    return *std::move(value);
+    if (value) {
+      return value;
+    }
+    // GoogleSQL gives a TVF a scalar argument's expression rather than its InputArgumentType's
+    // parameter flag.
+    if (const auto* expr = Argument(signature, arguments, name)->scalar_expr();
+        expr != nullptr && expr->Is<googlesql::ResolvedParameter>()) {
+      return std::nullopt;
+    }
+    return absl::InvalidArgumentError(
+        absl::StrCat("Invalid ", name,
+                     " argument of VECTOR_SEARCH, should be a literal value or query parameter"));
   };
-  const auto column_value = required("column_to_search");
-  const auto top_k = required("top_k");
-  const auto distance_value = required("distance_type");
-  const auto options = required("options");
+  const auto column_value = literal_or_parameter("column_to_search");
+  const auto top_k = literal_or_parameter("top_k");
+  const auto distance_value = literal_or_parameter("distance_type");
+  const auto options = literal_or_parameter("options");
   for (const auto* value : {&column_value, &top_k, &distance_value, &options}) {
     if (!value->ok()) {
       return value->status();
@@ -293,29 +258,46 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SearchSchema(
       !lexical_query->is_null()) {
     return Unsupported("hybrid search");
   }
-  const std::string column_to_search = column_value->string_value();
-  if (auto status = CheckBaseColumn(arguments.at(0).relation(), column_to_search); !status.ok()) {
-    return status;
+  // The column name, or nullopt for a parameter.
+  const std::optional<std::string> column_to_search =
+      *column_value ? std::optional((*column_value)->string_value()) : std::nullopt;
+  // A base table query that is a value table selects an expression or renames its column, which
+  // the analyzer rejects after resolving it.
+  const auto& base_relation = arguments.at(0).relation();
+  if (!base_relation.is_value_table() && column_to_search) {
+    if (auto status = CheckBaseColumn(base_relation, *column_to_search); !status.ok()) {
+      return status;
+    }
   }
-  const std::string distance_type = absl::AsciiStrToUpper(distance_value->string_value());
-  if (distance_type != "EUCLIDEAN" && distance_type != "COSINE" && distance_type != "DOT_PRODUCT") {
-    return absl::InvalidArgumentError(
-        absl::StrCat("distance_type argument of VECTOR_SEARCH should be one of: EUCLIDEAN, COSINE, "
-                     "DOT_PRODUCT. Got ",
-                     distance_value->string_value(), "."));
+  if (const auto& distance = *distance_value; distance.has_value() && !distance->is_null()) {
+    const std::string& distance_type = distance->string_value();
+    if (!IsDistanceType(distance_type)) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "distance_type argument of VECTOR_SEARCH should be one of: EUCLIDEAN, COSINE, "
+          "DOT_PRODUCT. Got ",
+          distance_type, "."));
+    }
   }
-  if (auto status = CheckOptions(options->string_value()); !status.ok()) {
-    return status;
+  if (const auto& text = *options; text.has_value() && !text->is_null()) {
+    if (auto status = googlesql_functions::CheckVectorSearchOptions(text->string_value());
+        !status.ok()) {
+      return status;
+    }
   }
   googlesql::TVFRelation::ColumnList columns;
   if (form == kBatch) {
-    const auto named = literal("query_column_to_search");
-    if (!named) {
-      return Unsupported("with a non-literal query_column_to_search");
+    const auto named = literal_or_parameter("query_column_to_search");
+    if (!named.ok()) {
+      return named.status();
     }
-    const auto& query = arguments.at(2).relation();
-    if (auto status = CheckQueryColumn(query, *named, column_to_search); !status.ok()) {
-      return status;
+    const auto query = QueryRelation(arguments.at(2).relation());
+    // The default query column depends on column_to_search.
+    if (const auto& name = *named;
+        name.has_value() && (!name->is_null() || column_to_search.has_value())) {
+      if (auto status = CheckQueryColumn(query, *name, column_to_search.value_or(""));
+          !status.ok()) {
+        return status;
+      }
     }
     auto column = StructColumn(*type_factory, query, "query");
     if (!column.ok()) {
@@ -333,18 +315,19 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SearchSchema(
       return absl::InvalidArgumentError(
           "One of the query data subquery or query_value of VECTOR_SEARCH must be specified.");
     }
-    if (type->IsString() || type->IsStruct()) {
-      return Unsupported("with autonomous embedding generation");
-    }
     if (!IsEmbedding(type)) {
       return absl::InvalidArgumentError("query_value must be of type ARRAY<FLOAT64>");
     }
   }
-  auto base = StructColumn(*type_factory, arguments.at(0).relation(), "base");
-  if (!base.ok()) {
-    return base.status();
+  if (base_relation.is_value_table()) {
+    columns.emplace_back("base", base_relation.column(0).type);
+  } else {
+    auto base = StructColumn(*type_factory, base_relation, "base");
+    if (!base.ok()) {
+      return base.status();
+    }
+    columns.push_back(*std::move(base));
   }
-  columns.push_back(*std::move(base));
   columns.emplace_back("distance", googlesql::types::DoubleType());
   return googlesql::TVFSignature::Create(arguments, googlesql::TVFRelation(std::move(columns)));
 }

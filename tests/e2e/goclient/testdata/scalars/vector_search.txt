@@ -349,3 +349,87 @@ CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TAB
 
 CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => '{"fraction_lists_to_search":{}}')
 => error contains: Malformated options: {"fraction_lists_to_search":{}}
+
+# An eighth round of observed BigQuery answers collected with tools/bqanswers.
+
+# No emulator table has autonomous embedding generation, so STRING and STRUCT columns have no
+# embeddings to search, and query values and columns must be ARRAY<FLOAT64>.
+CREATE TEMP TABLE b AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => 'a')
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT 'a' AS e; CREATE TEMP TABLE q AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q)
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT STRUCT([1.0] AS result, 'ok' AS status) AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT STRUCT('gs://bucket/a' AS uri, CAST(NULL AS STRING) AS version, CAST(NULL AS STRING) AS authorizer, JSON '{}' AS details) AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
+=> error contains: No generation expression found for the column_to_search: e.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => 'a')
+=> error contains: query_value must be of type ARRAY<FLOAT64>
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => STRUCT('gs://bucket/a' AS uri, CAST(NULL AS STRING) AS version, CAST(NULL AS STRING) AS authorizer, JSON '{}' AS details))
+=> error contains: query_value must be of type ARRAY<FLOAT64>
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; CREATE TEMP TABLE q AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', TABLE q, 'e')
+=> error contains: query_column_to_search argument of VECTOR_SEARCH: e should be of type ARRAY<FLOAT64>.
+
+# top_k and distance_type are literals or query parameters, which vector_search_test.go covers.
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0], top_k => 1 + 1)
+=> error contains: Invalid top_k argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [CAST(x AS FLOAT64)] AS e FROM UNNEST(GENERATE_ARRAY(1, 12)) AS x; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [0.0], top_k => (SELECT 1))
+=> error contains: Invalid top_k argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => CONCAT('DOT_', 'PRODUCT'))
+=> error contains: Invalid distance_type argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+# Query data that is a value table has one column, $col1.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(query) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT AS STRUCT 'q' AS id, [1.0, 1.0] AS e))
+=> error contains: One and only one column of ARRAY<FLOAT64> type should exist in 3rd argument of VECTOR_SEARCH when query_column_to_search is not specified and no ARRAY<FLOAT64> column with the same name as e exists in the 3rd argument.
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(query) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT AS VALUE [1.0, 1.0]))
+=> "{\"$col1\":[1,1]}"
+
+# A ninth round of observed BigQuery answers: a base table query that is a value table renames
+# its column, to an empty name.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(base) FROM VECTOR_SEARCH((SELECT AS VALUE e FROM b), 'e', query_value => [1.0, 1.0])
+=> error contains: Column names in the 1st argument query for VECTOR_SEARCH cannot be renamed: 
+
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT TO_JSON_STRING(base) FROM VECTOR_SEARCH((SELECT AS STRUCT e FROM b), 'e', query_value => [1.0, 1.0])
+=> error contains: Columns with functions or nested field expressions are not allowed in the 1st argument query for VECTOR_SEARCH.
+
+# A tenth round of observed BigQuery answers: a NULL distance_type is the default, and base table
+# queries cannot sample, pivot or unpivot. Query parameters are in vector_search_test.go.
+CREATE TEMP TABLE b AS SELECT [1.0, 2.0] AS e; SELECT distance FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0, 1.0], distance_type => NULL)
+=> "1.0"
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b TABLESAMPLE SYSTEM (100 PERCENT)), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS id, 'x' AS k, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b PIVOT (ANY_VALUE(id) FOR k IN ('x'))), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+CREATE TEMP TABLE b AS SELECT 1 AS x, 2 AS y, [1.0, 2.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH((SELECT * FROM b UNPIVOT (v FOR k IN (x, y))), 'e', query_value => [1.0, 1.0])
+=> error contains: Unsupported query pattern in the 1st argument query for VECTOR_SEARCH.
+
+# An eleventh round of observed BigQuery answers: column_to_search has no default for a NULL,
+# while options ignores one, and every argument but the query is a literal or a query parameter.
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, NULL, query_value => [1.0])
+=> error contains: 2nd argument of VECTOR_SEARCH must be specified.
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => NULL)
+=> "1"
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, CONCAT('', 'e'), query_value => [1.0])
+=> error contains: Invalid column_to_search argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', (SELECT [1.0] AS e), CONCAT('', 'e'))
+=> error contains: Invalid query_column_to_search argument of VECTOR_SEARCH, should be a literal value or query parameter
+
+CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], options => CONCAT('{', '}'))
+=> error contains: Invalid options argument of VECTOR_SEARCH, should be a literal value or query parameter

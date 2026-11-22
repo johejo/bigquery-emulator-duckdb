@@ -142,3 +142,16 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
     ],
 )
+
+cc_library(
+    name = "vector_search_options",
+    srcs = ["vector_search_options.cc"],
+    hdrs = ["vector_search_options.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/public:json_value",
+    ],
+    linkstatic = True,
+    deps = ["@abseil-cpp//absl/status"],
+)

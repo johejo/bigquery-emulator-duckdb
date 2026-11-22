@@ -244,8 +244,7 @@ const googlesql::ASTSystemVariableExpr* FindSystemVariable(const googlesql::ASTN
 
 // BigQuery's VECTOR_SEARCH takes as its base table a table, or a query that selects its columns
 // without renaming them and may filter them, with the errors observed in
-// tests/e2e/goclient/testdata/scalars/vector_search.txt. What it answers for queries reading
-// no table or another relation, such as UNNEST, is unverified.
+// tests/e2e/goclient/testdata/scalars/vector_search.txt.
 absl::Status CheckVectorSearchBase(const googlesql::ResolvedNode& node) {
   std::vector<const googlesql::ResolvedNode*> scans;
   node.GetDescendantsWithKinds({googlesql::RESOLVED_TVFSCAN}, &scans);
@@ -284,15 +283,11 @@ absl::Status CheckVectorSearchBase(const googlesql::ResolvedNode& node) {
       if (scan->Is<googlesql::ResolvedWithRefScan>()) {
         return only_select();
       }
-      if (scan->Is<googlesql::ResolvedAggregateScan>() || scan->Is<googlesql::ResolvedJoinScan>() ||
-          scan->Is<googlesql::ResolvedProjectScan>()) {
-        return error("Unsupported query pattern");
-      }
     }
+    // BigQuery rejects reading anything else, such as a subquery, a join, a grouping, TABLESAMPLE,
+    // PIVOT and UNPIVOT.
     if (!scan->Is<googlesql::ResolvedTableScan>()) {
-      return absl::InvalidArgumentError(
-          "The emulator does not support VECTOR_SEARCH over a base table query that reads no "
-          "table or another relation");
+      return error("Unsupported query pattern");
     }
     const auto& schema = tvf.signature()->input_arguments().at(0).relation();
     for (int i = 0; i < schema.num_columns(); ++i) {
@@ -303,6 +298,13 @@ absl::Status CheckVectorSearchBase(const googlesql::ResolvedNode& node) {
                          "renamed: ",
                          schema.column(i).name));
       }
+    }
+    // BigQuery rejects the value tables of the forms above; what it does with others is
+    // unverified.
+    if (schema.is_value_table()) {
+      return absl::InvalidArgumentError(
+          "The emulator does not support VECTOR_SEARCH over a base table query that is a value "
+          "table");
     }
   }
   return absl::OkStatus();

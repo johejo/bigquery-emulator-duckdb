@@ -1,14 +1,5 @@
-# VECTOR_SEARCH searches only ARRAY<FLOAT64> embeddings, without autonomous embedding generation.
-CREATE TEMP TABLE b AS SELECT 'a' AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0])
-=> error contains: The emulator does not support VECTOR_SEARCH with autonomous embedding generation
-
-CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => 'a')
-=> error contains: The emulator does not support VECTOR_SEARCH with autonomous embedding generation
-
-# Hybrid search is unsupported.
+# VECTOR_SEARCH's hybrid search ranks rows by fusing semantic and lexical rankings with an
+# undocumented lexical scoring, so it is unsupported; scalars/known_bugs.txt has BigQuery's
+# answer.
 CREATE TEMP TABLE b AS SELECT 'a' AS d, [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], lexical_search_columns => ['d'], lexical_search_query_value => 'a')
 => error contains: The emulator does not support VECTOR_SEARCH hybrid search
-
-# Arguments other than the query value must be literals.
-CREATE TEMP TABLE b AS SELECT [1.0] AS e; SELECT COUNT(*) FROM VECTOR_SEARCH(TABLE b, 'e', query_value => [1.0], top_k => (SELECT 1))
-=> error contains: The emulator does not support VECTOR_SEARCH with a non-literal or NULL top_k

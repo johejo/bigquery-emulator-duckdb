@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -188,11 +190,12 @@ std::optional<Relation> GraphExpandScan(const googlesql::ResolvedTVFScan& tvf,
 }
 
 // A relation argument of VECTOR_SEARCH as its rows (`row`) and the embeddings it searches with
-// (`embedding`), or nullopt where its columns cannot be read.
-std::optional<std::string> SearchedRows(const googlesql::ResolvedFunctionArgument& argument,
-                                        const googlesql::TVFRelation& schema,
-                                        const googlesql::Type* type, int column,
-                                        const Scope& scope) {
+// (`embedding`), which `embedding` gives from the columns' values, or nullopt where its columns
+// cannot be read.
+std::optional<std::string> SearchedRows(
+    const googlesql::ResolvedFunctionArgument& argument, const googlesql::TVFRelation& schema,
+    const googlesql::Type* type, const Scope& scope,
+    const std::function<std::string(const std::vector<std::string>&)>& embedding) {
   const auto input = Scan(*argument.scan(), scope);
   const auto sql_type = DuckDbType(type, scope.context.timestamp_precision);
   if (!input || !sql_type) {
@@ -200,109 +203,68 @@ std::optional<std::string> SearchedRows(const googlesql::ResolvedFunctionArgumen
   }
   const auto names = DuckDbStructFieldNames(type->AsStruct());
   std::vector<std::string> fields;
-  std::string embedding;
+  std::vector<std::string> values;
   for (int i = 0; i < schema.num_columns(); ++i) {
     const auto value = input->columns.find(argument.argument_column_list(i).column_id());
     if (value == input->columns.end()) {
       return std::nullopt;
     }
     fields.push_back(QuoteIdentifier(names.at(static_cast<size_t>(i))) + " := " + value->second);
-    if (i == column) {
-      embedding = value->second;
-    }
+    values.push_back(value->second);
   }
   return "SELECT CAST(struct_pack(" + Join(fields, ", ") + ") AS " + *sql_type + ") AS row, " +
-         embedding + " AS embedding, row_number() OVER () AS id" + input->From();
-}
-
-// The column of `schema` that `name` selects, ignoring case; the catalog accepted it as one.
-int SearchedColumn(const googlesql::TVFRelation& schema, const std::string& name) {
-  for (int i = 0; i < schema.num_columns(); ++i) {
-    if (absl::EqualsIgnoreCase(schema.column(i).name, name)) {
-      return i;
-    }
-  }
-  return -1;
+         embedding(values) + " AS embedding, row_number() OVER () AS id" + input->From();
 }
 
 bool IsEmbedding(const googlesql::Type* type) {
   return type->IsArray() && type->AsArray()->element_type()->IsDouble();
 }
 
-// The query column a batch search reads, as the catalog chose it: the one named, or else the
-// ARRAY<FLOAT64> column named like the base column, or else the only ARRAY<FLOAT64> column.
-int QueryColumn(const googlesql::TVFRelation& schema, const googlesql::Value& named,
-                const std::string& column) {
-  if (!named.is_null()) {
-    return SearchedColumn(schema, named.string_value());
+// A searched relation's column names, which BigQuery gives a value table as $col1.
+std::vector<std::string> SearchedNames(const googlesql::TVFRelation& schema) {
+  if (schema.is_value_table()) {
+    return {"$col1"};
   }
-  if (const int same = SearchedColumn(schema, column);
-      same != -1 && IsEmbedding(schema.column(same).type)) {
-    return same;
-  }
+  std::vector<std::string> names;
+  names.reserve(static_cast<size_t>(schema.num_columns()));
   for (int i = 0; i < schema.num_columns(); ++i) {
-    if (IsEmbedding(schema.column(i).type)) {
-      return i;
-    }
+    names.push_back(schema.column(i).name);
   }
-  return -1;
+  return names;
 }
 
-// VECTOR_SEARCH's brute-force search: the top_k base rows nearest each query embedding. The
-// catalog validated the literal arguments. The errors are BigQuery's, observed in
-// tests/e2e/goclient/testdata/scalars/vector_search.txt.
-std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
-                                         const Scope& scope) {
-  const auto& signature = *tvf.function_call_signature();
-  const auto& arguments = tvf.signature()->input_arguments();
-  const auto literal = [&](std::string_view name) {
-    for (int i = 0; i < signature.NumConcreteArguments(); ++i) {
-      const auto& argument = signature.ConcreteArgument(i);
-      if (argument.has_argument_name() && argument.argument_name() == name) {
-        return *arguments.at(static_cast<size_t>(i)).GetScalarArgType()->literal_value();
-      }
-    }
-    throw std::logic_error("VECTOR_SEARCH has no argument " + std::string(name));
-  };
-  const auto& result = tvf.signature()->result_schema();
-  const bool batch = tvf.argument_list(2)->scan() != nullptr;
-  const auto& base_schema = arguments.at(0).relation();
-  const int base_column = SearchedColumn(base_schema, literal("column_to_search").string_value());
-  const auto base = SearchedRows(*tvf.argument_list(0), base_schema,
-                                 result.column(batch ? 1 : 0).type, base_column, scope);
-  if (!base) {
-    return std::nullopt;
+// A CASE on the column name `name`, SQL that is a literal or a query parameter, giving `value(i)`
+// for the column i it selects, ignoring case, as the catalog does; `otherwise` where it selects
+// none or several.
+std::string SelectColumn(const std::string& name, const std::vector<std::string>& names,
+                         const std::function<std::string(int)>& value,
+                         const std::string& otherwise) {
+  std::map<std::string, int> counts;
+  for (const auto& each : names) {
+    ++counts[absl::AsciiStrToLower(each)];
   }
-  // The query value is bound once, as the batch form's query rows are.
-  std::string query;
-  std::string mismatch = "Array inputs are not equal in length";
-  if (batch) {
-    const auto& query_schema = arguments.at(2).relation();
-    const int query_column = QueryColumn(query_schema, literal("query_column_to_search"),
-                                         base_schema.column(base_column).name);
-    const auto rows = SearchedRows(*tvf.argument_list(2), query_schema, result.column(0).type,
-                                   query_column, scope);
-    if (!rows) {
-      return std::nullopt;
+  std::string result = "CASE lower(" + name + ")";
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    const std::string lower = absl::AsciiStrToLower(names.at(i));
+    if (counts.at(lower) == 1) {
+      result += " WHEN " + QuoteLiteral(lower) + " THEN " + value(static_cast<int>(i));
     }
-    query = *rows;
-    mismatch = std::format(
-        "Dimension of column `{}` in the base table does not match the dimension of column `{}` "
-        "in the query data.",
-        base_schema.column(base_column).name, query_schema.column(query_column).name);
-  } else {
-    const auto value = Expression(*tvf.argument_list(2)->expr(), scope, Columns{});
-    if (!value) {
-      return std::nullopt;
-    }
-    query = "SELECT NULL AS row, " + *value + " AS embedding, NULL AS id";
   }
-  // BigQuery searches NULL embeddings as empty ones, whose dimension differs from the others',
-  // except that a NULL single query value that is not a literal gives NULL distances.
-  const std::string type = absl::AsciiStrToUpper(literal("distance_type").string_value());
-  // The raw distance, `r.d`, the elements' infinities and NaNs, and the terms it sums. NaN
-  // elements give NaN distances, which BigQuery orders first, even where terms overflow, and
-  // infinite elements infinite or NaN ones. Otherwise an infinite term or sum fails.
+  return result + " ELSE " + otherwise + " END";
+}
+
+std::string SqlError(const std::string& message) { return "error(" + message + ")"; }
+
+// The distance of type `type` between `e.b` and `e.q` as `raw`, which the pairs compute as
+// `r.d`, and `checked`, which reads it with BigQuery's errors. NaN elements give NaN distances,
+// which BigQuery orders first, even where terms overflow, and infinite elements infinite or NaN
+// ones. Otherwise an infinite term or sum fails.
+struct SearchDistance {
+  std::string raw;
+  std::string checked;
+};
+
+SearchDistance VectorSearchDistance(const std::string& type) {
   std::string raw;
   std::string term;
   std::string zero;
@@ -326,14 +288,229 @@ std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
     term = "e.b[i] * e.q[i]";
   }
   const std::string sum = type == "EUCLIDEAN" ? "r.d" : "list_inner_product(e.b, e.q)";
-  const std::string distance = std::format(
-      "CASE {}WHEN r.inf OR r.nan THEN r.d WHEN isinf({}) OR len(list_filter(list_transform("
-      "range(1, len(e.b) + 1), lambda i: {}), lambda t: isinf(t))) > 0 THEN error('Compute "
-      "overflow') ELSE r.d END",
-      zero, sum, term);
+  return {
+      .raw = raw,
+      .checked = std::format(
+          "CASE {}WHEN r.inf OR r.nan THEN r.d WHEN isinf({}) OR len(list_filter(list_transform("
+          "range(1, len(e.b) + 1), lambda i: {}), lambda t: isinf(t))) > 0 THEN error('Compute "
+          "overflow') ELSE r.d END",
+          zero, sum, term),
+  };
+}
+
+// VECTOR_SEARCH's brute-force search: the top_k base rows nearest each query embedding. The
+// catalog validated the literal arguments; top_k and distance_type can also be query
+// parameters. The errors are BigQuery's, observed in
+// tests/e2e/goclient/testdata/scalars/vector_search.txt.
+std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
+                                         const Scope& scope) {
+  const auto& signature = *tvf.function_call_signature();
+  const auto& arguments = tvf.signature()->input_arguments();
+  const auto index = [&](std::string_view name) {
+    for (int i = 0; i < signature.NumConcreteArguments(); ++i) {
+      const auto& argument = signature.ConcreteArgument(i);
+      if (argument.has_argument_name() && argument.argument_name() == name) {
+        return i;
+      }
+    }
+    throw std::logic_error("VECTOR_SEARCH has no argument " + std::string(name));
+  };
+  // The literal value of an argument, or nullopt for a query parameter.
+  const auto literal = [&](std::string_view name) -> std::optional<googlesql::Value> {
+    const auto scalar = arguments.at(static_cast<size_t>(index(name))).GetScalarArgType();
+    if (!scalar.ok() || scalar->literal_value() == nullptr) {
+      return std::nullopt;
+    }
+    return *scalar->literal_value();
+  };
+  // A query parameter's SQL.
+  const auto parameter = [&](std::string_view name) -> std::optional<std::string> {
+    const int i = index(name);
+    if (i >= tvf.argument_list_size() || tvf.argument_list(i)->expr() == nullptr) {
+      return std::nullopt;
+    }
+    return Expression(*tvf.argument_list(i)->expr(), scope, Columns{});
+  };
+  // An argument's SQL: its literal or the query parameter the catalog let through.
+  const auto argument_sql = [&](std::string_view name) -> std::optional<std::string> {
+    if (const auto value = literal(name)) {
+      return value->is_null() ? "NULL" : QuoteLiteral(value->string_value());
+    }
+    return parameter(name);
+  };
+  const auto& result = tvf.signature()->result_schema();
+  const bool batch = tvf.argument_list(2)->scan() != nullptr;
+  const auto& base_schema = arguments.at(0).relation();
+  const auto base_names = SearchedNames(base_schema);
+  const auto base_type = [&](int i) { return base_schema.column(i).type; };
+  const auto column = argument_sql("column_to_search");
+  if (!column) {
+    return std::nullopt;
+  }
+  // The checks of arguments that are query parameters, which the catalog made for literals with
+  // the same errors.
+  std::vector<std::string> checks;
+  checks.push_back(
+      "CASE WHEN " + *column + " IS NULL THEN " +
+      "error('2nd argument of VECTOR_SEARCH must be specified.') ELSE " +
+      SelectColumn(
+          *column, base_names,
+          [&](int i) {
+            const std::string& name = base_names.at(static_cast<size_t>(i));
+            if (IsEmbedding(base_type(i))) {
+              return std::string("TRUE");
+            }
+            if (base_type(i)->IsString() || base_type(i)->IsStruct()) {
+              return SqlError(QuoteLiteral(
+                  "No generation expression found for the column_to_search: " + name + "."));
+            }
+            return SqlError(QuoteLiteral(
+                "column_to_search argument of VECTOR_SEARCH: " + name +
+                " should be of type ARRAY<FLOAT64>, STRING, ObjectRef, or STRUCT<ARRAY<FLOAT64>, "
+                "STRING>."));
+          },
+          SqlError("'Column ' || " + *column +
+                   " || ' should exist in the 1st argument of VECTOR_SEARCH.'")) +
+      " END");
+  const auto base_name = SelectColumn(
+      *column, base_names,
+      [&](int i) { return QuoteLiteral(base_names.at(static_cast<size_t>(i))); }, "NULL");
+  const auto base =
+      SearchedRows(*tvf.argument_list(0), base_schema, result.column(batch ? 1 : 0).type, scope,
+                   [&](const std::vector<std::string>& values) {
+                     return SelectColumn(
+                         *column, base_names,
+                         [&](int i) {
+                           return IsEmbedding(base_type(i)) ? values.at(static_cast<size_t>(i))
+                                                            : std::string("NULL");
+                         },
+                         "NULL");
+                   });
+  if (!base) {
+    return std::nullopt;
+  }
+  // The query value is bound once, as the batch form's query rows are.
+  std::string query;
+  std::string mismatch = QuoteLiteral("Array inputs are not equal in length");
+  if (batch) {
+    const auto& query_schema = arguments.at(2).relation();
+    const auto query_names = SearchedNames(query_schema);
+    const auto query_type = [&](int i) { return query_schema.column(i).type; };
+    const auto named = argument_sql("query_column_to_search");
+    if (!named) {
+      return std::nullopt;
+    }
+    std::vector<int> embeddings;
+    for (int i = 0; i < query_schema.num_columns(); ++i) {
+      if (IsEmbedding(query_type(i))) {
+        embeddings.push_back(i);
+      }
+    }
+    // The query column: the one named, or without a name, the ARRAY<FLOAT64> column named like
+    // the base column, or else the only ARRAY<FLOAT64> column; as CASEs giving `value(i)` for it,
+    // and checking it. A NULL parameter, as a NULL literal, names none.
+    const bool one = embeddings.size() == 1;
+    const std::string none = SqlError(
+        "'One and only one column of ARRAY<FLOAT64> type should exist in 3rd argument of "
+        "VECTOR_SEARCH when query_column_to_search is not specified and no ARRAY<FLOAT64> column "
+        "with the same name as ' || " +
+        *column + " || ' exists in the 3rd argument.'");
+    const auto default_column = [&](const std::function<std::string(int)>& value) {
+      const std::string only = one ? value(embeddings.front()) : "NULL";
+      return SelectColumn(
+          *column, query_names, [&](int i) { return IsEmbedding(query_type(i)) ? value(i) : only; },
+          only);
+    };
+    const std::string default_check = SelectColumn(
+        *column, query_names,
+        [&](int i) { return IsEmbedding(query_type(i)) || one ? std::string("TRUE") : none; },
+        one ? "TRUE" : none);
+    const auto named_column = [&](const std::function<std::string(int)>& value) {
+      return SelectColumn(*named, query_names, value, "NULL");
+    };
+    const std::string named_check = SelectColumn(
+        *named, query_names,
+        [&](int i) {
+          return IsEmbedding(query_type(i))
+                     ? std::string("TRUE")
+                     : SqlError(QuoteLiteral("query_column_to_search argument of VECTOR_SEARCH: " +
+                                             query_names.at(static_cast<size_t>(i)) +
+                                             " should be of type ARRAY<FLOAT64>."));
+        },
+        SqlError(*named + " || ' should exist in 3rd argument of VECTOR_SEARCH.'"));
+    const auto query_column = [&](const std::function<std::string(int)>& value) {
+      return "CASE WHEN " + *named + " IS NULL THEN " + default_column(value) + " ELSE " +
+             named_column(value) + " END";
+    };
+    checks.push_back("CASE WHEN " + *named + " IS NULL THEN " + default_check + " ELSE " +
+                     named_check + " END");
+    const auto rows = SearchedRows(*tvf.argument_list(2), query_schema, result.column(0).type,
+                                   scope, [&](const std::vector<std::string>& values) {
+                                     return query_column([&](int i) {
+                                       return IsEmbedding(query_type(i))
+                                                  ? values.at(static_cast<size_t>(i))
+                                                  : std::string("NULL");
+                                     });
+                                   });
+    if (!rows) {
+      return std::nullopt;
+    }
+    query = *rows;
+    mismatch =
+        "'Dimension of column `' || " + base_name +
+        " || '` in the base table does not match the dimension of column `' || " +
+        query_column([&](int i) { return QuoteLiteral(query_names.at(static_cast<size_t>(i))); }) +
+        " || '` in the query data.'";
+  } else {
+    const auto value = Expression(*tvf.argument_list(2)->expr(), scope, Columns{});
+    if (!value) {
+      return std::nullopt;
+    }
+    query = "SELECT NULL AS row, " + *value + " AS embedding, NULL AS id";
+  }
+  if (!literal("options")) {
+    const auto options = parameter("options");
+    if (!options) {
+      return std::nullopt;
+    }
+    // BigQuery ignores a NULL parameter, as the default {}.
+    checks.push_back("CASE WHEN " + *options + " IS NULL THEN TRUE ELSE bq_vector_search_options(" +
+                     *options + ") END");
+  }
+  SearchDistance distance;
+  if (const auto type = literal("distance_type")) {
+    // A NULL literal is the default.
+    distance = VectorSearchDistance(type->is_null() ? "EUCLIDEAN"
+                                                    : absl::AsciiStrToUpper(type->string_value()));
+  } else {
+    // A parameter selects the distance type as its value names it, ignoring case, and a NULL
+    // one the default.
+    const auto parameter_value = parameter("distance_type");
+    if (!parameter_value) {
+      return std::nullopt;
+    }
+    const std::string name = "COALESCE(" + *parameter_value + ", 'EUCLIDEAN')";
+    std::string raw = "CASE upper(" + name + ")";
+    std::string checked = raw;
+    for (const std::string each_type : {"EUCLIDEAN", "COSINE", "DOT_PRODUCT"}) {
+      const auto each = VectorSearchDistance(each_type);
+      raw += " WHEN '" + each_type + "' THEN " + each.raw;
+      checked += " WHEN '" + each_type + "' THEN " + each.checked;
+    }
+    distance = {
+        .raw = raw + " END",
+        .checked = checked +
+                   " ELSE error('distance_type argument of VECTOR_SEARCH should be one of: "
+                   "EUCLIDEAN, COSINE, DOT_PRODUCT. Got ' || " +
+                   name + " || '.') END",
+    };
+  }
+  // BigQuery searches NULL embeddings as empty ones, whose dimension differs from the others',
+  // except that a NULL single query value that is not a literal gives NULL distances.
   const std::string pairs = std::format(
       "SELECT vq.row AS query, vq.id AS query_id, vb.row AS base, d.distance FROM ({}) AS vq "
-      "CROSS JOIN ({}) AS vb, LATERAL (SELECT COALESCE(vb.embedding, []::DOUBLE[]) AS b, "
+      "CROSS JOIN ({}) AS vb, LATERAL (SELECT "
+      "COALESCE(vb.embedding, []::DOUBLE[]) AS b, "
       "COALESCE(vq.embedding, []::DOUBLE[]) AS q) AS e, LATERAL (SELECT len(list_filter(e.q, "
       "lambda x: x IS NULL)) > 0 AS null_query, len(e.b) <> len(e.q) AS mismatch) AS c, LATERAL "
       "(SELECT CASE WHEN NOT c.null_query AND NOT c.mismatch THEN {} END AS d, "
@@ -341,11 +518,19 @@ std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
       "lambda x: isnan(x))) > 0 AS nan) AS r, LATERAL (SELECT CASE {}WHEN c.null_query THEN "
       "error('Unexpected NULL element in input array') WHEN c.mismatch THEN error({}) ELSE {} END "
       "AS distance) AS d",
-      query, *base, raw, batch ? "" : "WHEN vq.embedding IS NULL THEN NULL ",
-      QuoteLiteral(mismatch), distance);
+      query, *base, distance.raw, batch ? "" : "WHEN vq.embedding IS NULL THEN NULL ", mismatch,
+      distance.checked);
   // A NULL top_k is the default, 10, and a negative one returns every base row.
-  const auto top_k_value = literal("top_k");
-  const int64_t top_k = top_k_value.is_null() ? 10 : top_k_value.int64_value();
+  std::string top_k;
+  if (const auto value = literal("top_k")) {
+    top_k = value->is_null() ? "10" : std::to_string(value->int64_value());
+  } else {
+    const auto k = parameter("top_k");
+    if (!k) {
+      return std::nullopt;
+    }
+    top_k = "COALESCE(" + *k + ", 10)";
+  }
   const std::string ranked =
       "SELECT *, row_number() OVER (PARTITION BY query_id ORDER BY isnan(distance) DESC, "
       "distance) AS rank FROM (" +
@@ -355,12 +540,15 @@ std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
   for (int i = 0; i < tvf.column_list_size(); ++i) {
     const int id = tvf.column_list(i).column_id();
     const std::string& name = result.column(tvf.column_index_list(i)).name;
-    projections.push_back(QuoteIdentifier(name) + " AS " + ColumnName(id));
+    projections.push_back("vs." + QuoteIdentifier(name) + " AS " + ColumnName(id));
     output.columns.emplace(id, "q." + ColumnName(id));
   }
+  // The checks of parameters run once, before any row, as BigQuery's do when the search reads
+  // none: the LEFT JOIN keeps their row.
   output.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
-               " FROM (" + ranked + ")" +
-               (top_k < 0 ? "" : " WHERE rank <= " + std::to_string(top_k));
+               " FROM (SELECT " + Join(checks, " AND ") +
+               " AS ok) AS chk LEFT JOIN (SELECT * FROM (" + ranked + ") WHERE " + top_k +
+               " < 0 OR rank <= " + top_k + ") AS vs ON chk.ok WHERE vs.rank IS NOT NULL";
   return output;
 }
 

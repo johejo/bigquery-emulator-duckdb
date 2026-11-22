@@ -259,11 +259,16 @@ QueryParameters QueryParameters::Parse(const json& parameters, TimestampPrecisio
     if (!parameter.contains("parameterType")) {
       throw ApiError::Invalid("Query parameter is missing parameterType");
     }
+    // BigQuery rejects a parameter without a value, while an empty one is NULL, as observed in
+    // tests/e2e/goclient/vector_search_test.go.
     const auto value = parameter.find("parameterValue");
+    if (value == parameter.end()) {
+      throw ApiError::Invalid("Missing query parameter value");
+    }
     const std::string name = parameter.value("name", "");
     std::string literal = ToDuckDbLiteral({
         .type = parameter["parameterType"],
-        .value = value == parameter.end() ? NoValue() : *value,
+        .value = *value,
         .parameter = name,
         .precision = precision,
     });

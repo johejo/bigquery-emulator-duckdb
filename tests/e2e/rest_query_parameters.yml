@@ -71,6 +71,23 @@ steps:
                   parameterType: {}
                   parameterValue: {value: '1'}
     test: current.res.status == 400
+  # BigQuery rejects a parameter without parameterValue, as observed with tools/bqanswers
+  # (2026-11-22); the Go client sends a NULL parameter's value as empty instead.
+  missing_parameter_value:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @k IS NULL
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters:
+                - name: k
+                  parameterType: {type: INT64}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains "Missing query parameter value"
   # INTERVAL strings use the canonical year-month day hour:minute:second format.
   # third_party/bigquery_docs/reference/standard-sql/data-types.md
   invalid_interval_value:
