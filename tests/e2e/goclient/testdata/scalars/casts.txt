@@ -113,3 +113,39 @@ SELECT CAST(x AS NUMERIC) FROM UNNEST([1e29]) AS x
 
 SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST([1.844674407370955e19]) AS x
 => "18446744073709549568"
+
+# STRING -> INT64 reads hex strings with a sign.
+# Source: conversion_functions.md, CAST AS INT64.
+SELECT ARRAY_AGG(CAST(x AS INT64) ORDER BY i) FROM UNNEST(['0x123', '-0x123']) AS x WITH OFFSET i
+=> [{"v":"291"},{"v":"-291"}]
+
+# Source: GoogleSQL compliance/testdata/cast_function.test, cast_invalid_string_to_int64 and
+# safe_cast_invalid_string_to_int64.
+SELECT CAST(x AS INT64) FROM UNNEST(['abc']) AS x
+=> error: Bad int64 value: abc
+
+SELECT SAFE_CAST(x AS INT64) FROM UNNEST(['abc']) AS x
+=> null
+
+# STRING -> FLOAT64 and NUMERIC read the form of a literal, which has no digit separators.
+# Source: conversion_functions.md, CAST AS FLOAT64 and CAST AS NUMERIC.
+SELECT CAST(x AS FLOAT64) FROM UNNEST(['1_0.5']) AS x
+=> error:
+
+SELECT CAST(x AS NUMERIC) FROM UNNEST(['1_0']) AS x
+=> error:
+
+SELECT TO_JSON_STRING(ARRAY(SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST(['1_0', ' 2.5 ', '1.0000000005', NULL]) AS x WITH OFFSET i ORDER BY i))
+=> "[null,\"2.5\",\"1.000000001\",null]"
+
+# Source: BigQuery answers to unverified/casts.txt (STRING -> INT64 and FLOAT64 forms).
+# STRING -> INT64 takes neither a decimal point nor digit separators.
+SELECT CAST(x AS INT64) FROM UNNEST(['1.5']) AS x
+=> error: Bad int64 value: 1.5
+
+SELECT CAST(x AS INT64) FROM UNNEST(['1_000']) AS x
+=> error: Bad int64 value: 1_000
+
+# STRING -> FLOAT64 reads a hex string, though a floating point literal cannot be one.
+SELECT CAST(x AS FLOAT64) FROM UNNEST(['0x10']) AS x
+=> "16.0"

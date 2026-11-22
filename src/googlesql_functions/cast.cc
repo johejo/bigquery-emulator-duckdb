@@ -133,6 +133,32 @@ absl::StatusOr<bool> CastStringToBool(std::string_view text) {
   return out.bool_value();
 }
 
+// BigQuery reads hex with a sign, such as -0x10, and rejects digit separators, such as 1_000,
+// unlike DuckDB's casts.
+absl::StatusOr<int64_t> CastStringToInt64(std::string_view text) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Value out, googlesql::CastValue(Value::String(text), absl::UTCTimeZone(),
+                                            bigquery_emulator_duckdb::GoogleSqlLanguageOptions(),
+                                            types::Int64Type()));
+  return out.int64_value();
+}
+
+absl::StatusOr<double> CastStringToFloat64(std::string_view text) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Value out, googlesql::CastValue(Value::String(text), absl::UTCTimeZone(),
+                                            bigquery_emulator_duckdb::GoogleSqlLanguageOptions(),
+                                            types::DoubleType()));
+  return out.double_value();
+}
+
+absl::StatusOr<NumericValue> CastStringToNumeric(std::string_view text) {
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Value out, googlesql::CastValue(Value::String(text), absl::UTCTimeZone(),
+                                            bigquery_emulator_duckdb::GoogleSqlLanguageOptions(),
+                                            types::NumericType()));
+  return out.numeric_value();
+}
+
 absl::StatusOr<std::string> CastBytesToString(std::string_view bytes, std::string_view format) {
   return FormatString(Value::Bytes(bytes), format);
 }
