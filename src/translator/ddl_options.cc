@@ -682,9 +682,11 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
   if (external && (!format || metadata.external_data->uris.empty())) {
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
   }
-  if (external && scalar_uri != (metadata.external_data->format == "BIGTABLE")) {
-    throw ApiError::InvalidQuery(
-        "Bigtable uris must be a STRING; other external table uris must be an ARRAY<STRING>");
+  // BigQuery also accepts a singleton array of Bigtable URIs
+  // (bigtable_qualifiers.api.answers.json). Bigtable source validation checks that exactly one URI
+  // was supplied.
+  if (external && scalar_uri && metadata.external_data->format != "BIGTABLE") {
+    throw ApiError::InvalidQuery("Non-Bigtable external table uris must be an ARRAY<STRING>");
   }
   // As BigQuery's answers in external_decimal_target_types.api.answers.json show.
   if (external && metadata.external_data->format == "PARQUET" &&

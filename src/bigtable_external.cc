@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -12,10 +13,12 @@
 
 #include "google/cloud/bigtable/admin/bigtable_table_admin_client.h"
 #include "google/cloud/bigtable/admin/bigtable_table_admin_connection.h"
+#include "google/cloud/bigtable/cell.h"
 #include "google/cloud/bigtable/data_connection.h"
 #include "google/cloud/bigtable/filters.h"
 #include "google/cloud/bigtable/instance_resource.h"
 #include "google/cloud/bigtable/options.h"
+#include "google/cloud/bigtable/row.h"
 #include "google/cloud/bigtable/row_range.h"
 #include "google/cloud/bigtable/table.h"
 #include "google/cloud/bigtable/table_resource.h"
@@ -60,6 +63,104 @@ std::string List(const std::vector<std::string>& values) {
   return result + "]";
 }
 
+FieldSchema CellSchema(const BigtableCellOptions& defaults,
+                       const BigtableCellOptions& overrides = {}) {
+  const bool latest =
+      overrides.only_read_latest.value_or(defaults.only_read_latest.value_or(false));
+  const auto& type = overrides.type ? overrides.type : defaults.type;
+  return {
+      .name = "cell",
+      .type = FieldType::kRecord,
+      .mode = latest ? FieldMode::kNullable : FieldMode::kRepeated,
+      .fields =
+          {
+              {.name = "timestamp", .type = FieldType::kTimestamp},
+              {.name = "value", .type = type == "STRING" ? FieldType::kString : FieldType::kBytes},
+          },
+  };
+}
+
+struct FamilyRead {
+  const FieldSchema& schema;
+  // A read of `column` counts every cell in the family, though its array excludes promoted cells.
+  const std::set<size_t>* fields;
+  std::map<std::string_view, size_t> promoted;
+
+  [[nodiscard]] bool Reads(size_t field) const {
+    return fields == nullptr || fields->contains(field);
+  }
+};
+
+void AppendCell(std::vector<std::string>& versions, const cbt::Cell& cell,
+                const FieldSchema& schema) {
+  // ReadRows orders versions newest first within each qualifier.
+  if (schema.mode != FieldMode::kRepeated && !versions.empty()) {
+    return;
+  }
+  versions.push_back(
+      "{'timestamp': make_timestamp(" + std::to_string(cell.timestamp().count()) +
+      "), 'value': " + Bytes(cell.value(), schema.fields.at(1).type == FieldType::kString) + "}");
+}
+
+std::string CellValue(const std::vector<std::string>& versions, const FieldSchema& schema) {
+  return schema.mode == FieldMode::kRepeated ? List(versions) : versions.front();
+}
+
+std::optional<std::string> ReadFamily(const FamilyRead& read, const cbt::Row& row) {
+  const bool fallback = read.Reads(0);
+  const auto& fields = read.schema.fields;
+  const auto& fallback_cell = fields.front().fields.at(1);
+  std::map<std::string, std::vector<std::string>> unlisted;
+  std::vector<std::vector<std::string>> named(fields.size());
+  bool present = false;
+  for (const auto& cell : row.cells()) {
+    if (cell.family_name() != read.schema.name) {
+      continue;
+    }
+    present |= fallback;
+    if (const auto found = read.promoted.find(cell.column_qualifier());
+        found != read.promoted.end()) {
+      const size_t field = found->second;
+      if (read.Reads(field)) {
+        present = true;
+        AppendCell(named.at(field), cell, fields.at(field).fields.front());
+      }
+    } else if (fallback) {
+      AppendCell(unlisted[cell.column_qualifier()], cell, fallback_cell);
+    }
+  }
+  if (!present) {
+    return std::nullopt;
+  }
+  std::vector<std::string> columns;
+  columns.reserve(unlisted.size());
+  for (const auto& [qualifier, cells] : unlisted) {
+    columns.push_back("{'name': " + Bytes(qualifier, true) +
+                      ", 'cell': " + CellValue(cells, fallback_cell) + "}");
+  }
+  std::string result = "{'column': " + List(columns);
+  for (size_t i = 1; i < fields.size(); ++i) {
+    result += ", " + QuoteLiteral(fields.at(i).name) + ": ";
+    const auto& cells = named.at(i);
+    result +=
+        cells.empty() ? "NULL" : "{'cell': " + CellValue(cells, fields.at(i).fields.front()) + "}";
+  }
+  return result + "}";
+}
+
+void AppendReadRow(std::string& query, const std::vector<FieldSchema>& schema,
+                   const std::vector<std::string>& values) {
+  query += query.empty() ? "SELECT " : " UNION ALL SELECT ";
+  for (size_t i = 0; i < schema.size(); ++i) {
+    if (i != 0) {
+      query += ',';
+    }
+    const auto& field = schema.at(i);
+    query += "CAST(" + values.at(i) + " AS " + ToDuckDbReadType(field) + ") AS " +
+             QuoteIdentifier(field.name);
+  }
+}
+
 }  // namespace
 
 std::vector<FieldSchema> DetectBigtableSchema(const GcsExternalData& definition) {
@@ -87,126 +188,104 @@ std::vector<FieldSchema> DetectBigtableSchema(const GcsExternalData& definition)
       },
   };
   std::ranges::transform(families, std::back_inserter(schema), [](const BigtableFamily& family) {
-    FieldSchema cell{
-        .name = "cell",
+    FieldSchema result{
+        .name = family.family_id,
         .type = FieldType::kRecord,
-        .mode =
-            family.only_read_latest.value_or(false) ? FieldMode::kNullable : FieldMode::kRepeated,
         .fields =
             {
-                {.name = "timestamp", .type = FieldType::kTimestamp},
                 {
-                    .name = "value",
-                    .type = family.type == "STRING" ? FieldType::kString : FieldType::kBytes,
+                    .name = "column",
+                    .type = FieldType::kRecord,
+                    .mode = FieldMode::kRepeated,
+                    .fields =
+                        {
+                            {.name = "name", .type = FieldType::kString},
+                            CellSchema(family.cells),
+                        },
                 },
             },
     };
-    FieldSchema column{
-        .name = "column",
-        .type = FieldType::kRecord,
-        .mode = FieldMode::kRepeated,
-        .fields = {{.name = "name", .type = FieldType::kString}, std::move(cell)},
-    };
-    return FieldSchema{
-        .name = family.family_id,
-        .type = FieldType::kRecord,
-        .fields = {std::move(column)},
-    };
+    for (const auto& column : family.columns) {
+      result.fields.push_back({
+          .name = column.Name(),
+          .type = FieldType::kRecord,
+          .fields = {CellSchema(family.cells, column.cells)},
+      });
+    }
+    return result;
   });
+  SetModesGiven(schema);
   return schema;
 }
 
 TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema) {
-  return [definition = std::move(definition),
-          schema = std::move(schema)](TableReadContext& context) {
-    ValidateBigtableExternal(definition);
-    const BigtableSource source = ParseBigtableSource(definition);
-    google::cloud::Options connection_options;
-    if (!source.profile.empty()) {
-      connection_options.set<cbt::AppProfileIdOption>(source.profile);
-    }
-    // Client-side metrics export to Cloud Monitoring, and detecting their resource waits for the
-    // GCE metadata server, which made each read take seconds.
-    cbt::Table table(
-        cbt::MakeDataConnection(
-            {cbt::InstanceResource(google::cloud::Project(source.project), source.instance)},
-            google::cloud::Options{}.set<cbt::EnableMetricsOption>(false)),
-        cbt::TableResource(source.project, source.instance, source.table), connection_options);
-    // BigQuery keeps rows that have a cell in any referenced family, or all rows if no family
-    // is referenced. Unreferenced families do not affect which rows a query sees.
-    std::set<std::string_view> selected_families;
-    for (size_t i = 1; i < schema.size(); ++i) {
-      const auto& name = schema.at(i).name;
-      if (!context.columns || context.columns->contains(name)) {
-        selected_families.insert(name);
-      }
-    }
-    std::string query;
-    for (const auto& row :
-         table.ReadRows(cbt::RowRange::InfiniteRange(), cbt::Filter::PassAllFilter())) {
-      CheckStatus(row.status());
-      if (!selected_families.empty() &&
-          std::ranges::none_of(row->cells(), [&selected_families](const auto& cell) {
-            return selected_families.contains(cell.family_name());
-          })) {
-        continue;
-      }
-      std::string select = "SELECT ";
-      for (size_t i = 0; i < schema.size(); ++i) {
-        const auto& field = schema.at(i);
-        if (i != 0) {
-          select += ',';
-        }
-        std::string value = "NULL";
-        if (i == 0) {
-          value = Bytes(row->row_key(), field.type == FieldType::kString);
-        } else if (selected_families.contains(field.name)) {
-          const bool latest = field.fields.at(0).fields.at(1).mode != FieldMode::kRepeated;
-          std::map<std::string, std::vector<std::string>> columns;
-          for (const auto& cell : row->cells()) {
-            if (cell.family_name() != field.name) {
-              continue;
+  return FieldProjectedRead{
+      .prepare =
+          [definition = std::move(definition),
+           schema = std::move(schema)](TableReadContext& context) {
+            ValidateBigtableExternal(definition);
+            const BigtableSource source = ParseBigtableSource(definition);
+            google::cloud::Options connection_options;
+            if (!source.profile.empty()) {
+              connection_options.set<cbt::AppProfileIdOption>(source.profile);
             }
-            auto& cells = columns[cell.column_qualifier()];
-            if (latest && !cells.empty()) {
-              continue;
+            // Client-side metrics export to Cloud Monitoring, and detecting their resource waits
+            // for the GCE metadata server, which made each read take seconds.
+            const cbt::InstanceResource instance(google::cloud::Project(source.project),
+                                                 source.instance);
+            cbt::Table table(
+                cbt::MakeDataConnection(
+                    {instance}, google::cloud::Options{}.set<cbt::EnableMetricsOption>(false)),
+                cbt::TableResource(source.project, source.instance, source.table),
+                connection_options);
+            std::map<size_t, FamilyRead> reads;
+            for (size_t i = 1; i < schema.size(); ++i) {
+              const auto& field = schema.at(i);
+              if (context.columns && !context.columns->contains(field.name)) {
+                continue;
+              }
+              const auto selected = context.fields.find(field.name);
+              FamilyRead read{
+                  .schema = field,
+                  .fields = selected == context.fields.end() ? nullptr : &selected->second,
+                  .promoted = {},
+              };
+              if (definition.bigtable_options) {
+                const auto& families = definition.bigtable_options->column_families;
+                const auto family =
+                    std::ranges::find(families, field.name, &BigtableFamily::family_id);
+                if (family != families.end()) {
+                  for (size_t j = 0; j < family->columns.size(); ++j) {
+                    read.promoted.emplace(family->columns.at(j).qualifier, j + 1);
+                  }
+                }
+              }
+              reads.emplace(i, std::move(read));
             }
-            cells.push_back("{'timestamp': make_timestamp(" +
-                            std::to_string(cell.timestamp().count()) + "), 'value': " +
-                            Bytes(cell.value(), field.fields.at(0).fields.at(1).fields.at(1).type ==
-                                                    FieldType::kString) +
-                            "}");
-          }
-          if (!columns.empty()) {
-            std::vector<std::string> values;
-            values.reserve(columns.size());
-            for (const auto& [name, cells] : columns) {
-              values.push_back("{'name': " + Bytes(name, true) +
-                               ", 'cell': " + (latest ? cells.front() : List(cells)) + "}");
+            std::vector<std::string> values(schema.size(), "NULL");
+            std::string query;
+            for (const auto& row :
+                 table.ReadRows(cbt::RowRange::InfiniteRange(), cbt::Filter::PassAllFilter())) {
+              CheckStatus(row.status());
+              // BigQuery keeps rows matching any read, or all rows when no family is referenced.
+              bool present = reads.empty();
+              for (const auto& [i, read] : reads) {
+                auto value = ReadFamily(read, *row);
+                present |= value.has_value();
+                values.at(i) = value ? *std::move(value) : "NULL";
+              }
+              if (present) {
+                values.front() = Bytes(row->row_key(), schema.front().type == FieldType::kString);
+                AppendReadRow(query, schema, values);
+              }
             }
-            value = "{'column': " + List(values) + "}";
-          }
-        }
-        select += "CAST(" + value + " AS " + ToDuckDbReadType(field) + ") AS " +
-                  QuoteIdentifier(field.name);
-      }
-      if (!query.empty()) {
-        query += " UNION ALL ";
-      }
-      query += select;
-    }
-    if (query.empty()) {
-      query = "SELECT ";
-      for (size_t i = 0; i < schema.size(); ++i) {
-        if (i != 0) {
-          query += ',';
-        }
-        query += "CAST(NULL AS " + ToDuckDbReadType(schema.at(i)) + ") AS " +
-                 QuoteIdentifier(schema.at(i).name);
-      }
-      query += " WHERE FALSE";
-    }
-    return query;
+            if (query.empty()) {
+              std::ranges::fill(values, "NULL");
+              AppendReadRow(query, schema, values);
+              query += " WHERE FALSE";
+            }
+            return query;
+          },
   };
 }
 

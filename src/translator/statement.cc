@@ -23,6 +23,7 @@ namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
                                      const Scope& scope) {
   CheckPartitionFilters(statement);
+  CollectReadFields(statement, scope.context);
   if (statement.Is<googlesql::ResolvedCreatePropertyGraphStmt>()) {
     return CreatePropertyGraph(*statement.GetAs<googlesql::ResolvedCreatePropertyGraphStmt>(),
                                scope);

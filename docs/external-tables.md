@@ -147,15 +147,17 @@ file's path lacks those keys.
 ## Bigtable
 
 Bigtable supports BYTES and STRING cell values, `readRowkeyAsString`,
-`ignoreUnspecifiedColumnFamilies` and family-level `onlyReadLatest`. These are unsupported:
+`ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` at the family and qualifier levels.
+Use `columnFamilies[].columns` to expose individual qualifiers as named fields beside
+`family.column`; that array contains only the unlisted qualifiers. Numeric/boolean conversion,
+JSON/PROTO values, `outputColumnFamiliesAsJson`, explicit schemas and GCS-specific read options
+are unsupported.
 
-- Promoting individual qualifiers through `columns`.
-- Numeric/boolean conversion, JSON/PROTO values and `outputColumnFamiliesAsJson`.
-- Explicit schemas and GCS-specific read options.
-
-A scan that references column families includes only source rows with a cell in at least one
-of those families. In an included row, a missing family is `NULL`. A scan that references
-no family, such as in `SELECT rowkey`, includes all source rows.
+Reading a named field matches only cells with that qualifier. Reading a whole family or
+`family.column` matches any cell in the family, even if it belongs to a named qualifier.
+A scan includes rows that match at least one of these reads. In an included row, a missing
+family or named qualifier is `NULL`. A scan that references no family, such as in
+`SELECT rowkey`, includes all source rows.
 
 Schemas are fixed at creation; queries read current source rows. Endpoint setup is in the
 [README](../README.md#bigtable-external-tables).

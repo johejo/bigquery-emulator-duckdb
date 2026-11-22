@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -20,12 +21,17 @@ namespace bigquery_emulator_duckdb {
 using TextQuery =
     std::function<std::vector<std::vector<std::optional<std::string>>>(const std::string& sql)>;
 
+// For each partly read struct column, the ordinals of the immediate fields read.
+// Columns absent here are read in full if selected.
+using ReadFields = std::map<std::string, std::set<size_t>>;
+
 // What preparing a read of a table has besides its definition.
 struct TableReadContext {
   // The owner of the read's temporary files, including those written before it throws.
   TemporaryFiles& files;
   // The names of the table's columns the statement reads, or none for all of them.
   const std::optional<std::set<std::string>>& columns;
+  const ReadFields& fields;
   const TextQuery& query;
   // Adds a warning to the job, such as of a bad record the read skips.
   std::function<void(const ApiError& warning)> warn;
@@ -33,10 +39,17 @@ struct TableReadContext {
   bool dry_run = false;
 };
 
+using PrepareTableRead = std::function<std::string(TableReadContext&)>;
+
+// Opt in when the source's rows depend on which fields of a struct are read.
+struct FieldProjectedRead {
+  PrepareTableRead prepare;
+};
+
 // A read definition, resolved without acquiring its source. A fixed query needs no staging.
 // A preparation owns its definition by value: it must not borrow the analyzer, catalog or
 // TableSource.
-using TableRead = std::variant<std::string, std::function<std::string(TableReadContext&)>>;
+using TableRead = std::variant<std::string, PrepareTableRead, FieldProjectedRead>;
 
 // One statement's preparation cache and staged files. Never shared between statements or jobs;
 // shared ownership only extends this statement's lifetime through consumption of its results.
@@ -52,13 +65,14 @@ class StatementResources {
   StatementResources(const StatementResources&) = delete;
   StatementResources& operator=(const StatementResources&) = delete;
 
-  // Prepares a resolved table at most once for each set of `columns` it reads, none for all of
-  // them. Fixed queries also work without an execution owner; resource-backed reads without one
+  // Prepares a resolved table at most once per projection of columns and their fields.
+  // Fixed queries also work without an execution owner; resource-backed reads without one
   // are rejected before accessing the source.
   static std::optional<std::string> ReadQuery(
       const TableReference& table, const std::optional<TableRead>& definition,
       StatementResources* resources,
-      const std::optional<std::set<std::string>>& columns = std::nullopt);
+      const std::optional<std::set<std::string>>& columns = std::nullopt,
+      const ReadFields& fields = {});
 
   // The warnings of the statement's reads, in the order they were added, each once, and at most
   // the first 100, as BigQuery reports them.

@@ -50,6 +50,9 @@ func testScenarios(t *testing.T, pattern string, knownBug bool) {
 			for _, c := range file.Cases {
 				t.Run(c.Name, func(t *testing.T) {
 					t.Parallel()
+					if c.Name == "bigtable_qualifiers" {
+						seedBigtableQualifiers(t, project)
+					}
 					gcs := os.Getenv("STORAGE_EMULATOR_HOST")
 					if gcs != "" && !strings.Contains(gcs, "://") {
 						gcs = "http://" + gcs

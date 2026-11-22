@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,6 +60,8 @@ struct Context {
   // The first construct found unsupported, reported in the error the statement fails with.
   std::string unsupported = {};
   int next_name = 0;
+  // Only columns read by field: complete reads and non-struct columns have no entry.
+  std::map<int, std::set<size_t>> read_fields = {};
 
   // A name no other call returns, for WITH queries and lambda parameters.
   std::string FreshName(std::string_view prefix) {

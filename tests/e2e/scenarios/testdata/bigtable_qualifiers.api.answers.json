@@ -1,0 +1,840 @@
+{
+  "version": 1,
+  "cases": {
+    "bigtable_qualifiers": {
+      "project": "johejo-sandbox2",
+      "run": "h6v7t44cr44fcchutzvx3ytper",
+      "steps": {
+        "combined": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "both"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": [
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.002"
+                                },
+                                {
+                                  "v": "new"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.001"
+                                },
+                                {
+                                  "v": "old"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": []
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "named_only"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": [
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.002"
+                                },
+                                {
+                                  "v": "solo"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "v": []
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "other_family"
+                },
+                {
+                  "v": null
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "loose"
+                          },
+                          {
+                            "v": [
+                              {
+                                "v": {
+                                  "f": [
+                                    {
+                                      "v": "0.002"
+                                    },
+                                    {
+                                      "v": "b3RoZXI="
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "create_ddl": {
+          "complete": true,
+          "statement": "CREATE_EXTERNAL_TABLE"
+        },
+        "ddl_metadata": {
+          "options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "onlyReadLatest": false,
+                    "qualifierString": "promoted"
+                  },
+                  {
+                    "fieldName": "binary_name",
+                    "qualifierEncoded": "/w==",
+                    "type": "BYTES"
+                  }
+                ],
+                "familyId": "family_a",
+                "onlyReadLatest": true,
+                "type": "STRING"
+              },
+              {
+                "familyId": "family_b"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "readRowkeyAsString": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "STRING"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "STRING"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "STRING"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "promoted",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "binary_name",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family_a",
+              "type": "RECORD"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family_b",
+              "type": "RECORD"
+            }
+          ]
+        },
+        "encoded_only": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "both"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": {
+                          "f": [
+                            {
+                              "v": "0.002"
+                            },
+                            {
+                              "v": "cmF3LW5ldw=="
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "entire_family": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "both"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": [
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "loose"
+                                },
+                                {
+                                  "v": {
+                                    "f": [
+                                      {
+                                        "v": "0.002"
+                                      },
+                                      {
+                                        "v": "unlisted"
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "v": {
+                          "f": [
+                            {
+                              "v": [
+                                {
+                                  "v": {
+                                    "f": [
+                                      {
+                                        "v": "0.002"
+                                      },
+                                      {
+                                        "v": "new"
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "v": {
+                                    "f": [
+                                      {
+                                        "v": "0.001"
+                                      },
+                                      {
+                                        "v": "old"
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "v": {
+                          "f": [
+                            {
+                              "v": {
+                                "f": [
+                                  {
+                                    "v": "0.002"
+                                  },
+                                  {
+                                    "v": "cmF3LW5ldw=="
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "fallback_only"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": [
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "loose"
+                                },
+                                {
+                                  "v": {
+                                    "f": [
+                                      {
+                                        "v": "0.002"
+                                      },
+                                      {
+                                        "v": "unlisted"
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "v": null
+                      },
+                      {
+                        "v": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "named_only"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": []
+                      },
+                      {
+                        "v": {
+                          "f": [
+                            {
+                              "v": [
+                                {
+                                  "v": {
+                                    "f": [
+                                      {
+                                        "v": "0.002"
+                                      },
+                                      {
+                                        "v": "solo"
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "v": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "fallback_only": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "both"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "loose"
+                          },
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.002"
+                                },
+                                {
+                                  "v": "unlisted"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "fallback_only"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "loose"
+                          },
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.002"
+                                },
+                                {
+                                  "v": "unlisted"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "named_only"
+                },
+                {
+                  "v": []
+                }
+              ]
+            }
+          ]
+        },
+        "promoted_only": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "both"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": [
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.002"
+                                },
+                                {
+                                  "v": "new"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.001"
+                                },
+                                {
+                                  "v": "old"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "named_only"
+                },
+                {
+                  "v": {
+                    "f": [
+                      {
+                        "v": [
+                          {
+                            "v": {
+                              "f": [
+                                {
+                                  "v": "0.002"
+                                },
+                                {
+                                  "v": "solo"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "rest_metadata": {
+          "options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "onlyReadLatest": false,
+                    "qualifierString": "promoted"
+                  },
+                  {
+                    "fieldName": "binary_name",
+                    "qualifierEncoded": "/w==",
+                    "type": "BYTES"
+                  }
+                ],
+                "familyId": "family_a",
+                "onlyReadLatest": true,
+                "type": "STRING"
+              },
+              {
+                "familyId": "family_b"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "readRowkeyAsString": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "STRING"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "STRING"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "STRING"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "promoted",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "binary_name",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family_a",
+              "type": "RECORD"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family_b",
+              "type": "RECORD"
+            }
+          ]
+        },
+        "rowkeys": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "both"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "fallback_only"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "named_only"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "other_family"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
