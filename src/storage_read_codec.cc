@@ -69,9 +69,6 @@ void SetTypeMetadata(ArrowSchema* out, FieldType type) {
 }
 
 void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
-  if (field.precision || field.scale) {
-    throw ApiError::Invalid("Storage Read does not support parameterized decimals");
-  }
   ArrowSchemaInit(out);
   ArrowCheck(ArrowSchemaSetName(out, field.name.c_str()));
   if (field.mode == FieldMode::kRepeated) {
@@ -125,7 +122,7 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
       ArrowCheck(ArrowSchemaSetTypeDecimal(
           out,
           field.type == FieldType::kNumeric ? NANOARROW_TYPE_DECIMAL128 : NANOARROW_TYPE_DECIMAL256,
-          field.type == FieldType::kNumeric ? 38 : 76, field.type == FieldType::kNumeric ? 9 : 38));
+          StorageDecimalPrecision(field, /*arrow=*/true), StorageDecimalScale(field)));
       break;
     case FieldType::kRecord:
       ArrowCheck(ArrowSchemaSetTypeStruct(out, static_cast<int64_t>(field.fields.size())));
@@ -173,9 +170,6 @@ struct AvroNames {
 };
 
 json AvroField(const FieldSchema& field, AvroNames& names) {
-  if (field.precision || field.scale) {
-    throw ApiError::Invalid("Storage Read does not support parameterized decimals");
-  }
   json type;
   switch (field.type) {
     case FieldType::kInteger:
@@ -204,8 +198,8 @@ json AvroField(const FieldSchema& field, AvroNames& names) {
       type = {
           {"type", "bytes"},
           {"logicalType", "decimal"},
-          {"precision", field.type == FieldType::kNumeric ? 38 : 77},
-          {"scale", field.type == FieldType::kNumeric ? 9 : 38},
+          {"precision", StorageDecimalPrecision(field, /*arrow=*/false)},
+          {"scale", StorageDecimalScale(field)},
       };
       break;
     case FieldType::kRecord: {
@@ -339,8 +333,8 @@ void AvroValue(std::string& out, const FieldSchema& field, const ArrowArrayView&
     case FieldType::kBigNumeric: {
       ArrowDecimal decimal{};
       const int bits = field.type == FieldType::kNumeric ? 128 : 256;
-      ArrowDecimalInit(&decimal, bits, field.type == FieldType::kNumeric ? 38 : 76,
-                       field.type == FieldType::kNumeric ? 9 : 38);
+      ArrowDecimalInit(&decimal, bits, StorageDecimalPrecision(field, /*arrow=*/true),
+                       StorageDecimalScale(field));
       ArrowArrayViewGetDecimalUnsafe(&view, row, &decimal);
       std::array<uint8_t, 32> bytes{};
       ArrowDecimalGetBytes(&decimal, bytes.data());
@@ -360,6 +354,18 @@ void AvroValue(std::string& out, const FieldSchema& field, const ArrowArrayView&
 }
 
 }  // namespace
+
+int32_t StorageDecimalScale(const FieldSchema& field) {
+  return static_cast<int32_t>(field.scale.value_or(field.precision                     ? 0
+                                                   : field.type == FieldType::kNumeric ? 9
+                                                                                       : 38));
+}
+
+int32_t StorageDecimalPrecision(const FieldSchema& field, bool arrow) {
+  return static_cast<int32_t>(field.precision.value_or(field.type == FieldType::kNumeric ? 38
+                                                       : arrow                           ? 76
+                                                                                         : 77));
+}
 
 std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow) {
   if (!arrow) {
