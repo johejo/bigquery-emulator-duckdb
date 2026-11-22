@@ -213,6 +213,18 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query,
   return statements.empty() ? nullptr : std::move(output);
 }
 
+// Isolate a statement while keeping its line and column within the script for errors.
+std::string DryRunStatementSql(const std::string& sql, const googlesql::ASTStatement& statement) {
+  const auto& range = statement.location();
+  const int start = range.start().GetByteOffset();
+  const auto end = static_cast<size_t>(range.end().GetByteOffset());
+  std::string result = sql.substr(0, end);
+  std::replace_if(
+      result.begin(), result.begin() + start,
+      [](char c) { return c != '\n' && c != '\r' && c != '\t'; }, ' ');
+  return result;
+}
+
 // TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
 std::string ScriptStatementType(const googlesql::ParserOutput& script) {
   const auto& statements = script.script()->statement_list();
@@ -705,16 +717,30 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   query.destination_table = request.destination_table;
   StatementWrites writes = StatementWrites::kCatalog;
   const auto script = ParseScript(request.query, writes);
+  const googlesql::ASTStatement* dry_run_call = nullptr;
+  std::vector<const googlesql::ASTStatement*> dry_run_selects;
   if (script) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
-      const auto* first = script->script()->statement_list().front();
-      if (!first->Is<googlesql::ASTCallStatement>()) {
-        throw ApiError::UnsupportedQuery("dry runs of scripts that do not start with CALL");
+      for (const auto* statement : script->script()->statement_list()) {
+        if (statement->Is<googlesql::ASTCallStatement>()) {
+          dry_run_call = statement;
+          break;
+        }
+        if (!statement->Is<googlesql::ASTQueryStatement>()) {
+          break;
+        }
+        dry_run_selects.push_back(statement);
       }
-      // A dry run stops at the first CALL. Ignore subsequent statements even for location
-      // inference, while keeping the prefix so analysis reports positions in the original SQL.
-      request.query.resize(static_cast<size_t>(first->location().end().GetByteOffset()));
+      if (dry_run_call == nullptr) {
+        throw ApiError::UnsupportedQuery(
+            "dry runs of scripts unless they start with CALL or SELECTs followed by CALL");
+      }
+      if (!dry_run_selects.empty() && !request.parameters.positional_types().empty()) {
+        throw ApiError::UnsupportedQuery("positional parameters in dry runs of SELECT before CALL");
+      }
+      // Do not consider anything after the first CALL, even for location inference.
+      request.query.resize(static_cast<size_t>(dry_run_call->location().end().GetByteOffset()));
       writes = StatementWrites::kNothing;
     }
   }
@@ -753,9 +779,24 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
       // Outside a multi-statement query, BigQuery defines @@row_count as NULL.
       {{"row_count"}, googlesql::Value::NullInt64()},
   };
+  const auto prepare = [this, &setup](const TranslatedStatement& statement) {
+    std::optional<absl::MutexLock> graph_lock;
+    if (statement.property_graph || statement.reads_property_graph) {
+      graph_lock.emplace(graph_mutex_);
+    }
+    return Prepare(statement.sql, setup);
+  };
+  for (const auto* statement : dry_run_selects) {
+    const auto select =
+        Translate(DryRunStatementSql(request.query, *statement), request.parameters,
+                  settings.default_project, settings.default_dataset, &location, &variables,
+                  /*stores_result=*/false, /*dry_run=*/true, nullptr, &statement_lock.catalog);
+    prepare(select);
+  }
   const TranslatedStatement translation = Translate(
-      request.query, request.parameters, settings.default_project, settings.default_dataset,
-      &location, &variables, request.destination_table.has_value(), request.dry_run, session.get(),
+      dry_run_selects.empty() ? request.query : DryRunStatementSql(request.query, *dry_run_call),
+      request.parameters, settings.default_project, settings.default_dataset, &location, &variables,
+      request.destination_table.has_value(), request.dry_run, session.get(),
       &statement_lock.catalog);
   if (!script) {
     query.statement_type = translation.statement_type;
@@ -791,11 +832,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
              !AlterationStatements(translation).has_value()) {
     // CALL has no SQL to prepare; its signature was already checked by the analyzer.
     // A dry run checks an alteration against the table or dataset without running it.
-    std::optional<absl::MutexLock> graph_lock;
-    if (translation.property_graph || translation.reads_property_graph) {
-      graph_lock.emplace(graph_mutex_);
-    }
-    result = Prepare(translation.sql, setup);
+    result = prepare(translation);
   }
   if (translation.result_schema.has_value()) {
     result.schema = ReconcileSchema(std::move(result.schema),
