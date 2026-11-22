@@ -1,0 +1,106 @@
+version: 1
+# See third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
+# for defaultDataset on CREATE/DROP PROCEDURE, and
+# third_party/bigquery_docs/multi-statement-queries.md for CALL dry runs.
+description: Procedure DDL uses the default dataset, and a CALL dry run checks only the signature.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: procedure_defaults_and_dry_run
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE PROCEDURE p(x INT64) OPTIONS(strict_mode=FALSE) BEGIN SELECT missing_column; END
+            defaultDataset: {projectId: '${project}', datasetId: '${dataset}'}
+            useLegacySql: false
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CALL `${project}.${dataset}.p`(42);'
+            dryRun: true
+            useLegacySql: false
+        observe:
+          status: /status
+      - name: wrong_type
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CALL `${project}.${dataset}.p`([42])'
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe:
+          status: /status
+      - name: wrong_arity
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CALL `${project}.${dataset}.p`()'
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe:
+          status: /status
+      - name: create_output
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE PROCEDURE p_out(OUT x INT64) BEGIN SET x = 42; END
+            defaultDataset: {projectId: '${project}', datasetId: '${dataset}'}
+            useLegacySql: false
+      - name: output_literal
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CALL `${project}.${dataset}.p_out`(42)'
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe:
+          status: /status
+      - name: drop
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: DROP PROCEDURE p
+            defaultDataset: {projectId: '${project}', datasetId: '${dataset}'}
+            useLegacySql: false
+      - name: missing
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CALL `${project}.${dataset}.p`(42)'
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe:
+          status: /status
+    expect:
+      dry_run: {status: 200}
+      wrong_type: {status: 400}
+      wrong_arity: {status: 400}
+      output_literal: {status: 400}
+      missing: {status: 400}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

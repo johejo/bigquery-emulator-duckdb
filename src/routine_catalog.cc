@@ -157,7 +157,7 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
 absl::Status RoutineCatalog::FindProcedure(const absl::Span<const std::string>& path,
                                            const googlesql::Procedure** procedure,
                                            const FindOptions& /*options*/) {
-  const auto key = NormalizeTablePath(SplitTablePath(path), default_project(), "", &source());
+  const auto key = NormalizeTablePath(path, default_project(), default_dataset(), &source());
   if (key.size() != 3) {
     return absl::NotFoundError("Procedure name must include a dataset");
   }

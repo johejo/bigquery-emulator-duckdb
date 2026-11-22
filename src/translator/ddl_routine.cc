@@ -25,15 +25,15 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-// The routine a persistent CREATE or DROP FUNCTION names, which BigQuery requires to be qualified
-// with its dataset.
+// Persistent functions require a dataset qualifier; procedure DDL can use the default dataset.
 std::optional<RoutineReference> TargetRoutine(const std::vector<std::string>& path,
-                                              const Scope& scope) {
-  if (SplitTablePath(path).size() < 2) {
+                                              const Scope& scope,
+                                              const std::string& default_dataset = "") {
+  if (default_dataset.empty() && SplitTablePath(path).size() < 2) {
     return Unsupported(scope, "persistent routine name " + Join(path, ".") + " without a dataset");
   }
-  const auto parts =
-      NormalizeTablePath(path, scope.context.defaults.project, "", scope.context.defaults.source);
+  const auto parts = NormalizeTablePath(path, scope.context.defaults.project, default_dataset,
+                                        scope.context.defaults.source);
   if (parts.empty()) {
     return Unsupported(scope, "routine name " + Join(path, "."));
   }
@@ -275,7 +275,7 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
       create.external_security() != googlesql::ResolvedCreateStatement::SQL_SECURITY_UNSPECIFIED) {
     return Unsupported(scope, "non-SQL or temporary procedures and procedure security");
   }
-  const auto target = TargetRoutine(create.name_path(), scope);
+  const auto target = TargetRoutine(create.name_path(), scope, scope.context.defaults.dataset);
   if (!target) {
     return std::nullopt;
   }
@@ -334,7 +334,7 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
 
 std::optional<std::string> DropProcedure(const googlesql::ResolvedDropStmt& drop,
                                          const Scope& scope) {
-  const auto target = TargetRoutine(drop.name_path(), scope);
+  const auto target = TargetRoutine(drop.name_path(), scope, scope.context.defaults.dataset);
   if (!target) {
     return std::nullopt;
   }

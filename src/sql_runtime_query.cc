@@ -187,7 +187,7 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
 // BigQuery parses every query as a script, so a query that does not parse as one fails
 // with the script parser's error, as the analyzer reports a statement's, rather than with the
 // error of a single statement it is not.
-std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query,
+std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query, bool dry_run,
                                                      StatementWrites& writes) {
   std::unique_ptr<googlesql::ParserOutput> output;
   if (const absl::Status status =
@@ -197,13 +197,14 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query,
     throw std::runtime_error(status.ToString());
   }
   // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
-  // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
+  // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script. A standalone CALL
+  // needs a script to execute its body, but a dry run only analyzes the call itself.
   const auto& statements = output->script()->statement_list();
   writes =
       statements.size() == 1 ? StatementWritesOf(*statements.at(0)) : StatementWrites::kCatalog;
   if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
       statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT &&
-      statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT) {
+      (dry_run || statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT)) {
     const auto* create = statements.at(0)->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
     if (create == nullptr || !create->is_temp()) {
       return nullptr;
@@ -519,6 +520,11 @@ TranslatedStatement SqlRuntime::Translate(
                          declarations_);
   const AnalyzerResult analyzed =
       AnalyzeGoogleSql(query, catalog, type_factory, functions_.timestamp_precision(), settings);
+  if (dry_run && analyzed.CheckStandaloneCall()) {
+    TranslatedStatement call;
+    call.statement_type = "CALL";
+    return call;
+  }
   std::string unsupported;
   std::optional<TranslatedStatement> translated = TranslateStatement(
       functions_, analyzed.statement(), parameters,
@@ -709,7 +715,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   }
 
   StatementWrites writes = StatementWrites::kCatalog;
-  if (const auto script = ParseScript(request.query, writes)) {
+  if (const auto script = ParseScript(request.query, request.dry_run, writes)) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
@@ -769,7 +775,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         request.write_disposition, translation.sql, written, setup, /*count_only=*/false,
         TableMetadata(), /*copy=*/false, /*restore=*/false, std::nullopt, &statement_lock.catalog);
     result.rows.KeepResources(translation.resources);
-  } else if (!AlterationStatements(translation).has_value()) {
+  } else if (translation.statement_type != "CALL" &&
+             !AlterationStatements(translation).has_value()) {
+    // CALL has no SQL to prepare; its signature was already checked by the analyzer.
     // A dry run checks an alteration against the table or dataset without running it.
     std::optional<absl::MutexLock> graph_lock;
     if (translation.property_graph || translation.reads_property_graph) {

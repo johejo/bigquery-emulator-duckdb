@@ -68,6 +68,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   [[nodiscard]] TableSource& source() const { return source_; }
   [[nodiscard]] googlesql::TypeFactory* type_factory() const { return type_factory_; }
   [[nodiscard]] const std::string& default_project() const { return default_project_; }
+  [[nodiscard]] const std::string& default_dataset() const { return default_dataset_; }
 
   [[nodiscard]] const ExcludedFunctionIds& excluded_function_ids() const {
     return excluded_function_ids_;

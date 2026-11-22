@@ -27,6 +27,7 @@
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/error_helpers.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/sql_view.h"
@@ -71,6 +72,20 @@ const googlesql::Value* AnalyzerResult::literal_value() const {
   return expr != nullptr && expr->Is<googlesql::ResolvedLiteral>()
              ? &expr->GetAs<googlesql::ResolvedLiteral>()->value()
              : nullptr;
+}
+
+bool AnalyzerResult::CheckStandaloneCall() const {
+  if (!statement().Is<googlesql::ResolvedCallStmt>()) {
+    return false;
+  }
+  const auto& signature = statement().GetAs<googlesql::ResolvedCallStmt>()->signature();
+  for (const auto& argument : signature.arguments()) {
+    const auto mode = argument.options().procedure_argument_mode();
+    if (mode == googlesql::FunctionEnums::OUT || mode == googlesql::FunctionEnums::INOUT) {
+      throw ApiError::InvalidQuery("OUT and INOUT arguments must be variables");
+    }
+  }
+  return true;
 }
 
 std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {

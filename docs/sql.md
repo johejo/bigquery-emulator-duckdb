@@ -23,7 +23,7 @@ rejected.
 | [Graphs](#graphs) | 2 | 3 |
 | [Queries](#queries) | 36 | 3 |
 | [DML](#dml) | 9 | 0 |
-| [DDL](#ddl) | 26 | 7 |
+| [DDL](#ddl) | 27 | 6 |
 | [Collation](#collation) | 15 | 0 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 |
 | [INFORMATION_SCHEMA](#information_schema) | 13 | 0 |
@@ -132,7 +132,7 @@ rejected.
 | `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: TVF arguments other than fixed scalar types; non-SQL, temporary or value-table TVFs and TVF security. |
 | `DROP TABLE FUNCTION` | Supported |  |
 | `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedure arguments of ANY TYPE. |
-| `DROP PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: persistent routine name missing without a dataset. |
+| `DROP PROCEDURE` | Supported | See [Stored procedures](compatibility.md#stored-procedures). |
 
 ## Collation
 
