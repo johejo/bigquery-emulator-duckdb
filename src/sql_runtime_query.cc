@@ -487,14 +487,15 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
   QueryParameters parameters;
   if (snapshot_micros) {
     query += " FOR SYSTEM_TIME AS OF @snapshot_time";
-    parameters = QueryParameters::Parse(
-        nlohmann::json::array({{{"name", "snapshot_time"},
-                                {"parameterType", {{"type", "TIMESTAMP"}}},
-                                {"parameterValue",
-                                 {{"value", absl::FormatTime(absl::RFC3339_full,
-                                                             absl::FromUnixMicros(*snapshot_micros),
-                                                             absl::UTCTimeZone())}}}}}),
-        functions_.timestamp_precision());
+    const std::string timestamp = absl::FormatTime(
+        absl::RFC3339_full, absl::FromUnixMicros(*snapshot_micros), absl::UTCTimeZone());
+    const nlohmann::json parameter = {
+        {"name", "snapshot_time"},
+        {"parameterType", {{"type", "TIMESTAMP"}}},
+        {"parameterValue", {{"value", timestamp}}},
+    };
+    parameters = QueryParameters::Parse(nlohmann::json::array({parameter}),
+                                        functions_.timestamp_precision());
   }
   if (!restriction.empty()) {
     if (restriction.size() > size_t{1024} * 1024) {
