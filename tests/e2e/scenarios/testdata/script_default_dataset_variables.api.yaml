@@ -1,5 +1,5 @@
 version: 1
-description: Determine the initial dataset system variables in a script, with and without a request default dataset.
+description: The dataset system variables start as NULL even when the request supplies a default dataset.
 vars:
   dataset: bqa_${run}_${case}
 cases:
@@ -37,6 +37,9 @@ cases:
         observe:
           dataset_id: /body/rows/0/f/0/v
           dataset_project_id: /body/rows/0/f/1/v
+    expect:
+      with_default_dataset: {dataset_id: null, dataset_project_id: null}
+      without_default_dataset: {dataset_id: null, dataset_project_id: null}
     cleanup:
       - name: delete_dataset
         rest:

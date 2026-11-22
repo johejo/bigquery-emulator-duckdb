@@ -393,9 +393,8 @@ expression and `USING` arguments without evaluating them. Leading `DECLARE` stat
 precede `SELECT` and `EXECUTE IMMEDIATE`; `DEFAULT` expressions are checked without evaluation,
 and `INTO` targets must be declared there. Other uses of `DECLARE` and dry runs of
 `CREATE TEMP TABLE` are unsupported.
-With a request default dataset, reading
-`@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
-value is verified against BigQuery. Assignments to other system variables are unsupported.
+Assignments to system variables other than `@@dataset_id` and `@@dataset_project_id`
+are unsupported.
 An `EXCEPTION` clause never handles an error that the emulator reports as unsupported.
 
 Transaction modes, SQL UDF declarations inside transactions, writes to multiple projects (or

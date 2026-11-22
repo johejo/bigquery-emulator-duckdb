@@ -624,10 +624,16 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   AnalyzerSettings Settings(const googlesql::ScriptExecutor& executor) const {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
-    const auto& project = system_variables_.at({"dataset_project_id"});
-    const auto& dataset = system_variables_.at({"dataset_id"});
-    settings.default_project = project.is_null() ? query_project_ : project.string_value();
-    settings.default_dataset = dataset.is_null() ? "" : dataset.string_value();
+    // A request default resolves names but does not initialize the script variables.
+    // An explicit SET, including SET to NULL, overrides the corresponding default.
+    if (assigned_system_variables_.contains({"dataset_project_id"})) {
+      const auto& project = system_variables_.at({"dataset_project_id"});
+      settings.default_project = project.is_null() ? query_project_ : project.string_value();
+    }
+    if (assigned_system_variables_.contains({"dataset_id"})) {
+      const auto& dataset = system_variables_.at({"dataset_id"});
+      settings.default_dataset = dataset.is_null() ? "" : dataset.string_value();
+    }
     if (const ScriptFrame& frame = frames_.back(); !frame.procedure_project.empty()) {
       settings.default_project = frame.procedure_project;
       settings.default_dataset.clear();
@@ -640,15 +646,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   googlesql::SystemVariableValuesMap SystemVariables(
       const googlesql::ScriptExecutor& executor) const {
     auto variables = executor.GetKnownSystemVariables();
-    // Initial reads of the dataset variables with a request default dataset remain unsupported
-    // until checked against BigQuery. Without a request default, both are confirmed to start as
-    // NULL. @@project_id is read-only and known from the start.
     for (const auto& [path, value] : system_variables_) {
       if (IsRowCount(path)) {
         variables.emplace(path, row_count_ ? googlesql::Value::Int64(*row_count_)
                                            : googlesql::Value::NullInt64());
-      } else if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path) ||
-                 IsProjectId(path)) {
+      } else {
         variables.emplace(path, value);
       }
     }
@@ -1090,16 +1092,8 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
 
   googlesql::TypeFactory type_factory;
   googlesql::SystemVariableValuesMap variables{
-      {
-          {"dataset_project_id"},
-          default_dataset.empty() ? googlesql::Value::NullString()
-                                  : googlesql::Value::String(default_project),
-      },
-      {
-          {"dataset_id"},
-          default_dataset.empty() ? googlesql::Value::NullString()
-                                  : googlesql::Value::String(default_dataset),
-      },
+      {{"dataset_project_id"}, googlesql::Value::NullString()},
+      {{"dataset_id"}, googlesql::Value::NullString()},
       {{"project_id"}, googlesql::Value::String(query_project)},
       {{"row_count"}, googlesql::Value::NullInt64()},
   };

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "cases": {
+    "dataset_variables": {
+      "project": "johejo-sandbox",
+      "run": "ltzq56xvmefvglxjelrrs7oemo",
+      "steps": {
+        "with_default_dataset": {
+          "dataset_id": null,
+          "dataset_project_id": null
+        },
+        "without_default_dataset": {
+          "dataset_id": null,
+          "dataset_project_id": null
+        }
+      }
+    }
+  }
+}
