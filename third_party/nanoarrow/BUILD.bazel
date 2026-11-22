@@ -1,4 +1,5 @@
 exports_files([
     "BUILD.nanoarrow.bazel",
+    "ipc_bounds.patch",
     "public_headers.patch",
 ])

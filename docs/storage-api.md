@@ -6,7 +6,10 @@ See the [README](../README.md#bigquery-storage-api-grpc) for connection options 
 ## Writing rows
 
 Use `storage/managedwriter.NewClient` or the generated Storage v1 client with a self-contained
-protobuf writer descriptor and serialized rows. Arrow input is unsupported.
+protobuf writer descriptor and serialized rows, or an Arrow IPC writer schema and record batch.
+Arrow input is limited to uncompressed batches with `Int64` and `Utf8` fields for `INT64` and
+`STRING` columns. Dictionary encoding, field metadata, and missing-value interpretation options
+are not supported for Arrow writes.
 
 The default stream and COMMITTED streams publish immediately. BUFFERED streams publish through
 `FlushRows`; PENDING streams publish atomically through `BatchCommitWriteStreams` after

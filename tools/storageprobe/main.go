@@ -16,6 +16,10 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/arrowtest"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/serverprocess"
 	"google.golang.org/api/option"
@@ -96,6 +100,36 @@ func (e *env) append(ctx context.Context, stream string, offset *wrapperspb.Int6
 		Rows: &storagepb.AppendRowsRequest_ProtoRows{ProtoRows: &storagepb.AppendRowsRequest_ProtoData{
 			WriterSchema: &storagepb.ProtoSchema{ProtoDescriptor: descriptor},
 			Rows:         &storagepb.ProtoRows{SerializedRows: [][]byte{row}}}}})
+}
+
+func arrowAppend(fieldType bigquery.FieldType, wireType arrow.DataType) func(context.Context, *env) error {
+	return func(ctx context.Context, e *env) error {
+		path, err := e.table(ctx, bigquery.Schema{{Name: "value", Type: fieldType}})
+		if err != nil {
+			return err
+		}
+		b := array.NewRecordBuilder(memory.DefaultAllocator, arrow.NewSchema([]arrow.Field{{Name: "value", Type: wireType}}, nil))
+		defer b.Release()
+		switch f := b.Field(0).(type) {
+		case *array.StringBuilder:
+			f.Append("sample")
+		case *array.BooleanBuilder:
+			f.Append(true)
+		default:
+			return fmt.Errorf("no Arrow probe sample for %s", wireType)
+		}
+		record := b.NewRecordBatch()
+		defer record.Release()
+		schema, batch, err := arrowtest.Encode(record)
+		if err != nil {
+			return err
+		}
+		return e.send(ctx, &storagepb.AppendRowsRequest{WriteStream: path + "/streams/_default",
+			Rows: &storagepb.AppendRowsRequest_ArrowRows{ArrowRows: &storagepb.AppendRowsRequest_ArrowData{
+				WriterSchema: &storagepb.ArrowSchema{SerializedSchema: schema},
+				Rows:         &storagepb.ArrowRecordBatch{SerializedRecordBatch: batch},
+			}}})
+	}
 }
 
 // send sends the requests on one AppendRows connection and returns the first error reported.
@@ -340,14 +374,8 @@ var sections = []section{
 				}
 				return e.append(ctx, stream.Name, wrapperspb.Int64(0))
 			}},
-			{"Arrow rows", func(ctx context.Context, e *env) error {
-				path, err := e.table(ctx, stringSchema)
-				if err != nil {
-					return err
-				}
-				return e.send(ctx, &storagepb.AppendRowsRequest{WriteStream: path + "/streams/_default",
-					Rows: &storagepb.AppendRowsRequest_ArrowRows{ArrowRows: &storagepb.AppendRowsRequest_ArrowData{}}})
-			}},
+			{"Arrow UTF-8 rows", arrowAppend(bigquery.StringFieldType, arrow.BinaryTypes.String)},
+			{"Arrow boolean rows", arrowAppend(bigquery.BooleanFieldType, arrow.FixedWidthTypes.Boolean)},
 			{"writer schema changes on a connection", func(ctx context.Context, e *env) error {
 				path, err := e.table(ctx, bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType},
 					{Name: "other", Type: bigquery.StringFieldType}})

@@ -36,6 +36,7 @@
 #include "src/field_schema.h"
 #include "src/project.h"
 #include "src/references.h"
+#include "src/server/storage_arrow.h"
 #include "src/server/storage_codec.h"
 #include "src/storage_read_codec.h"
 #include "src/storage_snapshot.h"
@@ -738,6 +739,8 @@ class WriteService final : public pb::BigQueryWrite::Service {
     int64_t storage_id = 0;
     bool default_missing = false;
     std::unique_ptr<StorageProtoDecoder> decoder;
+    std::string arrow_schema;
+    std::unique_ptr<StorageArrowDecoder> arrow_decoder;
     std::shared_ptr<WriteState> lease;
   };
 
@@ -836,9 +839,14 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (request.ByteSizeLong() >= size_t{20} * 1024 * 1024) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "AppendRowsRequest must be smaller than 20 MB");
     }
-    if (!request.has_proto_rows()) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write requires protobuf rows; Arrow input is unsupported");
+    const bool arrow = request.has_arrow_rows();
+    if (!arrow && !request.has_proto_rows()) {
+      Fail(grpc::StatusCode::INVALID_ARGUMENT, "AppendRows requires row data");
+    }
+    if (arrow && (request.default_missing_value_interpretation() !=
+                      pb::AppendRowsRequest::MISSING_VALUE_INTERPRETATION_UNSPECIFIED ||
+                  !request.missing_value_interpretations().empty())) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED, "Missing value interpretations for Arrow rows");
     }
     absl::MutexLock const lock(mutex_);
     if (connection.name.empty() && request.write_stream().empty()) {
@@ -883,8 +891,12 @@ class WriteService final : public pb::BigQueryWrite::Service {
       }
     }
     const bool first = connection.name.empty() || changing;
+    if (!first && arrow != (connection.arrow_decoder != nullptr)) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED, "Changing row format for the current destination");
+    }
     if (first) {
-      if (!request.proto_rows().has_writer_schema()) {
+      if (arrow ? !request.arrow_rows().has_writer_schema()
+                : !request.proto_rows().has_writer_schema()) {
         Fail(grpc::StatusCode::INVALID_ARGUMENT, "The first request must include writer_schema");
       }
       if (!IsDefault(name) && state->active) {
@@ -894,10 +906,19 @@ class WriteService final : public pb::BigQueryWrite::Service {
     }
     const std::string schema = SchemaToJson(state->schema).dump();
     const bool schema_changed = !first && connection.schema != schema;
-    if (first || schema_changed ||
-        (request.proto_rows().has_writer_schema() &&
-         request.proto_rows().writer_schema().proto_descriptor().SerializeAsString() !=
-             connection.descriptor.SerializeAsString())) {
+    if (arrow) {
+      const auto& input = request.arrow_rows();
+      const auto& wire = input.has_writer_schema() ? input.writer_schema().serialized_schema()
+                                                   : connection.arrow_schema;
+      if (first || schema_changed || wire != connection.arrow_schema) {
+        auto decoder = std::make_unique<StorageArrowDecoder>(wire, state->schema);
+        connection.arrow_schema = wire;
+        connection.arrow_decoder = std::move(decoder);
+      }
+    } else if (first || schema_changed ||
+               (request.proto_rows().has_writer_schema() &&
+                request.proto_rows().writer_schema().proto_descriptor().SerializeAsString() !=
+                    connection.descriptor.SerializeAsString())) {
       const auto& descriptor = request.proto_rows().has_writer_schema()
                                    ? request.proto_rows().writer_schema().proto_descriptor()
                                    : connection.descriptor;
@@ -905,6 +926,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
         auto decoder = std::make_unique<StorageProtoDecoder>(descriptor, state->schema);
         connection.descriptor = descriptor;
         connection.decoder = std::move(decoder);
+        connection.arrow_decoder.reset();
       } catch (const StorageFieldMismatch& error) {
         throw ConnectionError(grpc::StatusCode::INVALID_ARGUMENT,
                               "The proto field mismatched with BigQuery field at " + error.field +
@@ -940,6 +962,10 @@ class WriteService final : public pb::BigQueryWrite::Service {
       missing.emplace(field, interpretation == pb::AppendRowsRequest::DEFAULT_VALUE);
     }
     json rows = json::array();
+    if (arrow) {
+      rows =
+          connection.arrow_decoder->Decode(request.arrow_rows().rows().serialized_record_batch());
+    }
     for (int i = 0; i < request.proto_rows().rows().serialized_rows_size(); ++i) {
       try {
         rows.push_back(connection.decoder->Decode(request.proto_rows().rows().serialized_rows(i),
