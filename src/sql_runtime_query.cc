@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -525,8 +526,7 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
 struct SqlRuntime::DryRunDeclarations {
   const QueryParameters& parameters;
   std::string_view sql = {};
-  std::vector<const googlesql::ASTVariableDeclaration*> nodes = {};
-  size_t positional_count = 0;
+  std::span<const googlesql::ASTVariableDeclaration* const> nodes;
   const googlesql::ASTExecuteImmediateStatement* dynamic = nullptr;
 
   void AddVariables(googlesql::SimpleCatalog& variables, googlesql::Catalog& catalog,
@@ -584,7 +584,7 @@ struct SqlRuntime::DryRunDeclarations {
         variables.AddOwnedConstant(std::move(constant));
       }
     }
-    if (dynamic->into_clause() == nullptr) {
+    if (dynamic == nullptr || dynamic->into_clause() == nullptr) {
       return;
     }
     const googlesql::ParseLocationTranslator location(sql);
@@ -842,24 +842,23 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   bool skip_dry_run_stop = false;
   bool dry_run_to_end = false;
   std::vector<const googlesql::ASTStatement*> dry_run_prefix;
-  DryRunDeclarations dry_run_declarations{.parameters = request.parameters};
+  std::vector<const googlesql::ASTVariableDeclaration*> dry_run_declarations;
+  size_t declaration_parameters = 0;
   if (script) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       for (const auto* statement : script->script()->statement_list()) {
-        if (const auto* dynamic =
-                statement->GetAsOrNull<googlesql::ASTExecuteImmediateStatement>()) {
-          dry_run_declarations.dynamic = dynamic;
+        if (statement->Is<googlesql::ASTExecuteImmediateStatement>()) {
           dry_run_stop = statement;
           break;
         }
         if (const auto* declaration = statement->GetAsOrNull<googlesql::ASTVariableDeclaration>();
             declaration != nullptr && dry_run_prefix.empty()) {
-          dry_run_declarations.nodes.push_back(declaration);
-          dry_run_declarations.positional_count += CountPositionalParameters(*declaration);
+          dry_run_declarations.push_back(declaration);
+          declaration_parameters += CountPositionalParameters(*declaration);
           continue;
         }
-        if (!dry_run_declarations.nodes.empty()) {
+        if (!dry_run_declarations.empty() && !statement->Is<googlesql::ASTQueryStatement>()) {
           break;
         }
         if (statement->Is<googlesql::ASTCallStatement>() || statement->IsDdlStatement()) {
@@ -883,7 +882,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         }
         dry_run_prefix.push_back(statement);
       }
-      dry_run_to_end = dry_run_prefix.size() == script->script()->statement_list().size();
+      dry_run_to_end =
+          !dry_run_prefix.empty() && dry_run_declarations.size() + dry_run_prefix.size() ==
+                                         script->script()->statement_list().size();
       if (dry_run_stop != nullptr) {
         // Infer location only from statements the dry run validates, not skipped control flow.
         const auto& range = dry_run_stop->location();
@@ -895,7 +896,6 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
       writes = dry_run_stop != nullptr && dry_run_stop->IsDdlStatement()
                    ? StatementWrites::kCatalog
                    : StatementWrites::kNothing;
-      dry_run_declarations.sql = request.query;
     }
   }
   InferLocation(request.query, settings.default_project, settings.default_dataset, location);
@@ -946,7 +946,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
                      &variables, stores_result, request.dry_run, session.get(),
                      &statement_lock.catalog, declarations);
   };
-  size_t next_parameter = dry_run_declarations.positional_count;
+  size_t next_parameter = declaration_parameters;
   const auto translate_script_statement = [&](const googlesql::ASTStatement& statement,
                                               bool stores_result) {
     // Statement analysis numbers its parameters from 1 again. Advance only through the
@@ -954,8 +954,15 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     const auto count = CountPositionalParameters(statement);
     const auto parameters = request.parameters.SlicePositional(next_parameter, count);
     next_parameter += count;
-    return translate(DryRunStatementSql(request.query, statement), parameters, stores_result,
-                     &statement == dry_run_declarations.dynamic ? &dry_run_declarations : nullptr);
+    const DryRunDeclarations declarations{
+        .parameters = request.parameters,
+        .sql = request.query,
+        .nodes = dry_run_declarations,
+        .dynamic = statement.GetAsOrNull<googlesql::ASTExecuteImmediateStatement>(),
+    };
+    return translate(
+        DryRunStatementSql(request.query, statement), parameters, stores_result,
+        declarations.nodes.empty() && declarations.dynamic == nullptr ? nullptr : &declarations);
   };
   for (const auto* statement : dry_run_prefix) {
     const auto translated = translate_script_statement(*statement, /*stores_result=*/false);
@@ -969,7 +976,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     return {};
   }
   const TranslatedStatement translation =
-      dry_run_prefix.empty() && dry_run_declarations.dynamic == nullptr
+      dry_run_prefix.empty() && (dry_run_stop == nullptr ||
+                                 !dry_run_stop->Is<googlesql::ASTExecuteImmediateStatement>())
           ? translate(request.query, request.parameters, request.destination_table.has_value())
           : translate_script_statement(*dry_run_stop, request.destination_table.has_value());
   if (!script) {

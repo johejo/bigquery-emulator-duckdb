@@ -389,9 +389,9 @@ Script dry runs validate `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MERGE` and `TR
 through the end of the script or until a stopping statement. Validation stops after
 [`CALL`](#stored-procedures) or supported DDL, or before
 `IF`, `FOR` or `WHILE`. For `EXECUTE IMMEDIATE`, validation stops after checking the SQL
-expression and `USING` arguments without evaluating them. `EXECUTE IMMEDIATE` can also follow
-leading `DECLARE` statements, whose `DEFAULT` expressions are checked without evaluation.
-`INTO` targets must be declared there. Other uses of `DECLARE` and dry runs of
+expression and `USING` arguments without evaluating them. Leading `DECLARE` statements can
+precede `SELECT` and `EXECUTE IMMEDIATE`; `DEFAULT` expressions are checked without evaluation,
+and `INTO` targets must be declared there. Other uses of `DECLARE` and dry runs of
 `CREATE TEMP TABLE` are unsupported.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
