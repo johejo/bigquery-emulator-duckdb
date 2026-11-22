@@ -1478,6 +1478,7 @@ cc_library(
         "@googlesql//googlesql/parser",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:parse_location",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",

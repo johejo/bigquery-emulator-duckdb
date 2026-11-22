@@ -26,6 +26,7 @@
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/parse_location.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
@@ -187,7 +188,7 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
 // BigQuery parses every query as a script, so a query that does not parse as one fails
 // with the script parser's error, as the analyzer reports a statement's, rather than with the
 // error of a single statement it is not.
-std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query, bool dry_run,
+std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query,
                                                      StatementWrites& writes) {
   std::unique_ptr<googlesql::ParserOutput> output;
   if (const absl::Status status =
@@ -197,14 +198,13 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query, b
     throw std::runtime_error(status.ToString());
   }
   // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
-  // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script. A standalone CALL
-  // needs a script to execute its body, but a dry run only analyzes the call itself.
+  // IMMEDIATE and CALL, which GoogleSQL parses as SQL statements, run as scripts.
   const auto& statements = output->script()->statement_list();
   writes =
       statements.size() == 1 ? StatementWritesOf(*statements.at(0)) : StatementWrites::kCatalog;
   if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
       statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT &&
-      (dry_run || statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT)) {
+      statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT) {
     const auto* create = statements.at(0)->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
     if (create == nullptr || !create->is_temp()) {
       return nullptr;
@@ -703,6 +703,21 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   }
 
   query.destination_table = request.destination_table;
+  StatementWrites writes = StatementWrites::kCatalog;
+  const auto script = ParseScript(request.query, writes);
+  if (script) {
+    query.statement_type = ScriptStatementType(*script);
+    if (request.dry_run) {
+      const auto* first = script->script()->statement_list().front();
+      if (!first->Is<googlesql::ASTCallStatement>()) {
+        throw ApiError::UnsupportedQuery("dry runs of scripts that do not start with CALL");
+      }
+      // A dry run stops at the first CALL. Ignore subsequent statements even for location
+      // inference, while keeping the prefix so analysis reports positions in the original SQL.
+      request.query.resize(static_cast<size_t>(first->location().end().GetByteOffset()));
+      writes = StatementWrites::kNothing;
+    }
+  }
   InferLocation(request.query, settings.default_project, settings.default_dataset, location);
   if (request.destination_table.has_value()) {
     const DatasetReference dataset{
@@ -714,12 +729,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     }
   }
 
-  StatementWrites writes = StatementWrites::kCatalog;
-  if (const auto script = ParseScript(request.query, request.dry_run, writes)) {
-    query.statement_type = ScriptStatementType(*script);
-    if (request.dry_run) {
-      throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
-    }
+  if (script && !request.dry_run) {
     if (request.destination_table.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
     }
@@ -747,7 +757,9 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
       request.query, request.parameters, settings.default_project, settings.default_dataset,
       &location, &variables, request.destination_table.has_value(), request.dry_run, session.get(),
       &statement_lock.catalog);
-  query.statement_type = translation.statement_type;
+  if (!script) {
+    query.statement_type = translation.statement_type;
+  }
   query.ddl_target_table = translation.ddl_target_table;
   query.ddl_target_dataset = translation.ddl_target_dataset;
   query.ddl_target_routine = translation.ddl_target_routine;

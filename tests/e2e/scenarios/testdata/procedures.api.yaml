@@ -33,6 +33,18 @@ cases:
             useLegacySql: false
         observe:
           status: /status
+      - name: leading_call_dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              CALL `${project}.${dataset}.p`(42);
+              SELECT missing_column;
+            dryRun: true
+            useLegacySql: false
+        observe:
+          status: /status
       - name: wrong_type
         rest:
           method: POST
@@ -95,6 +107,7 @@ cases:
           status: /status
     expect:
       dry_run: {status: 200}
+      leading_call_dry_run: {status: 200}
       wrong_type: {status: 400}
       wrong_arity: {status: 400}
       output_literal: {status: 400}
