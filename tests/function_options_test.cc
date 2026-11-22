@@ -150,11 +150,15 @@ TEST(FunctionOptionsTest, NanPolicyPreservesOtherValues) {
     };
     const auto formatted = googlesql_functions::Format("%t", {*array}, options);
     ASSERT_TRUE(formatted.ok()) << formatted.status();
-    ASSERT_TRUE(formatted->has_value());
+    if (!formatted->has_value()) {
+      GTEST_FAIL() << "FORMAT returned NULL";
+    }
     EXPECT_EQ((**formatted).find("-nan"), std::string::npos);
     const auto floating = googlesql_functions::Format("%f", {negative_nan}, options);
     ASSERT_TRUE(floating.ok()) << floating.status();
-    ASSERT_TRUE(floating->has_value());
+    if (!floating->has_value()) {
+      GTEST_FAIL() << "FORMAT returned NULL";
+    }
     EXPECT_EQ((**floating).find('-') != std::string::npos, !unsigned_nan) << **floating;
     EXPECT_NE((**formatted).find("-0"), std::string::npos);
   }

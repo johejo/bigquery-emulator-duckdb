@@ -204,7 +204,9 @@ TEST_F(PartitionPolicyReadTest, SqlSourceScansAndPartitionCountsKeepExecutingSna
   ASSERT_EQ(visible.rows.size(), 1);
   EXPECT_EQ(visible.rows.String(0, 1), "future");
   const auto counts = source->CountRows(table_, "CAST(d AS VARCHAR)");
-  ASSERT_TRUE(counts);
+  if (!counts) {
+    GTEST_FAIL() << "no row counts";
+  }
   ASSERT_EQ(counts->size(), 1);
   EXPECT_EQ(counts->front().first, "2159-12-31");
   EXPECT_EQ(counts->front().second, 1);
