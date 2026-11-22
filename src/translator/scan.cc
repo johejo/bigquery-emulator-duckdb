@@ -27,6 +27,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/analyzer_functions/graph_expand.h"
 #include "src/catalog_table.h"
 #include "src/connection_id.h"
 #include "src/duckdb_sql.h"
@@ -124,7 +125,71 @@ std::optional<Relation> ExternalQueryScan(const googlesql::ResolvedTVFScan& tvf,
   return result;
 }
 
+std::optional<std::string> GraphExpandValue(const analyzer_functions::GraphExpandColumn& column,
+                                            const googlesql::Type* type,
+                                            const std::vector<std::string>& values) {
+  const auto& value = values.at(column.body_index);
+  if (!column.is_row) {
+    return value;
+  }
+  const auto* record = type->AsStruct();
+  if (record == nullptr) {
+    return std::nullopt;
+  }
+  const auto keys = DuckDbStructFieldNames(record);
+  std::vector<std::string> fields;
+  for (int i = 0; i < record->num_fields(); ++i) {
+    const auto& field = record->field(i);
+    const auto source =
+        std::ranges::find(column.fields, field.name, &analyzer_functions::GraphExpandColumn::name);
+    if (source == column.fields.end()) {
+      return std::nullopt;
+    }
+    const auto field_value = GraphExpandValue(*source, field.type, values);
+    if (!field_value) {
+      return std::nullopt;
+    }
+    fields.push_back(QuoteIdentifier(keys.at(i)) + " := " + *field_value);
+  }
+  if (fields.empty()) {
+    fields.push_back(QuoteIdentifier(kEmptyStruct) + " := TRUE");
+  }
+  return "CASE WHEN " + value + " IS NOT NULL THEN struct_pack(" + Join(fields, ", ") + ") END";
+}
+
+std::optional<Relation> GraphExpandScan(const googlesql::ResolvedTVFScan& tvf,
+                                        const analyzer_functions::GraphExpandBody& body,
+                                        const Scope& scope) {
+  const auto input = Scan(*body.query.query(), Scope{.context = scope.context});
+  if (!input) {
+    return std::nullopt;
+  }
+  std::vector<std::string> values;
+  std::ranges::transform(
+      body.query.output_column_list(), std::back_inserter(values),
+      [&](const auto& output) { return input->columns.at(output->column().column_id()); });
+  Relation result;
+  std::vector<std::string> projections;
+  for (int i = 0; i < tvf.column_list_size(); ++i) {
+    const auto& column = tvf.column_list(i);
+    const auto& source = body.columns.at(tvf.column_index_list(i));
+    const auto value = GraphExpandValue(source, column.type(), values);
+    if (!value) {
+      return Unsupported(scope, "GRAPH_EXPAND ROW projection");
+    }
+    const std::string alias = ColumnName(column.column_id());
+    projections.push_back(*value + " AS " + alias);
+    result.columns.emplace(column.column_id(), "q." + alias);
+  }
+  result.sql =
+      "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) + input->From();
+  return result;
+}
+
 std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, const Scope& scope) {
+  if (const auto body = analyzer_functions::GetGraphExpandBody(*tvf.signature())) {
+    return GraphExpandScan(tvf, *body, scope);
+  }
   if (tvf.tvf()->Name() == "external_query") {
     return ExternalQueryScan(tvf, scope);
   }

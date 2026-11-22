@@ -22,3 +22,7 @@ The open-source reference implementation omits Base32; comparing against its err
 otherwise mark working functions as known errors. The fallback is limited to Base32's
 feature-independent vectors, including SAFE calls. Drop it once the reference implementation
 supports Base32.
+
+`graph_measures.patch` preserves measure declarations and their expression SQL in the simple
+property-graph catalog. It skips scalar analysis of those expressions; `GRAPH_EXPAND` analyzes
+them against the result schema and supplies the element key to the measure rewriter.

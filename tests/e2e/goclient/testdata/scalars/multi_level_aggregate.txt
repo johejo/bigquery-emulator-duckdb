@@ -1,0 +1,21 @@
+# GoogleSQL compliance: multi_level_emps_metrics_by_dept in multi_level_aggregation_basic.test.
+# The repeated employee rows represent the LEFT JOIN to dependents. Employees 4 and 6 earn the
+# same salary but are different employees. COUNT(*) still counts at the joined row grain.
+WITH employees AS (
+  SELECT * FROM UNNEST([
+    STRUCT(1 AS id, 101 AS dept, 200000 AS salary, 45 AS age, 1 AS copies),
+    (2, 102, 180000, 42, 3), (3, 101, 150000, 28, 2), (4, 102, 80000, 25, 1),
+    (5, 101, 70000, 29, 1), (6, 102, 80000, 37, 1)])
+), metrics AS (
+  SELECT dept, SUM(ANY_VALUE(salary) GROUP BY id) AS total,
+    ARRAY_AGG(ANY_VALUE(age) GROUP BY id ORDER BY ANY_VALUE(age)) AS ages,
+    COUNT(*) AS joined_rows
+  FROM employees CROSS JOIN UNNEST(GENERATE_ARRAY(1, copies))
+  GROUP BY dept
+)
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM metrics ORDER BY dept));
+=> "[{\"dept\":101,\"total\":420000,\"ages\":[28,29,45],\"joined_rows\":4},{\"dept\":102,\"total\":340000,\"ages\":[25,37,42],\"joined_rows\":5}]"
+
+# GROUP BY produces no inner groups on empty input; COUNT on those groups returns zero.
+SELECT COUNT(MAX(n) GROUP BY n) FROM UNNEST(ARRAY<INT64>[]) AS n
+=> "0"

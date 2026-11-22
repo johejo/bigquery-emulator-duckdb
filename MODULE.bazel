@@ -96,6 +96,7 @@ archive_override(
         # Lets //:compliance_test use GoogleSQL's compliance test cases.
         "//third_party/googlesql:compliance.patch",
         "//third_party/googlesql:compliance_expected_results.patch",
+        "//third_party/googlesql:graph_measures.patch",
         "//third_party/googlesql:openssl.patch",
     ],
     strip_prefix = "googlesql-2026.11.1",

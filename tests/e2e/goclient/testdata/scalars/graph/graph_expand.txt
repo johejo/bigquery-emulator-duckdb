@@ -8,6 +8,13 @@ SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreGraph')
 SELECT SUM(L_population) FROM GRAPH_EXPAND('scalar_graph.StoreGraph') GROUP BY S_location_id
 => "2000"
 
+# BigQuery rejects COUNT(*) in a graph measure; use COUNT(column) instead (tools/bqanswers).
+CREATE PROPERTY GRAPH scalar_graph.StoreGraphWithCountStarMeasure
+  NODE TABLES (scalar_graph.Locations AS L
+    PROPERTIES (id, population, MEASURE(SUM(population)) AS total_population,
+      MEASURE(COUNT(*)) AS location_count));
+=> error contains: COUNT(*) is not allowed in a measure expression in BigQuery. Please specify a column, e.g., COUNT(<column_name>).
+
 # BigQuery inlines an edge table with its node table's table and properties only where the table
 # has no columns other than those the edge references, whichever endpoint references the node
 # table and whether a foreign key relates the tables; observed BigQuery answers collected with
@@ -28,6 +35,27 @@ SELECT COUNT(*) FROM GRAPH_EXPAND('scalar_graph.StoreLocations', start_node => '
 # third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
 SELECT STRING_AGG(name ORDER BY id) FROM GRAPH_EXPAND('scalar_graph.StoreGraph', start_node => 'L', flatten_results => FALSE)
 => "Anytown,Sometown"
+# In the documented StoreGraph expansion, the edge is inlined and L is a top-level name.
+SELECT STRING_AGG(L.name, ',' ORDER BY name) FROM GRAPH_EXPAND('scalar_graph.StoreGraph', flatten_results => FALSE)
+=> "Anytown,Anytown"
+
+# BigQuery answers collected with tools/bqanswers. Contrary to the description of nested
+# STRUCTs in third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md, BigQuery
+# rejects returning a joined ROW. It allows projecting scalar fields underneath it: when the
+# edge is not inlined, P is nested under SP. SP survives a NULL or unmatched destination key.
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT id, SP.edge_size, SP.P.id AS place_id, SP.P.name AS place_name
+  FROM GRAPH_EXPAND('scalar_graph.NestedShopPlaces', flatten_results => FALSE) ORDER BY id
+))
+=> "[{\"id\":1,\"edge_size\":3,\"place_id\":1,\"place_name\":\"p\"},{\"id\":2,\"edge_size\":4,\"place_id\":2,\"place_name\":null},{\"id\":3,\"edge_size\":5,\"place_id\":null,\"place_name\":null},{\"id\":4,\"edge_size\":6,\"place_id\":null,\"place_name\":null}]"
+SELECT * FROM GRAPH_EXPAND('scalar_graph.NestedShopPlaces', flatten_results => FALSE) ORDER BY id
+=> error contains: Returning expressions of type ROW is not allowed
+SELECT * FROM GRAPH_EXPAND('scalar_graph.NestedShopPlacesDefaultEdge', flatten_results => FALSE) ORDER BY id
+=> error contains: Returning expressions of type ROW is not allowed
+SELECT id, P.id AS place_id, P.name AS place_name FROM GRAPH_EXPAND('scalar_graph.NestedShopPlacesDefaultEdge', flatten_results => FALSE) ORDER BY id
+=> error contains: Unrecognized name: P
+SELECT id, TYPEOF(P) AS place_type FROM GRAPH_EXPAND('scalar_graph.NestedShopPlacesDefaultEdge', flatten_results => FALSE) ORDER BY id
+=> error contains: Unrecognized name: P
 
 # An edge table joins between its node tables and adds its properties and key columns, ordered by
 # name; a shop without a place keeps its edge row. Observed on BigQuery with tools/bqanswers.
@@ -52,6 +80,25 @@ SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scala
 # A joined edge adds its key columns, not the other columns that reference its source node.
 SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY S_id) FROM GRAPH_EXPAND('scalar_graph.ShopSizes') AS t
 => "{\"S_id\":1,\"S_other_place_id\":2,\"S_place_id\":1,\"S_size\":3,\"SP_edge_size\":3,\"SP_id\":1,\"P_id\":1,\"P_name\":\"p\"},{\"S_id\":2,\"S_other_place_id\":null,\"S_place_id\":null,\"S_size\":4,\"SP_edge_size\":4,\"SP_id\":2,\"P_id\":null,\"P_name\":null}"
+
+# BigQuery answers collected with tools/bqanswers: flattened output puts the second branch
+# before the first branch's descendants. In nested output, C is reached through B without BC.
+# A missing AB or C does not remove the unrelated AD branch.
+SELECT STRING_AGG(TO_JSON_STRING(t), ',' ORDER BY A_id) FROM GRAPH_EXPAND('scalar_graph.ExpandTree') AS t
+=> "{\"A_id\":1,\"AB_branch_score\":11,\"AB_id\":1,\"B_id\":10,\"B_leaf_id\":100,\"AD_sibling_score\":2,\"AD_id\":1,\"D_id\":200,\"D_name\":\"sibling\",\"C_id\":100,\"C_name\":\"leaf\"},{\"A_id\":2,\"AB_branch_score\":22,\"AB_id\":2,\"B_id\":20,\"B_leaf_id\":null,\"AD_sibling_score\":4,\"AD_id\":2,\"D_id\":200,\"D_name\":\"sibling\",\"C_id\":null,\"C_name\":null},{\"A_id\":3,\"AB_branch_score\":null,\"AB_id\":null,\"B_id\":null,\"B_leaf_id\":null,\"AD_sibling_score\":6,\"AD_id\":3,\"D_id\":200,\"D_name\":\"sibling\",\"C_id\":null,\"C_name\":null}"
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT id, AB.branch_score, AB.B.id AS branch_id,
+    AD.sibling_score, AD.D.name AS sibling_name
+  FROM GRAPH_EXPAND('scalar_graph.ExpandTree', flatten_results => FALSE) ORDER BY id
+))
+=> "[{\"id\":1,\"branch_score\":11,\"branch_id\":10,\"sibling_score\":2,\"sibling_name\":\"sibling\"},{\"id\":2,\"branch_score\":22,\"branch_id\":20,\"sibling_score\":4,\"sibling_name\":\"sibling\"},{\"id\":3,\"branch_score\":null,\"branch_id\":null,\"sibling_score\":6,\"sibling_name\":\"sibling\"}]"
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT id, AB.B.C.name AS leaf_name
+  FROM GRAPH_EXPAND('scalar_graph.ExpandTree', flatten_results => FALSE) ORDER BY id
+))
+=> "[{\"id\":1,\"leaf_name\":\"leaf\"},{\"id\":2,\"leaf_name\":null},{\"id\":3,\"leaf_name\":null}]"
+SELECT * FROM GRAPH_EXPAND('scalar_graph.ExpandTree', flatten_results => FALSE) ORDER BY id
+=> error contains: Returning expressions of type ROW is not allowed
 
 # Graphs that the documented input limitations exclude: multiple root node tables without
 # start_node, and a label other than the default one.
