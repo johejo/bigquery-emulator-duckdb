@@ -1,5 +1,7 @@
 #include "src/googlesql_functions_duckdb/cast.h"
 
+#include <vector>
+
 #include "duckdb.h"
 #include "src/duckdb_functions/apply.h"
 #include "src/duckdb_functions/register.h"
@@ -22,11 +24,20 @@ void RegisterCastFunctions(duckdb_connection connection) {
            Apply<CastFloat64ToInt64, kSafe>);
   Register(connection, "bq_string_to_bool", {kVarchar, kBoolean}, kBoolean,
            Apply<CastStringToBool, kSafe>);
+  Register(connection, "bq_string_to_int64", {kVarchar, kBoolean}, kBigint,
+           Apply<CastStringToInt64, kSafe>);
+  Register(connection, "bq_string_to_float64", {kVarchar, kBoolean}, kDouble,
+           Apply<CastStringToFloat64, kSafe>);
   Register(connection, "bq_cast_constrain_string", {kVarchar, kBigint}, kVarchar,
            Apply<ConstrainString>);
   Register(connection, "bq_cast_constrain_bytes", {kBlob, kBigint}, kBlob, Apply<ConstrainBytes>);
   Register(connection, "bq_float64_to_numeric", {kDouble, kBoolean}, numeric.get(),
            Apply<CastFloat64ToNumeric, kSafe>);
+  // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
+  // constructor.
+  const std::vector<duckdb_logical_type> text = {varchar.get(), boolean.get()};
+  Register(connection, "bq_string_to_numeric", text, numeric.get(),
+           Apply<CastStringToNumeric, kSafe>);
   LogicalType const bigint(duckdb_create_logical_type(kBigint));
   Register(connection, "bq_cast_constrain_numeric", {numeric.get(), bigint.get(), bigint.get()},
            numeric.get(), Apply<ConstrainNumeric>);
