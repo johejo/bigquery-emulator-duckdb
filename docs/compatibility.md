@@ -389,8 +389,9 @@ Script dry runs support a prefix of `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MER
 `TRUNCATE TABLE` statements followed by [`CALL`](#stored-procedures), supported DDL,
 `EXECUTE IMMEDIATE`, `IF`, `FOR` or `WHILE`. Validation stops after `CALL` or DDL, or before
 `IF`, `FOR` or `WHILE`. For `EXECUTE IMMEDIATE`, validation stops after checking the SQL
-expression and `USING` arguments without evaluating them. `INTO` and `CREATE TEMP TABLE`
-are not supported in dry runs.
+expression and `USING` arguments without evaluating them. `EXECUTE IMMEDIATE` can also follow
+leading typed `DECLARE` statements without `DEFAULT`, and `INTO` targets must be declared there.
+Other uses of `DECLARE` and dry runs of `CREATE TEMP TABLE` are unsupported.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
 value is verified against BigQuery. Assignments to other system variables are unsupported.

@@ -1,5 +1,5 @@
 version: 1
-description: Determine how EXECUTE IMMEDIATE dry runs validate INTO targets.
+description: EXECUTE IMMEDIATE dry runs check whether INTO targets were declared.
 cases:
   - name: into_declared_target
     steps:
@@ -14,6 +14,8 @@ cases:
             dryRun: true
             useLegacySql: false
         observe: {status: /status}
+    expect:
+      dry_run: {status: 200}
   - name: into_undeclared_target
     steps:
       - name: dry_run
@@ -26,4 +28,11 @@ cases:
               EXECUTE IMMEDIATE 'SELECT 42' INTO missing_target;
             dryRun: true
             useLegacySql: false
-        observe: {status: /status}
+        expectFailure: true
+        observe:
+          status: /status
+          message: /body/error/message
+    expect:
+      dry_run:
+        status: 400
+        message: 'Undeclared variable: missing_target at [2:36]'

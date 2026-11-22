@@ -26,10 +26,14 @@
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/multi_catalog.h"
 #include "googlesql/public/parse_location.h"
+#include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "googlesql/scripting/script_segment.h"
+#include "googlesql/scripting/type_aliases.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -57,6 +61,7 @@
 #include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
 #include "src/table_source.h"
+#include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
 #include "src/translator/literal.h"
@@ -516,11 +521,64 @@ std::shared_ptr<const StorageSnapshot> SqlRuntime::ReadStorageTable(
   return snapshot;
 }
 
+struct SqlRuntime::DryRunDeclarations {
+  std::string_view sql;
+  std::vector<const googlesql::ASTVariableDeclaration*> nodes;
+  const googlesql::ASTExecuteImmediateStatement* dynamic = nullptr;
+
+  void AddVariables(googlesql::SimpleCatalog& variables, googlesql::Catalog& catalog,
+                    googlesql::TypeFactory& types, TimestampPrecision precision,
+                    const AnalyzerSettings& settings) const {
+    std::set<std::string> names;
+    for (const auto* declaration : nodes) {
+      if (declaration->type() == nullptr || declaration->default_value() != nullptr) {
+        throw ApiError::UnsupportedQuery("DECLARE with DEFAULT in script dry runs");
+      }
+      const auto type =
+          AnalyzeScriptType(googlesql::ScriptSegment::FromASTNode(sql, declaration->type()),
+                            catalog, types, precision, settings);
+      if (!type.ok()) {
+        throw ApiError::InvalidQuery(std::string(type.status().message()));
+      }
+      for (const auto* identifier : declaration->variable_list()->identifier_list()) {
+        const auto name = identifier->GetAsString();
+        if (!names.insert(ToUpperAscii(name)).second) {
+          throw ApiError::InvalidQuery("Variable redeclaration: " + name);
+        }
+        std::unique_ptr<googlesql::SimpleConstant> constant;
+        const auto status = googlesql::SimpleConstant::Create(
+            {name}, googlesql::Value::Null(type->type), &constant);
+        if (!status.ok()) {
+          throw ApiError::InvalidQuery(std::string(status.message()));
+        }
+        variables.AddOwnedConstant(std::move(constant));
+      }
+    }
+    if (dynamic->into_clause() == nullptr) {
+      return;
+    }
+    const googlesql::ParseLocationTranslator location(sql);
+    for (const auto* identifier : dynamic->into_clause()->identifiers()->identifier_list()) {
+      const auto name = identifier->GetAsString();
+      if (!names.contains(ToUpperAscii(name))) {
+        std::string message = "Undeclared variable: " + name;
+        if (const auto position =
+                location.GetLineAndColumnAfterTabExpansion(identifier->location().start());
+            position.ok()) {
+          message += std::format(" at [{}:{}]", position->first, position->second);
+        }
+        throw ApiError::InvalidQuery(message);
+      }
+    }
+  }
+};
+
 TranslatedStatement SqlRuntime::Translate(
     const std::string& query, const QueryParameters& parameters, const std::string& default_project,
     const std::string& default_dataset, JobLocation* location,
     const googlesql::SystemVariableValuesMap* system_variables, bool stores_result, bool dry_run,
-    Backend* session, const ExpirationMutex::CatalogLock* catalog_lock) {
+    Backend* session, const ExpirationMutex::CatalogLock* catalog_lock,
+    const DryRunDeclarations* declarations) {
   Backend& backend = session != nullptr ? *session : backend_;
   AnalyzerSettings settings{
       .default_project = default_project,
@@ -548,8 +606,21 @@ TranslatedStatement SqlRuntime::Translate(
   RoutineCatalog catalog(*source, &type_factory, settings.default_project, settings.default_dataset,
                          functions_.timestamp_precision(), nullptr, excluded_function_ids_,
                          declarations_);
-  const AnalyzerResult analyzed =
-      AnalyzeGoogleSql(query, catalog, type_factory, functions_.timestamp_precision(), settings);
+  std::optional<googlesql::SimpleCatalog> variables;
+  std::unique_ptr<googlesql::MultiCatalog> scoped_catalog;
+  if (declarations != nullptr) {
+    variables.emplace("variables", &type_factory);
+    const auto status =
+        googlesql::MultiCatalog::Create("script", {&*variables, &catalog}, &scoped_catalog);
+    if (!status.ok()) {
+      throw ApiError::InvalidQuery(std::string(status.message()));
+    }
+    declarations->AddVariables(*variables, *scoped_catalog, type_factory,
+                               functions_.timestamp_precision(), settings);
+  }
+  const AnalyzerResult analyzed = AnalyzeGoogleSql(
+      query, scoped_catalog ? *static_cast<googlesql::Catalog*>(scoped_catalog.get()) : catalog,
+      type_factory, functions_.timestamp_precision(), settings);
   if (dry_run) {
     if (auto type = analyzed.CheckScriptDryRun(); type.has_value()) {
       TranslatedStatement checked;
@@ -740,12 +811,26 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   const googlesql::ASTStatement* dry_run_stop = nullptr;
   bool skip_dry_run_stop = false;
   std::vector<const googlesql::ASTStatement*> dry_run_prefix;
+  DryRunDeclarations dry_run_declarations;
   if (script) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       for (const auto* statement : script->script()->statement_list()) {
-        if (statement->Is<googlesql::ASTCallStatement>() || statement->IsDdlStatement() ||
-            statement->Is<googlesql::ASTExecuteImmediateStatement>()) {
+        if (const auto* dynamic =
+                statement->GetAsOrNull<googlesql::ASTExecuteImmediateStatement>()) {
+          dry_run_declarations.dynamic = dynamic;
+          dry_run_stop = statement;
+          break;
+        }
+        if (const auto* declaration = statement->GetAsOrNull<googlesql::ASTVariableDeclaration>();
+            declaration != nullptr && dry_run_prefix.empty()) {
+          dry_run_declarations.nodes.push_back(declaration);
+          continue;
+        }
+        if (!dry_run_declarations.nodes.empty()) {
+          break;
+        }
+        if (statement->Is<googlesql::ASTCallStatement>() || statement->IsDdlStatement()) {
           const auto* create_table = statement->GetAsOrNull<googlesql::ASTCreateTableStmtBase>();
           if (create_table != nullptr && create_table->is_temp()) {
             throw ApiError::UnsupportedQuery("dry runs of CREATE TEMP TABLE");
@@ -776,6 +861,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
           static_cast<size_t>((skip_dry_run_stop ? range.start() : range.end()).GetByteOffset()));
       writes =
           dry_run_stop->IsDdlStatement() ? StatementWrites::kCatalog : StatementWrites::kNothing;
+      dry_run_declarations.sql = request.query;
     }
   }
   InferLocation(request.query, settings.default_project, settings.default_dataset, location);
@@ -821,10 +907,10 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     return Prepare(statement.sql, setup);
   };
   const auto translate = [&](const std::string& sql, const QueryParameters& parameters,
-                             bool stores_result) {
+                             bool stores_result, const DryRunDeclarations* declarations = nullptr) {
     return Translate(sql, parameters, settings.default_project, settings.default_dataset, &location,
                      &variables, stores_result, request.dry_run, session.get(),
-                     &statement_lock.catalog);
+                     &statement_lock.catalog, declarations);
   };
   size_t next_parameter = 0;
   const auto translate_script_statement = [&](const googlesql::ASTStatement& statement,
@@ -834,7 +920,8 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     const auto count = CountPositionalParameters(statement);
     const auto parameters = request.parameters.SlicePositional(next_parameter, count);
     next_parameter += count;
-    return translate(DryRunStatementSql(request.query, statement), parameters, stores_result);
+    return translate(DryRunStatementSql(request.query, statement), parameters, stores_result,
+                     &statement == dry_run_declarations.dynamic ? &dry_run_declarations : nullptr);
   };
   for (const auto* statement : dry_run_prefix) {
     const auto translated = translate_script_statement(*statement, /*stores_result=*/false);
@@ -848,7 +935,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     return {};
   }
   const TranslatedStatement translation =
-      dry_run_prefix.empty()
+      dry_run_prefix.empty() && dry_run_declarations.dynamic == nullptr
           ? translate(request.query, request.parameters, request.destination_table.has_value())
           : translate_script_statement(*dry_run_stop, request.destination_table.has_value());
   if (!script) {

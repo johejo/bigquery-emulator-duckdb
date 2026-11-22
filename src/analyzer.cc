@@ -76,10 +76,6 @@ const googlesql::Value* AnalyzerResult::literal_value() const {
 
 std::optional<std::string> AnalyzerResult::CheckScriptDryRun() const {
   if (statement().Is<googlesql::ResolvedExecuteImmediateStmt>()) {
-    const auto* dynamic = statement().GetAs<googlesql::ResolvedExecuteImmediateStmt>();
-    if (!dynamic->into_identifier_list().empty()) {
-      throw ApiError::UnsupportedQuery("dry runs of EXECUTE IMMEDIATE with INTO");
-    }
     return "EXECUTE_IMMEDIATE";
   }
   if (!statement().Is<googlesql::ResolvedCallStmt>()) {
