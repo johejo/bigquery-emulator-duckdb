@@ -1,6 +1,6 @@
 version: 1
 # A script dry run validates the first DDL statement and skips the rest.
-# See third_party/bigquery_docs/multi-statement-queries.md#dry-run-a-multi-statement-query.
+# See “Dry-run a multi-statement query” in third_party/bigquery_docs/multi-statement-queries.md.
 description: A script dry run stops at the first DDL without executing it.
 vars:
   dataset: bqa_${run}_${case}

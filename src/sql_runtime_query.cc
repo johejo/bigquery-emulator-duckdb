@@ -234,6 +234,15 @@ size_t CountPositionalParameters(const googlesql::ASTStatement& statement) {
       }));
 }
 
+bool StopsDryRunBefore(const googlesql::ASTStatement& statement) {
+  if (statement.Is<googlesql::ASTIfStatement>() || statement.Is<googlesql::ASTForInStatement>()) {
+    return true;
+  }
+  // GoogleSQL also represents LOOP as an ASTWhileStatement, without a condition.
+  const auto* loop = statement.GetAsOrNull<googlesql::ASTWhileStatement>();
+  return loop != nullptr && loop->condition() != nullptr;
+}
+
 // TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
 std::string ScriptStatementType(const googlesql::ParserOutput& script) {
   const auto& statements = script.script()->statement_list();
@@ -727,6 +736,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   StatementWrites writes = StatementWrites::kCatalog;
   const auto script = ParseScript(request.query, writes);
   const googlesql::ASTStatement* dry_run_stop = nullptr;
+  bool skip_dry_run_stop = false;
   std::vector<const googlesql::ASTStatement*> dry_run_prefix;
   if (script) {
     query.statement_type = ScriptStatementType(*script);
@@ -740,6 +750,11 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
           dry_run_stop = statement;
           break;
         }
+        if (StopsDryRunBefore(*statement)) {
+          dry_run_stop = statement;
+          skip_dry_run_stop = true;
+          break;
+        }
         if (!statement->Is<googlesql::ASTQueryStatement>() &&
             StatementWritesOf(*statement) != StatementWrites::kRows) {
           break;
@@ -748,10 +763,12 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
       }
       if (dry_run_stop == nullptr) {
         throw ApiError::UnsupportedQuery(
-            "dry runs of scripts unless CALL or DDL is preceded only by SELECT or supported DML");
+            "dry runs of scripts without a supported stopping statement after SELECT or DML");
       }
-      // Do not consider anything after the first CALL or DDL, even for location inference.
-      request.query.resize(static_cast<size_t>(dry_run_stop->location().end().GetByteOffset()));
+      // Infer location only from statements the dry run validates, not skipped control flow.
+      const auto& range = dry_run_stop->location();
+      request.query.resize(
+          static_cast<size_t>((skip_dry_run_stop ? range.start() : range.end()).GetByteOffset()));
       writes =
           dry_run_stop->IsDdlStatement() ? StatementWrites::kCatalog : StatementWrites::kNothing;
     }
@@ -818,6 +835,12 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     const auto translated = translate_script_statement(*statement, /*stores_result=*/false);
     // Prepare DML against the original tables without applying its changes.
     prepare(translated);
+  }
+  if (skip_dry_run_stop) {
+    if (request.destination_table.has_value()) {
+      throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
+    }
+    return {};
   }
   const TranslatedStatement translation =
       dry_run_prefix.empty()

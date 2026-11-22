@@ -385,9 +385,10 @@ not support dry runs or destination tables.
 
 ## Scripts and transactions
 
-Script dry runs require a [`CALL`](#stored-procedures) or supported DDL, optionally preceded by
-`SELECT`, `INSERT`, `UPDATE`, `DELETE` or `MERGE` statements. Validation stops after the first
-`CALL` or DDL. `CREATE TEMP TABLE` cannot be dry-run.
+Script dry runs support a prefix of `SELECT`, `INSERT`, `UPDATE`, `DELETE` and `MERGE` statements
+followed by [`CALL`](#stored-procedures), supported DDL, `IF`, `FOR` or `WHILE`. Validation stops
+after a `CALL` or DDL, or before an `IF`, `FOR` or `WHILE` (including its condition or query and
+its body). `CREATE TEMP TABLE` cannot be dry-run.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
 value is verified against BigQuery. Assignments to other system variables are unsupported.
