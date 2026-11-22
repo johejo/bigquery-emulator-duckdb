@@ -385,8 +385,8 @@ not support dry runs or destination tables.
 
 ## Scripts and transactions
 
-Script dry runs are limited to scripts that start with [`CALL`](#stored-procedures) or have only
-`SELECT` statements before the first `CALL`.
+Script dry runs require a [`CALL`](#stored-procedures), optionally preceded by `SELECT`,
+`INSERT`, `UPDATE`, `DELETE` or `MERGE` statements.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
 value is verified against BigQuery. Assignments to other system variables are unsupported.

@@ -727,7 +727,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   StatementWrites writes = StatementWrites::kCatalog;
   const auto script = ParseScript(request.query, writes);
   const googlesql::ASTStatement* dry_run_call = nullptr;
-  std::vector<const googlesql::ASTStatement*> dry_run_selects;
+  std::vector<const googlesql::ASTStatement*> dry_run_prefix;
   if (script) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
@@ -736,14 +736,15 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
           dry_run_call = statement;
           break;
         }
-        if (!statement->Is<googlesql::ASTQueryStatement>()) {
+        if (!statement->Is<googlesql::ASTQueryStatement>() &&
+            StatementWritesOf(*statement) != StatementWrites::kRows) {
           break;
         }
-        dry_run_selects.push_back(statement);
+        dry_run_prefix.push_back(statement);
       }
       if (dry_run_call == nullptr) {
         throw ApiError::UnsupportedQuery(
-            "dry runs of scripts unless they start with CALL or SELECTs followed by CALL");
+            "dry runs of scripts unless CALL is preceded only by SELECT or supported DML");
       }
       // Do not consider anything after the first CALL, even for location inference.
       request.query.resize(static_cast<size_t>(dry_run_call->location().end().GetByteOffset()));
@@ -808,11 +809,13 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     next_parameter += count;
     return translate(DryRunStatementSql(request.query, statement), parameters, stores_result);
   };
-  for (const auto* statement : dry_run_selects) {
-    prepare(translate_script_statement(*statement, /*stores_result=*/false));
+  for (const auto* statement : dry_run_prefix) {
+    const auto translated = translate_script_statement(*statement, /*stores_result=*/false);
+    // Prepare DML against the original tables without applying its changes.
+    prepare(translated);
   }
   const TranslatedStatement translation =
-      dry_run_selects.empty()
+      dry_run_prefix.empty()
           ? translate(request.query, request.parameters, request.destination_table.has_value())
           : translate_script_statement(*dry_run_call, request.destination_table.has_value());
   if (!script) {
