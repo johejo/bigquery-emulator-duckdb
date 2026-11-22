@@ -1,0 +1,75 @@
+version: 1
+# See “Dry-run a multi-statement query” in third_party/bigquery_docs/multi-statement-queries.md.
+description: Without a stopping statement, dry runs validate all SELECT and DML statements without applying writes.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: select_only
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'SELECT 1; SELECT 2;'
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 200}
+  - name: select_and_dml
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CREATE TABLE `${project}.${dataset}.t` (n INT64)'
+            useLegacySql: false
+      - name: valid_final_dml
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT COUNT(*) FROM `${project}.${dataset}.t`;
+              INSERT INTO `${project}.${dataset}.t` (n) VALUES (42);
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: invalid_final_dml
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT COUNT(*) FROM `${project}.${dataset}.t`;
+              INSERT INTO `${project}.${dataset}.t` (missing_column) VALUES (42);
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+      - name: unchanged
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'SELECT COUNT(*) FROM `${project}.${dataset}.t`'
+            useLegacySql: false
+        observe: {n: /body/rows/0/f/0/v}
+    expect:
+      valid_final_dml: {status: 200}
+      invalid_final_dml: {status: 400}
+      unchanged: {n: '0'}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

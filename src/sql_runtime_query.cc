@@ -810,6 +810,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   const auto script = ParseScript(request.query, writes);
   const googlesql::ASTStatement* dry_run_stop = nullptr;
   bool skip_dry_run_stop = false;
+  bool dry_run_to_end = false;
   std::vector<const googlesql::ASTStatement*> dry_run_prefix;
   DryRunDeclarations dry_run_declarations;
   if (script) {
@@ -851,16 +852,18 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         }
         dry_run_prefix.push_back(statement);
       }
-      if (dry_run_stop == nullptr) {
-        throw ApiError::UnsupportedQuery(
-            "dry runs of scripts without a supported stopping statement after SELECT or DML");
+      dry_run_to_end = dry_run_prefix.size() == script->script()->statement_list().size();
+      if (dry_run_stop != nullptr) {
+        // Infer location only from statements the dry run validates, not skipped control flow.
+        const auto& range = dry_run_stop->location();
+        request.query.resize(
+            static_cast<size_t>((skip_dry_run_stop ? range.start() : range.end()).GetByteOffset()));
+      } else if (!dry_run_to_end) {
+        throw ApiError::UnsupportedQuery("dry runs of scripts containing unsupported statements");
       }
-      // Infer location only from statements the dry run validates, not skipped control flow.
-      const auto& range = dry_run_stop->location();
-      request.query.resize(
-          static_cast<size_t>((skip_dry_run_stop ? range.start() : range.end()).GetByteOffset()));
-      writes =
-          dry_run_stop->IsDdlStatement() ? StatementWrites::kCatalog : StatementWrites::kNothing;
+      writes = dry_run_stop != nullptr && dry_run_stop->IsDdlStatement()
+                   ? StatementWrites::kCatalog
+                   : StatementWrites::kNothing;
       dry_run_declarations.sql = request.query;
     }
   }
@@ -928,7 +931,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
     // Prepare DML against the original tables without applying its changes.
     prepare(translated);
   }
-  if (skip_dry_run_stop) {
+  if (skip_dry_run_stop || dry_run_to_end) {
     if (request.destination_table.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
     }

@@ -62,20 +62,10 @@ func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
 	}
 }
 
-func TestMultiStatementQueryRejectsJobOptionsOfASingleStatement(t *testing.T) {
+func TestMultiStatementQueryRejectsDestinationTable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-
-	dryRun := client.Query("SELECT 1; SELECT 2")
-	dryRun.DryRun = true
-	job, err := dryRun.Run(ctx)
-	if err == nil {
-		err = job.LastStatus().Err()
-	}
-	if err == nil || !strings.Contains(err.Error(), "The emulator does not support dry runs") {
-		t.Errorf("got %v, want dry runs of a multi-statement query to be unsupported", err)
-	}
 
 	destination := client.Query("SELECT 1; SELECT 2")
 	destination.Dst = client.Dataset("go_scripts_destination").Table("t")

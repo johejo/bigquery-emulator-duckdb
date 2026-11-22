@@ -385,9 +385,9 @@ not support dry runs or destination tables.
 
 ## Scripts and transactions
 
-Script dry runs support a prefix of `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MERGE` and
-`TRUNCATE TABLE` statements followed by [`CALL`](#stored-procedures), supported DDL,
-`EXECUTE IMMEDIATE`, `IF`, `FOR` or `WHILE`. Validation stops after `CALL` or DDL, or before
+Script dry runs validate `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MERGE` and `TRUNCATE TABLE`
+through the end of the script or until a stopping statement. Validation stops after
+[`CALL`](#stored-procedures) or supported DDL, or before
 `IF`, `FOR` or `WHILE`. For `EXECUTE IMMEDIATE`, validation stops after checking the SQL
 expression and `USING` arguments without evaluating them. `EXECUTE IMMEDIATE` can also follow
 leading typed `DECLARE` statements without `DEFAULT`, and `INTO` targets must be declared there.
