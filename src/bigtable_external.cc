@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iterator>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -131,22 +132,35 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
             {cbt::InstanceResource(google::cloud::Project(source.project), source.instance)},
             google::cloud::Options{}.set<cbt::EnableMetricsOption>(false)),
         cbt::TableResource(source.project, source.instance, source.table), connection_options);
+    // BigQuery keeps rows that have a cell in any referenced family, or all rows if no family
+    // is referenced. Unreferenced families do not affect which rows a query sees.
+    std::set<std::string_view> selected_families;
+    for (size_t i = 1; i < schema.size(); ++i) {
+      const auto& name = schema.at(i).name;
+      if (!context.columns || context.columns->contains(name)) {
+        selected_families.insert(name);
+      }
+    }
     std::string query;
     for (const auto& row :
          table.ReadRows(cbt::RowRange::InfiniteRange(), cbt::Filter::PassAllFilter())) {
       CheckStatus(row.status());
+      if (!selected_families.empty() &&
+          std::ranges::none_of(row->cells(), [&selected_families](const auto& cell) {
+            return selected_families.contains(cell.family_name());
+          })) {
+        continue;
+      }
       std::string select = "SELECT ";
       for (size_t i = 0; i < schema.size(); ++i) {
         const auto& field = schema.at(i);
         if (i != 0) {
           select += ',';
         }
-        std::string value;
+        std::string value = "NULL";
         if (i == 0) {
           value = Bytes(row->row_key(), field.type == FieldType::kString);
-        } else if (context.columns && !context.columns->contains(field.name)) {
-          value = "NULL";
-        } else {
+        } else if (selected_families.contains(field.name)) {
           const bool latest = field.fields.at(0).fields.at(1).mode != FieldMode::kRepeated;
           std::map<std::string, std::vector<std::string>> columns;
           for (const auto& cell : row->cells()) {
@@ -163,17 +177,15 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
                                                     FieldType::kString) +
                             "}");
           }
-          if (columns.empty()) {
-            throw ApiError::Unsupported(
-                "Reading a Bigtable row with a missing selected column family");
+          if (!columns.empty()) {
+            std::vector<std::string> values;
+            values.reserve(columns.size());
+            for (const auto& [name, cells] : columns) {
+              values.push_back("{'name': " + Bytes(name, true) +
+                               ", 'cell': " + (latest ? cells.front() : List(cells)) + "}");
+            }
+            value = "{'column': " + List(values) + "}";
           }
-          std::vector<std::string> values;
-          values.reserve(columns.size());
-          for (const auto& [name, cells] : columns) {
-            values.push_back("{'name': " + Bytes(name, true) +
-                             ", 'cell': " + (latest ? cells.front() : List(cells)) + "}");
-          }
-          value = "{'column': " + List(values) + "}";
         }
         select += "CAST(" + value + " AS " + ToDuckDbReadType(field) + ") AS " +
                   QuoteIdentifier(field.name);
