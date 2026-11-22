@@ -19,6 +19,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/time/time.h"
 #include "googlesql/public/catalog.h"
@@ -186,6 +187,183 @@ std::optional<Relation> GraphExpandScan(const googlesql::ResolvedTVFScan& tvf,
   return result;
 }
 
+// A relation argument of VECTOR_SEARCH as its rows (`row`) and the embeddings it searches with
+// (`embedding`), or nullopt where its columns cannot be read.
+std::optional<std::string> SearchedRows(const googlesql::ResolvedFunctionArgument& argument,
+                                        const googlesql::TVFRelation& schema,
+                                        const googlesql::Type* type, int column,
+                                        const Scope& scope) {
+  const auto input = Scan(*argument.scan(), scope);
+  const auto sql_type = DuckDbType(type, scope.context.timestamp_precision);
+  if (!input || !sql_type) {
+    return std::nullopt;
+  }
+  const auto names = DuckDbStructFieldNames(type->AsStruct());
+  std::vector<std::string> fields;
+  std::string embedding;
+  for (int i = 0; i < schema.num_columns(); ++i) {
+    const auto value = input->columns.find(argument.argument_column_list(i).column_id());
+    if (value == input->columns.end()) {
+      return std::nullopt;
+    }
+    fields.push_back(QuoteIdentifier(names.at(static_cast<size_t>(i))) + " := " + value->second);
+    if (i == column) {
+      embedding = value->second;
+    }
+  }
+  return "SELECT CAST(struct_pack(" + Join(fields, ", ") + ") AS " + *sql_type + ") AS row, " +
+         embedding + " AS embedding, row_number() OVER () AS id" + input->From();
+}
+
+// The column of `schema` that `name` selects, ignoring case; the catalog accepted it as one.
+int SearchedColumn(const googlesql::TVFRelation& schema, const std::string& name) {
+  for (int i = 0; i < schema.num_columns(); ++i) {
+    if (absl::EqualsIgnoreCase(schema.column(i).name, name)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+bool IsEmbedding(const googlesql::Type* type) {
+  return type->IsArray() && type->AsArray()->element_type()->IsDouble();
+}
+
+// The query column a batch search reads, as the catalog chose it: the one named, or else the
+// ARRAY<FLOAT64> column named like the base column, or else the only ARRAY<FLOAT64> column.
+int QueryColumn(const googlesql::TVFRelation& schema, const googlesql::Value& named,
+                const std::string& column) {
+  if (!named.is_null()) {
+    return SearchedColumn(schema, named.string_value());
+  }
+  if (const int same = SearchedColumn(schema, column);
+      same != -1 && IsEmbedding(schema.column(same).type)) {
+    return same;
+  }
+  for (int i = 0; i < schema.num_columns(); ++i) {
+    if (IsEmbedding(schema.column(i).type)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// VECTOR_SEARCH's brute-force search: the top_k base rows nearest each query embedding. The
+// catalog validated the literal arguments. The errors are BigQuery's, observed in
+// tests/e2e/goclient/testdata/scalars/vector_search.txt.
+std::optional<Relation> VectorSearchScan(const googlesql::ResolvedTVFScan& tvf,
+                                         const Scope& scope) {
+  const auto& signature = *tvf.function_call_signature();
+  const auto& arguments = tvf.signature()->input_arguments();
+  const auto literal = [&](std::string_view name) {
+    for (int i = 0; i < signature.NumConcreteArguments(); ++i) {
+      const auto& argument = signature.ConcreteArgument(i);
+      if (argument.has_argument_name() && argument.argument_name() == name) {
+        return *arguments.at(static_cast<size_t>(i)).GetScalarArgType()->literal_value();
+      }
+    }
+    throw std::logic_error("VECTOR_SEARCH has no argument " + std::string(name));
+  };
+  const auto& result = tvf.signature()->result_schema();
+  const bool batch = tvf.argument_list(2)->scan() != nullptr;
+  const auto& base_schema = arguments.at(0).relation();
+  const int base_column = SearchedColumn(base_schema, literal("column_to_search").string_value());
+  const auto base = SearchedRows(*tvf.argument_list(0), base_schema,
+                                 result.column(batch ? 1 : 0).type, base_column, scope);
+  if (!base) {
+    return std::nullopt;
+  }
+  // The query value is bound once, as the batch form's query rows are.
+  std::string query;
+  std::string mismatch = "Array inputs are not equal in length";
+  if (batch) {
+    const auto& query_schema = arguments.at(2).relation();
+    const int query_column = QueryColumn(query_schema, literal("query_column_to_search"),
+                                         base_schema.column(base_column).name);
+    const auto rows = SearchedRows(*tvf.argument_list(2), query_schema, result.column(0).type,
+                                   query_column, scope);
+    if (!rows) {
+      return std::nullopt;
+    }
+    query = *rows;
+    mismatch = std::format(
+        "Dimension of column `{}` in the base table does not match the dimension of column `{}` "
+        "in the query data.",
+        base_schema.column(base_column).name, query_schema.column(query_column).name);
+  } else {
+    const auto value = Expression(*tvf.argument_list(2)->expr(), scope, Columns{});
+    if (!value) {
+      return std::nullopt;
+    }
+    query = "SELECT NULL AS row, " + *value + " AS embedding, NULL AS id";
+  }
+  // BigQuery searches NULL embeddings as empty ones, whose dimension differs from the others',
+  // except that a NULL single query value that is not a literal gives NULL distances.
+  const std::string type = absl::AsciiStrToUpper(literal("distance_type").string_value());
+  // The raw distance, `r.d`, the elements' infinities and NaNs, and the terms it sums. NaN
+  // elements give NaN distances, which BigQuery orders first, even where terms overflow, and
+  // infinite elements infinite or NaN ones. Otherwise an infinite term or sum fails.
+  std::string raw;
+  std::string term;
+  std::string zero;
+  if (type == "EUCLIDEAN") {
+    raw = "list_distance(e.b, e.q)";
+    term = "(e.b[i] - e.q[i]) * (e.b[i] - e.q[i])";
+  } else if (type == "COSINE") {
+    // BigQuery's cosine distance divides by the square root of the norms' product, as its
+    // examples' last digits show, rather than by the product of their square roots, and only
+    // the dot product fails to overflow: overflowing norms make the distance 1.
+    raw =
+        "1 - list_inner_product(e.b, e.q) / sqrt(list_inner_product(e.b, e.b) * "
+        "list_inner_product(e.q, e.q))";
+    term = "e.b[i] * e.q[i]";
+    zero =
+        "WHEN list_inner_product(e.b, e.b) = 0 OR list_inner_product(e.q, e.q) = 0 THEN "
+        "error('Cannot compute cosine distance against zero vector.') ";
+  } else {
+    // BigQuery's DOT_PRODUCT distance is the negated dot product, so the largest is nearest.
+    raw = "-list_inner_product(e.b, e.q)";
+    term = "e.b[i] * e.q[i]";
+  }
+  const std::string sum = type == "EUCLIDEAN" ? "r.d" : "list_inner_product(e.b, e.q)";
+  const std::string distance = std::format(
+      "CASE {}WHEN r.inf OR r.nan THEN r.d WHEN isinf({}) OR len(list_filter(list_transform("
+      "range(1, len(e.b) + 1), lambda i: {}), lambda t: isinf(t))) > 0 THEN error('Compute "
+      "overflow') ELSE r.d END",
+      zero, sum, term);
+  const std::string pairs = std::format(
+      "SELECT vq.row AS query, vq.id AS query_id, vb.row AS base, d.distance FROM ({}) AS vq "
+      "CROSS JOIN ({}) AS vb, LATERAL (SELECT COALESCE(vb.embedding, []::DOUBLE[]) AS b, "
+      "COALESCE(vq.embedding, []::DOUBLE[]) AS q) AS e, LATERAL (SELECT len(list_filter(e.q, "
+      "lambda x: x IS NULL)) > 0 AS null_query, len(e.b) <> len(e.q) AS mismatch) AS c, LATERAL "
+      "(SELECT CASE WHEN NOT c.null_query AND NOT c.mismatch THEN {} END AS d, "
+      "len(list_filter(e.b || e.q, lambda x: isinf(x))) > 0 AS inf, len(list_filter(e.b || e.q, "
+      "lambda x: isnan(x))) > 0 AS nan) AS r, LATERAL (SELECT CASE {}WHEN c.null_query THEN "
+      "error('Unexpected NULL element in input array') WHEN c.mismatch THEN error({}) ELSE {} END "
+      "AS distance) AS d",
+      query, *base, raw, batch ? "" : "WHEN vq.embedding IS NULL THEN NULL ",
+      QuoteLiteral(mismatch), distance);
+  // A NULL top_k is the default, 10, and a negative one returns every base row.
+  const auto top_k_value = literal("top_k");
+  const int64_t top_k = top_k_value.is_null() ? 10 : top_k_value.int64_value();
+  const std::string ranked =
+      "SELECT *, row_number() OVER (PARTITION BY query_id ORDER BY isnan(distance) DESC, "
+      "distance) AS rank FROM (" +
+      pairs + ")";
+  Relation output;
+  std::vector<std::string> projections;
+  for (int i = 0; i < tvf.column_list_size(); ++i) {
+    const int id = tvf.column_list(i).column_id();
+    const std::string& name = result.column(tvf.column_index_list(i)).name;
+    projections.push_back(QuoteIdentifier(name) + " AS " + ColumnName(id));
+    output.columns.emplace(id, "q." + ColumnName(id));
+  }
+  output.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
+               " FROM (" + ranked + ")" +
+               (top_k < 0 ? "" : " WHERE rank <= " + std::to_string(top_k));
+  return output;
+}
+
 std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, const Scope& scope) {
   if (const auto body = analyzer_functions::GetGraphExpandBody(*tvf.signature())) {
     return GraphExpandScan(tvf, *body, scope);
@@ -195,6 +373,9 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   }
   if (tvf.tvf()->Name() == "gap_fill") {
     return GapFillScan(tvf, scope);
+  }
+  if (tvf.tvf()->Name() == "vector_search") {
+    return VectorSearchScan(tvf, scope);
   }
   if (tvf.tvf()->Name() != "range_sessionize") {
     return Unsupported(scope, "table function " + tvf.tvf()->Name());

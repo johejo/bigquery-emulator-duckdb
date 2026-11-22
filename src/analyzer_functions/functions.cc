@@ -52,6 +52,7 @@ void AddBigQueryFunctionDeclarations(googlesql::SimpleCatalog& catalog) {
   AddRangeSessionize(catalog);
   AddGapFill(catalog);
   AddGraphExpand(catalog);
+  AddVectorSearch(catalog);
 }
 
 }  // namespace bigquery_emulator_duckdb::analyzer_functions

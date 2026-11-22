@@ -292,6 +292,19 @@ Value tables are unsupported.
 A query fails when a bucket reads a time point whose rows have different values, since which one
 BigQuery uses depends on row order.
 
+### VECTOR_SEARCH
+
+The emulator has no vector indexes, so `VECTOR_SEARCH` always runs the exact brute-force search,
+and the `use_brute_force` and `fraction_lists_to_search` options are validated but change
+nothing. Job statistics carry no `vectorSearchStatistics`. Limits:
+
+- Only `ARRAY<FLOAT64>` embeddings are searched; STRING and ObjectRef columns and values need
+  autonomous embedding generation, which is unsupported, and so is hybrid search.
+- `column_to_search`, `query_column_to_search`, `top_k`, `distance_type` and `options` must be
+  literals, and only `top_k` can be NULL.
+- A base table query that reads no table, such as one over `UNNEST`, is unsupported.
+- Value tables are unsupported.
+
 ### EXTERNAL_QUERY
 
 Connections to PostgreSQL, MySQL and Spanner are configured with `--connection`; see the

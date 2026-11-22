@@ -671,6 +671,7 @@ cc_library(
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:error_helpers",
+        "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:sql_function",

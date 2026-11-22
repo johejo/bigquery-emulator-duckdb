@@ -12,5 +12,6 @@ void AddObjectRefFunctions(googlesql::SimpleCatalog& catalog);
 void AddRangeSessionize(googlesql::SimpleCatalog& catalog);
 void AddGapFill(googlesql::SimpleCatalog& catalog);
 void AddGraphExpand(googlesql::SimpleCatalog& catalog);
+void AddVectorSearch(googlesql::SimpleCatalog& catalog);
 
 }  // namespace bigquery_emulator_duckdb::analyzer_functions
