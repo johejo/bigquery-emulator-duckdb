@@ -386,6 +386,7 @@ query `CREATE SNAPSHOT TABLE` | CREATE TABLE tagged (id INT64) OPTIONS (tags = [
 note `CREATE SNAPSHOT TABLE` | See [Time travel](compatibility.md#time-travel) and [Partition expiration](compatibility.md#partition-expiration).
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe'); SELECT rowkey FROM n
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'CLOUD_BIGTABLE', uris = ['https://googleapis.com/bigtable/projects/test/instances/test/tables/probe'], bigtable_options = '{"columnFamilies":[{"familyId":"family","columns":[{"qualifierString":"named","onlyReadLatest":true}]}]}'); SELECT family.named.cell.value FROM n
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}')
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (s STRUCT<x INT64>, r ARRAY<STRUCT<y STRING>>) OPTIONS (format = 'PARQUET', uris = ['gs://b/f.parquet'])
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])

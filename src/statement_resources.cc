@@ -23,7 +23,8 @@ constexpr size_t kMaxWarnings = 100;
 
 std::optional<std::string> StatementResources::ReadQuery(
     const TableReference& table, const std::optional<TableRead>& definition,
-    StatementResources* resources, const std::optional<std::set<std::string>>& columns) {
+    StatementResources* resources, const std::optional<std::set<std::string>>& columns,
+    const ReadFields& fields) {
   if (!definition) {
     return std::nullopt;
   }
@@ -41,12 +42,24 @@ std::optional<std::string> StatementResources::ReadQuery(
     key += '\0';
     key += column;
   }
+  const auto* projected = std::get_if<FieldProjectedRead>(&*definition);
+  const ReadFields no_fields;
+  const auto& selected_fields = projected != nullptr ? fields : no_fields;
+  for (const auto& [column, ordinals] : selected_fields) {
+    key.append(2, '\0');
+    key += column;
+    for (const size_t ordinal : ordinals) {
+      key += '\0';
+      key += std::to_string(ordinal);
+    }
+  }
   if (const auto found = resources->reads_.find(key); found != resources->reads_.end()) {
     return found->second;
   }
   TableReadContext context{
       .files = resources->files_,
       .columns = columns,
+      .fields = selected_fields,
       .query = resources->query_,
       .warn =
           [resources](const ApiError& warning) {
@@ -61,7 +74,9 @@ std::optional<std::string> StatementResources::ReadQuery(
           },
       .dry_run = resources->mode_ == Mode::kDryRun,
   };
-  std::string query = std::get<std::function<std::string(TableReadContext&)>>(*definition)(context);
+  const auto& prepare =
+      projected != nullptr ? projected->prepare : std::get<PrepareTableRead>(*definition);
+  std::string query = prepare(context);
   resources->reads_.emplace(key, query);
   return query;
 }

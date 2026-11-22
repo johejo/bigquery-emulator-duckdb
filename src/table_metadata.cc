@@ -10,12 +10,14 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
 
+#include "absl/strings/escaping.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
@@ -409,6 +411,101 @@ void ValidateClustering(const std::vector<std::string>& clustering,
   }
 }
 
+void WriteBigtableCells(json& value, const BigtableCellOptions& cells) {
+  if (cells.type) {
+    value["type"] = *cells.type;
+  }
+  if (cells.encoding) {
+    value["encoding"] = *cells.encoding;
+  }
+  if (cells.only_read_latest) {
+    value["onlyReadLatest"] = *cells.only_read_latest;
+  }
+}
+
+std::string BigtableOptionString(const std::string& key, const json& value) {
+  if (!value.is_string()) {
+    throw ApiError::Invalid("Bigtable " + key + " must be a string");
+  }
+  return value.get<std::string>();
+}
+
+bool ParseBigtableCells(BigtableCellOptions& cells, const std::string& key, const json& value) {
+  if (key == "type") {
+    cells.type = BigtableOptionString(key, value);
+    if (*cells.type != "BYTES" && *cells.type != "STRING") {
+      throw ApiError::Unsupported("Bigtable cell type " + *cells.type);
+    }
+  } else if (key == "encoding") {
+    cells.encoding = BigtableOptionString(key, value);
+    if (*cells.encoding != "BINARY" && *cells.encoding != "TEXT") {
+      throw ApiError::Unsupported("Bigtable cell encoding " + *cells.encoding);
+    }
+  } else if (key == "onlyReadLatest") {
+    if (!value.is_boolean()) {
+      throw ApiError::Invalid("Bigtable onlyReadLatest must be a boolean");
+    }
+    cells.only_read_latest = value.get<bool>();
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool IsBigtableFieldName(std::string_view name) {
+  constexpr std::string_view letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  constexpr std::string_view other = "0123456789_";
+  return !name.empty() && name.size() <= 300 &&
+         letters.find(name.front()) != std::string_view::npos &&
+         std::ranges::all_of(name.substr(1), [&](char c) {
+           return letters.find(c) != std::string_view::npos ||
+                  other.find(c) != std::string_view::npos;
+         });
+}
+
+std::vector<BigtableColumn> ParseBigtableColumns(const json& value) {
+  if (!value.is_array()) {
+    throw ApiError::Invalid("Bigtable columns must be an array");
+  }
+  std::vector<BigtableColumn> columns;
+  std::set<std::string> qualifiers;
+  std::set<std::string> names{"column"};
+  for (const auto& column : value) {
+    if (!column.is_object()) {
+      throw ApiError::Invalid("Bigtable column must be an object");
+    }
+    if (column.contains("qualifierString") == column.contains("qualifierEncoded")) {
+      throw ApiError::Invalid("Specify one of Bigtable qualifierString and qualifierEncoded");
+    }
+    BigtableColumn parsed;
+    for (const auto& [key, setting] : column.items()) {
+      if (key == "qualifierString") {
+        parsed.qualifier = BigtableOptionString(key, setting);
+      } else if (key == "qualifierEncoded") {
+        parsed.qualifier_encoded = BigtableOptionString(key, setting);
+        if (!absl::Base64Unescape(*parsed.qualifier_encoded, &parsed.qualifier)) {
+          throw ApiError::Invalid("Invalid Bigtable qualifierEncoded base64");
+        }
+      } else if (key == "fieldName") {
+        parsed.field_name = BigtableOptionString(key, setting);
+      } else if (!ParseBigtableCells(parsed.cells, key, setting)) {
+        throw ApiError::Unsupported("Bigtable column option " + key);
+      }
+    }
+    if (!IsBigtableFieldName(parsed.Name())) {
+      throw ApiError::Invalid("Bigtable column requires a valid fieldName");
+    }
+    if (!names.insert(ToLowerAscii(parsed.Name())).second) {
+      throw ApiError::Invalid("Duplicate Bigtable field: " + parsed.Name());
+    }
+    if (!qualifiers.insert(parsed.qualifier).second) {
+      throw ApiError::Invalid("Duplicate Bigtable qualifier for field: " + parsed.Name());
+    }
+    columns.push_back(std::move(parsed));
+  }
+  return columns;
+}
+
 }  // namespace
 
 json BigtableOptionsJson(const BigtableOptions& options) {
@@ -421,14 +518,15 @@ json BigtableOptionsJson(const BigtableOptions& options) {
   }
   for (const auto& family : options.column_families) {
     json value = {{"familyId", family.family_id}};
-    if (!family.type.empty()) {
-      value["type"] = family.type;
-    }
-    if (family.encoding) {
-      value["encoding"] = *family.encoding;
-    }
-    if (family.only_read_latest) {
-      value["onlyReadLatest"] = *family.only_read_latest;
+    WriteBigtableCells(value, family.cells);
+    for (const auto& column : family.columns) {
+      json field = column.qualifier_encoded ? json{{"qualifierEncoded", *column.qualifier_encoded}}
+                                            : json{{"qualifierString", column.qualifier}};
+      if (column.field_name) {
+        field["fieldName"] = *column.field_name;
+      }
+      WriteBigtableCells(field, column.cells);
+      value["columns"].push_back(std::move(field));
     }
     result["columnFamilies"].push_back(std::move(value));
   }
@@ -811,37 +909,16 @@ TableMetadata TableMetadataFromJson(const json& table) {
             }
             BigtableFamily entry;
             for (const auto& [key, setting] : family.items()) {
-              if (key == "familyId" || key == "type" || key == "encoding") {
-                if (!setting.is_string()) {
-                  throw ApiError::Invalid("Bigtable " + key + " must be a string");
-                }
-                if (key == "familyId") {
-                  entry.family_id = setting.get<std::string>();
-                } else if (key == "type") {
-                  entry.type = setting.get<std::string>();
-                  if (entry.type.empty()) {
-                    throw ApiError::Unsupported("Empty Bigtable cell type");
-                  }
-                } else {
-                  entry.encoding = setting.get<std::string>();
-                }
-              } else if (key == "onlyReadLatest") {
-                if (!setting.is_boolean()) {
-                  throw ApiError::Invalid("Bigtable onlyReadLatest must be a boolean");
-                }
-                entry.only_read_latest = setting.get<bool>();
-              } else {
+              if (key == "familyId") {
+                entry.family_id = BigtableOptionString(key, setting);
+              } else if (key == "columns") {
+                entry.columns = ParseBigtableColumns(setting);
+              } else if (!ParseBigtableCells(entry.cells, key, setting)) {
                 throw ApiError::Unsupported("Bigtable column family option " + key);
               }
             }
             if (entry.family_id.empty()) {
               throw ApiError::Invalid("Bigtable familyId must not be empty");
-            }
-            if (!entry.type.empty() && entry.type != "BYTES" && entry.type != "STRING") {
-              throw ApiError::Unsupported("Bigtable cell type " + entry.type);
-            }
-            if (entry.encoding && *entry.encoding != "BINARY" && *entry.encoding != "TEXT") {
-              throw ApiError::Unsupported("Bigtable cell encoding " + *entry.encoding);
             }
             parsed.column_families.push_back(std::move(entry));
           }

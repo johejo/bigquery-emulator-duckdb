@@ -208,7 +208,7 @@ func TestBigtableExternal(t *testing.T) {
 	for _, options := range []string{
 		`{"outputColumnFamiliesAsJson":true}`,
 		`{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}`,
-		`{"columnFamilies":[{"familyId":"family","columns":[{"qualifierString":"qualifier"}]}]}`,
+		`{"columnFamilies":[{"familyId":"family","columns":[{"qualifierString":"qualifier","type":"INTEGER"}]}]}`,
 	} {
 		query := fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_external.rejected OPTIONS (format='CLOUD_BIGTABLE', uris='%s', bigtable_options='%s')`, uri, options)
 		if err := wait(ctx, client.Query(query)); err == nil || !strings.Contains(err.Error(), "does not support") {

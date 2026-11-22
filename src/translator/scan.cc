@@ -1244,6 +1244,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     Relation result;
     std::vector<std::string> projections;
     std::set<std::string> names;
+    ReadFields fields;
     for (int i = 0; i < table->column_list_size(); ++i) {
       const auto& column = table->column_list(i);
       if (!DuckDbType(column.type(), scope.context.timestamp_precision) ||
@@ -1253,6 +1254,10 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
       const std::string alias = ColumnName(column.column_id());
       const std::string name = table->table()->GetColumn(table->column_index_list(i))->Name();
       names.insert(name);
+      if (const auto found = scope.context.read_fields.find(column.column_id());
+          found != scope.context.read_fields.end()) {
+        fields.emplace(name, found->second);
+      }
       projections.push_back(
           StoredColumn(QuoteIdentifier(name), column.type(), scope.context.timestamp_precision) +
           " AS " + alias);
@@ -1276,7 +1281,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
                "GoogleSQL query')";
       }
       return StatementResources::ReadQuery(stored_table->reference(), definition,
-                                           scope.context.resources, names);
+                                           scope.context.resources, names, fields);
     }();
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +

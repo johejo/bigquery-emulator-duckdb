@@ -82,6 +82,7 @@ std::optional<std::string> TranslateExpression(
       .resources = defaults.resources.get(),
       .system_variables = system_variables,
   };
+  translator::CollectReadFields(expression, context);
   auto sql = translator::Expression(expression, translator::Scope{.context = context}, {});
   if (!sql) {
     if (unsupported != nullptr) {

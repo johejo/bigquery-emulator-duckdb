@@ -27,11 +27,27 @@ struct HivePartitioning {
   bool operator==(const HivePartitioning&) const = default;
 };
 
-struct BigtableFamily {
-  std::string family_id;
-  std::string type = {};
+struct BigtableCellOptions {
+  std::optional<std::string> type = std::nullopt;
   std::optional<std::string> encoding = std::nullopt;
   std::optional<bool> only_read_latest = std::nullopt;
+  bool operator==(const BigtableCellOptions&) const = default;
+};
+
+struct BigtableColumn {
+  // The qualifier bytes used to match cells. Keep the submitted base64 spelling for metadata.
+  std::string qualifier;
+  std::optional<std::string> qualifier_encoded = std::nullopt;
+  std::optional<std::string> field_name = std::nullopt;
+  BigtableCellOptions cells = {};
+  [[nodiscard]] const std::string& Name() const { return field_name ? *field_name : qualifier; }
+  bool operator==(const BigtableColumn&) const = default;
+};
+
+struct BigtableFamily {
+  std::string family_id;
+  BigtableCellOptions cells = {};
+  std::vector<BigtableColumn> columns = {};
   bool operator==(const BigtableFamily&) const = default;
 };
 
