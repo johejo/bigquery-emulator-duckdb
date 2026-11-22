@@ -2,7 +2,9 @@ version: 1
 # See third_party/bigquery_docs/reference/standard-sql/data-definition-language.md
 # for defaultDataset on CREATE/DROP PROCEDURE, and
 # third_party/bigquery_docs/multi-statement-queries.md for CALL dry runs.
-description: Procedure DDL uses the default dataset, and a CALL dry run checks only the signature.
+# CALL takes expressions (reference/standard-sql/procedural-language.md), and
+# expressions can use positional parameters (reference/standard-sql/lexical.md).
+description: Procedure defaults, CALL dry runs, and positional parameters in standalone CALL.
 vars:
   dataset: bqa_${run}_${case}
 cases:
@@ -67,6 +69,31 @@ cases:
         expectFailure: true
         observe:
           status: /status
+      - name: create_positional
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CREATE PROCEDURE `${project}.${dataset}.p_args`(n INT64, label STRING) BEGIN SELECT n, label; END'
+            useLegacySql: false
+      - name: positional_call
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "CALL `${project}.${dataset}.p_args`(? + ?, CONCAT('?', ?))"
+            useLegacySql: false
+            parameterMode: POSITIONAL
+            queryParameters:
+              - parameterType: {type: INT64}
+                parameterValue: {value: '17'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '25'}
+              - parameterType: {type: STRING}
+                parameterValue: {value: example}
+        observe:
+          n: /body/rows/0/f/0/v
+          label: /body/rows/0/f/1/v
       - name: create_output
         rest:
           method: POST
@@ -110,6 +137,7 @@ cases:
       leading_call_dry_run: {status: 200}
       wrong_type: {status: 400}
       wrong_arity: {status: 400}
+      positional_call: {n: '42', label: '?example'}
       output_literal: {status: 400}
       missing: {status: 400}
     cleanup:

@@ -47,8 +47,10 @@
 #include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/scripting/error_helpers.h"
+#include "googlesql/scripting/parsed_script.h"
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
+#include "googlesql/scripting/stack_frame.h"
 #include "googlesql/scripting/type_aliases.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
@@ -625,6 +627,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       settings.default_project = frame.procedure_project;
       settings.default_dataset.clear();
       settings.named_parameters.clear();
+      settings.positional_parameters.clear();
     }
     return settings;
   }
@@ -776,15 +779,34 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return absl::OkStatus();
   }
 
-  // Sets `settings` to those that what the script runs now is analyzed with, and returns its query
-  // parameters: those of the request, but in dynamic SQL only the ones that EXECUTE IMMEDIATE
-  // passes with USING, which the executor adds to the analyzer options itself.
+  // Selects the parameter types and literals for this segment. In dynamic SQL, only USING
+  // parameters are visible, and the executor adds their types to the analyzer options itself.
   absl::StatusOr<QueryParameters> Parameters(const googlesql::ScriptExecutor& executor,
+                                             const googlesql::ScriptSegment* segment,
                                              AnalyzerSettings& settings) {
     settings = Settings(executor);
     switch (frames_.back().kind) {
-      case ScriptFrame::Kind::kScript:
-        return parameters_;
+      case ScriptFrame::Kind::kScript: {
+        if (settings.positional_parameters.empty()) {
+          return parameters_;
+        }
+        if (segment == nullptr) {
+          return Unsupported("positional parameters in synthesized script expressions");
+        }
+        // CALL arguments are analyzed separately, each with its parameter positions starting
+        // at 1. Use the span of types and literals for this argument, not the whole CALL.
+        const auto range =
+            executor.GetCurrentStackFrame()->parsed_script()->GetPositionalParameters(
+                segment->range());
+        settings.positional_parameters.clear();
+        std::vector<std::string> literals;
+        for (int64_t i = range.start_param_index; i < range.start_param_index + range.num_params;
+             ++i) {
+          settings.positional_parameters.push_back(settings_.positional_parameters.at(i));
+          literals.push_back(parameters_.ByPosition(static_cast<int>(i + 1)));
+        }
+        return QueryParameters({}, std::move(literals));
+      }
       case ScriptFrame::Kind::kProcedure:
         return QueryParameters();
       case ScriptFrame::Kind::kDynamicSql:
@@ -812,7 +834,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const std::function<absl::Status(const googlesql::ResolvedStatement&)>& check = nullptr) {
     GOOGLESQL_RETURN_IF_ERROR(CheckDefinition(*segment.node()));
     AnalyzerSettings settings;
-    GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
+    GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters,
+                               Parameters(executor, &segment, settings));
     // Transaction control needs no tables, and ROLLBACK must work on an aborted connection.
     const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
@@ -950,7 +973,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                                       const googlesql::ScriptSegment* segment,
                                                       const googlesql::Type* target_type) {
     AnalyzerSettings settings;
-    GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
+    GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters,
+                               Parameters(executor, segment, settings));
     const auto lifecycle_lock =
         host_.LockStatement(StatementWrites::kNothing, /*expire=*/!in_transaction_);
     StatementTransaction transaction(*backend_);
@@ -1051,7 +1075,13 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
                       const std::vector<std::string>& setup, const std::string& query_project,
                       int64_t number) {
   if (!parameters.positional_types().empty()) {
-    throw ApiError::UnsupportedQuery("positional parameters in multi-statement queries");
+    const auto statements = script.script()->statement_list();
+    if (statements.size() != 1 || !statements.front()->Is<googlesql::ASTCallStatement>()) {
+      throw ApiError::UnsupportedQuery("positional parameters in multi-statement queries");
+    }
+    if (!parameters.named_types().empty()) {
+      throw ApiError::InvalidQuery("A statement cannot use both named and positional parameters");
+    }
   }
   if (const auto unsupported = UnsupportedStatement(*script.script())) {
     throw ApiError::UnsupportedQuery(*unsupported);
@@ -1092,6 +1122,13 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
       throw ApiError::InvalidQuery(std::string(type.status().message()));
     }
     settings.named_parameters.emplace_back(field.name, *type);
+  }
+  for (const FieldSchema& field : parameters.positional_types()) {
+    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
+    if (!type.ok()) {
+      throw ApiError::InvalidQuery(std::string(type.status().message()));
+    }
+    settings.positional_parameters.push_back(*type);
   }
   absl::StatusOr<googlesql::AnalyzerOptions> analyzer_options =
       ScriptAnalyzerOptions(host.functions().timestamp_precision(), settings);

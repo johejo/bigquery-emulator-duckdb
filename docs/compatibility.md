@@ -386,6 +386,7 @@ not support dry runs, destination tables or positional parameters.
 ## Scripts and transactions
 
 Dry runs are unsupported for scripts unless they start with [`CALL`](#stored-procedures).
+Executing multi-statement queries with positional query parameters is unsupported.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
 value is verified against BigQuery. Assignments to other system variables are unsupported.
@@ -404,8 +405,7 @@ Inside procedures, including their dynamic SQL, system variable reads are limite
 `@@dataset_id`, `@@dataset_project_id`, `@@project_id`, `@@time_zone` and `@@error.message`;
 assignments are limited to `@@dataset_id` and `@@dataset_project_id`.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`. A `CALL` can be dry-run only as the first statement
-of a query. `CALL` queries do not support destination tables, and executing a `CALL` does not
-support positional query parameters.
+of a query. `CALL` queries do not support destination tables.
 
 ## Encryption keysets
 
