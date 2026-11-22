@@ -385,8 +385,9 @@ not support dry runs or destination tables.
 
 ## Scripts and transactions
 
-Script dry runs require a [`CALL`](#stored-procedures), optionally preceded by `SELECT`,
-`INSERT`, `UPDATE`, `DELETE` or `MERGE` statements.
+Script dry runs require a [`CALL`](#stored-procedures) or supported DDL, optionally preceded by
+`SELECT`, `INSERT`, `UPDATE`, `DELETE` or `MERGE` statements. Validation stops after the first
+`CALL` or DDL. `CREATE TEMP TABLE` cannot be dry-run.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
 value is verified against BigQuery. Assignments to other system variables are unsupported.
@@ -404,8 +405,8 @@ Roll back a failed transaction: it cannot preserve statements before the error f
 Inside procedures, including their dynamic SQL, system variable reads are limited to
 `@@dataset_id`, `@@dataset_project_id`, `@@project_id`, `@@time_zone` and `@@error.message`;
 assignments are limited to `@@dataset_id` and `@@dataset_project_id`.
-`EXECUTE IMMEDIATE` cannot execute a `CALL`. After parsing the script, a dry run stops at the
-first `CALL`; it does not analyze the procedure body or later statements.
+`EXECUTE IMMEDIATE` cannot execute a `CALL`. A `CALL` dry run checks the procedure's signature
+but does not analyze its body.
 `CALL` queries do not support destination tables.
 
 ## Encryption keysets

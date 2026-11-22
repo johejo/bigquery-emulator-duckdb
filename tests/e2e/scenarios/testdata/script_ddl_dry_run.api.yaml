@@ -1,0 +1,68 @@
+version: 1
+# A script dry run validates the first DDL statement and skips the rest.
+# See third_party/bigquery_docs/multi-statement-queries.md#dry-run-a-multi-statement-query.
+description: A script dry run stops at the first DDL without executing it.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: first_ddl
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: ddl_after_select
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT 1;
+              CREATE TABLE `${project}.${dataset}.t` AS SELECT 42 AS id;
+              CALL `${project}.${dataset}.missing_procedure`();
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: ddl_did_not_create_table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        expectFailure: true
+        observe: {status: /status}
+      - name: invalid_first_ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.t` AS SELECT missing_column;
+              SELECT 1;
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+      - name: temporary_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TEMP TABLE t AS SELECT 1 AS id;
+              SELECT * FROM t;
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      ddl_after_select: {status: 200}
+      ddl_did_not_create_table: {status: 404}
+      invalid_first_ddl: {status: 400}
+      temporary_table: {status: 400}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true

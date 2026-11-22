@@ -726,14 +726,18 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   query.destination_table = request.destination_table;
   StatementWrites writes = StatementWrites::kCatalog;
   const auto script = ParseScript(request.query, writes);
-  const googlesql::ASTStatement* dry_run_call = nullptr;
+  const googlesql::ASTStatement* dry_run_stop = nullptr;
   std::vector<const googlesql::ASTStatement*> dry_run_prefix;
   if (script) {
     query.statement_type = ScriptStatementType(*script);
     if (request.dry_run) {
       for (const auto* statement : script->script()->statement_list()) {
-        if (statement->Is<googlesql::ASTCallStatement>()) {
-          dry_run_call = statement;
+        if (statement->Is<googlesql::ASTCallStatement>() || statement->IsDdlStatement()) {
+          const auto* create_table = statement->GetAsOrNull<googlesql::ASTCreateTableStmtBase>();
+          if (create_table != nullptr && create_table->is_temp()) {
+            throw ApiError::UnsupportedQuery("dry runs of CREATE TEMP TABLE");
+          }
+          dry_run_stop = statement;
           break;
         }
         if (!statement->Is<googlesql::ASTQueryStatement>() &&
@@ -742,13 +746,14 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
         }
         dry_run_prefix.push_back(statement);
       }
-      if (dry_run_call == nullptr) {
+      if (dry_run_stop == nullptr) {
         throw ApiError::UnsupportedQuery(
-            "dry runs of scripts unless CALL is preceded only by SELECT or supported DML");
+            "dry runs of scripts unless CALL or DDL is preceded only by SELECT or supported DML");
       }
-      // Do not consider anything after the first CALL, even for location inference.
-      request.query.resize(static_cast<size_t>(dry_run_call->location().end().GetByteOffset()));
-      writes = StatementWrites::kNothing;
+      // Do not consider anything after the first CALL or DDL, even for location inference.
+      request.query.resize(static_cast<size_t>(dry_run_stop->location().end().GetByteOffset()));
+      writes =
+          dry_run_stop->IsDdlStatement() ? StatementWrites::kCatalog : StatementWrites::kNothing;
     }
   }
   InferLocation(request.query, settings.default_project, settings.default_dataset, location);
@@ -803,7 +808,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   const auto translate_script_statement = [&](const googlesql::ASTStatement& statement,
                                               bool stores_result) {
     // Statement analysis numbers its parameters from 1 again. Advance only through the
-    // validated prefix; nothing after CALL needs a binding.
+    // validated prefix; nothing after the stopping statement needs a binding.
     const auto count = CountPositionalParameters(statement);
     const auto parameters = request.parameters.SlicePositional(next_parameter, count);
     next_parameter += count;
@@ -817,7 +822,7 @@ QueryResult SqlRuntime::ExecuteQuery(QueryRequest request, QueryJob& query, JobL
   const TranslatedStatement translation =
       dry_run_prefix.empty()
           ? translate(request.query, request.parameters, request.destination_table.has_value())
-          : translate_script_statement(*dry_run_call, request.destination_table.has_value());
+          : translate_script_statement(*dry_run_stop, request.destination_table.has_value());
   if (!script) {
     query.statement_type = translation.statement_type;
   }
