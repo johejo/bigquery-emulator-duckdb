@@ -12,8 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Mirrors the Bigtable fixture described in bigtable_qualifiers.api.yaml.
-func seedBigtableQualifiers(t *testing.T, project string) {
+func createBigtableFixture(t *testing.T, project, tableID string, families map[string]*adminpb.ColumnFamily) (btpb.BigtableClient, string) {
 	t.Helper()
 	host := os.Getenv("BIGTABLE_EMULATOR_HOST")
 	if host == "" {
@@ -27,11 +26,10 @@ func seedBigtableQualifiers(t *testing.T, project string) {
 	ctx := t.Context()
 	admin := adminpb.NewBigtableTableAdminClient(conn)
 	parent := "projects/" + project + "/instances/bqanswers"
-	const tableID = "bigtable-qualifier-probe"
 	table := parent + "/tables/" + tableID
 	if _, err := admin.CreateTable(ctx, &adminpb.CreateTableRequest{
 		Parent: parent, TableId: tableID,
-		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family_a": {}, "family_b": {}}},
+		Table: &adminpb.Table{ColumnFamilies: families},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -42,29 +40,54 @@ func seedBigtableQualifiers(t *testing.T, project string) {
 			t.Error(err)
 		}
 	})
-	cell := func(family, qualifier, value string, micros int64) *btpb.Mutation {
-		return &btpb.Mutation{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
-			FamilyName: family, ColumnQualifier: []byte(qualifier), Value: []byte(value), TimestampMicros: micros,
-		}}}
-	}
-	data := btpb.NewBigtableClient(conn)
+	return btpb.NewBigtableClient(conn), table
+}
+
+func bigtableCell(family, qualifier, value string, micros int64) *btpb.Mutation {
+	return &btpb.Mutation{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+		FamilyName: family, ColumnQualifier: []byte(qualifier), Value: []byte(value), TimestampMicros: micros,
+	}}}
+}
+
+// Mirrors the fixture described in bigtable_qualifiers.api.yaml.
+func seedBigtableQualifiers(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-qualifier-probe", map[string]*adminpb.ColumnFamily{"family_a": {}, "family_b": {}})
+	ctx := t.Context()
 	for _, row := range []struct {
 		key   string
 		cells []*btpb.Mutation
 	}{
 		{"both", []*btpb.Mutation{
-			cell("family_a", "promoted", "old", 1000), cell("family_a", "promoted", "new", 2000),
-			cell("family_a", "loose", "unlisted", 2000),
-			cell("family_a", "\xff", "raw-old", 1000), cell("family_a", "\xff", "raw-new", 2000),
+			bigtableCell("family_a", "promoted", "old", 1000), bigtableCell("family_a", "promoted", "new", 2000),
+			bigtableCell("family_a", "loose", "unlisted", 2000),
+			bigtableCell("family_a", "\xff", "raw-old", 1000), bigtableCell("family_a", "\xff", "raw-new", 2000),
 		}},
-		{"fallback_only", []*btpb.Mutation{cell("family_a", "loose", "unlisted", 2000)}},
-		{"named_only", []*btpb.Mutation{cell("family_a", "promoted", "solo", 2000)}},
-		{"other_family", []*btpb.Mutation{cell("family_b", "loose", "other", 2000)}},
+		{"fallback_only", []*btpb.Mutation{bigtableCell("family_a", "loose", "unlisted", 2000)}},
+		{"named_only", []*btpb.Mutation{bigtableCell("family_a", "promoted", "solo", 2000)}},
+		{"other_family", []*btpb.Mutation{bigtableCell("family_b", "loose", "other", 2000)}},
 	} {
 		if _, err := data.MutateRow(ctx, &btpb.MutateRowRequest{
 			TableName: table, RowKey: []byte(row.key), Mutations: row.cells,
 		}); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// Mirrors the fixture described in bigtable_integer.api.yaml.
+func seedBigtableInteger(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-integer-probe", map[string]*adminpb.ColumnFamily{"family": {}})
+	if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+		TableName: table, RowKey: []byte("fixture"),
+		Mutations: []*btpb.Mutation{
+			bigtableCell("family", "text", "42", 1000),
+			bigtableCell("family", "long", "\x00\x00\x00\x00\x00\x00\x00\x2a", 1000),
+			bigtableCell("family", "short", "\x00\x00\x00\x2a", 1000),
+			bigtableCell("family", "empty", "", 1000),
+		},
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

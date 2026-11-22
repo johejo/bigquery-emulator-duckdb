@@ -146,12 +146,13 @@ file's path lacks those keys.
 
 ## Bigtable
 
-Bigtable supports BYTES and STRING cell values, `readRowkeyAsString`,
-`ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` at the family and qualifier levels.
-Use `columnFamilies[].columns` to expose individual qualifiers as named fields beside
-`family.column`; that array contains only the unlisted qualifiers. Numeric/boolean conversion,
-JSON/PROTO values, `outputColumnFamiliesAsJson`, explicit schemas and GCS-specific read options
-are unsupported.
+Bigtable supports BYTES and STRING cell values, and INTEGER cells with `BINARY` or omitted
+encoding (4- or 8-byte signed big-endian values). `readRowkeyAsString`,
+`ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` at the family and qualifier levels
+are supported. Use `columnFamilies[].columns` to expose individual qualifiers as named fields
+beside `family.column`; that array contains only the unlisted qualifiers. INTEGER with `TEXT`,
+FLOAT, BOOLEAN, JSON/PROTO values, `outputColumnFamiliesAsJson`, explicit schemas and
+GCS-specific read options are unsupported.
 
 Reading a named field matches only cells with that qualifier. Reading a whole family or
 `family.column` matches any cell in the family, even if it belongs to a named qualifier.

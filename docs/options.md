@@ -316,7 +316,7 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}')`; `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"outputColumnFamiliesAsJson":true}')`. |
+| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"TEXT"}]}')`; `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"outputColumnFamiliesAsJson":true}')`. |
 
 ## Unprobed contexts
 

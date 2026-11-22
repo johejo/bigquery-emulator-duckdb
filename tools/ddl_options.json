@@ -294,7 +294,7 @@
       {
         "name": "bigtable_options",
         "type": "STRING",
-        "values": ["'{}'", "'{\"readRowkeyAsString\":true}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"STRING\",\"onlyReadLatest\":true}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierEncoded\":\"/w==\",\"fieldName\":\"named\",\"type\":\"BYTES\",\"onlyReadLatest\":true}]}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\"}]}'", "'{\"outputColumnFamiliesAsJson\":true}'"]
+        "values": ["'{}'", "'{\"readRowkeyAsString\":true}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"STRING\",\"onlyReadLatest\":true}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierEncoded\":\"/w==\",\"fieldName\":\"named\",\"type\":\"BYTES\",\"onlyReadLatest\":true}]}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"BINARY\"}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierString\":\"number\",\"type\":\"INTEGER\"}]}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"TEXT\"}]}'", "'{\"outputColumnFamiliesAsJson\":true}'"]
       },
       {
         "name": "compression",

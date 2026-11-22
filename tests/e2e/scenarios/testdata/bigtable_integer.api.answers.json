@@ -1,0 +1,437 @@
+{
+  "version": 1,
+  "cases": {
+    "binary_empty": {
+      "project": "johejo-sandbox2",
+      "run": "mj7ae46vsck77puc354julgm3m",
+      "steps": {
+        "create": {
+          "options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "encoding": "BINARY",
+                    "fieldName": "probe_value",
+                    "onlyReadLatest": true,
+                    "qualifierString": "empty",
+                    "type": "INTEGER"
+                  }
+                ],
+                "familyId": "family"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "INTEGER"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "probe_value",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family",
+              "type": "RECORD"
+            }
+          ],
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_mj7ae46vsck77puc354julgm3m_binary_empty.t, error message: Incorrect cell value size. Expected: 8, Actual: 0 At row:fixture, column_family:family, column:empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-integer-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_mj7ae46vsck77puc354julgm3m_binary_empty.t, error message: Incorrect cell value size. Expected: 8, Actual: 0 At row:fixture, column_family:family, column:empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-integer-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "binary_four_bytes": {
+      "project": "johejo-sandbox2",
+      "run": "mj7ae46vsck77puc354julgm3m",
+      "steps": {
+        "create": {
+          "options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "encoding": "BINARY",
+                    "fieldName": "probe_value",
+                    "onlyReadLatest": true,
+                    "qualifierString": "short",
+                    "type": "INTEGER"
+                  }
+                ],
+                "familyId": "family"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "INTEGER"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "probe_value",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family",
+              "type": "RECORD"
+            }
+          ],
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "omitted_encoding_binary": {
+      "project": "johejo-sandbox2",
+      "run": "mj7ae46vsck77puc354julgm3m",
+      "steps": {
+        "create": {
+          "options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "fieldName": "probe_value",
+                    "onlyReadLatest": true,
+                    "qualifierString": "long",
+                    "type": "INTEGER"
+                  }
+                ],
+                "familyId": "family"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "INTEGER"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "probe_value",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family",
+              "type": "RECORD"
+            }
+          ],
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "omitted_encoding_text": {
+      "project": "johejo-sandbox2",
+      "run": "mj7ae46vsck77puc354julgm3m",
+      "steps": {
+        "create": {
+          "options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "fieldName": "probe_value",
+                    "onlyReadLatest": true,
+                    "qualifierString": "text",
+                    "type": "INTEGER"
+                  }
+                ],
+                "familyId": "family"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "fields": [
+                {
+                  "fields": [
+                    {
+                      "mode": "NULLABLE",
+                      "name": "name",
+                      "type": "STRING"
+                    },
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "BYTES"
+                        }
+                      ],
+                      "mode": "REPEATED",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "REPEATED",
+                  "name": "column",
+                  "type": "RECORD"
+                },
+                {
+                  "fields": [
+                    {
+                      "fields": [
+                        {
+                          "mode": "NULLABLE",
+                          "name": "timestamp",
+                          "type": "TIMESTAMP"
+                        },
+                        {
+                          "mode": "NULLABLE",
+                          "name": "value",
+                          "type": "INTEGER"
+                        }
+                      ],
+                      "mode": "NULLABLE",
+                      "name": "cell",
+                      "type": "RECORD"
+                    }
+                  ],
+                  "mode": "NULLABLE",
+                  "name": "probe_value",
+                  "type": "RECORD"
+                }
+              ],
+              "mode": "NULLABLE",
+              "name": "family",
+              "type": "RECORD"
+            }
+          ],
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_mj7ae46vsck77puc354julgm3m_omitted_encoding_text.t, error message: Incorrect cell value size. Expected: 8, Actual: 2 At row:fixture, column_family:family, column:text File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-integer-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_mj7ae46vsck77puc354julgm3m_omitted_encoding_text.t, error message: Incorrect cell value size. Expected: 8, Actual: 2 At row:fixture, column_family:family, column:text File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-integer-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}
