@@ -102,21 +102,28 @@ func (e *env) append(ctx context.Context, stream string, offset *wrapperspb.Int6
 			Rows:         &storagepb.ProtoRows{SerializedRows: [][]byte{row}}}}})
 }
 
-func arrowAppend(fieldType bigquery.FieldType, wireType arrow.DataType) func(context.Context, *env) error {
+func arrowAppend(fieldType bigquery.FieldType, wireType arrow.DataType, sample string) func(context.Context, *env) error {
+	return arrowAppendField(bigquery.FieldSchema{Type: fieldType}, wireType, sample)
+}
+
+func arrowRangeAppend(boundType bigquery.FieldType, wireType arrow.DataType, sample string) func(context.Context, *env) error {
+	return arrowAppendField(bigquery.FieldSchema{
+		Type: bigquery.RangeFieldType, RangeElementType: &bigquery.RangeElementType{Type: boundType},
+	}, arrow.StructOf(arrow.Field{Name: "start", Type: wireType, Nullable: true},
+		arrow.Field{Name: "end", Type: wireType, Nullable: true}), sample)
+}
+
+func arrowAppendField(field bigquery.FieldSchema, wireType arrow.DataType, sample string) func(context.Context, *env) error {
+	field.Name = "value"
 	return func(ctx context.Context, e *env) error {
-		path, err := e.table(ctx, bigquery.Schema{{Name: "value", Type: fieldType}})
+		path, err := e.table(ctx, bigquery.Schema{&field})
 		if err != nil {
 			return err
 		}
 		b := array.NewRecordBuilder(memory.DefaultAllocator, arrow.NewSchema([]arrow.Field{{Name: "value", Type: wireType}}, nil))
 		defer b.Release()
-		switch f := b.Field(0).(type) {
-		case *array.StringBuilder:
-			f.Append("sample")
-		case *array.BooleanBuilder:
-			f.Append(true)
-		default:
-			return fmt.Errorf("no Arrow probe sample for %s", wireType)
+		if err := b.Field(0).AppendValueFromString(sample); err != nil {
+			return fmt.Errorf("encode Arrow probe sample for %s: %w", wireType, err)
 		}
 		record := b.NewRecordBatch()
 		defer record.Release()
@@ -374,8 +381,38 @@ var sections = []section{
 				}
 				return e.append(ctx, stream.Name, wrapperspb.Int64(0))
 			}},
-			{"Arrow UTF-8 rows", arrowAppend(bigquery.StringFieldType, arrow.BinaryTypes.String)},
-			{"Arrow boolean rows", arrowAppend(bigquery.BooleanFieldType, arrow.FixedWidthTypes.Boolean)},
+			{"Arrow UTF-8 rows", arrowAppend(bigquery.StringFieldType, arrow.BinaryTypes.String, "sample")},
+			{"Arrow boolean rows", arrowAppend(bigquery.BooleanFieldType, arrow.FixedWidthTypes.Boolean, "true")},
+			{"Arrow binary rows", arrowAppend(bigquery.BytesFieldType, arrow.BinaryTypes.Binary, "c2FtcGxl")},
+			{"Arrow single-precision floating-point rows", arrowAppend(bigquery.FloatFieldType, arrow.PrimitiveTypes.Float32, "1")},
+			{"Arrow double-precision floating-point rows", arrowAppend(bigquery.FloatFieldType, arrow.PrimitiveTypes.Float64, "1")},
+			{"Arrow Int64 rows", arrowAppend(bigquery.IntegerFieldType, arrow.PrimitiveTypes.Int64, "-2")},
+			{"Arrow Uint8 rows", arrowAppend(bigquery.IntegerFieldType, arrow.PrimitiveTypes.Uint8, "2")},
+			{"Arrow Uint16 rows", arrowAppend(bigquery.IntegerFieldType, arrow.PrimitiveTypes.Uint16, "2")},
+			{"Arrow Uint32 rows", arrowAppend(bigquery.IntegerFieldType, arrow.PrimitiveTypes.Uint32, "2")},
+			{"Arrow Uint64 rows", arrowAppend(bigquery.IntegerFieldType, arrow.PrimitiveTypes.Uint64, "2")},
+			{"Arrow Date32 rows", arrowAppend(bigquery.DateFieldType, arrow.FixedWidthTypes.Date32, "2000-01-01")},
+			{"Arrow Int32 DATE rows", arrowAppend(bigquery.DateFieldType, arrow.PrimitiveTypes.Int32, "2")},
+			{"Arrow UTF-8 DATE rows", arrowAppend(bigquery.DateFieldType, arrow.BinaryTypes.String, "2000-01-01")},
+			{"Arrow TIME rows", arrowAppend(bigquery.TimeFieldType, &arrow.Time64Type{Unit: arrow.Microsecond}, "08:10:11.257193")},
+			{"Arrow DATETIME rows", arrowAppend(bigquery.DateTimeFieldType, &arrow.TimestampType{Unit: arrow.Microsecond}, "2000-01-01T12:00:00")},
+			{"Arrow TIMESTAMP rows", arrowAppend(bigquery.TimestampFieldType, &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: "UTC"}, "2000-01-01T12:00:00Z")},
+			{"Arrow NUMERIC rows", arrowAppend(bigquery.NumericFieldType, &arrow.Decimal128Type{Precision: 12, Scale: 5}, "1.23")},
+			{"Arrow BIGNUMERIC rows", arrowAppend(bigquery.BigNumericFieldType, &arrow.Decimal256Type{Precision: 50, Scale: 20}, "1.23")},
+			{"Arrow JSON rows", arrowAppend(bigquery.JSONFieldType, arrow.BinaryTypes.String, `{"probe":true}`)},
+			{"Arrow GEOGRAPHY rows", arrowAppend(bigquery.GeographyFieldType, arrow.BinaryTypes.String, "POINT(3 4)")},
+			{"Arrow year-month INTERVAL rows", arrowAppend(bigquery.IntervalFieldType, arrow.FixedWidthTypes.MonthInterval, "1")},
+			{"Arrow day-time INTERVAL rows", arrowAppend(bigquery.IntervalFieldType, arrow.FixedWidthTypes.DayTimeInterval, `{"Days":1,"Milliseconds":2}`)},
+			{"Arrow month-day-nano INTERVAL rows", arrowAppend(bigquery.IntervalFieldType, arrow.FixedWidthTypes.MonthDayNanoInterval, `{"Months":1,"Days":1,"Nanoseconds":1000}`)},
+			{"Arrow INTERVAL rows with sub-microsecond precision", arrowAppend(bigquery.IntervalFieldType, arrow.FixedWidthTypes.MonthDayNanoInterval, `{"Nanoseconds":123456789}`)},
+			{"Arrow UTF-8 INTERVAL rows", arrowAppend(bigquery.IntervalFieldType, arrow.BinaryTypes.String, "1-1 1 0:0:0")},
+			{"Arrow LIST rows", arrowAppendField(bigquery.FieldSchema{Type: bigquery.StringFieldType, Repeated: true},
+				arrow.ListOf(arrow.BinaryTypes.String), `["probe"]`)},
+			{"Arrow STRUCT rows", arrowAppendField(bigquery.FieldSchema{Type: bigquery.RecordFieldType, Schema: stringSchema},
+				arrow.StructOf(arrow.Field{Name: "value", Type: arrow.BinaryTypes.String, Nullable: true}), `{"value":"probe"}`)},
+			{"Arrow RANGE<DATE> rows", arrowRangeAppend(bigquery.DateFieldType, arrow.FixedWidthTypes.Date32, `{"start":"2000-01-01","end":null}`)},
+			{"Arrow RANGE<DATETIME> rows", arrowRangeAppend(bigquery.DateTimeFieldType, &arrow.TimestampType{Unit: arrow.Microsecond}, `{"start":"2000-01-01T00:00:00","end":null}`)},
+			{"Arrow RANGE<TIMESTAMP> rows", arrowRangeAppend(bigquery.TimestampFieldType, &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: "UTC"}, `{"start":"2000-01-01T00:00:00Z","end":null}`)},
 			{"writer schema changes on a connection", func(ctx context.Context, e *env) error {
 				path, err := e.table(ctx, bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType},
 					{Name: "other", Type: bigquery.StringFieldType}})
@@ -416,7 +453,7 @@ var sections = []section{
 				MaxLength: 10}}, "probe")},
 			{"JSON columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.JSONFieldType}}, `{"a": 1}`)},
 			{"GEOGRAPHY columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.GeographyFieldType}}, "POINT(1 2)")},
-			{"INTERVAL columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.IntervalFieldType}}, "0-0 1 0:0:0")},
+			{"INTERVAL columns in protobuf", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.IntervalFieldType}}, "0-0 1 0:0:0")},
 			{"ROUND_HALF_EVEN columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.NumericFieldType,
 				RoundingMode: bigquery.RoundHalfEven}}, "1.5")},
 			{"parameterized NUMERIC columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.NumericFieldType,

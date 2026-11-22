@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "cases": {
+    "time64_micro": {
+      "project": "johejo-sandbox",
+      "run": "fx3undoqzoyztlutui5zd7j2ts",
+      "steps": {
+        "append": {
+          "code": "OK"
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "12:34:56.123456"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

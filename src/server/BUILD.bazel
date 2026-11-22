@@ -34,11 +34,17 @@ cc_library(
     implementation_deps = [
         ":storage_codec",
         "//:api_error",
-        "@googlesql//googlesql/common:utf_util",
-        "@nanoarrow",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:interval_value",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/functions:date_time_util",
     ],
     deps = [
         "//:field_schema",
+        "@nanoarrow",
         "@nlohmann_json//:json",
     ],
 )
