@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -34,6 +35,9 @@ class QueryParameters {
   // the query uses a parameter the request did not declare.
   [[nodiscard]] const std::string& ByName(const std::string& name) const;
   [[nodiscard]] const std::string& ByPosition(int position) const;
+
+  // Rebase a statement's positional parameters to start at position 1. `start` is 0-based.
+  [[nodiscard]] QueryParameters SlicePositional(size_t start, size_t count) const;
 
   // The declared types, in TableFieldSchema form: the named parameters with their names, in
   // request order, and the positional ones in position order. An ARRAY parameter is its

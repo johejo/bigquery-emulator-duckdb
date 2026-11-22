@@ -1,0 +1,67 @@
+version: 1
+# IF, FOR, and WHILE stop dry-run validation before the control statement.
+# See “Dry-run a multi-statement query” in third_party/bigquery_docs/multi-statement-queries.md.
+description: Script dry runs skip IF, FOR, WHILE, and all subsequent statements.
+cases:
+  - name: control_flow
+    steps:
+      - name: stops_before_if
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              IF missing_condition THEN
+                SELECT missing_body_column;
+              END IF;
+              SELECT missing_later_column;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: stops_before_for
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT 1;
+              FOR row IN (SELECT missing_input_column) DO
+                SELECT missing_body_column;
+              END FOR;
+              SELECT missing_later_column;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: stops_before_while
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT 1;
+              WHILE missing_condition DO
+                SELECT missing_body_column;
+              END WHILE;
+              SELECT missing_later_column;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+      - name: validates_prefix
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT missing_prefix_column;
+              IF TRUE THEN
+                SELECT 1;
+              END IF;
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      stops_before_if: {status: 200}
+      stops_before_for: {status: 200}
+      stops_before_while: {status: 200}
+      validates_prefix: {status: 400}

@@ -1,0 +1,44 @@
+version: 1
+description: USING expressions and parameter modes in EXECUTE IMMEDIATE dry runs.
+cases:
+  - name: using_valid_expression
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "EXECUTE IMMEDIATE 'SELECT @n' USING 42 AS n"
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 200}
+  - name: using_unresolved_name
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "EXECUTE IMMEDIATE 'SELECT @n' USING missing_name AS n"
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 400}
+  - name: using_mixed_aliases
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "EXECUTE IMMEDIATE 'SELECT 1' USING 42 AS n, 7"
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 400}

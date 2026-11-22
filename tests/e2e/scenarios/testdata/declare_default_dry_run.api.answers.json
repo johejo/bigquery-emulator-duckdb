@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "cases": {
+    "incompatible_type": {
+      "project": "johejo-sandbox",
+      "run": "3xqhw5cdrjzryvipjq2sbtap4m",
+      "steps": {
+        "dry_run": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Query error: Cannot coerce expression [42] to type INT64 at [1:30]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Query error: Cannot coerce expression [42] to type INT64 at [1:30]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "inferred_type_and_scope": {
+      "project": "johejo-sandbox",
+      "run": "3xqhw5cdrjzryvipjq2sbtap4m",
+      "steps": {
+        "dry_run": {
+          "status": 200
+        }
+      }
+    },
+    "runtime_error_in_default": {
+      "project": "johejo-sandbox",
+      "run": "3xqhw5cdrjzryvipjq2sbtap4m",
+      "steps": {
+        "dry_run": {
+          "status": 200
+        }
+      }
+    },
+    "typed_default": {
+      "project": "johejo-sandbox",
+      "run": "3xqhw5cdrjzryvipjq2sbtap4m",
+      "steps": {
+        "dry_run": {
+          "status": 200
+        }
+      }
+    },
+    "unresolved_name": {
+      "project": "johejo-sandbox",
+      "run": "3xqhw5cdrjzryvipjq2sbtap4m",
+      "steps": {
+        "dry_run": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "Query error: Unrecognized name: missing_name at [1:30]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "Query error: Unrecognized name: missing_name at [1:30]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+version: 1
+description: Dry runs check DECLARE defaults and infer variable types without evaluating defaults.
+cases:
+  - name: typed_default
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE target INT64 DEFAULT 0;
+              EXECUTE IMMEDIATE 'SELECT 42' INTO target;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 200}
+  - name: inferred_type_and_scope
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE fragment STRING DEFAULT '42';
+              DECLARE sql DEFAULT CONCAT('SELECT ', fragment);
+              EXECUTE IMMEDIATE sql;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 200}
+  - name: incompatible_type
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE target INT64 DEFAULT [42];
+              EXECUTE IMMEDIATE 'SELECT 42' INTO target;
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 400}
+  - name: unresolved_name
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE target INT64 DEFAULT missing_name;
+              EXECUTE IMMEDIATE 'SELECT 42' INTO target;
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 400}
+  - name: runtime_error_in_default
+    steps:
+      - name: dry_run
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE target INT64 DEFAULT DIV(1, 0);
+              EXECUTE IMMEDIATE 'SELECT 42' INTO target;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+    expect:
+      dry_run: {status: 200}

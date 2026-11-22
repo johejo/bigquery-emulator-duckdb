@@ -27,6 +27,7 @@
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/error_helpers.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/sql_view.h"
@@ -66,11 +67,30 @@ const googlesql::ResolvedExpr& AnalyzerResult::expression() const {
   return *analyzer_output_->resolved_expr();
 }
 
+const googlesql::Type* AnalyzerResult::expression_type() const { return expression().type(); }
+
 const googlesql::Value* AnalyzerResult::literal_value() const {
   const auto* expr = analyzer_output_->resolved_expr();
   return expr != nullptr && expr->Is<googlesql::ResolvedLiteral>()
              ? &expr->GetAs<googlesql::ResolvedLiteral>()->value()
              : nullptr;
+}
+
+std::optional<std::string> AnalyzerResult::CheckScriptDryRun() const {
+  if (statement().Is<googlesql::ResolvedExecuteImmediateStmt>()) {
+    return "EXECUTE_IMMEDIATE";
+  }
+  if (!statement().Is<googlesql::ResolvedCallStmt>()) {
+    return std::nullopt;
+  }
+  const auto& signature = statement().GetAs<googlesql::ResolvedCallStmt>()->signature();
+  for (const auto& argument : signature.arguments()) {
+    const auto mode = argument.options().procedure_argument_mode();
+    if (mode == googlesql::FunctionEnums::OUT || mode == googlesql::FunctionEnums::INOUT) {
+      throw ApiError::InvalidQuery("OUT and INOUT arguments must be variables");
+    }
+  }
+  return "CALL";
 }
 
 std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {

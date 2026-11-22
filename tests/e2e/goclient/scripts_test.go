@@ -62,20 +62,10 @@ func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
 	}
 }
 
-func TestMultiStatementQueryRejectsJobOptionsOfASingleStatement(t *testing.T) {
+func TestMultiStatementQueryRejectsDestinationTable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-
-	dryRun := client.Query("SELECT 1; SELECT 2")
-	dryRun.DryRun = true
-	job, err := dryRun.Run(ctx)
-	if err == nil {
-		err = job.LastStatus().Err()
-	}
-	if err == nil || !strings.Contains(err.Error(), "The emulator does not support dry runs") {
-		t.Errorf("got %v, want dry runs of a multi-statement query to be unsupported", err)
-	}
 
 	destination := client.Query("SELECT 1; SELECT 2")
 	destination.Dst = client.Dataset("go_scripts_destination").Table("t")
@@ -364,15 +354,6 @@ func TestDatasetSystemVariablesResolveSubsequentStatements(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Initial reads with a request default remain unsupported until BigQuery settles their values.
-	for _, name := range []string{"dataset_id", "dataset_project_id"} {
-		t.Run("initial "+name, func(t *testing.T) {
-			_, _, err := runScript(t, client, first, "SELECT 1; SELECT @@"+name)
-			if err == nil || !strings.Contains(err.Error(), "The emulator does not support system variable @@"+name) {
-				t.Errorf("got %v, want an unsupported initial system variable read", err)
-			}
-		})
-	}
 	for _, tc := range []struct {
 		name string
 		sql  string
@@ -440,9 +421,8 @@ func TestDatasetSystemVariablesResolveSubsequentStatements(t *testing.T) {
 	}
 }
 
-// bqanswers confirmed that both variables initially return NULL without a request default.
-// This query deliberately has no DefaultDatasetID, unlike the scalar fixtures.
-func TestDatasetSystemVariablesInitiallyNull(t *testing.T) {
+// The REST scenario checks the initial values independently of the Go client's decoding.
+func TestDatasetSystemVariablesDecodeAsNullableStrings(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	rows, err := newClient(t).Query("SELECT 1; SELECT @@dataset_project_id, @@dataset_id").Read(ctx)

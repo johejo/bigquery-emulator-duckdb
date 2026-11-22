@@ -647,7 +647,9 @@ json RoutineList(const std::vector<Routine>& routines, const RoutineListRequest&
     item["routineReference"] = RoutineReferenceJson(routine.reference);
     entries.push_back(std::move(item));
   }
-  response["routines"] = std::move(entries);
+  if (!entries.empty()) {
+    response["routines"] = std::move(entries);
+  }
   return response;
 }
 

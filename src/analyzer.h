@@ -71,10 +71,15 @@ class AnalyzerResult {
   // The statement, or the expression, that was analyzed.
   [[nodiscard]] const googlesql::ResolvedStatement& statement() const;
   [[nodiscard]] const googlesql::ResolvedExpr& expression() const;
+  [[nodiscard]] const googlesql::Type* expression_type() const;
 
   // The analyzed expression's literal value, or nullptr when it is not a literal.
   // The value belongs to this result and remains valid as long as the result does.
   [[nodiscard]] const googlesql::Value* literal_value() const;
+
+  // The statement type of a script statement whose dry run needs only analysis, if any.
+  // Throws for forms that require script variables or whose dry-run behavior is unsupported.
+  [[nodiscard]] std::optional<std::string> CheckScriptDryRun() const;
 
   // ResultSchema of the statement.
   [[nodiscard]] std::optional<std::vector<FieldSchema>> result_schema() const;

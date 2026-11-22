@@ -284,6 +284,23 @@ QueryParameters QueryParameters::Parse(const json& parameters, TimestampPrecisio
   return result;
 }
 
+QueryParameters QueryParameters::SlicePositional(size_t start, size_t count) const {
+  if (start > by_position_.size() || count > by_position_.size() - start) {
+    throw ApiError::InvalidQuery("Query parameter not found at position " +
+                                 std::to_string(by_position_.size() + 1));
+  }
+  QueryParameters result;
+  result.by_name_ = by_name_;
+  result.named_types_ = named_types_;
+  for (size_t i = start; i < start + count; ++i) {
+    result.by_position_.push_back(by_position_.at(i));
+    if (!positional_types_.empty()) {
+      result.positional_types_.push_back(positional_types_.at(i));
+    }
+  }
+  return result;
+}
+
 const std::string& QueryParameters::ByName(const std::string& name) const {
   const auto it = by_name_.find(ToUpperAscii(name));
   if (it == by_name_.end()) {

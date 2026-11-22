@@ -381,13 +381,20 @@ Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `SAFE.`
 SQL UDF options other than description, JavaScript UDF options, the `library` option, and views that call
 temporary SQL UDFs are unsupported.
 Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do
-not support dry runs, destination tables or positional parameters.
+not support dry runs or destination tables.
 
 ## Scripts and transactions
 
-Multi-statement queries cannot be dry runs. With a request default dataset, reading
-`@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
-value is verified against BigQuery. Assignments to other system variables are unsupported.
+Script dry runs validate `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MERGE` and `TRUNCATE TABLE`
+through the end of the script or until a stopping statement. Validation stops after
+[`CALL`](#stored-procedures) or supported DDL, or before
+`IF`, `FOR` or `WHILE`. For `EXECUTE IMMEDIATE`, validation stops after checking the SQL
+expression and `USING` arguments without evaluating them. Leading `DECLARE` statements can
+precede `SELECT` and `EXECUTE IMMEDIATE`; `DEFAULT` expressions are checked without evaluation,
+and `INTO` targets must be declared there. Other uses of `DECLARE` and dry runs of
+`CREATE TEMP TABLE` are unsupported.
+Assignments to system variables other than `@@dataset_id` and `@@dataset_project_id`
+are unsupported.
 An `EXCEPTION` clause never handles an error that the emulator reports as unsupported.
 
 Transaction modes, SQL UDF declarations inside transactions, writes to multiple projects (or
@@ -402,8 +409,9 @@ Roll back a failed transaction: it cannot preserve statements before the error f
 Inside procedures, including their dynamic SQL, system variable reads are limited to
 `@@dataset_id`, `@@dataset_project_id`, `@@project_id`, `@@time_zone` and `@@error.message`;
 assignments are limited to `@@dataset_id` and `@@dataset_project_id`.
-`EXECUTE IMMEDIATE` cannot execute a `CALL`. CALL queries do not support dry runs, destination
-tables or positional query parameters.
+`EXECUTE IMMEDIATE` cannot execute a `CALL`. A `CALL` dry run checks the procedure's signature
+but does not analyze its body.
+`CALL` queries do not support destination tables.
 
 ## Encryption keysets
 

@@ -1,0 +1,58 @@
+version: 1
+# See “Dry-run a multi-statement query” and “Use variables” in
+# third_party/bigquery_docs/multi-statement-queries.md.
+# Positional parameters can replace expressions per
+# third_party/bigquery_docs/reference/standard-sql/lexical.md.
+description: SELECT dry runs resolve variables declared at the start of the script.
+cases:
+  - name: select_after_declare
+    steps:
+      - name: valid_parameters_and_variables
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE threshold INT64 DEFAULT ?;
+              SELECT CONCAT('tag:', ?);
+              SELECT threshold + 1;
+            dryRun: true
+            useLegacySql: false
+            parameterMode: POSITIONAL
+            queryParameters:
+              - parameterType: {type: INT64}
+                parameterValue: {value: '42'}
+              - parameterType: {type: STRING}
+                parameterValue: {value: blue}
+        observe: {status: /status}
+      - name: invalid_final_select
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE threshold INT64;
+              SELECT threshold + 1;
+              SELECT missing_variable;
+            dryRun: true
+            useLegacySql: false
+        expectFailure: true
+        observe: {status: /status}
+      - name: dynamic_sql_after_select
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              DECLARE sql STRING DEFAULT 'SELECT 42';
+              DECLARE target INT64;
+              SELECT sql;
+              EXECUTE IMMEDIATE sql INTO target;
+              SELECT missing_variable;
+            dryRun: true
+            useLegacySql: false
+        observe: {status: /status}
+    expect:
+      valid_parameters_and_variables: {status: 200}
+      invalid_final_select: {status: 400}
+      dynamic_sql_after_select: {status: 200}

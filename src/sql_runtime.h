@@ -248,6 +248,7 @@ class SqlRuntime {
 
   // Runs multi-statement queries on the same runtime and session as single statements.
   class ScriptHostImpl;
+  struct DryRunDeclarations;
 
   // The registered project's DuckDB file path, or ":memory:".
   std::string ProjectDatabase(const std::string& project_id) const;
@@ -259,7 +260,8 @@ class SqlRuntime {
       JobLocation* location = nullptr,
       const googlesql::SystemVariableValuesMap* system_variables = nullptr,
       bool stores_result = false, bool dry_run = false, Backend* session = nullptr,
-      const ExpirationMutex::CatalogLock* catalog_lock = nullptr);
+      const ExpirationMutex::CatalogLock* catalog_lock = nullptr,
+      const DryRunDeclarations* declarations = nullptr);
   // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
   static std::optional<std::string> DatasetLocation(Backend& backend,
                                                     const DatasetReference& dataset);

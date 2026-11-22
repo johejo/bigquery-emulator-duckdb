@@ -1,0 +1,47 @@
+version: 1
+description: The dataset system variables start as NULL even when the request supplies a default dataset.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: dataset_variables
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: with_default_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT 1;
+              SELECT @@dataset_id AS dataset_id, @@dataset_project_id AS dataset_project_id;
+            defaultDataset: {projectId: '${project}', datasetId: '${dataset}'}
+            useLegacySql: false
+        observe:
+          dataset_id: /body/rows/0/f/0/v
+          dataset_project_id: /body/rows/0/f/1/v
+      - name: without_default_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT 1;
+              SELECT @@dataset_id AS dataset_id, @@dataset_project_id AS dataset_project_id;
+            useLegacySql: false
+        observe:
+          dataset_id: /body/rows/0/f/0/v
+          dataset_project_id: /body/rows/0/f/1/v
+    expect:
+      with_default_dataset: {dataset_id: null, dataset_project_id: null}
+      without_default_dataset: {dataset_id: null, dataset_project_id: null}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
