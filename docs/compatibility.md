@@ -381,12 +381,11 @@ Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `SAFE.`
 SQL UDF options other than description, JavaScript UDF options, the `library` option, and views that call
 temporary SQL UDFs are unsupported.
 Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do
-not support dry runs, destination tables or positional parameters.
+not support dry runs or destination tables.
 
 ## Scripts and transactions
 
 Dry runs are unsupported for scripts unless they start with [`CALL`](#stored-procedures).
-Executing multi-statement queries with positional query parameters is unsupported.
 With a request default dataset, reading
 `@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
 value is verified against BigQuery. Assignments to other system variables are unsupported.

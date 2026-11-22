@@ -1,0 +1,48 @@
+version: 1
+# Positional parameters replace expressions in SQL order (reference/standard-sql/lexical.md).
+# EXECUTE IMMEDIATE binds its own placeholders by USING order (reference/standard-sql/procedural-language.md).
+description: Positional script parameters retain their SQL order across branches and dynamic SQL.
+cases:
+  - name: script_parameter_order
+    steps:
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: >-
+              DECLARE n INT64 DEFAULT ?;
+              CASE n + ?
+                WHEN ? THEN SET n = ?;
+                WHEN ? THEN SET n = n + ?;
+                ELSE SET n = ?;
+              END CASE;
+              EXECUTE IMMEDIATE ? INTO n USING n, ?;
+              SELECT n + ? AS result;
+            useLegacySql: false
+            parameterMode: POSITIONAL
+            queryParameters:
+              - parameterType: {type: INT64}
+                parameterValue: {value: '5'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '1'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '0'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '100'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '6'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '7'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '1000'}
+              - parameterType: {type: STRING}
+                parameterValue: {value: 'SELECT ? * ?'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '3'}
+              - parameterType: {type: INT64}
+                parameterValue: {value: '6'}
+        observe:
+          result: /body/rows/0/f/0/v
+    expect:
+      query: {result: '42'}

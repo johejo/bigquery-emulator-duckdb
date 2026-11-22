@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -388,13 +389,17 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor) override {
     // One CASE expression evaluates the value once and compares it as SQL does.
     std::string sql = absl::StrCat("CASE (", case_value.GetSegmentText(), ")");
+    std::vector<googlesql::ScriptSegment> segments{case_value};
     for (size_t i = 0; i < when_values.size(); ++i) {
-      absl::StrAppend(&sql, " WHEN (", when_values.at(i).GetSegmentText(), ") THEN ", i);
+      const auto& when = when_values.at(i);
+      absl::StrAppend(&sql, " WHEN (", when.GetSegmentText(), ") THEN ", i);
+      segments.push_back(when);
     }
     absl::StrAppend(&sql, " ELSE -1 END");
     googlesql::Value value;
     const absl::Status status = Evaluate([&]() -> absl::Status {
-      GOOGLESQL_ASSIGN_OR_RETURN(value, EvaluateExpression(executor, sql, nullptr, nullptr));
+      GOOGLESQL_ASSIGN_OR_RETURN(value,
+                                 EvaluateExpression(executor, sql, nullptr, nullptr, segments));
       return absl::OkStatus();
     });
     row_count_.reset();
@@ -779,10 +784,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return absl::OkStatus();
   }
 
-  // Selects the parameter types and literals for this segment. In dynamic SQL, only USING
-  // parameters are visible, and the executor adds their types to the analyzer options itself.
+  // Selects the parameter types and literals for these segments, in the order they are analyzed.
+  // In dynamic SQL, only USING parameters are visible, and the executor adds their types itself.
   absl::StatusOr<QueryParameters> Parameters(const googlesql::ScriptExecutor& executor,
-                                             const googlesql::ScriptSegment* segment,
+                                             std::span<const googlesql::ScriptSegment> segments,
                                              AnalyzerSettings& settings) {
     settings = Settings(executor);
     switch (frames_.back().kind) {
@@ -790,20 +795,18 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         if (settings.positional_parameters.empty()) {
           return parameters_;
         }
-        if (segment == nullptr) {
-          return Unsupported("positional parameters in synthesized script expressions");
-        }
-        // CALL arguments are analyzed separately, each with its parameter positions starting
-        // at 1. Use the span of types and literals for this argument, not the whole CALL.
-        const auto range =
-            executor.GetCurrentStackFrame()->parsed_script()->GetPositionalParameters(
-                segment->range());
+        // Each analysis starts at position 1. For a synthesized CASE expression, only its
+        // search expression and WHEN operands contribute parameters, not intervening bodies.
+        const auto& script = *executor.GetCurrentStackFrame()->parsed_script();
         settings.positional_parameters.clear();
         std::vector<std::string> literals;
-        for (int64_t i = range.start_param_index; i < range.start_param_index + range.num_params;
-             ++i) {
-          settings.positional_parameters.push_back(settings_.positional_parameters.at(i));
-          literals.push_back(parameters_.ByPosition(static_cast<int>(i + 1)));
+        for (const auto& segment : segments) {
+          const auto range = script.GetPositionalParameters(segment.range());
+          for (int64_t i = range.start_param_index; i < range.start_param_index + range.num_params;
+               ++i) {
+            settings.positional_parameters.push_back(settings_.positional_parameters.at(i));
+            literals.push_back(parameters_.ByPosition(static_cast<int>(i + 1)));
+          }
         }
         return QueryParameters({}, std::move(literals));
       }
@@ -813,6 +816,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         break;
     }
     settings.named_parameters.clear();
+    settings.positional_parameters.clear();
     const auto& values = executor.GetCurrentParameterValues();
     if (!values.has_value()) {
       return QueryParameters();
@@ -835,7 +839,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     GOOGLESQL_RETURN_IF_ERROR(CheckDefinition(*segment.node()));
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters,
-                               Parameters(executor, &segment, settings));
+                               Parameters(executor, {&segment, 1}, settings));
     // Transaction control needs no tables, and ROLLBACK must work on an aborted connection.
     const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
@@ -966,15 +970,18 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return result;
   }
 
-  // Evaluates the expression `sql`, the text of `segment` when it is given, coerced to
-  // `target_type` when that is given.
-  absl::StatusOr<googlesql::Value> EvaluateExpression(const googlesql::ScriptExecutor& executor,
-                                                      std::string_view sql,
-                                                      const googlesql::ScriptSegment* segment,
-                                                      const googlesql::Type* target_type) {
+  // Evaluates `sql`, coerced to `target_type` if given. A synthesized expression takes its
+  // parameters from its original segments and has no single location for errors.
+  absl::StatusOr<googlesql::Value> EvaluateExpression(
+      const googlesql::ScriptExecutor& executor, std::string_view sql,
+      const googlesql::ScriptSegment* segment, const googlesql::Type* target_type,
+      std::span<const googlesql::ScriptSegment> segments = {}) {
+    if (segment != nullptr) {
+      segments = {segment, 1};
+    }
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters,
-                               Parameters(executor, segment, settings));
+                               Parameters(executor, segments, settings));
     const auto lifecycle_lock =
         host_.LockStatement(StatementWrites::kNothing, /*expire=*/!in_transaction_);
     StatementTransaction transaction(*backend_);
@@ -1074,14 +1081,8 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
                       const std::string& default_project, const std::string& default_dataset,
                       const std::vector<std::string>& setup, const std::string& query_project,
                       int64_t number) {
-  if (!parameters.positional_types().empty()) {
-    const auto statements = script.script()->statement_list();
-    if (statements.size() != 1 || !statements.front()->Is<googlesql::ASTCallStatement>()) {
-      throw ApiError::UnsupportedQuery("positional parameters in multi-statement queries");
-    }
-    if (!parameters.named_types().empty()) {
-      throw ApiError::InvalidQuery("A statement cannot use both named and positional parameters");
-    }
+  if (!parameters.positional_types().empty() && !parameters.named_types().empty()) {
+    throw ApiError::InvalidQuery("A statement cannot use both named and positional parameters");
   }
   if (const auto unsupported = UnsupportedStatement(*script.script())) {
     throw ApiError::UnsupportedQuery(*unsupported);
