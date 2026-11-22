@@ -13,6 +13,10 @@ namespace bigquery_emulator_duckdb {
 
 // Storage Read wire encoders.
 
+// The wire scale of a decimal column. An omitted scale in NUMERIC(P) means zero.
+int32_t StorageDecimalScale(const FieldSchema& field);
+int32_t StorageDecimalPrecision(const FieldSchema& field, bool arrow);
+
 // The Avro schema JSON, or the encapsulated Arrow IPC schema message, of `schema`.
 std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow);
 

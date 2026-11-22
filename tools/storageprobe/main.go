@@ -266,11 +266,18 @@ func finalize(e *env, ctx context.Context, kind storagepb.WriteStream_Type, time
 	return stream, nil
 }
 
+var parameterizedDecimals = bigquery.Schema{
+	{Name: "n", Type: bigquery.NumericFieldType, Precision: 8, Scale: 2},
+	{Name: "b", Type: bigquery.BigNumericFieldType, Precision: 50, Scale: 16},
+}
+
 var sections = []section{
 	{"BigQueryRead", []rpc{
 		{"CreateReadSession", "See [Reading rows](storage-api.md#reading-rows).", []form{
 			{"Arrow", readSession(stringSchema, storagepb.DataFormat_ARROW, nil, nil)},
 			{"Avro", readSession(stringSchema, storagepb.DataFormat_AVRO, nil, nil)},
+			{"parameterized decimals in Arrow", readSession(parameterizedDecimals, storagepb.DataFormat_ARROW, nil, nil)},
+			{"parameterized decimals in Avro", readSession(parameterizedDecimals, storagepb.DataFormat_AVRO, nil, nil)},
 			{"selected fields", readSession(stringSchema, storagepb.DataFormat_ARROW,
 				&storagepb.ReadSession_TableReadOptions{SelectedFields: []string{"value"}}, nil)},
 			{"row restrictions", readSession(stringSchema, storagepb.DataFormat_ARROW,

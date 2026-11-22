@@ -25,6 +25,12 @@ absl::StatusOr<googlesql::NumericValue> CastFloat64ToNumeric(double value);
 
 absl::StatusOr<bool> CastStringToBool(std::string_view text);
 
+absl::StatusOr<int64_t> CastStringToInt64(std::string_view text);
+
+absl::StatusOr<double> CastStringToFloat64(std::string_view text);
+
+absl::StatusOr<googlesql::NumericValue> CastStringToNumeric(std::string_view text);
+
 absl::StatusOr<std::string> CastBytesToString(std::string_view bytes, std::string_view format);
 
 absl::StatusOr<std::string> CastDateToString(int32_t date, std::string_view format);

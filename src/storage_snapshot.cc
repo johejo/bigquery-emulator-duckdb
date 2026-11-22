@@ -89,7 +89,8 @@ std::string_view Format(FieldType type) {
 }
 
 bool Eligible(const FieldSchema& field) {
-  return !Format(field.type).empty() && std::ranges::all_of(field.fields, Eligible);
+  return !field.precision && !field.scale && !Format(field.type).empty() &&
+         std::ranges::all_of(field.fields, Eligible);
 }
 
 // The element of the REPEATED `field`, as Storage Read gives it.
@@ -385,19 +386,29 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
     }
     case FieldType::kNumeric:
     case FieldType::kBigNumeric: {
+      const int scale = StorageDecimalScale(field);
+      const auto pack = [&](const auto& number, int storage_scale) {
+        check(number.status());
+        if (storage_scale == scale) {
+          return number->SerializeAsProtoBytes();
+        }
+        // Rescale divides the packed integer by 10^(storage_scale - scale). The
+        // column already enforced its scale at write time; do not round again.
+        const auto rescaled = number->Rescale(scale, /*allow_rounding=*/false);
+        check(rescaled.status());
+        return rescaled->SerializeAsProtoBytes();
+      };
       std::string packed;
       if (field.type == FieldType::kNumeric) {
         const auto number =
             googlesql::NumericValue::FromStringStrict(ValueString(VectorValue(vector, type, row)));
-        check(number.status());
-        packed = number->SerializeAsProtoBytes();
+        packed = pack(number, 9);
       } else {
         const auto number = type.id() == LogicalTypeId::BIGNUM
                                 ? BigNumericFromBignum(VectorString(vector, row))
                                 : googlesql::BigNumericValue::FromStringStrict(
                                       ValueString(VectorValue(vector, type, row)));
-        check(number.status());
-        packed = number->SerializeAsProtoBytes();
+        packed = pack(number, 38);
       }
       const bool negative =
           !packed.empty() && (static_cast<unsigned char>(packed.back()) & 0x80U) != 0;
@@ -405,8 +416,7 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
                     negative ? static_cast<char>(0xff) : '\0');
       ArrowDecimal decimal{};
       ArrowDecimalInit(&decimal, field.type == FieldType::kNumeric ? 128 : 256,
-                       field.type == FieldType::kNumeric ? 38 : 76,
-                       field.type == FieldType::kNumeric ? 9 : 38);
+                       StorageDecimalPrecision(field, /*arrow=*/true), scale);
       ArrowDecimalSetBytes(&decimal, reinterpret_cast<const uint8_t*>(packed.data()));
       append(ArrowArrayAppendDecimal(array, &decimal));
       return;
