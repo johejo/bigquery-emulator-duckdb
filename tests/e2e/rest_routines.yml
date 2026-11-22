@@ -224,7 +224,8 @@ steps:
           body: null
     test: |
       current.res.status == 200 &&
-      len(current.res.body.routines) == 0 && !("nextPageToken" in current.res.body)
+      (!("routines" in current.res.body) || len(current.res.body.routines) == 0) &&
+      !("nextPageToken" in current.res.body)
   table_functions:
     req:
       /projects/rest-routines/datasets/ds/routines?filter=routineType:TABLE_VALUED_FUNCTION:
@@ -232,7 +233,7 @@ steps:
           body: null
     test: |
       current.res.status == 200 &&
-      len(current.res.body.routines) == 0
+      (!("routines" in current.res.body) || len(current.res.body.routines) == 0)
   empty_parameters:
     req:
       /projects/rest-routines/datasets/ds/routines?filter=&readMask=:

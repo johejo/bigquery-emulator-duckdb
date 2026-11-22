@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "cases": {
+    "call_procedure": {
+      "project": "johejo-sandbox",
+      "run": "epj2dplkynjyhwohnq3om6c3pp",
+      "steps": {
+        "call": {
+          "status": 200,
+          "value": "42"
+        }
+      }
+    },
+    "create_procedure": {
+      "project": "johejo-sandbox",
+      "run": "epj2dplkynjyhwohnq3om6c3pp",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "routine": {
+          "routineType": "PROCEDURE",
+          "status": 200
+        }
+      }
+    },
+    "drop_procedure": {
+      "project": "johejo-sandbox",
+      "run": "epj2dplkynjyhwohnq3om6c3pp",
+      "steps": {
+        "drop": {
+          "status": 200
+        },
+        "routines": {}
+      }
+    }
+  }
+}

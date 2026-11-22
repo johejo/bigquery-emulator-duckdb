@@ -1,0 +1,111 @@
+version: 1
+# BigQuery resolves these names using @@dataset_id even without a request
+# defaultDataset. See the recorded answers alongside this scenario.
+description: SET @@dataset_id resolves unqualified SQL procedure names.
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: create_procedure
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SET @@dataset_id = '${dataset}';
+              CREATE PROCEDURE p() BEGIN SELECT 42; END;
+            useLegacySql: false
+        observe: {status: /status, errors: /body/errors}
+      - name: routine
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines/p
+        observe: {status: /status, routineType: /body/routineType}
+    expect:
+      create: {status: 200}
+      routine: {status: 200, routineType: PROCEDURE}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  - name: call_procedure
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CREATE PROCEDURE `${project}.${dataset}.p`() BEGIN SELECT 42; END'
+            useLegacySql: false
+      - name: call
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SET @@dataset_id = '${dataset}';
+              CALL p();
+            useLegacySql: false
+        observe: {status: /status, value: /body/rows/0/f/0/v, errors: /body/errors}
+    expect:
+      call: {status: 200, value: '42'}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  - name: drop_procedure
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: 'CREATE PROCEDURE `${project}.${dataset}.p`() BEGIN SELECT 42; END'
+            useLegacySql: false
+      - name: drop
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SET @@dataset_id = '${dataset}';
+              DROP PROCEDURE p;
+            useLegacySql: false
+        observe: {status: /status, errors: /body/errors}
+      - name: routines
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/routines
+        observe: {routines: /body/routines}
+    expect:
+      drop: {status: 200}
+      routines: {}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
