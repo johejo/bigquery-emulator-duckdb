@@ -675,6 +675,7 @@ cc_library(
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:options_cc_proto",
+        "@googlesql//googlesql/public:parse_helpers",
         "@googlesql//googlesql/public:sql_function",
         "@googlesql//googlesql/public:sql_view",
         "@googlesql//googlesql/public:strings",

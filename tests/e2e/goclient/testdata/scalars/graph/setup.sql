@@ -304,3 +304,94 @@ CREATE PROPERTY GRAPH scalar_graph.ExpandTree
       DESTINATION KEY (target_id) REFERENCES D (id) PROPERTIES (score AS sibling_score),
     scalar_graph.ExpandBranches AS BC SOURCE KEY (id) REFERENCES B (id)
       DESTINATION KEY (leaf_id) REFERENCES C (id));
+CREATE TABLE scalar_graph.MeasureCollege (college_id INT64 PRIMARY KEY NOT ENFORCED, college_name STRING)
+AS SELECT * FROM UNNEST([STRUCT(101 AS college_id, 'College of Engineering' AS college_name),
+  (102, 'College of Arts')]);
+CREATE TABLE scalar_graph.MeasureDepartment (dept_id INT64 PRIMARY KEY NOT ENFORCED, dept_name STRING,
+  college_id INT64, budget FLOAT64)
+AS SELECT * FROM UNNEST([
+  STRUCT(1001 AS dept_id, 'Computer Science' AS dept_name, 101 AS college_id, 500000.0 AS budget),
+  (1002, 'Mechanical Engineering', 101, 400000), (1003, 'Fine Arts', 102, 200000),
+  (1004, 'Research', 101, 50000)]);
+CREATE TABLE scalar_graph.MeasureCourse (course_id INT64 PRIMARY KEY NOT ENFORCED, course_name STRING,
+  dept_id INT64, credits INT64)
+AS SELECT * FROM UNNEST([
+  STRUCT(1 AS course_id, 'Intro to CS' AS course_name, 1001 AS dept_id, 3 AS credits),
+  (2, 'Data Structures', 1001, 4), (3, 'Thermodynamics', 1002, 3), (4, 'Oil Painting', 1003, 2)]);
+CREATE TABLE scalar_graph.MeasureCourseWithOrphan (course_id INT64 PRIMARY KEY NOT ENFORCED,
+  course_name STRING, dept_id INT64, credits INT64)
+AS SELECT * FROM scalar_graph.MeasureCourse UNION ALL SELECT 5, 'Orphan', NULL, 1;
+CREATE TABLE scalar_graph.MeasureInstructor (instructor_id INT64 PRIMARY KEY NOT ENFORCED,
+  instructor_name STRING, dept_id INT64, salary FLOAT64)
+AS SELECT * FROM UNNEST([
+  STRUCT(501 AS instructor_id, 'Dr. Dana' AS instructor_name, 1001 AS dept_id, 120000.0 AS salary),
+  (502, 'Dr. Lee', 1001, 110000), (503, 'Dr. Taylor', 1002, 115000), (504, 'Prof. Izumi', 1003, 90000)]);
+CREATE PROPERTY GRAPH scalar_graph.SchoolGraph
+  NODE TABLES (
+    scalar_graph.MeasureCollege AS College KEY(college_id) PROPERTIES(college_id, college_name),
+    scalar_graph.MeasureDepartment AS Department KEY(dept_id)
+      PROPERTIES(dept_id, dept_name, college_id, budget,
+        MEASURE(SUM(budget)) AS total_budget,
+        MEASURE(SUM(budget) * 1.10) AS budget_with_overhead),
+    scalar_graph.MeasureCourse AS Course KEY(course_id)
+      PROPERTIES(course_id, course_name, credits, dept_id,
+        MEASURE(AVG(credits)) AS avg_credits,
+        MEASURE(SUM(credits)) AS total_credits,
+        MEASURE(COUNT(course_id)) AS course_count,
+        MEASURE(COUNT(DISTINCT CASE WHEN credits >= 3 THEN course_id ELSE NULL END)) AS major_course_count,
+        MEASURE(SAFE_DIVIDE(AGG(total_credits), NULLIF(AGG(course_count), 0))) AS computed_avg_credits))
+  EDGE TABLES (
+    scalar_graph.MeasureDepartment AS CollegeDept
+      SOURCE KEY (college_id) REFERENCES College (college_id)
+      DESTINATION KEY (dept_id) REFERENCES Department (dept_id),
+    scalar_graph.MeasureCourse AS DeptCourse
+      SOURCE KEY (dept_id) REFERENCES Department (dept_id)
+      DESTINATION KEY (course_id) REFERENCES Course (course_id));
+CREATE PROPERTY GRAPH scalar_graph.SchoolGraphWithOrphan
+  NODE TABLES (
+    scalar_graph.MeasureDepartment AS Department KEY(dept_id)
+      PROPERTIES(dept_id, dept_name, college_id, budget,
+        COALESCE(budget, 0) AS budget_or_zero,
+        MEASURE(AVG(COALESCE(budget, 0))) AS avg_budget_inline,
+        MEASURE(AVG(budget_or_zero)) AS avg_budget_property),
+    scalar_graph.MeasureCourseWithOrphan AS Course KEY(course_id)
+      PROPERTIES(course_id, course_name, credits, dept_id))
+  EDGE TABLES (
+    scalar_graph.MeasureCourseWithOrphan AS DeptCourse
+      SOURCE KEY (dept_id) REFERENCES Department (dept_id)
+      DESTINATION KEY (course_id) REFERENCES Course (course_id));
+CREATE PROPERTY GRAPH scalar_graph.SchoolGraphMultiRoot
+  NODE TABLES (
+    scalar_graph.MeasureCollege AS College KEY(college_id) PROPERTIES(college_id, college_name),
+    scalar_graph.MeasureDepartment AS Department KEY(dept_id)
+      PROPERTIES(dept_id, dept_name, college_id, budget, MEASURE(SUM(budget)) AS total_budget),
+    scalar_graph.MeasureCourse AS Course KEY(course_id)
+      PROPERTIES(course_id, course_name, credits, dept_id, MEASURE(COUNT(course_id)) AS course_count),
+    scalar_graph.MeasureInstructor AS Instructor KEY(instructor_id)
+      PROPERTIES(instructor_id, instructor_name, dept_id, salary,
+        MEASURE(COUNT(instructor_id)) AS instructor_count, MEASURE(SUM(salary)) AS total_salary))
+  EDGE TABLES (
+    scalar_graph.MeasureDepartment AS CollegeDept
+      SOURCE KEY (college_id) REFERENCES College (college_id)
+      DESTINATION KEY (dept_id) REFERENCES Department (dept_id),
+    scalar_graph.MeasureCourse AS DeptCourse
+      SOURCE KEY (dept_id) REFERENCES Department (dept_id)
+      DESTINATION KEY (course_id) REFERENCES Course (course_id),
+    scalar_graph.MeasureInstructor AS DeptInstructor
+      SOURCE KEY (dept_id) REFERENCES Department (dept_id)
+      DESTINATION KEY (instructor_id) REFERENCES Instructor (instructor_id));
+CREATE TABLE scalar_graph.MeasureAmounts (id INT64 PRIMARY KEY NOT ENFORCED, a INT64, b INT64)
+AS SELECT 1 AS id, 100 AS a, 1 AS b UNION ALL SELECT 2, 100, 2 UNION ALL SELECT 3, NULL, 3;
+CREATE TABLE scalar_graph.MeasureAmountRows (id INT64 PRIMARY KEY NOT ENFORCED, lid INT64)
+AS SELECT id, CASE WHEN id <= 2 THEN 1 WHEN id = 3 THEN 2 WHEN id = 4 THEN 3 END AS lid
+FROM UNNEST(GENERATE_ARRAY(1, 6)) AS id;
+CREATE PROPERTY GRAPH scalar_graph.MeasureCountOneBeside
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b, MEASURE(SUM(amount) + COUNT(1)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+CREATE PROPERTY GRAPH scalar_graph.MeasureSumOfConstantBeside
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b, MEASURE(SUM(amount) + SUM(1)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
