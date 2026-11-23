@@ -46,7 +46,7 @@ void ArrowCheck(int code) {
 }
 
 // Sets the metadata BigQuery gives a field of `type` whose Arrow type other types share:
-// JSON and GEOGRAPHY are text of extension types, and a RANGE is a marked struct.
+// JSON, GEOGRAPHY and INTERVAL are extension types, and a RANGE is a marked struct.
 void SetTypeMetadata(ArrowSchema* out, FieldType type) {
   nanoarrow::UniqueBuffer metadata;
   ArrowCheck(ArrowMetadataBuilderInit(metadata.get(), nullptr));
@@ -61,6 +61,10 @@ void SetTypeMetadata(ArrowSchema* out, FieldType type) {
     case FieldType::kJson:
       ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
                                             ArrowCharView("google:sqlType:json")));
+      break;
+    case FieldType::kInterval:
+      ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("ARROW:extension:name"),
+                                            ArrowCharView("google:sqlType:interval")));
       break;
     case FieldType::kRange:
       ArrowCheck(ArrowMetadataBuilderAppend(metadata.get(), ArrowCharView("google:sqlType"),
@@ -139,6 +143,18 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
     case FieldType::kString:
       ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
       break;
+    case FieldType::kInterval:
+      if (arrow) {
+        ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO));
+      } else {
+        // The Avro encoder reads the three signed parts in record order. Keeping the time
+        // part in microseconds here avoids limiting Avro to the range of Arrow nanoseconds.
+        ArrowCheck(ArrowSchemaSetTypeStruct(out, 3));
+        ArrowCheck(ArrowSchemaSetType(out->children[0], NANOARROW_TYPE_INT32));
+        ArrowCheck(ArrowSchemaSetType(out->children[1], NANOARROW_TYPE_INT32));
+        ArrowCheck(ArrowSchemaSetType(out->children[2], NANOARROW_TYPE_INT64));
+      }
+      break;
     case FieldType::kRange:
       ArrowCheck(ArrowSchemaSetTypeStruct(out, 2));
       ArrowField(out->children[0], RangeBoundField(field, "start"), arrow);
@@ -162,9 +178,10 @@ bool AvroName(std::string_view name) {
 }
 
 // The names of the Avro records a schema has defined so far. Its RECORD fields are numbered, and
-// the record of a RANGE is defined once for each element type, then named.
+// INTERVAL and each RANGE element type are defined once, then referenced by name.
 struct AvroNames {
   int record_id = 0;
+  bool interval = false;
   std::set<FieldType> ranges = {};
 };
 
@@ -222,6 +239,23 @@ json AvroField(const FieldSchema& field, AvroNames& names) {
     case FieldType::kGeography:
     case FieldType::kJson:
       type = {{"type", "string"}, {"sqlType", FieldTypeName(field.type)}};
+      break;
+    case FieldType::kInterval:
+      if (std::exchange(names.interval, true)) {
+        type = "google.sqlType.INTERVAL";
+      } else {
+        auto fields = json::array({
+            {{"name", "months"}, {"type", "int"}},
+            {{"name", "days"}, {"type", "int"}},
+            {{"name", "microseconds"}, {"type", "long"}},
+        });
+        type = {
+            {"type", "record"},
+            {"name", "INTERVAL"},
+            {"namespace", "google.sqlType"},
+            {"fields", std::move(fields)},
+        };
+      }
       break;
     case FieldType::kRange: {
       const FieldType element = RangeBoundField(field, "").type;
@@ -294,6 +328,11 @@ void AvroValue(std::string& out, const FieldSchema& field, const ArrowArrayView&
     case FieldType::kRecord:
       for (size_t i = 0; i < field.fields.size(); ++i) {
         AvroValue(out, field.fields.at(i), *view.children[i], row);
+      }
+      return;
+    case FieldType::kInterval:
+      for (int64_t i = 0; i < 3; ++i) {
+        AvroLong(out, ArrowArrayViewGetIntUnsafe(view.children[i], row));
       }
       return;
     case FieldType::kRange:

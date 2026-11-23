@@ -19,6 +19,7 @@
 #include "duckdb/common/typedefs.hpp"
 #include "duckdb/common/types.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/types/interval.hpp"
 #include "duckdb/common/types/selection_vector.hpp"
 #include "duckdb/common/types/timestamp.hpp"
 #include "duckdb/common/types/timestamp_base.hpp"
@@ -39,6 +40,7 @@
 #include "src/backend_error.h"
 #include "src/bignumeric.h"
 #include "src/field_schema.h"
+#include "src/interval.h"
 #include "src/result_chunks.h"
 #include "src/statement_resources.h"
 #include "src/storage_read_codec.h"
@@ -289,7 +291,7 @@ void ValidateCivilTime(const ArrowArrayView& view, const FieldSchema& field, int
 
 // Appends `row` of a vector in Storage Read wire layout, without encoding a query cell.
 void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb::Vector& vector,
-                       const duckdb::LogicalType& type, size_t row) {
+                       const duckdb::LogicalType& type, size_t row, bool arrow) {
   const auto append = [](int code) {
     if (code != NANOARROW_OK) {
       throw ApiError::Internal("Arrow IPC operation failed: " + std::to_string(code));
@@ -308,7 +310,7 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
       item.mode = FieldMode::kRequired;
       for (size_t i = 0; i < elements.size(); ++i) {
         AppendArrowVector(array->children[0], item, elements.child(), elements.type(),
-                          elements.row(i));
+                          elements.row(i), arrow);
       }
     }
     append(ArrowArrayFinishElement(array));
@@ -329,7 +331,7 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
       } else {
         AppendArrowVector(array->children[i],
                           range ? RangeBoundField(field, "") : field.fields.at(i), child,
-                          child_type, row);
+                          child_type, row, arrow);
       }
     }
     append(ArrowArrayFinishElement(array));
@@ -382,6 +384,34 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
         micros = absl::ToUnixMicros(timestamp);
       }
       append(ArrowArrayAppendInt(array, micros));
+      return;
+    }
+    case FieldType::kInterval: {
+      const auto stored = VectorElement<duckdb::interval_t>(vector, row);
+      const auto interval = IntervalFromDuckDb(
+          {.months = stored.months, .days = stored.days, .micros = stored.micros});
+      check(interval.status());
+      if (arrow) {
+        const auto nanos = interval->get_nanos();
+        if (nanos < std::numeric_limits<int64_t>::min() ||
+            nanos > std::numeric_limits<int64_t>::max()) {
+          throw ApiError::Invalid("INTERVAL time part exceeds the Arrow nanosecond range");
+        }
+        ArrowInterval wire{};
+        ArrowIntervalInit(&wire, NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO);
+        wire.months = static_cast<int32_t>(interval->get_months());
+        wire.days = static_cast<int32_t>(interval->get_days());
+        wire.ns = static_cast<int64_t>(nanos);
+        append(ArrowArrayAppendInterval(array, &wire));
+      } else {
+        if (interval->get_nano_fractions() != 0) {
+          throw ApiError::Invalid("Storage Read Avro does not support sub-microsecond INTERVALs");
+        }
+        append(ArrowArrayAppendInt(array->children[0], interval->get_months()));
+        append(ArrowArrayAppendInt(array->children[1], interval->get_days()));
+        append(ArrowArrayAppendInt(array->children[2], interval->get_micros()));
+        append(ArrowArrayFinishElement(array));
+      }
       return;
     }
     case FieldType::kNumeric:
@@ -447,7 +477,8 @@ class StorageSnapshot::Impl {
   // Whether DuckDB exports each column in the layout Storage Read gives it.
   std::vector<bool> direct;
   duckdb::vector<duckdb::LogicalType> direct_types;
-  nanoarrow::UniqueSchema wire;
+  nanoarrow::UniqueSchema avro_wire;
+  nanoarrow::UniqueSchema arrow_wire;
   std::unique_ptr<const ResultChunks> chunks;
 };
 
@@ -463,7 +494,8 @@ StorageSnapshot::StorageSnapshot(duckdb::QueryResult& result, std::vector<FieldS
   state.session = std::move(session);
   state.fields = std::move(schema);
   state.options = result.client_properties;
-  StorageReadArraySchema(state.wire.get(), state.fields, false);
+  StorageReadArraySchema(state.avro_wire.get(), state.fields, false);
+  StorageReadArraySchema(state.arrow_wire.get(), state.fields, true);
   state.chunks = std::make_unique<const ResultChunks>(result, state.session);
   for (size_t i = 0; i < state.fields.size(); ++i) {
     const auto& type = state.chunks->type(i);
@@ -502,7 +534,8 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
   }
   nanoarrow::UniqueArray root;
   ArrowError error{};
-  Check(ArrowArrayInitFromSchema(root.get(), state.wire.get(), &error), error);
+  const ArrowSchema& wire = *(arrow ? state.arrow_wire.get() : state.avro_wire.get());
+  Check(ArrowArrayInitFromSchema(root.get(), &wire, &error), error);
   for (size_t column = 0; column < state.fields.size(); ++column) {
     if (state.direct.at(column)) {
       continue;
@@ -513,7 +546,7 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
                        [&](const duckdb::DataChunk& chunk, size_t begin, size_t take, size_t) {
                          for (size_t row = begin; row < begin + take; ++row) {
                            AppendArrowVector(child, state.fields.at(column), chunk.data.at(column),
-                                             state.chunks->type(column), row);
+                                             state.chunks->type(column), row, arrow);
                          }
                        });
     Check(ArrowArrayFinishBuildingDefault(child, &error), error);
@@ -551,9 +584,9 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
       if (!state.direct.at(column)) {
         continue;
       }
-      Normalize(exported->children[source], *state.wire->children[column], state.fields.at(column));
+      Normalize(exported->children[source], *wire.children[column], state.fields.at(column));
       nanoarrow::UniqueArrayView view;
-      Check(ArrowArrayViewInitFromSchema(view.get(), state.wire->children[column], &error), error);
+      Check(ArrowArrayViewInitFromSchema(view.get(), wire.children[column], &error), error);
       Check(ArrowArrayViewSetArray(view.get(), exported->children[source], &error), error);
       for (int64_t row = 0; std::cmp_less(row, count); ++row) {
         ValidateCivilTime(*view.get(), state.fields.at(column), row);
@@ -565,8 +598,8 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow,
   }
   root->length = static_cast<int64_t>(count);
   root->null_count = 0;
-  return arrow ? EncodeArrowRecordBatch(*state.wire.get(), *root.get(), compression)
-               : EncodeAvroRows(*state.wire.get(), *root.get(), state.fields);
+  return arrow ? EncodeArrowRecordBatch(wire, *root.get(), compression)
+               : EncodeAvroRows(wire, *root.get(), state.fields);
 }
 
 }  // namespace bigquery_emulator_duckdb

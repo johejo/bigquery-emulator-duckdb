@@ -1110,6 +1110,7 @@ cc_library(
         ":duckdb_sql",
         ":duckdb_types",
         ":duckpgq",
+        ":interval",
         ":result_chunks",
         ":timestamp_precision",
         ":vector_value",
