@@ -32,7 +32,7 @@ RPC list the forms the emulator rejected.
 | RPC | Status | Notes |
 | --- | --- | --- |
 | `CreateWriteStream` | Supported | See [Lifetime and persistence](storage-api.md#lifetime-and-persistence). |
-| `AppendRows` | Partial | See [Write limitations](storage-api.md#write-limitations). Unsupported: INTERVAL columns in protobuf; parameterized STRING columns. |
+| `AppendRows` | Partial | See [Write limitations](storage-api.md#write-limitations). Unsupported: parameterized STRING columns. |
 | `GetWriteStream` | Supported | See [Write limitations](storage-api.md#write-limitations). |
 | `FinalizeWriteStream` | Supported |  |
 | `FlushRows` | Supported |  |
