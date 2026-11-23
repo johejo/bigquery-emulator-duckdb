@@ -1,14 +1,14 @@
 version: 1
 description: >-
-  Check how Storage Read represents sub-microsecond INTERVALs written through Arrow,
-  and what Arrow does when the time component does not fit in signed 64-bit nanoseconds.
+  Check whether Storage Read rounds a negative INTERVAL time part toward zero or down
+  in Arrow and Avro. Positive cases are recorded in tests/e2e/storage/testdata.
 vars:
   dataset: bqa_${run}_${case}
   table: projects/${project}/datasets/${dataset}/tables/t
   stream: ${table}/streams/_default
-  # The Arrow fixture from storage_write_arrow.api.yaml: value = (0 months, 0 days, 1001 ns).
+  # Arrow MONTH_DAY_NANO: value = (0 months, 0 days, -1001 ns).
   nano_schema: '/////3gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAUAAAAEAAUABAADwAOAAgAAAAEABAAAAAQAAAAGAAAAAAACwEYAAAAAAAAAAAABgAIAAYABgAAAAAAAgAFAAAAdmFsdWUAAAA='
-  nano_batch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADpAwAAAAAAAA=='
+  nano_batch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAX/P///////w=='
 templates:
   read_interval:
     steps:
@@ -25,8 +25,7 @@ templates:
           path: /bigquery/v2/projects/${project}/queries
           body:
             query: >-
-              CREATE TABLE `${project}.${dataset}.t` AS
-              SELECT INTERVAL 3000000 HOUR AS wide, CAST(NULL AS INTERVAL) AS value
+              CREATE TABLE `${project}.${dataset}.t` (value INTERVAL)
             useLegacySql: false
             location: US
             timeoutMs: 60000
@@ -52,7 +51,6 @@ templates:
               readSession:
                 table: ${table}
                 dataFormat: ${format}
-                readOptions: {selectedFields: ['${column}']}
               maxStreamCount: 1
         bind:
           read_stream: /messages/0/streams/0/name
@@ -77,10 +75,7 @@ templates:
 cases:
   - name: arrow_nanos
     template: read_interval
-    vars: {format: ARROW, column: value}
+    vars: {format: ARROW}
   - name: avro_nanos
     template: read_interval
-    vars: {format: AVRO, column: value}
-  - name: arrow_wide
-    template: read_interval
-    vars: {format: ARROW, column: wide}
+    vars: {format: AVRO}

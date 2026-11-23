@@ -391,11 +391,18 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
       const auto interval = IntervalFromDuckDb(
           {.months = stored.months, .days = stored.days, .micros = stored.micros});
       check(interval.status());
+      // Storage Read exposes microsecond precision even for intervals written with Arrow.
+      // The rounding direction for negative fractional microseconds is not verified.
+      if (interval->get_micros() < 0 && interval->get_nano_fractions() != 0) {
+        throw ApiError::Unsupported("Storage Read of negative sub-microsecond INTERVALs");
+      }
+      const int64_t micros = interval->get_micros();
       if (arrow) {
-        const auto nanos = interval->get_nanos();
+        const auto nanos = static_cast<__int128>(micros) * googlesql::IntervalValue::kNanosInMicro;
         if (nanos < std::numeric_limits<int64_t>::min() ||
             nanos > std::numeric_limits<int64_t>::max()) {
-          throw ApiError::Invalid("INTERVAL time part exceeds the Arrow nanosecond range");
+          throw std::range_error("Out of range conversion for microseconds value: " +
+                                 std::to_string(micros) + " to nanoseconds");
         }
         ArrowInterval wire{};
         ArrowIntervalInit(&wire, NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO);
@@ -404,12 +411,9 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
         wire.ns = static_cast<int64_t>(nanos);
         append(ArrowArrayAppendInterval(array, &wire));
       } else {
-        if (interval->get_nano_fractions() != 0) {
-          throw ApiError::Invalid("Storage Read Avro does not support sub-microsecond INTERVALs");
-        }
         append(ArrowArrayAppendInt(array->children[0], interval->get_months()));
         append(ArrowArrayAppendInt(array->children[1], interval->get_days()));
-        append(ArrowArrayAppendInt(array->children[2], interval->get_micros()));
+        append(ArrowArrayAppendInt(array->children[2], micros));
         append(ArrowArrayFinishElement(array));
       }
       return;
