@@ -32,10 +32,14 @@ std::string ColumnDefinition(const FieldSchema& field, TimestampPrecision precis
 std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema,
                                              TimestampPrecision precision, bool external = false);
 
-// The DuckDB expression for `value`, a value of `field` in a tabledata.insertAll row. An unknown
-// field of a RECORD is an error unless `ignore_unknown_values` is set.
+struct InsertValueOptions {
+  bool ignore_unknown_values = false;
+  bool allow_interval_nanos = false;  // Storage Write can supply an exact interval.
+};
+
+// The DuckDB expression for `value`, a value of `field` in a streamed row.
 std::string InsertValue(const nlohmann::json& value, const FieldSchema& field,
-                        bool ignore_unknown_values);
+                        InsertValueOptions options);
 
 // The value `sql` with REQUIRED and length constraints checked at every depth, by position
 // within records.

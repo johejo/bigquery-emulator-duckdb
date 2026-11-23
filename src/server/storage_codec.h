@@ -3,6 +3,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -29,6 +30,10 @@ class StorageFieldMismatch : public std::invalid_argument {
 
 // Rejects column options that cannot be honored when decoding or publishing staged rows.
 void ValidateStorageWriteSchema(const std::vector<FieldSchema>& schema);
+
+// Validates text fields shared by the protobuf and Arrow writers. In particular, JSON null
+// stays inside a string, distinct from SQL NULL.
+std::string DecodeStorageText(std::string_view text, FieldType type, std::string_view name);
 
 // The self-contained proto2 writer descriptor of one AppendRows connection. Decodes to the
 // named JSON values that WriteStorageRows validates against the destination table.

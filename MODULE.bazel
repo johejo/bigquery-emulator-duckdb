@@ -205,6 +205,7 @@ http_archive(
     patches = [
         "//third_party/nanoarrow:public_headers.patch",
         "//third_party/nanoarrow:compression.patch",
+        "//third_party/nanoarrow:ipc_bounds.patch",
     ],
     sha256 = "bb422ce7ed486abd95eb027a1ac092bbc1b5ed44955e89c098f0a1cb75109d5c",
     strip_prefix = "arrow-nanoarrow-apache-arrow-nanoarrow-0.7.0",

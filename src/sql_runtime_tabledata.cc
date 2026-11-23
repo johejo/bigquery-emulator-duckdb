@@ -35,10 +35,10 @@ namespace {
 // casts round halfway values away from zero, so the values of ROUND_HALF_EVEN fields are read
 // unrounded and rounded to even, as BigQuery rounds the rows it streams.
 std::string RoundedInsertValue(const function_catalog::Catalog& functions, const json& value,
-                               const FieldSchema& field, bool ignore_unknown_values) {
+                               const FieldSchema& field, InsertValueOptions options) {
   const FieldSchema unrounded = WithoutRoundingParameters(field);
-  const std::optional<std::string> rounded = TranslateAppendedValue(
-      functions, InsertValue(value, unrounded, ignore_unknown_values), unrounded, field);
+  const std::optional<std::string> rounded =
+      TranslateAppendedValue(functions, InsertValue(value, unrounded, options), unrounded, field);
   if (!rounded.has_value()) {
     throw ApiError::Unsupported("streaming into ROUND_HALF_EVEN columns");
   }
@@ -156,6 +156,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
       (void)KeepVersion(*session, table);
     }
     std::vector<std::string> statements;
+    constexpr InsertValueOptions options{.allow_interval_nanos = true};
     for (size_t index = 0; index < rows.size(); ++index) {
       const auto& row = rows.at(index);
       std::vector<std::string> columns;
@@ -166,7 +167,7 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
         try {
           values.push_back(value == row.end()
                                ? "DEFAULT"
-                               : RoundedInsertValue(functions_, *value, field, false));
+                               : RoundedInsertValue(functions_, *value, field, options));
         } catch (const ApiError& error) {
           return {{.index = index, .message = error.what()}};
         }
@@ -224,6 +225,7 @@ std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const
   std::vector<InsertError> errors;
   std::vector<std::string> statements;
   std::vector<size_t> indexes;
+  const InsertValueOptions options{.ignore_unknown_values = ignore_unknown_values};
   for (size_t i = 0; i < rows.size(); ++i) {
     try {
       if (!rows[i].is_object() || !rows[i].contains("json") || !rows[i]["json"].is_object()) {
@@ -242,9 +244,8 @@ std::vector<InsertError> SqlRuntime::InsertTableData(TableReference table, const
       for (const FieldSchema& field : schema) {
         columns.push_back(QuoteIdentifier(field.name));
         const auto it = values.find(field.name);
-        literals.push_back(it == values.end()
-                               ? "DEFAULT"
-                               : RoundedInsertValue(functions_, *it, field, ignore_unknown_values));
+        literals.push_back(
+            it == values.end() ? "DEFAULT" : RoundedInsertValue(functions_, *it, field, options));
       }
       std::string statement = "INSERT INTO ";
       statement += QualifiedName(table);

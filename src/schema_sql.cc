@@ -28,23 +28,22 @@ namespace {
 
 using nlohmann::json;
 
-std::string InsertRecord(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
+std::string InsertRecord(const json& value, const FieldSchema& field, InsertValueOptions options) {
   if (!value.is_object()) {
     throw ApiError::Invalid("Expected an object for field " + field.name);
   }
   for (auto it = value.begin(); it != value.end(); ++it) {
     const bool known = std::ranges::any_of(
         field.fields, [&](const FieldSchema& child) { return child.name == it.key(); });
-    if (!known && !ignore_unknown_values) {
+    if (!known && !options.ignore_unknown_values) {
       throw ApiError::Invalid("Unknown field: " + it.key());
     }
   }
   std::vector<std::string> fields;
   for (const FieldSchema& child : field.fields) {
     const auto it = value.find(child.name);
-    fields.push_back(
-        QuoteIdentifier(child.name) + " := " +
-        InsertValue(it == value.end() ? json(nullptr) : *it, child, ignore_unknown_values));
+    fields.push_back(QuoteIdentifier(child.name) +
+                     " := " + InsertValue(it == value.end() ? json(nullptr) : *it, child, options));
   }
   return "struct_pack(" + Join(fields, ", ") + ")";
 }
@@ -247,7 +246,7 @@ std::string RangeFromText(const std::string& text, const FieldSchema& field, boo
   return null_on_error ? "TRY(" + value + ")" : value;
 }
 
-std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
+std::string InsertValue(const json& value, const FieldSchema& field, InsertValueOptions options) {
   const std::string type = ToDuckDbType(field);
   if (value.is_null()) {
     if (field.mode == FieldMode::kRequired) {
@@ -261,13 +260,12 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
     }
     const FieldSchema element = AsNullable(field);
     std::vector<std::string> values;
-    std::ranges::transform(value, std::back_inserter(values), [&](const json& item) {
-      return InsertValue(item, element, ignore_unknown_values);
-    });
+    std::ranges::transform(value, std::back_inserter(values),
+                           [&](const json& item) { return InsertValue(item, element, options); });
     return "CAST([" + Join(values, ", ") + "] AS " + type + ")";
   }
   if (field.type == FieldType::kRecord) {
-    return InsertRecord(value, field, ignore_unknown_values);
+    return InsertRecord(value, field, options);
   }
   if (field.type == FieldType::kRange) {
     // {"start": ..., "end": ...}, where a missing or null bound is unbounded.
@@ -278,7 +276,7 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
     for (const char* name : {"start", "end"}) {
       const auto it = value.find(name);
       bounds.push_back(InsertValue(it == value.end() ? json(nullptr) : *it,
-                                   RangeBoundField(field, field.name), false));
+                                   RangeBoundField(field, field.name), options));
     }
     return "CAST(" + DuckDbRange(bounds.at(0), bounds.at(1)) + " AS " + type + ")";
   }
@@ -301,7 +299,8 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   }
   if (field.type == FieldType::kInterval) {
     // GoogleSQL parses the text as it does a query parameter's.
-    const auto interval = googlesql::IntervalValue::ParseFromString(scalar, /*allow_nanos=*/false);
+    const auto interval =
+        googlesql::IntervalValue::ParseFromString(scalar, options.allow_interval_nanos);
     if (!interval.ok()) {
       throw ApiError::Invalid("Invalid INTERVAL value for field " + field.name + ": " + scalar);
     }

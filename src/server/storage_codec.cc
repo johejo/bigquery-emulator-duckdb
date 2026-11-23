@@ -55,6 +55,82 @@ void Check(const absl::Status& status) {
   }
 }
 
+}  // namespace
+
+std::string DecodeStorageText(std::string_view text, FieldType type, std::string_view name) {
+  if (!googlesql::IsWellFormedUTF8(text)) {
+    throw ApiError::Invalid("Invalid UTF-8: " + std::string(name));
+  }
+  switch (type) {
+    case FieldType::kDate: {
+      int32_t date = 0;
+      std::string canonical;
+      Check(googlesql::functions::ConvertStringToDate(text, &date));
+      Check(googlesql::functions::ConvertDateToString(date, &canonical));
+      return canonical;
+    }
+    case FieldType::kTime: {
+      googlesql::TimeValue time;
+      Check(googlesql::functions::ConvertStringToTime(text, googlesql::functions::kMicroseconds,
+                                                      &time));
+      return time.DebugString();
+    }
+    case FieldType::kDatetime: {
+      googlesql::DatetimeValue datetime;
+      Check(googlesql::functions::ConvertStringToDatetime(text, googlesql::functions::kMicroseconds,
+                                                          &datetime));
+      return datetime.DebugString();
+    }
+    case FieldType::kTimestamp: {
+      int64_t timestamp = 0;
+      std::string canonical;
+      Check(googlesql::functions::ConvertStringToTimestamp(
+          text, absl::UTCTimeZone(), googlesql::functions::kMicroseconds, true, &timestamp));
+      Check(googlesql::functions::ConvertTimestampToStringWithTruncation(
+          timestamp, googlesql::functions::kMicroseconds, absl::UTCTimeZone(), &canonical));
+      return canonical;
+    }
+    case FieldType::kNumeric: {
+      const auto value = googlesql::NumericValue::FromStringStrict(text);
+      Check(value.status());
+      return value->ToString();
+    }
+    case FieldType::kBigNumeric: {
+      const auto value = googlesql::BigNumericValue::FromStringStrict(text);
+      Check(value.status());
+      return value->ToString();
+    }
+    case FieldType::kJson: {
+      // Parsing through nlohmann could round large numbers or turn JSON null into SQL NULL.
+      const auto value = googlesql::JSONValue::ParseJSONString(
+          text, {
+                    .wide_number_mode = googlesql::JSONParsingOptions::WideNumberMode::kRound,
+                    .max_nesting = 500,
+                });
+      Check(value.status());
+      return value->GetConstRef().ToString();
+    }
+    case FieldType::kGeography: {
+      // Read here only for BigQuery's error, which names no function.
+      const auto geography = googlesql_geography::ReadGeography(text, /*oriented=*/true, "");
+      if (!geography.ok()) {
+        std::string_view reason = geography.status().message();
+        if (reason.starts_with(googlesql_geography::kGeoJsonFailed)) {
+          reason.remove_prefix(googlesql_geography::kGeoJsonFailed.size());
+        }
+        throw ApiError::Invalid("Cannot convert value " + std::string(text) + " to GEOGRAPHY: " +
+                                std::string(reason) + " on field " + std::string(name) + ".");
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return std::string(text);
+}
+
+namespace {
+
 const FieldSchema& Destination(const std::vector<FieldSchema>& schema, std::string_view name) {
   const auto found = std::ranges::find(schema, name, &FieldSchema::name);
   if (found == schema.end()) {
@@ -156,79 +232,10 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
     }
   }
   if (input.cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
-    std::string text =
+    const std::string text =
         repeated ? r->GetRepeatedString(message, &input, index) : r->GetString(message, &input);
     if (input.type() != FieldDescriptor::TYPE_BYTES) {
-      if (!googlesql::IsWellFormedUTF8(text)) {
-        throw ApiError::Invalid("Invalid UTF-8: " + field.name);
-      }
-      std::string canonical;
-      switch (field.type) {
-        case FieldType::kDate: {
-          int32_t date = 0;
-          Check(googlesql::functions::ConvertStringToDate(text, &date));
-          Check(googlesql::functions::ConvertDateToString(date, &canonical));
-          return canonical;
-        }
-        case FieldType::kTime: {
-          googlesql::TimeValue time;
-          Check(googlesql::functions::ConvertStringToTime(text, googlesql::functions::kMicroseconds,
-                                                          &time));
-          return time.DebugString();
-        }
-        case FieldType::kDatetime: {
-          googlesql::DatetimeValue datetime;
-          Check(googlesql::functions::ConvertStringToDatetime(
-              text, googlesql::functions::kMicroseconds, &datetime));
-          return datetime.DebugString();
-        }
-        case FieldType::kTimestamp: {
-          int64_t timestamp = 0;
-          Check(googlesql::functions::ConvertStringToTimestamp(
-              text, absl::UTCTimeZone(), googlesql::functions::kMicroseconds, true, &timestamp));
-          Check(googlesql::functions::ConvertTimestampToStringWithTruncation(
-              timestamp, googlesql::functions::kMicroseconds, absl::UTCTimeZone(), &canonical));
-          return canonical;
-        }
-        case FieldType::kNumeric: {
-          const auto value = googlesql::NumericValue::FromStringStrict(text);
-          Check(value.status());
-          return value->ToString();
-        }
-        case FieldType::kBigNumeric: {
-          const auto value = googlesql::BigNumericValue::FromStringStrict(text);
-          Check(value.status());
-          return value->ToString();
-        }
-        case FieldType::kJson: {
-          // Keep JSON text inside a string: a parsed JSON null would become SQL NULL in
-          // WriteStorageRows, and parsing through nlohmann could round large numbers.
-          const auto value = googlesql::JSONValue::ParseJSONString(
-              text, {
-                        .wide_number_mode = googlesql::JSONParsingOptions::WideNumberMode::kRound,
-                        .max_nesting = 500,
-                    });
-          Check(value.status());
-          return value->GetConstRef().ToString();
-        }
-        case FieldType::kGeography: {
-          // Read here only for BigQuery's error, which names no function, since the value is
-          // written from its text.
-          const auto geography = googlesql_geography::ReadGeography(text, /*oriented=*/true, "");
-          if (!geography.ok()) {
-            std::string_view reason = geography.status().message();
-            if (reason.starts_with(googlesql_geography::kGeoJsonFailed)) {
-              reason.remove_prefix(googlesql_geography::kGeoJsonFailed.size());
-            }
-            throw ApiError::Invalid("Cannot convert value " + text + " to GEOGRAPHY: " +
-                                    std::string(reason) + " on field " + field.name + ".");
-          }
-          return text;
-        }
-        default:
-          break;
-      }
-      return text;
+      return DecodeStorageText(text, field.type, field.name);
     }
     if (field.type == FieldType::kBytes) {
       return absl::Base64Escape(text);
