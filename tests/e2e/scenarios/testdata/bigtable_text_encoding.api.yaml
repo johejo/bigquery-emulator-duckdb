@@ -1,11 +1,9 @@
 version: 1
+# Recorded on BigQuery in run erimz3irep4co5kquuo2otx5ok; see the adjacent answers file.
 description: >-
-  Check how BigQuery parses INTEGER, FLOAT and BOOLEAN Bigtable cells with TEXT encoding, which
-  BigtableColumnFamily.encoding describes only as alphanumeric text strings: signs, whitespace,
-  leading zeros, range limits, exponents, special floating-point values, letter case, numeric
-  booleans, empty cells and invalid text.
-# BigQuery earlier read TEXT "1.5" as FLOAT 1.5 and "true" as BOOLEAN true (run
-# uzdilxwqcsjrlxhg35bery7a4u, recorded in pull request #704).
+  Verify how INTEGER, FLOAT and BOOLEAN Bigtable cells with TEXT encoding are parsed: signs,
+  whitespace, leading zeros, range limits, exponents, special floating-point values, letter
+  case, numeric booleans, empty cells and invalid text.
 # Fixture: use the instance from the Bigtable metadata scenario, in the same project
 # as the URI below. For example, in Bash:
 #   table=bigtable-text-encoding-probe
@@ -41,6 +39,23 @@ vars:
     columnFamilies:
       - familyId: family
         columns: ['${column}']
+  create_body:
+    tableReference: {tableId: t}
+    externalDataConfiguration:
+      sourceFormat: BIGTABLE
+      sourceUris: ['${uri}']
+      bigtableOptions: '${table_options}'
+  read_body:
+    location: US
+    useLegacySql: false
+    timeoutMs: 100000
+    query: SELECT family.probe_value.cell.value FROM `${project}.${dataset}.t`
+  created: {status: 200}
+  success:
+    complete: true
+    schema: [{name: value, mode: NULLABLE, type: '${value_type}'}]
+    rows: [{f: [{v: '${value}'}]}]
+  rejection: {status: 400, reason: invalid}
 templates:
   read:
     steps:
@@ -53,23 +68,40 @@ templates:
         rest:
           method: POST
           path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
-          body:
-            tableReference: {tableId: t}
-            externalDataConfiguration:
-              sourceFormat: BIGTABLE
-              sourceUris: ['${uri}']
-              bigtableOptions: '${table_options}'
+          body: '${create_body}'
         observe: {status: /status}
       - name: read
         rest:
           method: POST
           path: /bigquery/v2/projects/${project}/queries
-          body:
-            location: US
-            useLegacySql: false
-            timeoutMs: 100000
-            query: SELECT family.probe_value.cell.value FROM `${project}.${dataset}.t`
+          body: '${read_body}'
         observe: {complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows, errors: /body/errors}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        # The full message contains deployment-specific source and destination paths.
+        observe: {status: /status, reason: /body/error/errors/0/reason}
     cleanup:
       - name: delete
         rest:
@@ -79,180 +111,287 @@ cases:
   - name: int_plain
     template: read
     vars:
+      value_type: INTEGER
+      value: '42'
       column: {qualifierString: int_plain, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_negative
     template: read
     vars:
+      value_type: INTEGER
+      value: '-42'
       column: {qualifierString: int_negative, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_plus
     template: read
     vars:
+      value_type: INTEGER
+      value: '42'
       column: {qualifierString: int_plus, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_leading_zero
     template: read
     vars:
+      value_type: INTEGER
+      value: '42'
       column: {qualifierString: int_leading_zero, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_leading_space
     template: read
     vars:
+      value_type: INTEGER
+      value: '42'
       column: {qualifierString: int_leading_space, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_trailing_space
     template: read
     vars:
+      value_type: INTEGER
+      value: '42'
       column: {qualifierString: int_trailing_space, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_max
     template: read
     vars:
+      value_type: INTEGER
+      value: '9223372036854775807'
       column: {qualifierString: int_max, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_min
     template: read
     vars:
+      value_type: INTEGER
+      value: '-9223372036854775808'
       column: {qualifierString: int_min, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: int_overflow
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_overflow, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: int_decimal
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_decimal, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: int_exponent
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_exponent, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: int_hex
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_hex, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: int_underscore
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_underscore, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: int_empty
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_empty, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: int_alpha
-    template: read
+    template: reject
     vars:
       column: {qualifierString: int_alpha, fieldName: probe_value, type: INTEGER, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: float_integer
     template: read
     vars:
+      value_type: FLOAT
+      value: '2.0'
       column: {qualifierString: float_integer, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_negative
     template: read
     vars:
+      value_type: FLOAT
+      value: '-0.5'
       column: {qualifierString: float_negative, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_plus
     template: read
     vars:
+      value_type: FLOAT
+      value: '1.5'
       column: {qualifierString: float_plus, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_exponent
     template: read
     vars:
+      value_type: FLOAT
+      value: '1000.0'
       column: {qualifierString: float_exponent, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_leading_dot
     template: read
     vars:
+      value_type: FLOAT
+      value: '0.5'
       column: {qualifierString: float_leading_dot, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_trailing_dot
     template: read
     vars:
+      value_type: FLOAT
+      value: '1.0'
       column: {qualifierString: float_trailing_dot, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_leading_space
     template: read
     vars:
+      value_type: FLOAT
+      value: '1.5'
       column: {qualifierString: float_leading_space, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_trailing_space
     template: read
     vars:
+      value_type: FLOAT
+      value: '1.5'
       column: {qualifierString: float_trailing_space, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_nan
     template: read
     vars:
+      value_type: FLOAT
+      value: 'NaN'
       column: {qualifierString: float_nan, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_nan_lower
     template: read
     vars:
+      value_type: FLOAT
+      value: 'NaN'
       column: {qualifierString: float_nan_lower, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_infinity
     template: read
     vars:
+      value_type: FLOAT
+      value: 'Infinity'
       column: {qualifierString: float_infinity, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_negative_infinity
     template: read
     vars:
+      value_type: FLOAT
+      value: '-Infinity'
       column: {qualifierString: float_negative_infinity, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_inf
     template: read
     vars:
+      value_type: FLOAT
+      value: 'Infinity'
       column: {qualifierString: float_inf, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_overflow
     template: read
     vars:
+      value_type: FLOAT
+      value: 'Infinity'
       column: {qualifierString: float_overflow, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_java_suffix
-    template: read
+    template: reject
     vars:
       column: {qualifierString: float_java_suffix, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: float_comma
-    template: read
+    template: reject
     vars:
       column: {qualifierString: float_comma, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: float_hex
     template: read
     vars:
+      value_type: FLOAT
+      value: '8.0'
       column: {qualifierString: float_hex, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: float_empty
-    template: read
+    template: reject
     vars:
       column: {qualifierString: float_empty, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: float_alpha
-    template: read
+    template: reject
     vars:
       column: {qualifierString: float_alpha, fieldName: probe_value, type: FLOAT, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: bool_false
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'false'
       column: {qualifierString: bool_false, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_upper
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'true'
       column: {qualifierString: bool_upper, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_mixed
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'true'
       column: {qualifierString: bool_mixed, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_upper_false
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'false'
       column: {qualifierString: bool_upper_false, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_one
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'true'
       column: {qualifierString: bool_one, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_zero
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'false'
       column: {qualifierString: bool_zero, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_t
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'true'
       column: {qualifierString: bool_t, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_yes
     template: read
     vars:
+      value_type: BOOLEAN
+      value: 'true'
       column: {qualifierString: bool_yes, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
   - name: bool_leading_space
-    template: read
+    template: reject
     vars:
       column: {qualifierString: bool_leading_space, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: bool_empty
-    template: read
+    template: reject
     vars:
       column: {qualifierString: bool_empty, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
   - name: bool_alpha
-    template: read
+    template: reject
     vars:
       column: {qualifierString: bool_alpha, fieldName: probe_value, type: BOOLEAN, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}

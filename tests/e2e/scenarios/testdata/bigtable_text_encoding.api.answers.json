@@ -1,0 +1,1265 @@
+{
+  "version": 1,
+  "cases": {
+    "bool_alpha": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_bool_alpha.t, error message: Could not convert cell value abc. At row:fixture, column_family:family, column:bool_alpha File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_bool_alpha.t, error message: Could not convert cell value abc. At row:fixture, column_family:family, column:bool_alpha File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bool_empty": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_bool_empty.t, error message: Could not convert cell value . At row:fixture, column_family:family, column:bool_empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_bool_empty.t, error message: Could not convert cell value . At row:fixture, column_family:family, column:bool_empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bool_false": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_leading_space": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_bool_leading_space.t, error message: Could not convert cell value  true. At row:fixture, column_family:family, column:bool_leading_space File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_bool_leading_space.t, error message: Could not convert cell value  true. At row:fixture, column_family:family, column:bool_leading_space File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "bool_mixed": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_one": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_t": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_upper": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_upper_false": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_yes": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "bool_zero": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "BOOLEAN"
+            }
+          ]
+        }
+      }
+    },
+    "float_alpha": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_alpha.t, error message: Could not convert cell value abc. At row:fixture, column_family:family, column:float_alpha File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_alpha.t, error message: Could not convert cell value abc. At row:fixture, column_family:family, column:float_alpha File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "float_comma": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_comma.t, error message: Could not convert cell value 1,5. At row:fixture, column_family:family, column:float_comma File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_comma.t, error message: Could not convert cell value 1,5. At row:fixture, column_family:family, column:float_comma File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "float_empty": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_empty.t, error message: Could not convert cell value . At row:fixture, column_family:family, column:float_empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_empty.t, error message: Could not convert cell value . At row:fixture, column_family:family, column:float_empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "float_exponent": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1000.0"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_hex": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "8.0"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_inf": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "Infinity"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_infinity": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "Infinity"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_integer": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "2.0"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_java_suffix": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_java_suffix.t, error message: Could not convert cell value 1.5d. At row:fixture, column_family:family, column:float_java_suffix File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_float_java_suffix.t, error message: Could not convert cell value 1.5d. At row:fixture, column_family:family, column:float_java_suffix File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "float_leading_dot": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.5"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_leading_space": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.5"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_nan": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "NaN"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_nan_lower": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "NaN"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_negative": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "-0.5"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_negative_infinity": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "-Infinity"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_overflow": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "Infinity"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_plus": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.5"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_trailing_dot": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.0"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "float_trailing_space": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.5"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "FLOAT"
+            }
+          ]
+        }
+      }
+    },
+    "int_alpha": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_alpha.t, error message: Could not convert cell value abc. At row:fixture, column_family:family, column:int_alpha File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_alpha.t, error message: Could not convert cell value abc. At row:fixture, column_family:family, column:int_alpha File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "int_decimal": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_decimal.t, error message: Could not convert cell value 42.0. At row:fixture, column_family:family, column:int_decimal File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_decimal.t, error message: Could not convert cell value 42.0. At row:fixture, column_family:family, column:int_decimal File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "int_empty": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_empty.t, error message: Could not convert cell value . At row:fixture, column_family:family, column:int_empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_empty.t, error message: Could not convert cell value . At row:fixture, column_family:family, column:int_empty File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "int_exponent": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_exponent.t, error message: Could not convert cell value 4e1. At row:fixture, column_family:family, column:int_exponent File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_exponent.t, error message: Could not convert cell value 4e1. At row:fixture, column_family:family, column:int_exponent File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "int_hex": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_hex.t, error message: Could not convert cell value 0x2a. At row:fixture, column_family:family, column:int_hex File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_hex.t, error message: Could not convert cell value 0x2a. At row:fixture, column_family:family, column:int_hex File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "int_leading_space": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_leading_zero": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_max": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "9223372036854775807"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_min": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "-9223372036854775808"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_negative": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "-42"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_overflow": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_overflow.t, error message: Could not convert cell value 9223372036854775808. At row:fixture, column_family:family, column:int_overflow File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_overflow.t, error message: Could not convert cell value 9223372036854775808. At row:fixture, column_family:family, column:int_overflow File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "int_plain": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_plus": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_trailing_space": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "42"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    },
+    "int_underscore": {
+      "project": "johejo-sandbox2",
+      "run": "erimz3irep4co5kquuo2otx5ok",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_underscore.t, error message: Could not convert cell value 4_2. At row:fixture, column_family:family, column:int_underscore File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_erimz3irep4co5kquuo2otx5ok_int_underscore.t, error message: Could not convert cell value 4_2. At row:fixture, column_family:family, column:int_underscore File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-text-encoding-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

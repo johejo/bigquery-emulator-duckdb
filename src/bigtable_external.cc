@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iterator>
 #include <map>
 #include <numeric>
@@ -16,6 +17,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/numbers.h"
 #include "google/cloud/bigtable/admin/bigtable_table_admin_client.h"
 #include "google/cloud/bigtable/admin/bigtable_table_admin_connection.h"
 #include "google/cloud/bigtable/cell.h"
@@ -91,6 +94,8 @@ struct FamilyRead {
   // A read of `column` counts every cell in the family, though its array excludes promoted cells.
   const std::set<size_t>* fields;
   std::map<std::string_view, size_t> promoted;
+  // Whether each field's cells use TEXT encoding, indexed like schema.fields.
+  std::vector<bool> text;
 
   [[nodiscard]] bool Reads(size_t field) const {
     return fields == nullptr || fields->contains(field);
@@ -108,8 +113,48 @@ uint64_t BigEndianBits(std::string_view value) {
                           ", Actual: " + std::to_string(value.size()));
 }
 
+std::string DoubleLiteral(double number) {
+  std::array<char, 32> text{};
+  const auto result = std::to_chars(text.begin(), text.end(), number);
+  // The string cast spells NaN, infinities and -0, which DuckDB numeric literals cannot.
+  return "CAST('" + std::string(text.begin(), result.ptr) + "' AS DOUBLE)";
+}
+
+// BigQuery's parsing of TEXT cells matches absl::SimpleAtoi and absl::SimpleAtob, and strtod
+// after stripping ASCII whitespace, which also accepts hexadecimal floats and overflows to
+// infinity.
+std::string TextCellLiteral(std::string_view value, FieldType type) {
+  switch (type) {
+    case FieldType::kInteger:
+      if (int64_t number = 0; absl::SimpleAtoi(value, &number)) {
+        return std::to_string(number);
+      }
+      break;
+    case FieldType::kFloat: {
+      const std::string text(absl::StripAsciiWhitespace(value));
+      char* end = nullptr;
+      const double number = std::strtod(text.c_str(), &end);
+      if (!text.empty() && end == text.c_str() + text.size()) {
+        return DoubleLiteral(number);
+      }
+      break;
+    }
+    case FieldType::kBoolean:
+      if (bool flag = false; absl::SimpleAtob(value, &flag)) {
+        return flag ? "true" : "false";
+      }
+      break;
+    default:
+      return Bytes(value, type == FieldType::kString);
+  }
+  throw ApiError::Invalid("Could not convert cell value " + std::string(value) + ".");
+}
+
 // BINARY cells hold HBase Bytes.toBytes encodings, as BigtableColumnFamily.type documents.
-std::string CellLiteral(std::string_view value, FieldType type) {
+std::string CellLiteral(std::string_view value, FieldType type, bool text) {
+  if (text) {
+    return TextCellLiteral(value, type);
+  }
   switch (type) {
     case FieldType::kInteger: {
       // BigQuery accepts both HBase Bytes.toBytes(int) and Bytes.toBytes(long).
@@ -127,13 +172,9 @@ std::string CellLiteral(std::string_view value, FieldType type) {
         ThrowCellSize(value, sizeof(double));
       }
       const uint64_t bits = BigEndianBits(value);
-      const double number = value.size() == sizeof(float)
-                                ? std::bit_cast<float>(static_cast<uint32_t>(bits))
-                                : std::bit_cast<double>(bits);
-      std::array<char, 32> text{};
-      const auto result = std::to_chars(text.begin(), text.end(), number);
-      // The string cast spells NaN, infinities and -0, which DuckDB numeric literals cannot.
-      return "CAST('" + std::string(text.begin(), result.ptr) + "' AS DOUBLE)";
+      return DoubleLiteral(value.size() == sizeof(float)
+                               ? std::bit_cast<float>(static_cast<uint32_t>(bits))
+                               : std::bit_cast<double>(bits));
     }
     case FieldType::kBoolean:
       // As HBase Bytes.toBoolean does, BigQuery reads any nonzero byte as true.
@@ -147,13 +188,14 @@ std::string CellLiteral(std::string_view value, FieldType type) {
 }
 
 void AppendCell(std::vector<std::string>& versions, const cbt::Cell& cell,
-                const FieldSchema& schema) {
+                const FieldSchema& schema, bool text) {
   // ReadRows orders versions newest first within each qualifier.
   if (schema.mode != FieldMode::kRepeated && !versions.empty()) {
     return;
   }
   versions.push_back("{'timestamp': make_timestamp(" + std::to_string(cell.timestamp().count()) +
-                     "), 'value': " + CellLiteral(cell.value(), schema.fields.at(1).type) + "}");
+                     "), 'value': " + CellLiteral(cell.value(), schema.fields.at(1).type, text) +
+                     "}");
 }
 
 std::string CellValue(const std::vector<std::string>& versions, const FieldSchema& schema) {
@@ -177,10 +219,10 @@ std::optional<std::string> ReadFamily(const FamilyRead& read, const cbt::Row& ro
       const size_t field = found->second;
       if (read.Reads(field)) {
         present = true;
-        AppendCell(named.at(field), cell, fields.at(field).fields.front());
+        AppendCell(named.at(field), cell, fields.at(field).fields.front(), read.text.at(field));
       }
     } else if (fallback) {
-      AppendCell(unlisted[cell.column_qualifier()], cell, fallback_cell);
+      AppendCell(unlisted[cell.column_qualifier()], cell, fallback_cell, read.text.front());
     }
   }
   if (!present) {
@@ -303,14 +345,19 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
                   .schema = field,
                   .fields = selected == context.fields.end() ? nullptr : &selected->second,
                   .promoted = {},
+                  .text = std::vector<bool>(field.fields.size(), false),
               };
               if (definition.bigtable_options) {
                 const auto& families = definition.bigtable_options->column_families;
                 const auto family =
                     std::ranges::find(families, field.name, &BigtableFamily::family_id);
                 if (family != families.end()) {
+                  read.text.front() = family->cells.encoding == "TEXT";
                   for (size_t j = 0; j < family->columns.size(); ++j) {
-                    read.promoted.emplace(family->columns.at(j).qualifier, j + 1);
+                    const auto& column = family->columns.at(j);
+                    read.promoted.emplace(column.qualifier, j + 1);
+                    read.text.at(j + 1) = column.cells.encoding.value_or(
+                                              family->cells.encoding.value_or("")) == "TEXT";
                   }
                 }
               }

@@ -110,3 +110,64 @@ func seedBigtableFloatBoolean(t *testing.T, project string) {
 		t.Fatal(err)
 	}
 }
+
+// Mirrors the fixture described in bigtable_text_encoding.api.yaml.
+func seedBigtableTextEncoding(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-text-encoding-probe", map[string]*adminpb.ColumnFamily{"family": {}})
+	var mutations []*btpb.Mutation
+	for _, cell := range [][2]string{
+		{"int_plain", "42"},
+		{"int_negative", "-42"},
+		{"int_plus", "+42"},
+		{"int_leading_zero", "042"},
+		{"int_leading_space", " 42"},
+		{"int_trailing_space", "42 "},
+		{"int_max", "9223372036854775807"},
+		{"int_min", "-9223372036854775808"},
+		{"int_overflow", "9223372036854775808"},
+		{"int_decimal", "42.0"},
+		{"int_exponent", "4e1"},
+		{"int_hex", "0x2a"},
+		{"int_underscore", "4_2"},
+		{"int_empty", ""},
+		{"int_alpha", "abc"},
+		{"float_integer", "2"},
+		{"float_negative", "-0.5"},
+		{"float_plus", "+1.5"},
+		{"float_exponent", "1e3"},
+		{"float_leading_dot", ".5"},
+		{"float_trailing_dot", "1."},
+		{"float_leading_space", " 1.5"},
+		{"float_trailing_space", "1.5 "},
+		{"float_nan", "NaN"},
+		{"float_nan_lower", "nan"},
+		{"float_infinity", "Infinity"},
+		{"float_negative_infinity", "-Infinity"},
+		{"float_inf", "inf"},
+		{"float_overflow", "1e400"},
+		{"float_java_suffix", "1.5d"},
+		{"float_comma", "1,5"},
+		{"float_hex", "0x1p3"},
+		{"float_empty", ""},
+		{"float_alpha", "abc"},
+		{"bool_false", "false"},
+		{"bool_upper", "TRUE"},
+		{"bool_mixed", "True"},
+		{"bool_upper_false", "FALSE"},
+		{"bool_one", "1"},
+		{"bool_zero", "0"},
+		{"bool_t", "t"},
+		{"bool_yes", "yes"},
+		{"bool_leading_space", " true"},
+		{"bool_empty", ""},
+		{"bool_alpha", "abc"},
+	} {
+		mutations = append(mutations, bigtableCell("family", cell[0], cell[1], 1000))
+	}
+	if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+		TableName: table, RowKey: []byte("fixture"), Mutations: mutations,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
