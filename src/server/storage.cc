@@ -360,8 +360,13 @@ class ReadService final : public pb::BigQueryRead::Service {
         size_t count = std::min<size_t>(1024, stream.end - position);
         std::string bytes;
         while (true) {
-          bytes = stream.snapshot->rows->ReadRows(position, count, stream.snapshot->arrow,
-                                                  stream.snapshot->buffer_compression);
+          try {
+            bytes = stream.snapshot->rows->ReadRows(position, count, stream.snapshot->arrow,
+                                                    stream.snapshot->buffer_compression);
+          } catch (const std::range_error& error) {
+            Fail(grpc::StatusCode::OUT_OF_RANGE, "there was an error operating on '" +
+                                                     request->read_stream() + "': " + error.what());
+          }
           if (bytes.size() <= size_t{4} * 1024 * 1024 || count <= 1) {
             break;
           }

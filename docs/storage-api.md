@@ -22,8 +22,10 @@ A RANGE column is a struct of `start` and `end`, which is null where unbounded, 
 If `snapshot_time` is set, the read uses the same history and has the same limits as
 [`FOR SYSTEM_TIME AS OF`](compatibility.md#time-travel).
 
-INTERVAL columns are unsupported. The [support table](storage.md) lists the request options
-the emulator rejects.
+Storage Read rounds INTERVAL time parts down to whole microseconds. Arrow uses `MONTH_DAY_NANO`
+and returns `OUT_OF_RANGE` if the time part does not fit in signed 64-bit nanoseconds. Avro uses
+a `google.sqlType.INTERVAL` record of months, days, and microseconds. The [support table](storage.md)
+lists unsupported request options.
 
 ## Write limitations
 

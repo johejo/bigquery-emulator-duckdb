@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "cases": {
+    "arrow_nested": {
+      "project": "johejo-sandbox",
+      "run": "gyvbux5mgydgnji6mhxhbscfh4",
+      "steps": {
+        "read": {
+          "code": "OK",
+          "messages": [
+            {
+              "arrowRecordBatch": {
+                "serializedRecordBatch": "/////5gBAAAUAAAAAAAAAAwAFgAGAAUACAAMAAwAAAAAAwQAGAAAAFgAAAAAAAAAAAAKABgADAAEAAgACgAAAOwAAAAQAAAAAQAAAAAAAAAAAAAADQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAIAAAAAAAAAAoAAAAAAAAAAAAAAAAAAAAKAAAAAAAAAAIAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAABAAAAAAAAAAQAAAAAAAAAABAAAAAAAAAEgAAAAAAAAAEAAAAAAAAAAAAAAABwAAAAEAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAAAAAAAAgAAAP3///8HAAAAmCDD/P////8AAAAAAAAAAACgB8LaUQAAAAAAAAAAAAD9////BwAAAJggw/z/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+              },
+              "arrowSchema": {
+                "serializedSchema": "//////gCAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAMAAAAAAgAAPAEAAAQAAACE/f//AAABDRgAAAAcAAAABAAAAAIAAACgAAAAEAAAAAMAAAByZWMAtP3//4b///8AAAELFAAAAGgAAAAIAAAAFAAAAAAAAAAHAAAAbWlzc2luZwABAAAABAAAADT+//8kAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAAAyv7//wIAEgAYAAgABgAHAAwAAAAQABQAEgAAAAAAAQsUAAAAaAAAAAgAAAAUAAAAAAAAAAUAAAB2YWx1ZQAAAAEAAAAEAAAAwP7//yQAAAAEAAAAFwAAAGdvb2dsZTpzcWxUeXBlOmludGVydmFsABQAAABBUlJPVzpleHRlbnNpb246bmFtZQAAAAB+/v//AAACAFL///8AAAAMGAAAAHAAAAAIAAAAHAAAAAEAAABkAAAACwAAAGVtcHR5X2l0ZW1zAAEAAAAEAAAARP///yQAAAAEAAAAFwAAAGdvb2dsZTpzcWxUeXBlOmludGVydmFsABQAAABBUlJPVzpleHRlbnNpb246bmFtZQAAAAA8////OP///wAAAQsQAAAAHAAAAAQAAAAAAAAABAAAAGl0ZW0AAAYABgAEAAYAAAACABIAGAAIAAAABwAMAAAAEAAUABIAAAAAAAAMGAAAAHgAAAAIAAAAGAAAAAEAAAB8AAAABQAAAGl0ZW1zAAAAAQAAAAwAAAAIAAwABAAIAAgAAAAkAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAAABAAEAAQAAAAQABQACAAGAAcADAAAABAAEAAAAAAAAQsQAAAAHAAAAAQAAAAAAAAABAAAAGl0ZW0AAAYACAAGAAYAAAAAAAIA"
+              },
+              "rowCount": "1",
+              "stats": {
+                "progress": {
+                  "atResponseEnd": 0.5
+                }
+              }
+            }
+          ]
+        },
+        "session": {
+          "arrowSchema": "//////gCAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAMAAAAAAgAAPAEAAAQAAACE/f//AAABDRgAAAAcAAAABAAAAAIAAACgAAAAEAAAAAMAAAByZWMAtP3//4b///8AAAELFAAAAGgAAAAIAAAAFAAAAAAAAAAHAAAAbWlzc2luZwABAAAABAAAADT+//8kAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAAAyv7//wIAEgAYAAgABgAHAAwAAAAQABQAEgAAAAAAAQsUAAAAaAAAAAgAAAAUAAAAAAAAAAUAAAB2YWx1ZQAAAAEAAAAEAAAAwP7//yQAAAAEAAAAFwAAAGdvb2dsZTpzcWxUeXBlOmludGVydmFsABQAAABBUlJPVzpleHRlbnNpb246bmFtZQAAAAB+/v//AAACAFL///8AAAAMGAAAAHAAAAAIAAAAHAAAAAEAAABkAAAACwAAAGVtcHR5X2l0ZW1zAAEAAAAEAAAARP///yQAAAAEAAAAFwAAAGdvb2dsZTpzcWxUeXBlOmludGVydmFsABQAAABBUlJPVzpleHRlbnNpb246bmFtZQAAAAA8////OP///wAAAQsQAAAAHAAAAAQAAAAAAAAABAAAAGl0ZW0AAAYABgAEAAYAAAACABIAGAAIAAAABwAMAAAAEAAUABIAAAAAAAAMGAAAAHgAAAAIAAAAGAAAAAEAAAB8AAAABQAAAGl0ZW1zAAAAAQAAAAwAAAAIAAwABAAIAAgAAAAkAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAAABAAEAAQAAAAQABQACAAGAAcADAAAABAAEAAAAAAAAQsQAAAAHAAAAAQAAAAAAAAABAAAAGl0ZW0AAAYACAAGAAYAAAAAAAIA",
+          "code": "OK"
+        }
+      }
+    },
+    "arrow_scalar": {
+      "project": "johejo-sandbox",
+      "run": "gyvbux5mgydgnji6mhxhbscfh4",
+      "steps": {
+        "read": {
+          "code": "OK",
+          "messages": [
+            {
+              "arrowRecordBatch": {
+                "serializedRecordBatch": "/////7gAAAAUAAAAAAAAAAwAFgAGAAUACAAMAAwAAAAAAwQAGAAAACgAAAAAAAAAAAAKABgADAAEAAgACgAAAFwAAAAQAAAAAQAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAAEAAAAAAAAAAAAAAAAgAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAA/f///wcAAACYIMP8/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+              },
+              "arrowSchema": {
+                "serializedSchema": "/////1ABAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAIAAACYAAAABAAAAIL///8AAAELFAAAAGwAAAAIAAAAFAAAAAAAAAAHAAAAbWlzc2luZwABAAAABAAAAHD///8kAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAYABgAEAAYAAAACABIAGAAIAAYABwAMAAAAEAAUABIAAAAAAAELFAAAAHQAAAAIAAAAFAAAAAAAAAAFAAAAdmFsdWUAAAABAAAADAAAAAgADAAEAAgACAAAACQAAAAEAAAAFwAAAGdvb2dsZTpzcWxUeXBlOmludGVydmFsABQAAABBUlJPVzpleHRlbnNpb246bmFtZQAABgAIAAYABgAAAAAAAgA="
+              },
+              "rowCount": "1",
+              "stats": {
+                "progress": {
+                  "atResponseEnd": 0.5
+                }
+              }
+            }
+          ]
+        },
+        "session": {
+          "arrowSchema": "/////1ABAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAIAAACYAAAABAAAAIL///8AAAELFAAAAGwAAAAIAAAAFAAAAAAAAAAHAAAAbWlzc2luZwABAAAABAAAAHD///8kAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAYABgAEAAYAAAACABIAGAAIAAYABwAMAAAAEAAUABIAAAAAAAELFAAAAHQAAAAIAAAAFAAAAAAAAAAFAAAAdmFsdWUAAAABAAAADAAAAAgADAAEAAgACAAAACQAAAAEAAAAFwAAAGdvb2dsZTpzcWxUeXBlOmludGVydmFsABQAAABBUlJPVzpleHRlbnNpb246bmFtZQAABgAIAAYABgAAAAAAAgA=",
+          "code": "OK"
+        }
+      }
+    },
+    "avro_nested": {
+      "project": "johejo-sandbox",
+      "run": "gyvbux5mgydgnji6mhxhbscfh4",
+      "steps": {
+        "read": {
+          "code": "OK",
+          "messages": [
+            {
+              "avroRows": {
+                "serializedBinaryRows": "BAUO4dAGAACAkNjGngUAAAICBQ7h0AYA"
+              },
+              "avroSchema": {
+                "schema": "{\n    \"type\": \"record\",\n    \"name\": \"__root__\",\n    \"fields\": [\n        {\n            \"name\": \"items\",\n            \"type\": {\n                \"type\": \"array\",\n                \"items\": {\n                    \"type\": \"record\",\n                    \"namespace\": \"google.sqlType\",\n                    \"name\": \"INTERVAL\",\n                    \"fields\": [\n                        {\n                            \"name\": \"months\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"days\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"microseconds\",\n                            \"type\": \"long\"\n                        }\n                    ]\n                }\n            }\n        },\n        {\n            \"name\": \"empty_items\",\n            \"type\": {\n                \"type\": \"array\",\n                \"items\": \"google.sqlType.INTERVAL\"\n            }\n        },\n        {\n            \"name\": \"rec\",\n            \"type\": [\n                \"null\",\n                {\n                    \"type\": \"record\",\n                    \"name\": \"__s_0\",\n                    \"fields\": [\n                        {\n                            \"name\": \"value\",\n                            \"type\": [\n                                \"null\",\n                                \"google.sqlType.INTERVAL\"\n                            ]\n                        },\n                        {\n                            \"name\": \"missing\",\n                            \"type\": [\n                                \"null\",\n                                \"google.sqlType.INTERVAL\"\n                            ]\n                        }\n                    ]\n                }\n            ]\n        }\n    ]\n}"
+              },
+              "rowCount": "1",
+              "stats": {
+                "progress": {
+                  "atResponseEnd": 0.5
+                }
+              }
+            }
+          ]
+        },
+        "session": {
+          "avroSchema": "{\n    \"type\": \"record\",\n    \"name\": \"__root__\",\n    \"fields\": [\n        {\n            \"name\": \"items\",\n            \"type\": {\n                \"type\": \"array\",\n                \"items\": {\n                    \"type\": \"record\",\n                    \"namespace\": \"google.sqlType\",\n                    \"name\": \"INTERVAL\",\n                    \"fields\": [\n                        {\n                            \"name\": \"months\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"days\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"microseconds\",\n                            \"type\": \"long\"\n                        }\n                    ]\n                }\n            }\n        },\n        {\n            \"name\": \"empty_items\",\n            \"type\": {\n                \"type\": \"array\",\n                \"items\": \"google.sqlType.INTERVAL\"\n            }\n        },\n        {\n            \"name\": \"rec\",\n            \"type\": [\n                \"null\",\n                {\n                    \"type\": \"record\",\n                    \"name\": \"__s_0\",\n                    \"fields\": [\n                        {\n                            \"name\": \"value\",\n                            \"type\": [\n                                \"null\",\n                                \"google.sqlType.INTERVAL\"\n                            ]\n                        },\n                        {\n                            \"name\": \"missing\",\n                            \"type\": [\n                                \"null\",\n                                \"google.sqlType.INTERVAL\"\n                            ]\n                        }\n                    ]\n                }\n            ]\n        }\n    ]\n}",
+          "code": "OK"
+        }
+      }
+    },
+    "avro_scalar": {
+      "project": "johejo-sandbox",
+      "run": "gyvbux5mgydgnji6mhxhbscfh4",
+      "steps": {
+        "read": {
+          "code": "OK",
+          "messages": [
+            {
+              "avroRows": {
+                "serializedBinaryRows": "AgUO4dAGAA=="
+              },
+              "avroSchema": {
+                "schema": "{\n    \"type\": \"record\",\n    \"name\": \"__root__\",\n    \"fields\": [\n        {\n            \"name\": \"value\",\n            \"type\": [\n                \"null\",\n                {\n                    \"type\": \"record\",\n                    \"namespace\": \"google.sqlType\",\n                    \"name\": \"INTERVAL\",\n                    \"fields\": [\n                        {\n                            \"name\": \"months\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"days\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"microseconds\",\n                            \"type\": \"long\"\n                        }\n                    ]\n                }\n            ]\n        },\n        {\n            \"name\": \"missing\",\n            \"type\": [\n                \"null\",\n                \"google.sqlType.INTERVAL\"\n            ]\n        }\n    ]\n}"
+              },
+              "rowCount": "1",
+              "stats": {
+                "progress": {
+                  "atResponseEnd": 0.5
+                }
+              }
+            }
+          ]
+        },
+        "session": {
+          "avroSchema": "{\n    \"type\": \"record\",\n    \"name\": \"__root__\",\n    \"fields\": [\n        {\n            \"name\": \"value\",\n            \"type\": [\n                \"null\",\n                {\n                    \"type\": \"record\",\n                    \"namespace\": \"google.sqlType\",\n                    \"name\": \"INTERVAL\",\n                    \"fields\": [\n                        {\n                            \"name\": \"months\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"days\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"microseconds\",\n                            \"type\": \"long\"\n                        }\n                    ]\n                }\n            ]\n        },\n        {\n            \"name\": \"missing\",\n            \"type\": [\n                \"null\",\n                \"google.sqlType.INTERVAL\"\n            ]\n        }\n    ]\n}",
+          "code": "OK"
+        }
+      }
+    }
+  }
+}
