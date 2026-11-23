@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include "src/text_encoding.h"
+
 namespace bigquery_emulator_duckdb {
 
 // How a CSV source separates records and values.
@@ -15,6 +17,8 @@ struct CsvDialect {
   // None when values are never quoted.
   std::optional<char> quote = '"';
   bool allow_quoted_newlines = false;
+  // Decode fields only after splitting a raw byte stream.
+  std::optional<TextEncoding> cell_encoding = std::nullopt;
 };
 
 // A value of a record, absent when it is unquoted and empty or the record ends before it.
@@ -39,6 +43,10 @@ struct CsvRecord {
 std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDialect& dialect,
                                        size_t limit = std::numeric_limits<size_t>::max(),
                                        bool lenient = false);
+
+// The separator byte of an external table's CSV delimiter option, in the source encoding.
+// Rejects empty options and delimiter bytes the reader cannot use.
+char ExternalCsvDelimiter(std::string_view option, TextEncoding encoding);
 
 // The quote character of a CSV quote option, none for an empty one. Throws ApiError::Invalid for
 // more than one character, as BigQuery does, and ApiError::Unsupported for one that is not ASCII

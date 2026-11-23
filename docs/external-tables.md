@@ -68,8 +68,9 @@ can also contain DATETIME, BIGNUMERIC, JSON, GEOGRAPHY, INTERVAL and RANGE colum
 Supported CSV options are:
 
 - `skip_leading_rows` / `csvOptions.skipLeadingRows`;
-- `field_delimiter` / `csvOptions.fieldDelimiter`: one ASCII character other than quote,
-  line break or NUL;
+- `field_delimiter` / `csvOptions.fieldDelimiter`: non-ASCII delimiters are supported for
+  UTF-8 and, if the first character is representable, ISO-8859-1 sources. Empty delimiters
+  and a double quote, line break or NUL as the separator are unsupported;
 - the [CSV options accepted by loads](compatibility.md#loads-extracts-and-copies).
 
 Schema detection does not take a quote, quoted line breaks or NULL markers. Other CSV options

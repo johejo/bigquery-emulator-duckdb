@@ -617,11 +617,30 @@ std::optional<int> CsvSkipLeadingRows(const GcsExternalData& definition) {
   return static_cast<int>(*definition.skip_leading_rows);
 }
 
-// The reader settings of a CSV table's options other than its delimiter and leading rows.
-CsvReadOptions CsvOptions(const GcsExternalData& definition) {
+TextEncoding ExternalEncoding(const GcsExternalData& definition) {
+  return ParseTextEncoding(definition.encoding.value_or("UTF-8")).value_or(TextEncoding::kUtf8);
+}
+
+// An empty delimiter means autodetect should choose one, not that an empty option was given.
+std::string CsvDelimiter(const GcsExternalData& definition, TextEncoding encoding) {
+  return definition.field_delimiter
+             ? std::string(1, ExternalCsvDelimiter(*definition.field_delimiter, encoding))
+             : std::string();
+}
+
+// A non-ASCII delimiter must split the original bytes, not the decoded text.
+std::optional<TextEncoding> CsvCellEncoding(std::string_view delimiter, TextEncoding encoding) {
+  if (!delimiter.empty() && static_cast<unsigned char>(delimiter.front()) >= 0x80) {
+    return encoding;
+  }
+  return std::nullopt;
+}
+
+// The reader settings of a CSV table, with its effective delimiter.
+CsvReadOptions CsvOptions(const GcsExternalData& definition, const std::string& delimiter) {
   return {
-      .quote =
-          ParseCsvQuote(definition.quote.value_or("\""), definition.field_delimiter.value_or(",")),
+      .field_delimiter = delimiter,
+      .quote = ParseCsvQuote(definition.quote.value_or("\""), delimiter),
       .allow_quoted_newlines = definition.allow_quoted_newlines.value_or(false),
       .allow_jagged_rows = definition.allow_jagged_rows.value_or(false),
       .ignore_unknown_values = definition.ignore_unknown_values.value_or(false),
@@ -642,20 +661,20 @@ FileFormat Format(const GcsExternalData& definition) {
 }
 
 // Downloads the sources of `definition`, the external table `table_name`, and decodes those of a
-// CSV or JSON table from its encoding. As BigQuery's answers in
+// CSV or JSON table from its encoding unless the CSV reader must decode individual fields.
+// As BigQuery's answers in
 // external_table_read_options.api.answers.json show, compression GZIP fails on a source that is
 // not gzip. BigQuery reads a gzip source with compression NONE as it is, and splits one in UTF-16
 // or UTF-32 into values before it decodes them, which both fail on gzip data; the emulator, which
 // reads gzip whatever the compression, rejects them as unsupported.
 std::vector<FileSource> StageSources(const GcsExternalData& definition, std::string_view table_name,
-                                     GcsClient& client, TemporaryFiles& files) {
+                                     GcsClient& client, TemporaryFiles& files,
+                                     TextEncoding encoding, bool decode_csv_cells) {
   const FileFormat format = Format(definition);
   std::vector<FileSource> sources = StageFileSources(definition.uris, format, client, files);
   if (format == FileFormat::kParquet) {
     return sources;
   }
-  const TextEncoding encoding =
-      ParseTextEncoding(definition.encoding.value_or("UTF-8")).value_or(TextEncoding::kUtf8);
   for (FileSource& source : sources) {
     // StageFileSources gives a gzip source the suffix .gz.
     const bool gzip = source.path.ends_with(".gz");
@@ -673,7 +692,7 @@ std::vector<FileSource> StageSources(const GcsExternalData& definition, std::str
       throw ApiError::Unsupported("reading a gzip external source in " +
                                   std::string(TextEncodingName(encoding)) + ": " + source.uri);
     }
-    if (encoding != TextEncoding::kUtf8) {
+    if (encoding != TextEncoding::kUtf8 && !decode_csv_cells) {
       source.path = files.Write(DecodeText(ReadMaybeGzip(source.path), encoding));
     }
   }
@@ -825,7 +844,11 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
         "schemas must be the same.");
   }
   TemporaryFiles files;
-  const auto sources = StageSources(definition, table_id, client, files);
+  const TextEncoding encoding = ExternalEncoding(definition);
+  const std::string delimiter = csv ? CsvDelimiter(definition, encoding) : std::string();
+  const auto cell_encoding = CsvCellEncoding(delimiter, encoding);
+  const auto sources =
+      StageSources(definition, table_id, client, files, encoding, cell_encoding.has_value());
   if (sources.empty()) {
     throw ApiError::Invalid("External table source URIs match no files");
   }
@@ -835,9 +858,8 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
     return DetectJson(last, table_id, ExternalFormats(definition));
   }
   if (csv) {
-    DetectedCsv detected =
-        DetectCsv({last}, definition.field_delimiter.value_or(""), CsvSkipLeadingRows(definition),
-                  files, /*rows=*/false, ExternalFormats(definition));
+    DetectedCsv detected = DetectCsv({last}, delimiter, CsvSkipLeadingRows(definition), files,
+                                     /*rows=*/false, ExternalFormats(definition), cell_encoding);
     if (detected.schema.empty()) {
       throw ApiError::Invalid("External CSV source " + last.uri + " has no columns");
     }
@@ -928,7 +950,11 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
       columns.emplace_back("CAST(NULL AS VARCHAR) AS _FILE_NAME");
       return "SELECT " + Join(columns, ", ") + " WHERE FALSE";
     }
-    const auto sources = StageSources(definition, table_name, client, files);
+    const TextEncoding encoding = ExternalEncoding(definition);
+    std::string delimiter = csv ? CsvDelimiter(definition, encoding) : std::string();
+    const auto cell_encoding = CsvCellEncoding(delimiter, encoding);
+    const auto sources =
+        StageSources(definition, table_name, client, files, encoding, cell_encoding.has_value());
     // BigQuery ignores maxBadRecords for Parquet. A JSON table of one file fails at the record
     // that exceeds the limit. A CSV read finds its bad records even without a limit, since the
     // reader cannot report a value it fails to convert as BigQuery does.
@@ -994,19 +1020,17 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     std::vector<int64_t> first_records;
     // An autodetected table reads each file with the delimiter and header rows BigQuery detects
     // in the alphabetically last one, which gives its schema, and matches columns by position.
-    std::string delimiter = definition.field_delimiter.value_or(",");
     int skip_leading_rows = static_cast<int>(definition.skip_leading_rows.value_or(0));
     if (csv && definition.autodetect.value_or(false) && !sources.empty()) {
       const DetectedCsv detected =
-          DetectCsv({*std::ranges::max_element(sources, {}, &FileSource::uri)},
-                    definition.field_delimiter.value_or(""), CsvSkipLeadingRows(definition), files,
-                    /*rows=*/false, ExternalFormats(definition));
+          DetectCsv({*std::ranges::max_element(sources, {}, &FileSource::uri)}, delimiter,
+                    CsvSkipLeadingRows(definition), files,
+                    /*rows=*/false, ExternalFormats(definition), cell_encoding);
       delimiter = std::string(1, detected.delimiter);
       skip_leading_rows = detected.skipped_rows;
     }
-    CsvReadOptions csv_options = CsvOptions(definition);
+    CsvReadOptions csv_options = CsvOptions(definition, delimiter.empty() ? "," : delimiter);
     csv_options.skip_leading_rows = skip_leading_rows;
-    csv_options.field_delimiter = delimiter;
     csv_options.numbered_records = skips != nullptr;
     std::vector<std::string> reads;
     for (const auto& source : sources) {
@@ -1032,8 +1056,8 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
         first_records.push_back(bad.records + 1);
         std::vector<FileSource> staged;
         try {
-          staged =
-              StageCsvSources({source}, csv_options, read_schema, files, skips, context.columns);
+          staged = StageCsvSources({source}, csv_options, read_schema, files, skips,
+                                   context.columns, cell_encoding);
         } catch (const ApiError& error) {
           // A record the parser cannot split fails the read whatever its limit.
           throw RecordError(error, table_name, source.uri);

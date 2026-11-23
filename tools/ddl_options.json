@@ -358,7 +358,7 @@
       {
         "name": "field_delimiter",
         "type": "STRING",
-        "values": ["','", "'|'", "'\\t'", "'ab'"]
+        "values": ["','", "'|'", "'\\t'", "'ab'", "'é'"]
       },
       {
         "name": "format",

@@ -20,6 +20,7 @@
 #include "src/file_read_options.h"
 #include "src/schema_detect.h"
 #include "src/temporary_files.h"
+#include "src/text_encoding.h"
 
 // The rules below follow BigQuery's answers in
 // tests/e2e/goclient/testdata/unverified/load_csv_autodetect.api.answers.json, which
@@ -39,9 +40,11 @@ using Record = std::vector<Cell>;
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a separator and a count, named apart.
 std::vector<Record> ParseRecords(std::string_view contents, char delimiter,
                                  size_t limit = std::numeric_limits<size_t>::max(),
-                                 bool lenient = false) {
+                                 bool lenient = false,
+                                 std::optional<TextEncoding> cell_encoding = std::nullopt) {
   std::vector<Record> records;
-  for (CsvRecord& parsed : ParseCsvRecords(contents, {.delimiter = delimiter}, limit, lenient)) {
+  for (CsvRecord& parsed : ParseCsvRecords(
+           contents, {.delimiter = delimiter, .cell_encoding = cell_encoding}, limit, lenient)) {
     if (parsed.error) {
       throw ApiError::Invalid(
           std::format("Error while reading data, error message: {}; line_number: {}", *parsed.error,
@@ -148,7 +151,7 @@ std::string Quoted(std::string_view text) {
 
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
                       std::optional<int> skip_leading_rows, TemporaryFiles& downloads, bool rows,
-                      const DatetimeFormats& formats) {
+                      const DatetimeFormats& formats, std::optional<TextEncoding> cell_encoding) {
   // BigQuery samples one of several files, and whether it then finds a header in each is not
   // known.
   if (sources.size() > 1) {
@@ -166,7 +169,7 @@ DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view f
       field_delimiter.empty() ? DetectDelimiter(contents) : field_delimiter.front();
   // Detection reads a quote that does not close leniently, but a read of the rows fails on it.
   const std::vector<Record> records =
-      ParseRecords(contents, delimiter, std::numeric_limits<size_t>::max(), !rows);
+      ParseRecords(contents, delimiter, std::numeric_limits<size_t>::max(), !rows, cell_encoding);
 
   // Left out, skipLeadingRows looks for a header in the first row, which is otherwise data;
   // N > 0 skips N - 1 rows and looks for one in row N, which it skips either way; 0 reads every
