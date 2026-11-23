@@ -5,14 +5,15 @@
 This page lists the options of each statement in BigQuery's
 [DDL reference](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md)
 and whether the emulator accepts them. Statements and clauses are listed in [sql.md](sql.md), and
-behavior these tables cannot show in [compatibility.md](compatibility.md).
+behavior these tables cannot show in [compatibility.md](compatibility.md) and
+[external-tables.md](external-tables.md).
 
 `tools/restprobe` takes the options, their types and sample values from `tools/ddl_options.json`,
 a snapshot of the reference, and runs one statement per sample against a fresh emulator holding
 the fixture tables `d.t (id INT64, d DATE, a NUMERIC) PARTITION BY d`. A probe checks only that
 the statement runs, not the metadata it stores. Samples use `=` unless the catalog lists
-assignment operators, such as `+=` and `-=` for tags. The notes of a Partial option list the statements
-the emulator rejected.
+assignment operators, such as `+=` and `-=` for tags. The notes of a Partial option identify the
+rejected samples by statement or by a short label from the catalog.
 
 - **Supported**: every sample runs.
 - **Partial**: some samples run, and the emulator rejects the others as unsupported.
@@ -41,7 +42,7 @@ the emulator rejected.
 | [CREATE TABLE FUNCTION](#create-table-function) | 1 | 0 | 0 | 0 |
 | [CREATE PROCEDURE SQL](#create-procedure-sql) | 2 | 0 | 0 | 0 |
 | [CREATE FUNCTION Python](#create-function-python) | 3 | 0 | 1 | 5 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 10 | 1 | 2 | 8 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 10 | 1 | 1 | 8 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 15 | 1 | 0 | 0 |
 | [CREATE EXTERNAL TABLE Bigtable](#create-external-table-bigtable) | 1 | 1 | 0 | 0 |
 
@@ -268,7 +269,6 @@ the emulator rejected.
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
-| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
 | [`compression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`decimal_target_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Supported |  |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
@@ -316,7 +316,7 @@ the emulator rejected.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"TEXT"}]}')`; `CREATE EXTERNAL TABLE d.n OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/projects/test/instances/test/tables/probe', bigtable_options = '{"outputColumnFamiliesAsJson":true}')`. |
+| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `INTEGER` cells with `TEXT` encoding; `outputColumnFamiliesAsJson: true`. |
 
 ## Unprobed contexts
 
