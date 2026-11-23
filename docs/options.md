@@ -17,7 +17,8 @@ rejected samples by statement or by a short label from the catalog.
 
 - **Supported**: every sample runs.
 - **Partial**: some samples run, and the emulator rejects the others as unsupported.
-- **Unsupported**: the emulator rejects every sample as unsupported.
+- **Unsupported**: the emulator rejects every sample or its required setup as unsupported.
+  A setup failure is noted separately because the option itself was not reached.
 - **Broken**: a statement fails during execution, which is a bug.
 - **Untested**: the catalog has no sample for the option yet.
 
@@ -26,6 +27,9 @@ rejected samples by statement or by a short label from the catalog.
 | [CREATE SCHEMA](#create-schema) | 11 | 0 | 1 | 3 |
 | [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 10 | 0 | 1 | 3 |
 | [CREATE TABLE](#create-table) | 8 | 1 | 3 | 3 |
+| [CREATE TABLE LIKE](#create-table-like) | 7 | 2 | 3 | 3 |
+| [CREATE TABLE COPY](#create-table-copy) | 7 | 2 | 3 | 3 |
+| [CREATE TABLE CLONE](#create-table-clone) | 7 | 2 | 3 | 3 |
 | [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 8 | 0 | 4 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ADD COLUMN](#alter-table-add-column) | 2 | 0 | 2 | 0 |
@@ -41,9 +45,38 @@ rejected samples by statement or by a short label from the catalog.
 | [CREATE FUNCTION JavaScript](#create-function-javascript) | 0 | 0 | 2 | 0 |
 | [CREATE TABLE FUNCTION](#create-table-function) | 1 | 0 | 0 | 0 |
 | [CREATE PROCEDURE SQL](#create-procedure-sql) | 2 | 0 | 0 | 0 |
-| [CREATE FUNCTION Python](#create-function-python) | 3 | 0 | 1 | 5 |
+| [CREATE MATERIALIZED VIEW replica](#create-materialized-view-replica) | 0 | 0 | 1 | 0 |
+| [CREATE EXTERNAL SCHEMA](#create-external-schema) | 0 | 0 | 6 | 0 |
+| [CREATE FUNCTION remote](#create-function-remote) | 0 | 0 | 4 | 0 |
+| [CREATE FUNCTION Python](#create-function-python) | 3 | 0 | 2 | 4 |
+| [CREATE AGGREGATE FUNCTION SQL](#create-aggregate-function-sql) | 0 | 0 | 1 | 0 |
+| [CREATE AGGREGATE FUNCTION JavaScript](#create-aggregate-function-javascript) | 0 | 0 | 2 | 0 |
+| [CREATE PROCEDURE Spark](#create-procedure-spark) | 0 | 0 | 10 | 1 |
+| [CREATE CAPACITY](#create-capacity) | 0 | 0 | 4 | 0 |
+| [CREATE RESERVATION](#create-reservation) | 0 | 0 | 11 | 0 |
+| [CREATE ASSIGNMENT](#create-assignment) | 0 | 0 | 4 | 0 |
+| [CREATE SEARCH INDEX](#create-search-index) | 0 | 0 | 4 | 0 |
+| [CREATE SEARCH INDEX column](#create-search-index-column) | 0 | 0 | 2 | 0 |
+| [CREATE SEARCH INDEX ALL COLUMNS WITH COLUMN OPTIONS](#create-search-index-all-columns-with-column-options) | 0 | 0 | 2 | 0 |
+| [CREATE VECTOR INDEX](#create-vector-index) | 0 | 0 | 5 | 0 |
+| [CREATE DATA_POLICY](#create-data_policy) | 0 | 0 | 2 | 0 |
+| [CREATE CONNECTION](#create-connection) | 0 | 0 | 3 | 0 |
+| [ALTER SCHEMA ADD REPLICA](#alter-schema-add-replica) | 0 | 0 | 2 | 0 |
+| [ALTER ORGANIZATION SET OPTIONS](#alter-organization-set-options) | 0 | 0 | 13 | 0 |
+| [ALTER PROJECT SET OPTIONS](#alter-project-set-options) | 0 | 0 | 15 | 0 |
+| [ALTER BI_CAPACITY SET OPTIONS](#alter-bi_capacity-set-options) | 0 | 0 | 2 | 0 |
+| [ALTER CAPACITY SET OPTIONS](#alter-capacity-set-options) | 0 | 0 | 2 | 0 |
+| [ALTER RESERVATION SET OPTIONS](#alter-reservation-set-options) | 0 | 0 | 6 | 1 |
+| [ALTER SEARCH INDEX SET OPTIONS](#alter-search-index-set-options) | 0 | 0 | 4 | 0 |
+| [ALTER SEARCH INDEX ADD COLUMN](#alter-search-index-add-column) | 0 | 0 | 2 | 0 |
+| [ALTER SEARCH INDEX ALTER COLUMN SET OPTIONS](#alter-search-index-alter-column-set-options) | 0 | 0 | 2 | 0 |
+| [ALTER DATA_POLICY SET OPTIONS](#alter-data_policy-set-options) | 0 | 0 | 2 | 0 |
+| [ALTER CONNECTION SET OPTIONS](#alter-connection-set-options) | 0 | 0 | 2 | 0 |
+| [UNDROP SCHEMA](#undrop-schema) | 0 | 0 | 1 | 0 |
 | [CREATE EXTERNAL TABLE](#create-external-table) | 10 | 1 | 1 | 8 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 16 | 0 | 0 | 0 |
+| [CREATE TABLE generated column](#create-table-generated-column) | 0 | 0 | 1 | 0 |
+| [ALTER TABLE ADD COLUMN generated column](#alter-table-add-column-generated-column) | 0 | 0 | 1 | 0 |
 | [CREATE EXTERNAL TABLE Bigtable](#create-external-table-bigtable) | 1 | 1 | 0 | 0 |
 
 ## CREATE SCHEMA
@@ -93,6 +126,66 @@ rejected samples by statement or by a short label from the catalog.
 | [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Supported |  |
 | [`require_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS (kms_key_name = 'projects/test/locations/us/keyRings/r/cryptoKeys/k')`. |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+| [`default_rounding_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`enable_change_history`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
+| [`enable_fine_grained_mutations`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`storage_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`file_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`table_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+
+## CREATE TABLE LIKE
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
+| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Partial | Unsupported: `CREATE TABLE n LIKE t OPTIONS (partition_expiration_days = 7)`; `CREATE TABLE n LIKE t OPTIONS (partition_expiration_days = 7.5)`. |
+| [`require_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
+| [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE TABLE n LIKE t OPTIONS (kms_key_name = 'projects/test/locations/us/keyRings/r/cryptoKeys/k')`. |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+| [`default_rounding_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`enable_change_history`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
+| [`enable_fine_grained_mutations`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`storage_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`file_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`table_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+
+## CREATE TABLE COPY
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
+| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Partial | Unsupported: `CREATE TABLE n COPY t OPTIONS (partition_expiration_days = 7)`; `CREATE TABLE n COPY t OPTIONS (partition_expiration_days = 7.5)`. |
+| [`require_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
+| [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE TABLE n COPY t OPTIONS (kms_key_name = 'projects/test/locations/us/keyRings/r/cryptoKeys/k')`. |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+| [`default_rounding_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
+| [`enable_change_history`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
+| [`enable_fine_grained_mutations`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`storage_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`file_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`table_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
+
+## CREATE TABLE CLONE
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`expiration_timestamp`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `TIMESTAMP` | Supported |  |
+| [`partition_expiration_days`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Partial | Unsupported: `CREATE TABLE n CLONE t OPTIONS (partition_expiration_days = 7)`; `CREATE TABLE n CLONE t OPTIONS (partition_expiration_days = 7.5)`. |
+| [`require_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
+| [`kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE TABLE n CLONE t OPTIONS (kms_key_name = 'projects/test/locations/us/keyRings/r/cryptoKeys/k')`. |
 | [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
@@ -251,19 +344,270 @@ rejected samples by statement or by a short label from the catalog.
 | [`strict_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
+## CREATE MATERIALIZED VIEW replica
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`replication_interval_seconds`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+
+## CREATE EXTERNAL SCHEMA
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`external_source`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`tags`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+
+## CREATE FUNCTION remote
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`endpoint`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`user_defined_context`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`max_batching_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+
 ## CREATE FUNCTION Python
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`library`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
-| [`max_batching_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
+| [`max_batching_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
 | [`runtime_version`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`entry_point`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`packages`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
 | [`container_cpu`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `FLOAT64` | Untested | No sample for this option's constraints. |
 | [`container_memory`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`container_request_concurrency`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Untested | No sample for this option's constraints. |
+
+## CREATE AGGREGATE FUNCTION SQL
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## CREATE AGGREGATE FUNCTION JavaScript
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`library`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+
+## CREATE PROCEDURE Spark
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`engine`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`runtime_version`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`container_image`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`properties`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`main_file_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`main_class`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`py_file_uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+| [`jar_uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+| [`file_uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+| [`archive_uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+
+## CREATE CAPACITY
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`plan`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`renewal_plan`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`slot_count`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`edition`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## CREATE RESERVATION
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`ignore_idle_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`slot_capacity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`target_job_concurrency`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`edition`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`autoscale_max_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`secondary_location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`max_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`scaling_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`scheduling_policy_max_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`scheduling_policy_concurrency`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+
+## CREATE ASSIGNMENT
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`assignee`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE', slot_capacity = 100)`. |
+| [`job_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE', slot_capacity = 100)`. |
+| [`scheduling_policy_max_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE', slot_capacity = 100)`. |
+| [`scheduling_policy_concurrency`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE', slot_capacity = 100)`. |
+
+## CREATE SEARCH INDEX
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`analyzer`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`analyzer_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`data_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+| [`default_index_column_granularity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## CREATE SEARCH INDEX column
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`index_granularity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`data_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+
+## CREATE SEARCH INDEX ALL COLUMNS WITH COLUMN OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`index_granularity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`data_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+
+## CREATE VECTOR INDEX
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`index_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`distance_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`ivf_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`tree_ah_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`lexical_search_columns`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+
+## CREATE DATA_POLICY
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`data_policy_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`masking_expression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## CREATE CONNECTION
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`connection_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## ALTER SCHEMA ADD REPLICA
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`replica_kms_key`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## ALTER ORGANIZATION SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`default_kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_time_zone`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_query_job_timeout_ms`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`default_interactive_query_queue_timeout_ms`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`default_batch_query_queue_timeout_ms`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`default_query_optimizer_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`query_runtime`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`enable_global_queries_execution`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`enable_global_queries_data_access`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`reservation_override_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`reusable_column_aliases_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`disable_on_demand_billing`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`default_location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## ALTER PROJECT SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`default_kms_key_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_time_zone`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_query_job_timeout_ms`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`default_interactive_query_queue_timeout_ms`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`default_batch_query_queue_timeout_ms`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`default_query_optimizer_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_cloud_resource_connection_id`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_sql_dialect_option`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`query_runtime`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`enable_reservation_based_fairness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`enable_global_queries_execution`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`enable_global_queries_data_access`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+| [`reservation_override_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`reusable_column_aliases_mode`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+| [`default_location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
+
+## ALTER BI_CAPACITY SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`size_gb`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported |  |
+| [`preferred_tables`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported |  |
+
+## ALTER CAPACITY SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`plan`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CAPACITY `test.region-us.probe` OPTIONS (plan = 'ANNUAL', slot_count = 100)`. |
+| [`renewal_plan`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CAPACITY `test.region-us.probe` OPTIONS (plan = 'ANNUAL', slot_count = 100)`. |
+
+## ALTER RESERVATION SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`ignore_idle_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)`. |
+| [`slot_capacity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)`. |
+| [`target_job_concurrency`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)`. |
+| [`autoscale_max_slots`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)`. |
+| [`secondary_location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)`. |
+| [`is_primary`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Untested | No sample for this option's constraints. |
+| [`labels`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported | Blocked by unsupported setup: `CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)`. |
+
+## ALTER SEARCH INDEX SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`analyzer`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+| [`analyzer_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+| [`data_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+| [`default_index_column_granularity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+
+## ALTER SEARCH INDEX ADD COLUMN
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`index_granularity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+| [`data_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+
+## ALTER SEARCH INDEX ALTER COLUMN SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`index_granularity`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+| [`data_types`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `ARRAY<STRING>` | Unsupported | Blocked by unsupported setup: `CREATE SEARCH INDEX idx ON d.docs(title)`. |
+
+## ALTER DATA_POLICY SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`data_policy_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE DATA_POLICY `test.region-us.probe` OPTIONS (data_policy_type = 'DATA_MASKING_POLICY', masking_expression = 'ALWAYS_NULL')`. |
+| [`masking_expression`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE DATA_POLICY `test.region-us.probe` OPTIONS (data_policy_type = 'DATA_MASKING_POLICY', masking_expression = 'ALWAYS_NULL')`. |
+
+## ALTER CONNECTION SET OPTIONS
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`friendly_name`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+| [`description`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')`. |
+
+## UNDROP SCHEMA
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`location`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Unsupported |  |
 
 ## CREATE EXTERNAL TABLE
 
@@ -311,37 +655,21 @@ rejected samples by statement or by a short label from the catalog.
 | [`time_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`timestamp_format`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 
+## CREATE TABLE generated column
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`asynchronous`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+
+## ALTER TABLE ADD COLUMN generated column
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`asynchronous`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Unsupported |  |
+
 ## CREATE EXTERNAL TABLE Bigtable
 
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `PROTO_BINARY` encoding; `outputColumnFamiliesAsJson: true`. |
-
-## Unprobed contexts
-
-These contexts have no statement template yet, so none of their options is probed.
-
-- [CREATE MATERIALIZED VIEW replica](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `replication_interval_seconds`
-- [CREATE EXTERNAL SCHEMA](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `description`, `friendly_name`, `labels`, `location`, `external_source`, `tags`
-- [CREATE FUNCTION remote](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `description`, `endpoint`, `user_defined_context`, `max_batching_rows`
-- [CREATE AGGREGATE FUNCTION SQL](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `description`
-- [CREATE AGGREGATE FUNCTION JavaScript](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `description`, `library`
-- [CREATE PROCEDURE Spark](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `description`, `engine`, `runtime_version`, `container_image`, `properties`, `main_file_uri`, `main_class`, `py_file_uris`, `jar_uris`, `file_uris`, `archive_uris`
-- [CREATE CAPACITY](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `plan`, `renewal_plan`, `slot_count`, `edition`
-- [CREATE RESERVATION](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `ignore_idle_slots`, `slot_capacity`, `target_job_concurrency`, `edition`, `autoscale_max_slots`, `secondary_location`, `max_slots`, `scaling_mode`, `scheduling_policy_max_slots`, `scheduling_policy_concurrency`, `labels`
-- [CREATE ASSIGNMENT](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `assignee`, `job_type`, `scheduling_policy_max_slots`, `scheduling_policy_concurrency`
-- [CREATE SEARCH INDEX](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `analyzer`, `analyzer_options`, `data_types`, `default_index_column_granularity`
-- [CREATE SEARCH INDEX column](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `index_granularity`, `data_types`
-- [CREATE VECTOR INDEX](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `index_type`, `distance_type`, `ivf_options`, `tree_ah_options`, `lexical_search_columns`
-- [CREATE DATA_POLICY](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `data_policy_type`, `masking_expression`
-- [CREATE CONNECTION](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `connection_type`, `friendly_name`, `description`
-- [ALTER SCHEMA ADD REPLICA](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `location`, `replica_kms_key`
-- [ALTER ORGANIZATION SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `default_kms_key_name`, `default_time_zone`, `default_query_job_timeout_ms`, `default_interactive_query_queue_timeout_ms`, `default_batch_query_queue_timeout_ms`, `default_query_optimizer_options`, `query_runtime`, `enable_global_queries_execution`, `enable_global_queries_data_access`, `reservation_override_mode`, `reusable_column_aliases_mode`, `disable_on_demand_billing`, `default_location`
-- [ALTER PROJECT SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `default_kms_key_name`, `default_time_zone`, `default_query_job_timeout_ms`, `default_interactive_query_queue_timeout_ms`, `default_batch_query_queue_timeout_ms`, `default_query_optimizer_options`, `default_cloud_resource_connection_id`, `default_sql_dialect_option`, `query_runtime`, `enable_reservation_based_fairness`, `enable_global_queries_execution`, `enable_global_queries_data_access`, `reservation_override_mode`, `reusable_column_aliases_mode`, `default_location`
-- [ALTER BI_CAPACITY SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `size_gb`, `preferred_tables`
-- [ALTER CAPACITY SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `plan`, `renewal_plan`
-- [ALTER RESERVATION SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `ignore_idle_slots`, `slot_capacity`, `target_job_concurrency`, `autoscale_max_slots`, `secondary_location`, `is_primary`, `labels`
-- [ALTER DATA_POLICY SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `data_policy_type`, `masking_expression`
-- [ALTER CONNECTION SET OPTIONS](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `friendly_name`, `description`
-- [CREATE TABLE generated column](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md): `asynchronous`

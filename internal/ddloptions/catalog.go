@@ -26,7 +26,8 @@ type Option struct {
 }
 
 // Context is a statement that takes the options of Group. Template holds {option} where a case
-// puts one assignment; a context without one is listed but not probed. Templates replaces it for
+// puts one assignment, or {name} and {assignment} to qualify the name separately.
+// A context without a template is listed but not probed. Templates replaces it for
 // the options that need another statement, such as one the template already sets, so they stay
 // in the same context. Implementation names the DDL handlers' context, which the C++ test
 // compares types with. Heading optionally groups adjacent contexts in the report without
@@ -90,8 +91,13 @@ func (c Context) Applies(name string) bool {
 	return (c.Only == nil || slices.Contains(c.Only, name)) && !slices.Contains(c.Exclude, name)
 }
 
+func validTemplate(template string) bool {
+	option, name, assignment := strings.Count(template, "{option}"), strings.Count(template, "{name}"), strings.Count(template, "{assignment}")
+	return (option == 1 && name == 0 && assignment == 0) || (option == 0 && name == 1 && assignment == 1)
+}
+
 // Validate checks what keeps the catalog consistent, before any probe runs: names and samples
-// are unique, templates hold {option} once, restrictions name options of their group, and every
+// are unique, templates have assignment placeholders, restrictions name options of their group, and every
 // option appears in some context.
 func (c *Catalog) Validate() error {
 	for group, options := range c.Groups {
@@ -136,8 +142,8 @@ func (c *Catalog) Validate() error {
 		if !ok {
 			return fmt.Errorf("%s: unknown group %s", context.Name, context.Group)
 		}
-		if context.Template != "" && strings.Count(context.Template, "{option}") != 1 {
-			return fmt.Errorf("%s: template must contain {option} exactly once", context.Name)
+		if context.Template != "" && !validTemplate(context.Template) {
+			return fmt.Errorf("%s: template needs {option} or both {name} and {assignment}, exactly once", context.Name)
 		}
 		if len(context.Templates) > 0 && context.Template == "" {
 			return fmt.Errorf("%s: templates without a template", context.Name)
@@ -146,8 +152,8 @@ func (c *Catalog) Validate() error {
 			if !context.Applies(name) || !slices.ContainsFunc(options, func(o Option) bool { return o.Name == name }) {
 				return fmt.Errorf("%s: template for an option the context does not take: %s", context.Name, name)
 			}
-			if strings.Count(template, "{option}") != 1 {
-				return fmt.Errorf("%s.%s: template must contain {option} exactly once", context.Name, name)
+			if !validTemplate(template) {
+				return fmt.Errorf("%s.%s: template needs {option} or both {name} and {assignment}, exactly once", context.Name, name)
 			}
 		}
 		for key, names := range map[string][]string{"only": context.Only, "exclude": context.Exclude} {
@@ -217,8 +223,11 @@ func (c *Catalog) Cases() []Case {
 				}
 				for _, op := range operators {
 					for _, value := range option.Values {
+						assignment := op + " " + value
+						sql := strings.NewReplacer("{option}", option.Name+" "+assignment,
+							"{name}", option.Name, "{assignment}", assignment).Replace(template)
 						k.Queries = append(k.Queries, Query{
-							SQL:   strings.Replace(template, "{option}", option.Name+" "+op+" "+value, 1),
+							SQL:   sql,
 							Label: option.ValueLabels[value],
 						})
 					}

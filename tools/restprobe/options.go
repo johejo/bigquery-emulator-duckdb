@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/ddloptions"
@@ -18,6 +20,11 @@ var optionsPreamble string
 var optionFixture = []string{
 	"CREATE SCHEMA d",
 	"CREATE TABLE d.t (id INT64, d DATE, a NUMERIC) PARTITION BY d",
+}
+
+type optionProbe struct {
+	probereport.Probe
+	blockedBy string
 }
 
 func probeOptions(w io.Writer, binary, path string) error {
@@ -36,24 +43,32 @@ func probeOptions(w io.Writer, binary, path string) error {
 			jobs = append(jobs, job{i, query})
 		}
 	}
-	probes := make([]probereport.Probe, len(jobs))
+	probes := make([]optionProbe, len(jobs))
 	if err := parallel(len(jobs), func(i int) error {
-		setup := append(append([]string{}, optionFixture...), cases[jobs[i].k].Context.Setup...)
-		var err error
-		probes[i], err = probeQuery(binary, setup, jobs[i].query.SQL)
+		j := jobs[i]
+		contextSetup := cases[j.k].Context.Setup
+		setup := append(slices.Clone(optionFixture), contextSetup...)
+		p, err := probeQuery(binary, setup, j.query.SQL)
+		var failed *probeSetupError
+		if errors.As(err, &failed) && !slices.Contains(optionFixture, failed.statement) {
+			if blocked := classify(failed.statement, failed.message); blocked.Outcome == probereport.Unsupported {
+				probes[i] = optionProbe{Probe: blocked, blockedBy: failed.statement}
+				return nil
+			}
+		}
+		probes[i] = optionProbe{Probe: p}
 		return err
 	}); err != nil {
 		return err
 	}
-	results := make([][]probereport.Probe, len(cases))
+	results := make([][]optionProbe, len(cases))
 	for i, j := range jobs {
-		p := probes[i]
-		results[j.k] = append(results[j.k], p)
+		results[j.k] = append(results[j.k], probes[i])
 	}
 	return writeOptions(w, cases, results)
 }
 
-func writeOptions(w io.Writer, cases []ddloptions.Case, results [][]probereport.Probe) error {
+func writeOptions(w io.Writer, cases []ddloptions.Case, results [][]optionProbe) error {
 	var body, unprobed bytes.Buffer
 	var tallies []probereport.Tally
 	var current *ddloptions.Context
@@ -83,8 +98,13 @@ func writeOptions(w io.Writer, cases []ddloptions.Case, results [][]probereport.
 		counts := map[probereport.Outcome]int{}
 		rejected := map[string]bool{}
 		failures := map[string]bool{}
+		blocked := map[string]bool{}
 		for j, p := range results[i] {
 			counts[p.Outcome]++
+			if p.blockedBy != "" {
+				blocked["`"+p.blockedBy+"`"] = true
+				continue
+			}
 			switch p.Outcome {
 			case probereport.Unsupported:
 				query := k.Queries[j]
@@ -101,7 +121,9 @@ func writeOptions(w io.Writer, cases []ddloptions.Case, results [][]probereport.
 		}
 		status := probereport.Status(counts)
 		note := ""
-		if len(k.Queries) == 0 {
+		if len(blocked) != 0 {
+			note = "Blocked by unsupported setup: " + strings.Join(probereport.SortedNames(blocked), "; ") + "."
+		} else if len(k.Queries) == 0 {
 			note = "No sample for this option's constraints."
 		}
 		tallies[len(tallies)-1].Counts[status]++
