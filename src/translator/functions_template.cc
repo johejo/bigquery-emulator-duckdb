@@ -1437,6 +1437,45 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticTempl
                  .uses = {TypeUse::kGraphValues},
              }),
 
+      // Identifiers are opaque and valid only within the query, as BigQuery documents; encoding
+      // keeps clients from reading the private identity. An edge's endpoint identifiers equal
+      // its nodes' element identifiers.
+      Define("ELEMENT_ID",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "to_base64(encode(struct_extract($1, '$id')))",
+                     .conditions = kElement,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("SOURCE_NODE_ID",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "to_base64(encode(struct_extract($1, '$source_id')))",
+                     .conditions = kElement,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
+      Define("DESTINATION_NODE_ID",
+             {
+                 {
+                     .arity = 1,
+                     .spelling = "to_base64(encode(struct_extract($1, '$destination_id')))",
+                     .conditions = kElement,
+                 },
+             },
+             {
+                 .uses = {TypeUse::kGraphValues},
+             }),
+
       Define("NODES",
              {
                  {.arity = 1, .spelling = "struct_extract($1, '$nodes')", .conditions = kPath},

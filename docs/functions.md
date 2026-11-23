@@ -53,7 +53,7 @@ functions.
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
 | [Geography functions](#geography-functions) | 69 | 1 | 1 | 0 |
-| [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
+| [Graph SQL functions](#graph-sql-functions) | 12 | 0 | 0 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
@@ -307,9 +307,9 @@ functions.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`DESTINATION_NODE_ID`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Unsupported |  | [Graph limits](compatibility.md#graphs). |
+| [`DESTINATION_NODE_ID`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`EDGES`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
-| [`ELEMENT_ID`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Unsupported |  | [Graph limits](compatibility.md#graphs). |
+| [`ELEMENT_ID`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`IS_ACYCLIC`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`IS_SIMPLE`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`IS_TRAIL`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
@@ -318,7 +318,7 @@ functions.
 | [`PATH_FIRST`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`PATH_LAST`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`PATH_LENGTH`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
-| [`SOURCE_NODE_ID`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Unsupported |  | [Graph limits](compatibility.md#graphs). |
+| [`SOURCE_NODE_ID`](../third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 
 ## Hash functions
 

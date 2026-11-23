@@ -1,0 +1,72 @@
+# ELEMENT_ID, SOURCE_NODE_ID and DESTINATION_NODE_ID return STRING identifiers whose format
+# BigQuery leaves unspecified, valid only within the query; cases compare them rather than
+# reading them. An edge's endpoint identifiers are the identifiers of its nodes, as the
+# documentation's examples show for SOURCE_NODE_ID(o) and ELEMENT_ID(p). NULL gives NULL.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
+# FinGraph's Knows edges are 10:1->2, 11:2->1, 12:1->1, 13:1->2.
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1) RETURN TYPEOF(ELEMENT_ID(a)) AS result)
+=> "STRING"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) RETURN LOGICAL_AND(SOURCE_NODE_ID(e) = ELEMENT_ID(a) AND DESTINATION_NODE_ID(e) = ELEMENT_ID(b)) AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person)-[o:Owns]->(a:Account) RETURN LOGICAL_AND(SOURCE_NODE_ID(o) = ELEMENT_ID(p) AND DESTINATION_NODE_ID(o) = ELEMENT_ID(a)) AS result)
+=> "true"
+
+# Endpoints follow the stored edge orientation, not the traversal direction.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)<-[e:Knows]-(b:Person) RETURN LOGICAL_AND(SOURCE_NODE_ID(e) = ELEMENT_ID(b) AND DESTINATION_NODE_ID(e) = ELEMENT_ID(a)) AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows WHERE e.id = 10]-(b:Person) RETURN COUNTIF(SOURCE_NODE_ID(e) = ELEMENT_ID(a)) AS result)
+=> "1"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ()-[e:Knows WHERE e.id = 12]->() RETURN SOURCE_NODE_ID(e) = DESTINATION_NODE_ID(e) AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ()-[e:Knows WHERE e.id = 10]->() RETURN SOURCE_NODE_ID(e) = DESTINATION_NODE_ID(e) AS result)
+=> "false"
+
+# Identifiers are unique: per node, per edge, across element tables and between nodes and
+# edges, and the same element has the same identifier wherever the query reads it.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n) RETURN COUNT(DISTINCT ELEMENT_ID(n)) AS result)
+=> "4"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH -[e]-> RETURN COUNT(DISTINCT ELEMENT_ID(e)) AS result)
+=> "5"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person WHERE p.id = 1)-[o:Owns]->() RETURN ELEMENT_ID(p) = ELEMENT_ID(o) AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (n) RETURN COUNT(DISTINCT ELEMENT_ID(n)) AS result)
+=> "6"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedEdges MATCH -[e]-> RETURN COUNT(DISTINCT ELEMENT_ID(e)) AS result)
+=> "8"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 1) RETURN ELEMENT_ID(a) = ELEMENT_ID(b) AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows WHERE e.id = 10]->(b:Person) RETURN ELEMENT_ID(PATH_FIRST(p)) = ELEMENT_ID(a) AND ELEMENT_ID(EDGES(p)[OFFSET(0)]) = ELEMENT_ID(e) AS result)
+=> "true"
+
+# Every key column contributes to the identifier: edge y goes from (a, 1) to (b, 1).
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (n) RETURN COUNT(DISTINCT ELEMENT_ID(n)) AS result)
+=> "3"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH -[e WHERE e.edge_id = 'y']-> RETURN SOURCE_NODE_ID(e) = DESTINATION_NODE_ID(e) AS result)
+=> "false"
+
+# Person 3 has no outgoing Knows edge.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (a)-[e:Knows]->(b:Person) RETURN ELEMENT_ID(e) AS result)
+=> null
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (a)-[e:Knows]->(b:Person) RETURN SOURCE_NODE_ID(e) AS result)
+=> null
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (a)-[e:Knows]->(b:Person) RETURN DESTINATION_NODE_ID(e) AS result)
+=> null
+
+# Identifiers can be grouped.
+GRAPH scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->(b:Person) RETURN ELEMENT_ID(a) AS id, COUNT(*) AS n GROUP BY id NEXT RETURN MAX(n) AS result
+=> "3"
