@@ -1,0 +1,120 @@
+# TO_JSON of graph elements and paths: an element is an object of its identifier, kind, labels and
+# properties, and an edge's also of its endpoints' identifiers; a path is an array of its elements,
+# nodes and edges alternating. Identifiers are opaque, so cases remove them or read their type.
+# NULL is JSON null. The documented examples run over scalar_fingraph.FinGraph, which holds the
+# documentation's data; its timestamps differ from some examples' results, which cases remove.
+# third_party/bigquery_docs/reference/standard-sql/json_functions.md
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-queries.md
+
+GRAPH scalar_fingraph.FinGraph
+MATCH (src:Account {id: 7})-[t1:Transfers]->(dst:Account)
+RETURN TO_JSON(src) AS json_array
+NEXT
+RETURN STRING_AGG(TO_JSON_STRING(JSON_REMOVE(json_array, '$.identifier')), '|') AS result
+=> "{\"kind\":\"node\",\"labels\":[\"Account\"],\"properties\":{\"create_time\":\"2020-01-10T06:22:20.222Z\",\"id\":7,\"is_blocked\":false,\"nick_name\":\"Vacation Fund\"}}|{\"kind\":\"node\",\"labels\":[\"Account\"],\"properties\":{\"create_time\":\"2020-01-10T06:22:20.222Z\",\"id\":7,\"is_blocked\":false,\"nick_name\":\"Vacation Fund\"}}"
+
+GRAPH scalar_fingraph.FinGraph
+MATCH (src:Account {id: 7})-[t1:Transfers]->(dst:Account)
+RETURN TO_JSON(src) AS json_array
+NEXT
+RETURN LOGICAL_AND(JSON_TYPE(json_array.identifier) = 'string') AS result
+=> "true"
+
+SELECT TO_JSON_STRING(JSON_REMOVE(json_node, '$.identifier')) FROM (
+  SELECT TO_JSON(n) AS json_node
+  FROM GRAPH_TABLE(scalar_fingraph.FinGraph MATCH (n:Person WHERE n.id = 2) RETURN n)
+)
+=> "{\"kind\":\"node\",\"labels\":[\"Person\"],\"properties\":{\"birthday\":\"1980-10-31T00:00:00Z\",\"city\":\"Moravia\",\"country\":\"Czech_Republic\",\"id\":2,\"name\":\"Dana\"}}"
+
+# Edges have the identifiers of their endpoints.
+GRAPH scalar_fingraph.FinGraph
+MATCH p=(src:Account)-[t1:Transfers]->(dst:Account)
+WHERE src.id = 16
+RETURN TO_JSON_STRING(JSON_REMOVE(TO_JSON(p)[1], '$.identifier', '$.source_node_identifier', '$.destination_node_identifier', '$.properties.create_time')) AS result
+=> "{\"kind\":\"edge\",\"labels\":[\"Transfers\"],\"properties\":{\"amount\":300.0,\"id\":16,\"order_number\":\"103650009791820\",\"to_id\":20}}"
+
+GRAPH scalar_fingraph.FinGraph
+MATCH (src:Account)-[t1:Transfers]->(dst:Account)
+RETURN TO_JSON(t1) AS edge
+NEXT
+RETURN LOGICAL_AND(JSON_TYPE(edge.source_node_identifier) = 'string' AND JSON_TYPE(edge.destination_node_identifier) = 'string') AS result
+=> "true"
+
+# A path alternates nodes and edges.
+GRAPH scalar_fingraph.FinGraph
+MATCH p=(src:Account)-[t1:Transfers]->(mid:Account)-[t2:Transfers]->(dst:Account)
+WHERE src.id = 7
+RETURN TO_JSON(p) AS json_array
+NEXT
+RETURN STRING_AGG(DISTINCT TO_JSON_STRING(ARRAY(SELECT STRING(e.kind) FROM UNNEST(JSON_QUERY_ARRAY(json_array)) AS e WITH OFFSET ORDER BY offset))) AS result
+=> "[\"node\",\"edge\",\"node\",\"edge\",\"node\"]"
+
+GRAPH scalar_fingraph.FinGraph
+MATCH p=(account:Account {is_blocked: false})-[transfer:Transfers]-(dst:Account)
+RETURN TO_JSON(p) as results
+NEXT
+RETURN STRING_AGG(TO_JSON_STRING(results[0].properties.nick_name), ',' ORDER BY INT64(results[0].properties.id)) AS result
+=> "\"Vacation Fund\",\"Vacation Fund\",\"Vacation Fund\",\"Rainy Day Fund\",\"Rainy Day Fund\",\"Rainy Day Fund\""
+
+GRAPH scalar_fingraph.FinGraph
+MATCH p = (n:Person WHERE n.id = 1)
+RETURN TO_JSON_STRING(JSON_REMOVE(TO_JSON(p)[0], '$.identifier')) AS result
+=> "{\"kind\":\"node\",\"labels\":[\"Person\"],\"properties\":{\"birthday\":\"1991-12-21T00:00:00Z\",\"city\":\"Adelaide\",\"country\":\"Australia\",\"id\":1,\"name\":\"Alex\"}}"
+
+# Arrays of elements, such as NODES and EDGES return, are arrays of their objects.
+# third_party/bigquery_docs/reference/standard-sql/graph-sql-functions.md
+GRAPH scalar_fingraph.FinGraph
+MATCH p=(src:Account)-[t1:Transfers]->(mid:Account)-[t2:Transfers]->(dst:Account)
+LET ns = NODES(p)
+RETURN JSON_QUERY(TO_JSON(ns)[0], '$.labels') AS labels
+NEXT
+RETURN STRING_AGG(DISTINCT TO_JSON_STRING(labels)) AS result
+=> "[\"Account\"]"
+
+GRAPH scalar_fingraph.FinGraph
+MATCH p=(src:Account)-[t1:Transfers]->(mid:Account)-[t2:Transfers]->(dst:Account)
+LET es = EDGES(p)
+RETURN TO_JSON(es) AS edges
+NEXT
+RETURN STRING_AGG(DISTINCT TO_JSON_STRING([STRING(edges[0].kind), STRING(edges[1].kind)])) AS result
+=> "[\"edge\",\"edge\"]"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1)-[e:Knows]->{0,2}(b:Person) RETURN COUNTIF(TO_JSON_STRING(TO_JSON(e)) = '[]') AS result)
+=> "1"
+
+# NULL graph values are JSON null.
+SELECT TO_JSON_STRING(result) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN TO_JSON(b) AS result)
+=> "null"
+SELECT TO_JSON_STRING(result) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH p = (b:Person WHERE b.id = 999) RETURN TO_JSON(p) AS result)
+=> "null"
+SELECT TO_JSON_STRING(result) FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH p = (b:Person WHERE b.id = 999) RETURN TO_JSON(NODES(p)) AS result)
+=> "null"
+
+# Elements without properties have an empty properties object.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person) RETURN STRING_AGG(DISTINCT TO_JSON_STRING(TO_JSON(a).properties)) AS result)
+=> "{}"
+
+# BigQuery's answers: an element leaves out the properties its table does not define, also in a
+# path through nodes of different tables and in a common supertype. A node's identifier and an
+# edge's endpoint identifiers equal ELEMENT_ID, SOURCE_NODE_ID and DESTINATION_NODE_ID, but an
+# edge's own identifier differs from its ELEMENT_ID.
+SELECT * FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[o:Owns]->(b:Account) RETURN TO_JSON_STRING(JSON_REMOVE(TO_JSON(p), '$[0].identifier', '$[1].identifier', '$[1].source_node_identifier', '$[1].destination_node_identifier', '$[2].identifier')) AS result)
+=> "[{\"kind\":\"node\",\"labels\":[\"Person\"],\"properties\":{\"id\":1,\"name\":\"Alex\"}},{\"kind\":\"edge\",\"labels\":[\"Owns\"],\"properties\":{\"account_id\":7,\"id\":1}},{\"kind\":\"node\",\"labels\":[\"Account\"],\"properties\":{\"id\":7,\"kind\":\"checking\"}}]"
+SELECT * FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[o:Owns]->(b:Account) RETURN TO_JSON_STRING(JSON_REMOVE(TO_JSON(IF(TRUE, a, b)), '$.identifier')) AS result)
+=> "{\"kind\":\"node\",\"labels\":[\"Person\"],\"properties\":{\"id\":1,\"name\":\"Alex\"}}"
+SELECT * FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[o:Owns]->(b:Account) RETURN JSON_VALUE(TO_JSON(a).identifier) = ELEMENT_ID(a) AS result)
+=> "true"
+SELECT * FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[o:Owns]->(b:Account) RETURN JSON_VALUE(TO_JSON(o).identifier) = ELEMENT_ID(o) AS result)
+=> "false"
+SELECT * FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[o:Owns]->(b:Account) RETURN JSON_VALUE(TO_JSON(o).source_node_identifier) = SOURCE_NODE_ID(o) AND JSON_VALUE(TO_JSON(o).destination_node_identifier) = DESTINATION_NODE_ID(o) AS result)
+=> "true"
+
+# Edge identifiers stay unique, and apart from node identifiers.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n)-[e]->(m) RETURN COUNT(DISTINCT JSON_VALUE(TO_JSON(e).identifier)) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (n)-[e]->(m) RETURN COUNTIF(JSON_VALUE(TO_JSON(e).identifier) IN (JSON_VALUE(TO_JSON(n).identifier), JSON_VALUE(TO_JSON(m).identifier))) AS result)
+=> "0"
+
+# BigQuery rejects a path in query results; TO_JSON converts it.
+SELECT * FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[o:Owns]->(b:Account) RETURN p AS path)
+=> error contains: Returning expressions of type GRAPH_PATH is not allowed

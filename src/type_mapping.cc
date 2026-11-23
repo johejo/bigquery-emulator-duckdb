@@ -174,8 +174,11 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       const std::string endpoints = type->AsGraphElement()->IsEdge()
                                         ? R"(, "$source_id" VARCHAR, "$destination_id" VARCHAR)"
                                         : "";
+      // "$missing" names the type's properties that the element's table does not define, whose
+      // values are NULL; TO_JSON must not present them as properties of the element.
       return R"(STRUCT("$id" VARCHAR)" + endpoints +
-             R"(, "$labels" VARCHAR[], "$properties" STRUCT()" + Join(properties, ", ") + "))";
+             R"(, "$labels" VARCHAR[], "$missing" VARCHAR[], "$properties" STRUCT()" +
+             Join(properties, ", ") + "))";
     }
     case googlesql::TYPE_GRAPH_PATH: {
       if (use != TypeUse::kQuery) {

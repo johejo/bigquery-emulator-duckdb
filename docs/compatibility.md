@@ -494,8 +494,8 @@ both flattened and nested results. Other graph query forms do not support readin
 - Repetition bounds that are not literals.
 - GQL `CALL` statements invoking a table-valued function, including `CALL PER()`, and SQL/PGQ's
   `COLUMNS` clause.
-- Graph paths in query results.
-- Graph element comparisons other than `=` and `!=` (`<>`); graph path comparisons.
+- Graph element and path comparisons other than `=` and `!=` (`<>`).
+- `TO_JSON` of graph values inside a `STRUCT`.
 - Graph values in aggregate or analytic functions other than `COUNT`, `ANY_VALUE`, `MIN_BY`,
   `MAX_BY`, `ARRAY_AGG`, `ARRAY_CONCAT_AGG`, `FIRST_VALUE`, `LAST_VALUE`, `NTH_VALUE`, `LAG` and `LEAD`.
 - Horizontal aggregates other than `SUM`, `AVG`, `MIN`, `MAX`, `COUNT`, `COUNTIF`, `ANY_VALUE`,

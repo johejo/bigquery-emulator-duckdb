@@ -180,6 +180,7 @@ constexpr auto kHandlers =
                     .implementation = Implementation::kGoogleSQL,
                     .uses =
                         {
+                            TypeUse::kGraphValues,
                             TypeUse::kBuildsOrReadsInterval,
                             TypeUse::kBuildsOrReadsRange,
                             TypeUse::kReadsEmptyStruct,

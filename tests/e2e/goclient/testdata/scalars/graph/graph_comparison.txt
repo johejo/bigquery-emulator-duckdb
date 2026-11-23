@@ -46,3 +46,27 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id 
 => null
 SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN b <> b AS result)
 => null
+
+# Paths are equal when they have the same elements in the same order; NULL gives NULL.
+# Sources: GoogleSQL compliance graph_table_gql_extended2.test path_variable_equality,
+# path_equality and path_equality_with_null_input; the path type is a sequence of nodes
+# interleaved with edges: third_party/bigquery_docs/reference/standard-sql/data-types.md
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person), q = (c:Person)-[f:Knows]->(d:Person) WHERE p = q RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person), q = (c:Person)-[f:Knows]->(d:Person) WHERE p <> q RETURN COUNT(*) AS result)
+=> "12"
+# Edges 10 and 13 both join 1 to 2: the nodes alone do not make paths equal.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows WHERE e.id = 10]->(b:Person), q = (c:Person)-[f:Knows WHERE f.id = 13]->(d:Person) RETURN p != q AS result)
+=> "true"
+# A path and its prefix differ.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person WHERE a.id = 1) MATCH q = (a)-[e:Knows WHERE e.id = 12]->(b) RETURN p = q AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person WHERE a.id = 1) MATCH q = (a) RETURN p = q AS result)
+=> "true"
+# Traversing an edge in either direction gives different paths.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows WHERE e.id = 10]-(b:Person), q = (c:Person)-[f:Knows WHERE f.id = 10]-(d:Person) RETURN COUNTIF(p = q) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH p = (b:Person WHERE b.id = 999) RETURN p = p AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH q = (a:Person WHERE a.id = 3) OPTIONAL MATCH p = (b:Person WHERE b.id = 999) RETURN p != q AS result)
+=> null

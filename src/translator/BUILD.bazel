@@ -110,8 +110,10 @@ cc_library(
     # these sources, which change with every function, cannot include its definitions.
     implementation_deps = [
         "//:duckdb_sql",
+        "//:timestamp_precision",
         "//:type_mapping",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public/types",
         "@nlohmann_json//:json",
     ],
     linkstatic = True,

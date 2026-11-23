@@ -11,12 +11,15 @@
 #include <vector>
 
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/graph_element_type.h"
+#include "googlesql/public/types/graph_path_type.h"
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/catalog.h"
 #include "src/function_catalog/comparison.h"
 #include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
+#include "src/timestamp_precision.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -218,14 +221,113 @@ std::optional<std::string> ContainsSubstr(const ScalarCall& call) {
          call.arguments.at(2).sql + ")";
 }
 
+namespace {
+
+// The JSON text of the graph element, path, or ARRAY of them that `sql` holds, with `flag` as
+// stringify_wide_numbers, in the format BigQuery documents for TO_JSON; nullopt for other types,
+// such as a STRUCT that holds one. GoogleSQL's TO_JSON formats each element as a STRUCT of the
+// object's keys, so properties follow its rules for their types; `depth` keeps nested lambda
+// names apart.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): SQL expressions of the value and the flag.
+std::optional<std::string> GraphJson(const googlesql::Type* type, const std::string& sql,
+                                     const std::string& flag, TimestampPrecision precision,
+                                     int depth = 0) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  const auto duckdb_type = DuckDbType(type, precision);
+  if (!duckdb_type) {
+    return std::nullopt;
+  }
+  const std::string value = "_gj" + std::to_string(depth);
+  const auto bind = [&](const std::string& body) {
+    return "list_transform([CAST(" + sql + " AS " + *duckdb_type + ")], lambda " + value +
+           ": CASE WHEN " + value + " IS NULL THEN 'null' ELSE " + body + " END)[1]";
+  };
+  const auto elements = [&](const std::string& count, const std::string& element) {
+    const std::string index = "_gi" + std::to_string(depth);
+    return "'[' || array_to_string(list_transform(range(" + count + "), lambda " + index + ": " +
+           element + "), ',') || ']'";
+  };
+  if (type->IsArray()) {
+    const auto element =
+        GraphJson(type->AsArray()->element_type(), value + "[_gi" + std::to_string(depth) + " + 1]",
+                  flag, precision, depth + 1);
+    return element ? std::optional(bind(elements("len(" + value + ")", *element))) : std::nullopt;
+  }
+  if (type->IsGraphPath()) {
+    const std::string index = "_gi" + std::to_string(depth);
+    const std::string offset = "[" + index + " // 2 + 1]";
+    const auto node = GraphJson(type->AsGraphPath()->node_type(), value + ".\"$nodes\"" + offset,
+                                flag, precision, depth + 1);
+    const auto edge = GraphJson(type->AsGraphPath()->edge_type(), value + ".\"$edges\"" + offset,
+                                flag, precision, depth + 1);
+    if (!node || !edge) {
+      return std::nullopt;
+    }
+    // Nodes and edges alternate, starting and ending with a node.
+    return bind(
+        elements("len(" + value + ".\"$nodes\") + len(" + value + ".\"$edges\")",
+                 "CASE WHEN " + index + " % 2 = 0 THEN " + *node + " ELSE " + *edge + " END"));
+  }
+  if (!type->IsGraphElement()) {
+    return std::nullopt;
+  }
+  const auto* element = type->AsGraphElement();
+  std::vector<std::string> names = {"identifier", "kind", "labels", "properties"};
+  for (const auto& property : element->property_types()) {
+    names.push_back(property.name);
+    ValueFieldNames(property.value_type, names);
+  }
+  const auto identifier = [&](std::string_view field) {
+    return "to_base64(encode(" + value + ".\"" + std::string(field) + "\"))";
+  };
+  // A node's identifier is its ELEMENT_ID and an edge's endpoints' are its SOURCE_NODE_ID and
+  // DESTINATION_NODE_ID, but an edge's own identifier differs from its ELEMENT_ID, as BigQuery
+  // answers. Encoding it as a JSON array keeps it apart from every node's.
+  const std::string own =
+      element->IsEdge() ? "to_base64(encode(CAST(to_json([" + value + ".\"$id\"]) AS VARCHAR)))"
+                        : identifier("$id");
+  std::string fields =
+      "identifier := " + own + ", kind := " + (element->IsEdge() ? "'edge'" : "'node'") +
+      ", labels := " + value + ".\"$labels\", properties := " + value + ".\"$properties\"";
+  if (element->IsEdge()) {
+    names.emplace_back("source_node_identifier");
+    names.emplace_back("destination_node_identifier");
+    fields += ", source_node_identifier := " + identifier("$source_id") +
+              ", destination_node_identifier := " + identifier("$destination_id");
+  }
+  const std::string json = "bq_to_json(struct_pack(value := struct_pack(" + fields +
+                           "), names := " + QuoteLiteral(nlohmann::json(names).dump()) + "), " +
+                           flag + ")";
+  // Properties the element's table does not define are left out, as BigQuery answers.
+  return bind("CASE WHEN len(" + value + ".\"$missing\") = 0 THEN " + json +
+              " ELSE list_reduce(list_prepend(" + json + ", list_transform(" + value +
+              ".\"$missing\", lambda _gm: '$.properties.\"' || replace(replace(_gm, '\\', "
+              "'\\\\'), '\"', '\\\"') || '\"')), lambda _gr, _gp: bq_json_remove(_gr, _gp)) END");
+}
+
+}  // namespace
+
 // TO_JSON(value, stringify_wide_numbers) and TO_JSON_STRING(value, pretty_print).
 std::optional<std::string> ToJson(const ScalarCall& call) {
   const size_t n = call.arguments.size();
+  const std::string flag = n == 2 ? call.arguments.at(1).sql : "false";
+  if ((n == 1 || n == 2) && HasGraph(call.ArgumentType(0))) {
+    // Only TO_JSON takes graph values.
+    if (call.name != "TO_JSON") {
+      return std::nullopt;
+    }
+    const auto json =
+        GraphJson(call.ArgumentType(0), "_gf.v", "_gf.f", call.sql_timestamp_precision);
+    if (!json) {
+      return std::nullopt;
+    }
+    return "json(list_transform([struct_pack(v := " + call.arguments.at(0).sql + ", f := " + flag +
+           ")], lambda _gf: CASE WHEN _gf.f IS NULL THEN NULL ELSE " + *json + " END)[1])";
+  }
   const auto value = n == 1 || n == 2 ? ValueArgument(call, 0) : std::nullopt;
   if (!value) {
     return std::nullopt;
   }
-  const std::string flag = n == 2 ? call.arguments.at(1).sql : "false";
   if (call.name == "TO_JSON_STRING") {
     return "bq_to_json_string(" + *value + ", " + flag + ")";
   }
