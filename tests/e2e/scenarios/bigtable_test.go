@@ -91,3 +91,22 @@ func seedBigtableInteger(t *testing.T, project string) {
 		t.Fatal(err)
 	}
 }
+
+// Mirrors the fixture described in bigtable_float_boolean.api.yaml.
+func seedBigtableFloatBoolean(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-float-boolean-probe", map[string]*adminpb.ColumnFamily{"family": {}})
+	if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+		TableName: table, RowKey: []byte("fixture"),
+		Mutations: []*btpb.Mutation{
+			bigtableCell("family", "double", "\x3f\xf8\x00\x00\x00\x00\x00\x00", 1000),
+			bigtableCell("family", "single", "\x3f\xc0\x00\x00", 1000),
+			bigtableCell("family", "three", "\x00\x00\x00", 1000),
+			bigtableCell("family", "true", "\xff", 1000),
+			bigtableCell("family", "one", "\x01", 1000),
+			bigtableCell("family", "two", "\x00\xff", 1000),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
