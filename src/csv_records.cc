@@ -82,6 +82,15 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
   return records;
 }
 
+char ExternalCsvDelimiter(std::string_view option) {
+  const char delimiter = option.empty() ? '\0' : option.front();
+  if (delimiter == '\0' || delimiter == '\n' || delimiter == '\r' || delimiter == '"' ||
+      static_cast<unsigned char>(delimiter) > 127) {
+    throw ApiError::Unsupported("CSV external table field_delimiter");
+  }
+  return delimiter;
+}
+
 std::optional<char> ParseCsvQuote(const std::string& quote, const std::string& field_delimiter) {
   if (quote.empty()) {
     return std::nullopt;

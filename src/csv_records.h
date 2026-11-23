@@ -40,6 +40,10 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
                                        size_t limit = std::numeric_limits<size_t>::max(),
                                        bool lenient = false);
 
+// The first byte of an external table's CSV delimiter option. Rejects empty options and
+// delimiter bytes the reader cannot use.
+char ExternalCsvDelimiter(std::string_view option);
+
 // The quote character of a CSV quote option, none for an empty one. Throws ApiError::Invalid for
 // more than one character, as BigQuery does, and ApiError::Unsupported for one that is not ASCII
 // or is the field delimiter or a line break.

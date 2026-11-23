@@ -297,7 +297,7 @@ rejected samples by statement or by a short label from the catalog.
 | [`allow_jagged_rows`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`allow_quoted_newlines`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`encoding`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`field_delimiter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], field_delimiter = 'ab')`. |
+| [`field_delimiter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'CSV', uris = ['gs://bucket/data.csv'], field_delimiter = 'é')`. |
 | [`ignore_unknown_values`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |
 | [`max_bad_records`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INT64` | Supported |  |
 | [`null_marker`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |

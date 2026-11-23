@@ -1,0 +1,66 @@
+version: 1
+# loading-data-cloud-storage-csv.md specifies that BigQuery uses the first byte of the
+# field delimiter. The file contains 'a', not 'ab', between fields, and the quoted 'a'
+# in the value is data.
+description: CSV external tables use the first byte of a multi-character field delimiter.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+templates:
+  ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: source
+        # "idas\n7a\"cab\"\n"
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: aWRhcwo3YSJjYWIiCg==}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: >-
+              CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${schema}
+              OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'],
+              skip_leading_rows = 1, field_delimiter = 'ab')
+        observe: {status: /status, errors: /body/errors}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: SELECT id, s FROM `${project}.${dataset}.t`
+        observe: {status: /status, errors: /body/errors, rows: /body/rows}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_source
+        gcs: {method: DELETE, object: '${run}/${case}/a.csv'}
+cases:
+  - name: explicit_schema
+    template: ddl
+    vars:
+      schema: (id INT64, s STRING)
+    expect:
+      create: {status: 200}
+      read: {status: 200, rows: [{f: [{v: '7'}, {v: cab}]}]}
+  - name: detected_schema
+    template: ddl
+    vars:
+      schema: ''
+    expect:
+      create: {status: 200}
+      read: {status: 200, rows: [{f: [{v: '7'}, {v: cab}]}]}

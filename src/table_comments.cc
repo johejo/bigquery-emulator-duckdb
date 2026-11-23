@@ -146,20 +146,14 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
            *external.skip_leading_rows > std::numeric_limits<int>::max())) {
         throw ApiError::Unsupported("CSV external table skip_leading_rows out of range");
       }
-      if (external.field_delimiter &&
-          (external.field_delimiter->size() != 1 ||
-           static_cast<unsigned char>(external.field_delimiter->front()) > 127 ||
-           external.field_delimiter->front() == '\n' || external.field_delimiter->front() == '\r' ||
-           external.field_delimiter->front() == '"' || external.field_delimiter->front() == '\0')) {
-        throw ApiError::Unsupported("CSV external table field_delimiter");
-      }
+      const char delimiter = ExternalCsvDelimiter(external.field_delimiter.value_or(","));
       if (std::ranges::any_of(schema, [](const FieldSchema& field) {
             return field.mode == FieldMode::kRepeated || field.type == FieldType::kRecord;
           })) {
         throw ApiError::Invalid("CSV external tables do not support nested or repeated fields");
       }
       if (external.quote) {
-        ParseCsvQuote(*external.quote, external.field_delimiter.value_or(","));
+        ParseCsvQuote(*external.quote, std::string(1, delimiter));
       }
       CheckCsvNullMarkers(external.null_marker.has_value(), external.null_markers.has_value());
       // Detection reads values with the default quote and NULL markers.

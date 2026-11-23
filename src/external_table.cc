@@ -617,11 +617,18 @@ std::optional<int> CsvSkipLeadingRows(const GcsExternalData& definition) {
   return static_cast<int>(*definition.skip_leading_rows);
 }
 
-// The reader settings of a CSV table's options other than its delimiter and leading rows.
-CsvReadOptions CsvOptions(const GcsExternalData& definition) {
+// An empty delimiter means autodetect should choose one, not that an empty option was given.
+std::string CsvDelimiter(const GcsExternalData& definition) {
+  return definition.field_delimiter
+             ? std::string(1, ExternalCsvDelimiter(*definition.field_delimiter))
+             : std::string();
+}
+
+// The reader settings of a CSV table, with its effective delimiter.
+CsvReadOptions CsvOptions(const GcsExternalData& definition, const std::string& delimiter) {
   return {
-      .quote =
-          ParseCsvQuote(definition.quote.value_or("\""), definition.field_delimiter.value_or(",")),
+      .field_delimiter = delimiter,
+      .quote = ParseCsvQuote(definition.quote.value_or("\""), delimiter),
       .allow_quoted_newlines = definition.allow_quoted_newlines.value_or(false),
       .allow_jagged_rows = definition.allow_jagged_rows.value_or(false),
       .ignore_unknown_values = definition.ignore_unknown_values.value_or(false),
@@ -836,8 +843,8 @@ std::vector<FieldSchema> DetectGcsExternalSchema(const GcsExternalData& definiti
   }
   if (csv) {
     DetectedCsv detected =
-        DetectCsv({last}, definition.field_delimiter.value_or(""), CsvSkipLeadingRows(definition),
-                  files, /*rows=*/false, ExternalFormats(definition));
+        DetectCsv({last}, CsvDelimiter(definition), CsvSkipLeadingRows(definition), files,
+                  /*rows=*/false, ExternalFormats(definition));
     if (detected.schema.empty()) {
       throw ApiError::Invalid("External CSV source " + last.uri + " has no columns");
     }
@@ -994,19 +1001,18 @@ TableRead GcsExternalRead(GcsExternalData definition, std::vector<FieldSchema> s
     std::vector<int64_t> first_records;
     // An autodetected table reads each file with the delimiter and header rows BigQuery detects
     // in the alphabetically last one, which gives its schema, and matches columns by position.
-    std::string delimiter = definition.field_delimiter.value_or(",");
+    std::string delimiter = csv ? CsvDelimiter(definition) : std::string();
     int skip_leading_rows = static_cast<int>(definition.skip_leading_rows.value_or(0));
     if (csv && definition.autodetect.value_or(false) && !sources.empty()) {
       const DetectedCsv detected =
-          DetectCsv({*std::ranges::max_element(sources, {}, &FileSource::uri)},
-                    definition.field_delimiter.value_or(""), CsvSkipLeadingRows(definition), files,
+          DetectCsv({*std::ranges::max_element(sources, {}, &FileSource::uri)}, delimiter,
+                    CsvSkipLeadingRows(definition), files,
                     /*rows=*/false, ExternalFormats(definition));
       delimiter = std::string(1, detected.delimiter);
       skip_leading_rows = detected.skipped_rows;
     }
-    CsvReadOptions csv_options = CsvOptions(definition);
+    CsvReadOptions csv_options = CsvOptions(definition, delimiter.empty() ? "," : delimiter);
     csv_options.skip_leading_rows = skip_leading_rows;
-    csv_options.field_delimiter = delimiter;
     csv_options.numbered_records = skips != nullptr;
     std::vector<std::string> reads;
     for (const auto& source : sources) {
