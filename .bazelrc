@@ -21,6 +21,10 @@ build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshad
 # for their headers, found through -iquote. Direct uses of deprecated APIs are still reported.
 build --per_file_copt=external/.*@-w
 build --host_per_file_copt=external/.*@-w
+# Bazel 9's rules_cc passes the `includes` attribute as -I unless this feature is requested; keep
+# Bazel 8's -isystem, so dependencies' headers found through it, such as gtest's, stay quiet.
+build --features=system_include_paths
+build --host_features=system_include_paths
 build --copt=--system-header-prefix=absl/
 build --copt=--system-header-prefix=google/
 build --copt=--system-header-prefix=googlesql/
