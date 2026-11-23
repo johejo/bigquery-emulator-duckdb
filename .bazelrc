@@ -17,22 +17,13 @@ build --test_env=TZDIR
 build --per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Wmissing-designated-field-initializers,-Werror
 build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Wmissing-designated-field-initializers,-Werror
 
-# Silence dependencies' warnings: -w for their sources, and system-header treatment (a clang flag)
-# for their headers, found through -iquote. Direct uses of deprecated APIs are still reported.
+# Silence dependencies' warnings: -w for their sources, and -isystem for every search path of an
+# external repository, so their headers are system headers. Direct uses of deprecated APIs are
+# still reported.
 build --per_file_copt=external/.*@-w
 build --host_per_file_copt=external/.*@-w
-# Bazel 9's rules_cc passes the `includes` attribute as -I unless this feature is requested; keep
-# Bazel 8's -isystem, so dependencies' headers found through it, such as gtest's, stay quiet.
-build --features=system_include_paths
-build --host_features=system_include_paths
-build --copt=--system-header-prefix=absl/
-build --copt=--system-header-prefix=google/
-build --copt=--system-header-prefix=googlesql/
-build --copt=--system-header-prefix=s2/
-build --host_copt=--system-header-prefix=absl/
-build --host_copt=--system-header-prefix=google/
-build --host_copt=--system-header-prefix=googlesql/
-build --host_copt=--system-header-prefix=s2/
+build --features=external_include_paths
+build --host_features=external_include_paths
 
 # Optimize dependencies but not this repository's sources, which recompile often. The emulator
 # starts in about half the CPU time, which speeds up probes and end-to-end tests.
