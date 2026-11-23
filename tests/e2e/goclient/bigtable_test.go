@@ -2,7 +2,9 @@ package goclient
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -38,7 +40,8 @@ func TestBigtableExternal(t *testing.T) {
 	tableID := "go-external-bigtable"
 	source := parent + "/tables/" + tableID
 	_, err = admin.CreateTable(ctx, &adminpb.CreateTableRequest{
-		Parent: parent, TableId: tableID, Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}}},
+		Parent: parent, TableId: tableID,
+		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -205,10 +208,72 @@ func TestBigtableExternal(t *testing.T) {
 		}
 	}
 
+	// BigtableColumnFamily and BigtableColumn specify HBase Bytes.toBytes for BINARY;
+	// the long overload stores the signed INT64 bits in big-endian order.
+	integerCell := func(family, qualifier string, ts, value int64) *btpb.Mutation {
+		return &btpb.Mutation{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: family, ColumnQualifier: []byte(qualifier), TimestampMicros: ts,
+			Value: binary.BigEndian.AppendUint64(nil, uint64(value)),
+		}}}
+	}
+	if _, err := data.MutateRow(ctx, &btpb.MutateRowRequest{TableName: source, RowKey: []byte("numbers"), Mutations: []*btpb.Mutation{
+		integerCell("integers", "loose", 1000, math.MinInt64),
+		integerCell("integers", "loose", 2000, -42),
+		integerCell("integers", "limits", 2000, math.MaxInt64),
+		{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: "other_family", ColumnQualifier: []byte("number"), TimestampMicros: 2000,
+			Value: []byte{0xff, 0xff, 0xff, 0xfe}, // HBase Bytes.toBytes(int) for -2.
+		}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	numbers := dataset.Table("numbers")
+	if err := numbers.Create(ctx, &bigquery.TableMetadata{ExternalDataConfig: &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.Bigtable,
+		SourceURIs:   []string{uri},
+		Options: &bigquery.BigtableOptions{
+			IgnoreUnspecifiedColumnFamilies: true,
+			ColumnFamilies: []*bigquery.BigtableColumnFamily{
+				{FamilyID: "integers", Type: "INTEGER", Encoding: "BINARY", Columns: []*bigquery.BigtableColumn{
+					{Qualifier: "limits", OnlyReadLatest: true},
+				}},
+				{FamilyID: "other_family", Type: "BYTES", Encoding: "TEXT", Columns: []*bigquery.BigtableColumn{
+					{Qualifier: "number", Type: "INTEGER", Encoding: "BINARY"},
+				}},
+			},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	numMeta, err := numbers.Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []*bigquery.FieldSchema{
+		numMeta.Schema[1].Schema[0].Schema[1].Schema[1], // integers.column.cell.value
+		numMeta.Schema[1].Schema[1].Schema[0].Schema[1], // integers.limits.cell.value
+		numMeta.Schema[2].Schema[1].Schema[0].Schema[1], // other_family.number.cell.value
+	} {
+		if value.Name != "value" || value.Type != bigquery.IntegerFieldType {
+			t.Fatalf("expected INTEGER value schema, got %+v", value)
+		}
+	}
+	it, err := client.Query(`SELECT integers.column[OFFSET(0)].cell[OFFSET(0)].value AS newest,
+		integers.column[OFFSET(0)].cell[OFFSET(1)].value AS oldest,
+		integers.limits.cell.value AS max_value, other_family.number.cell[OFFSET(0)].value AS short_value
+		FROM go_bigtable_external.numbers`).Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]bigquery.Value{{int64(-42), int64(math.MinInt64), int64(math.MaxInt64), int64(-2)}}
+	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
+		t.Fatalf("BINARY INTEGER rows = %v, want %v", rows, want)
+	}
+
 	for _, options := range []string{
 		`{"outputColumnFamiliesAsJson":true}`,
-		`{"columnFamilies":[{"familyId":"family","type":"INTEGER"}]}`,
-		`{"columnFamilies":[{"familyId":"family","columns":[{"qualifierString":"qualifier","type":"INTEGER"}]}]}`,
+		`{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"TEXT"}]}`,
+		`{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"BINARY","columns":[{"qualifierString":"qualifier","encoding":"TEXT"}]}]}`,
 	} {
 		query := fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_external.rejected OPTIONS (format='CLOUD_BIGTABLE', uris='%s', bigtable_options='%s')`, uri, options)
 		if err := wait(ctx, client.Query(query)); err == nil || !strings.Contains(err.Error(), "does not support") {

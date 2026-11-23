@@ -433,7 +433,7 @@ std::string BigtableOptionString(const std::string& key, const json& value) {
 bool ParseBigtableCells(BigtableCellOptions& cells, const std::string& key, const json& value) {
   if (key == "type") {
     cells.type = BigtableOptionString(key, value);
-    if (*cells.type != "BYTES" && *cells.type != "STRING") {
+    if (*cells.type != "BYTES" && *cells.type != "STRING" && *cells.type != "INTEGER") {
       throw ApiError::Unsupported("Bigtable cell type " + *cells.type);
     }
   } else if (key == "encoding") {

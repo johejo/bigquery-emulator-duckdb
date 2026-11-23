@@ -1,9 +1,12 @@
 #include "src/bigtable_external.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <set>
 #include <string>
@@ -68,6 +71,7 @@ FieldSchema CellSchema(const BigtableCellOptions& defaults,
   const bool latest =
       overrides.only_read_latest.value_or(defaults.only_read_latest.value_or(false));
   const auto& type = overrides.type ? overrides.type : defaults.type;
+  const auto value_type = type ? ParseFieldType(*type) : std::nullopt;
   return {
       .name = "cell",
       .type = FieldType::kRecord,
@@ -75,7 +79,7 @@ FieldSchema CellSchema(const BigtableCellOptions& defaults,
       .fields =
           {
               {.name = "timestamp", .type = FieldType::kTimestamp},
-              {.name = "value", .type = type == "STRING" ? FieldType::kString : FieldType::kBytes},
+              {.name = "value", .type = value_type.value_or(FieldType::kBytes)},
           },
   };
 }
@@ -91,15 +95,31 @@ struct FamilyRead {
   }
 };
 
+std::string CellLiteral(std::string_view value, FieldType type) {
+  if (type != FieldType::kInteger) {
+    return Bytes(value, type == FieldType::kString);
+  }
+  // BigQuery accepts both HBase Bytes.toBytes(int) and Bytes.toBytes(long).
+  if (value.size() != sizeof(int32_t) && value.size() != sizeof(int64_t)) {
+    throw ApiError::Invalid("Incorrect cell value size. Expected: 8, Actual: " +
+                            std::to_string(value.size()));
+  }
+  const uint64_t bits = std::accumulate(
+      value.begin(), value.end(), uint64_t{0},
+      [](uint64_t prefix, char byte) { return (prefix << 8U) | static_cast<unsigned char>(byte); });
+  return value.size() == sizeof(int32_t)
+             ? std::to_string(std::bit_cast<int32_t>(static_cast<uint32_t>(bits)))
+             : std::to_string(std::bit_cast<int64_t>(bits));
+}
+
 void AppendCell(std::vector<std::string>& versions, const cbt::Cell& cell,
                 const FieldSchema& schema) {
   // ReadRows orders versions newest first within each qualifier.
   if (schema.mode != FieldMode::kRepeated && !versions.empty()) {
     return;
   }
-  versions.push_back(
-      "{'timestamp': make_timestamp(" + std::to_string(cell.timestamp().count()) +
-      "), 'value': " + Bytes(cell.value(), schema.fields.at(1).type == FieldType::kString) + "}");
+  versions.push_back("{'timestamp': make_timestamp(" + std::to_string(cell.timestamp().count()) +
+                     "), 'value': " + CellLiteral(cell.value(), schema.fields.at(1).type) + "}");
 }
 
 std::string CellValue(const std::vector<std::string>& versions, const FieldSchema& schema) {

@@ -1,0 +1,138 @@
+version: 1
+# Recorded on BigQuery in run mj7ae46vsck77puc354julgm3m; see the adjacent answers file.
+description: Verify the default INTEGER encoding and accepted binary cell lengths.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project
+# as the URI below. For example, in Bash:
+#   table=bigtable-integer-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=family
+#   for pair in text:NDI= long:AAAAAAAAACo= short:AAAAKg== empty:; do
+#     qualifier=$(printf '%s' "${pair%%:*}" | base64 -w0)
+#     curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#       -H 'Content-Type: application/json' \
+#       "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#       -d "{\"rowKey\":\"Zml4dHVyZQ==\",\"mutations\":[{\"setCell\":{\"familyName\":\"family\",\"columnQualifier\":\"$qualifier\",\"timestampMicros\":\"1000\",\"value\":\"${pair#*:}\"}}]}"
+#   done
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-integer-probe
+  table_options:
+    ignoreUnspecifiedColumnFamilies: true
+    columnFamilies:
+      - familyId: family
+        columns: ['${column}']
+  create_body:
+    tableReference: {tableId: t}
+    externalDataConfiguration:
+      sourceFormat: BIGTABLE
+      sourceUris: ['${uri}']
+      bigtableOptions: '${table_options}'
+  read_body:
+    location: US
+    useLegacySql: false
+    timeoutMs: 100000
+    query: SELECT family.probe_value.cell.value FROM `${project}.${dataset}.t`
+  created:
+    status: 200
+    options: '${table_options}'
+    schema:
+      - {name: rowkey, mode: NULLABLE, type: BYTES}
+      - name: family
+        mode: NULLABLE
+        type: RECORD
+        fields:
+          - name: column
+            mode: REPEATED
+            type: RECORD
+            fields:
+              - {name: name, mode: NULLABLE, type: STRING}
+              - name: cell
+                mode: REPEATED
+                type: RECORD
+                fields:
+                  - {name: timestamp, mode: NULLABLE, type: TIMESTAMP}
+                  - {name: value, mode: NULLABLE, type: BYTES}
+          - name: probe_value
+            mode: NULLABLE
+            type: RECORD
+            fields:
+              - name: cell
+                mode: NULLABLE
+                type: RECORD
+                fields:
+                  - {name: timestamp, mode: NULLABLE, type: TIMESTAMP}
+                  - {name: value, mode: NULLABLE, type: INTEGER}
+  success: {complete: true, rows: [{f: [{v: '42'}]}]}
+  rejection: {status: 400, reason: invalid}
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status, schema: /body/schema/fields, options: /body/externalDataConfiguration/bigtableOptions}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        observe: {complete: /body/jobComplete, rows: /body/rows, errors: /body/errors}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status, schema: /body/schema/fields, options: /body/externalDataConfiguration/bigtableOptions}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        # The full message contains deployment-specific source and destination paths.
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: omitted_encoding_text
+    template: reject
+    vars:
+      column: {qualifierString: text, fieldName: probe_value, type: INTEGER, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
+  - name: omitted_encoding_binary
+    template: read
+    vars:
+      column: {qualifierString: long, fieldName: probe_value, type: INTEGER, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: binary_four_bytes
+    template: read
+    vars:
+      column: {qualifierString: short, fieldName: probe_value, type: INTEGER, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: binary_empty
+    template: reject
+    vars:
+      column: {qualifierString: empty, fieldName: probe_value, type: INTEGER, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}

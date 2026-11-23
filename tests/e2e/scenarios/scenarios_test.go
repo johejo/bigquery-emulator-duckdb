@@ -47,6 +47,9 @@ func testScenarios(t *testing.T, pattern string, knownBug bool) {
 			t.Fatal(err)
 		}
 		t.Run(filepath.Base(path), func(t *testing.T) {
+			if filepath.Base(path) == "bigtable_integer.api.yaml" {
+				seedBigtableInteger(t, project)
+			}
 			for _, c := range file.Cases {
 				t.Run(c.Name, func(t *testing.T) {
 					t.Parallel()

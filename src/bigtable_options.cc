@@ -12,6 +12,18 @@
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
+namespace {
+
+void ValidateCellOptions(const BigtableCellOptions& family,
+                         const BigtableCellOptions& column = {}) {
+  const auto& type = column.type ? column.type : family.type;
+  const auto& encoding = column.encoding ? column.encoding : family.encoding;
+  if (type == "INTEGER" && encoding == "TEXT") {
+    throw ApiError::Unsupported("Bigtable INTEGER cells with TEXT encoding");
+  }
+}
+
+}  // namespace
 
 BigtableOptions ParseBigtableOptions(std::string_view json) {
   const auto parsed = nlohmann::json::parse(json, nullptr, false);
@@ -66,6 +78,12 @@ void ValidateBigtableExternal(const GcsExternalData& definition) {
     });
     if (duplicate != families.end()) {
       throw ApiError::Invalid("Duplicate Bigtable family: " + duplicate->family_id);
+    }
+    for (const auto& family : families) {
+      ValidateCellOptions(family.cells);
+      for (const auto& column : family.columns) {
+        ValidateCellOptions(family.cells, column.cells);
+      }
     }
   }
 }
