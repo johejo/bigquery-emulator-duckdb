@@ -22,6 +22,8 @@
 #include "googlesql/common/utf_util.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
+#include "googlesql/public/functions/datetime.pb.h"
+#include "googlesql/public/interval_value.h"
 #include "googlesql/public/json_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
@@ -170,6 +172,7 @@ bool ProtoType(const FieldSchema& field, const FieldDescriptor& descriptor) {
     case FieldType::kString:
     case FieldType::kJson:
     case FieldType::kGeography:
+    case FieldType::kInterval:
       return string;
     default:
       return false;
@@ -196,9 +199,6 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
              .empty() ||
         std::ranges::any_of(options, [](const auto* option) { return option->is_extension(); })) {
       throw ApiError::Invalid("Storage Write does not support protobuf field annotations");
-    }
-    if (field.type == FieldType::kInterval) {
-      throw ApiError::Invalid("Storage Write does not support INTERVAL input");
     }
     if (!ProtoType(field, input)) {
       throw StorageFieldMismatch(std::string(input.full_name()), std::string(input.type_name()),
@@ -235,6 +235,12 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
     const std::string text =
         repeated ? r->GetRepeatedString(message, &input, index) : r->GetString(message, &input);
     if (input.type() != FieldDescriptor::TYPE_BYTES) {
+      if (field.type == FieldType::kInterval) {
+        const auto value = googlesql::IntervalValue::ParseFromString(
+            text, googlesql::functions::YEAR, googlesql::functions::SECOND, /*allow_nanos=*/false);
+        Check(value.status());
+        return value->ToString();
+      }
       return DecodeStorageText(text, field.type, field.name);
     }
     if (field.type == FieldType::kBytes) {

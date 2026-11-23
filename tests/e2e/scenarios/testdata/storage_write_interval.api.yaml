@@ -1,0 +1,84 @@
+version: 1
+description: >-
+  Protobuf strings carry INTERVAL values in the canonical format documented in
+  third_party/bigquery_docs/supported-data-types.md and
+  third_party/bigquery_docs/reference/standard-sql/data-types.md.
+vars:
+  dataset: bqa_${run}_${case}
+  stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+  # Field 1, protobuf string "-2-11 28 -16:15:14.123456".
+  valid: ChktMi0xMSAyOCAtMTY6MTU6MTQuMTIzNDU2
+templates:
+  append_interval:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (value INTERVAL)
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema:
+                  protoDescriptor:
+                    name: Row
+                    field:
+                      - {name: value, number: 1, type: TYPE_STRING, label: LABEL_OPTIONAL}
+                rows: {serializedRows: '${rows}'}
+        observe:
+          code: /code
+          errorCode: /messages/0/error/code
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT CAST(value AS STRING) AS value FROM `${project}.${dataset}.t`
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: signed_microseconds
+    template: append_interval
+    vars:
+      rows: ['${valid}']
+    expect:
+      append: {code: OK}
+      query: {rows: [{f: [{v: '-2-11 28 -16:15:14.123456'}]}]}
+  - name: malformed
+    template: append_interval
+    vars:
+      # A valid row before "nope" must not be committed.
+      rows: ['${valid}', CgRub3Bl]
+    expect:
+      append: {code: OK, errorCode: 3}
+      query: {}
+  - name: out_of_range
+    template: append_interval
+    vars:
+      # 10001 years exceeds the documented 10000-year limit.
+      rows: [Cg8xMDAwMS0wIDAgMDowOjA=]
+    expect:
+      append: {code: OK, errorCode: 3}
+      query: {}

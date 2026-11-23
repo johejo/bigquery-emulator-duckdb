@@ -466,7 +466,7 @@ var sections = []section{
 				MaxLength: 10}}, "probe")},
 			{"JSON columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.JSONFieldType}}, `{"a": 1}`)},
 			{"GEOGRAPHY columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.GeographyFieldType}}, "POINT(1 2)")},
-			{"INTERVAL columns in protobuf", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.IntervalFieldType}}, "0-0 1 0:0:0")},
+			{"canonical INTERVAL strings in protobuf", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.IntervalFieldType}}, "0-0 1 0:0:0")},
 			{"ROUND_HALF_EVEN columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.NumericFieldType,
 				RoundingMode: bigquery.RoundHalfEven}}, "1.5")},
 			{"parameterized NUMERIC columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.NumericFieldType,
