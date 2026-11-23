@@ -41,7 +41,7 @@ func TestBigtableExternal(t *testing.T) {
 	source := parent + "/tables/" + tableID
 	_, err = admin.CreateTable(ctx, &adminpb.CreateTableRequest{
 		Parent: parent, TableId: tableID,
-		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}, "decoded": {}}},
+		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}, "decoded": {}, "texts": {}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -331,12 +331,42 @@ func TestBigtableExternal(t *testing.T) {
 		t.Fatalf("BINARY FLOAT and BOOLEAN rows = %v, want %v", rows, want)
 	}
 
+	// A column's encoding takes precedence over its family's, as BigtableColumn.encoding documents.
+	if _, err := data.MutateRow(ctx, &btpb.MutateRowRequest{TableName: source, RowKey: []byte("texts"), Mutations: []*btpb.Mutation{
+		{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: "texts", ColumnQualifier: []byte("loose"), TimestampMicros: 2000, Value: []byte("-7"),
+		}}},
+		integerCell("texts", "binary", 2000, 7),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	texts := dataset.Table("text_cells")
+	if err := texts.Create(ctx, &bigquery.TableMetadata{ExternalDataConfig: &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.Bigtable,
+		SourceURIs:   []string{uri},
+		Options: &bigquery.BigtableOptions{
+			IgnoreUnspecifiedColumnFamilies: true,
+			ColumnFamilies: []*bigquery.BigtableColumnFamily{
+				{FamilyID: "texts", Type: "INTEGER", Encoding: "TEXT", Columns: []*bigquery.BigtableColumn{
+					{Qualifier: "binary", Encoding: "BINARY", OnlyReadLatest: true},
+				}},
+			},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	it, err = client.Query(`SELECT texts.column[OFFSET(0)].cell[OFFSET(0)].value AS loose, texts.binary.cell.value AS ` + "`binary`" + `
+		FROM go_bigtable_external.text_cells`).Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = [][]bigquery.Value{{int64(-7), int64(7)}}
+	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
+		t.Fatalf("TEXT and BINARY INTEGER rows = %v, want %v", rows, want)
+	}
+
 	for _, options := range []string{
 		`{"outputColumnFamiliesAsJson":true}`,
-		`{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"TEXT"}]}`,
-		`{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"BINARY","columns":[{"qualifierString":"qualifier","encoding":"TEXT"}]}]}`,
-		`{"columnFamilies":[{"familyId":"family","type":"FLOAT","encoding":"TEXT"}]}`,
-		`{"columnFamilies":[{"familyId":"family","columns":[{"qualifierString":"qualifier","type":"BOOLEAN","encoding":"TEXT"}]}]}`,
 	} {
 		query := fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_external.rejected OPTIONS (format='CLOUD_BIGTABLE', uris='%s', bigtable_options='%s')`, uri, options)
 		if err := wait(ctx, client.Query(query)); err == nil || !strings.Contains(err.Error(), "does not support") {

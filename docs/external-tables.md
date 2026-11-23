@@ -155,7 +155,9 @@ and the [README](../README.md#bigtable-external-tables) for endpoint setup.
 | `INTEGER` | `BINARY` or omitted | Read as 4- or 8-byte signed big-endian integers |
 | `FLOAT` | `BINARY` or omitted | Read as 4- or 8-byte big-endian IEEE 754 values |
 | `BOOLEAN` | `BINARY` or omitted | Read one byte: 0x00 as false, any other value as true |
-| `INTEGER`, `FLOAT`, `BOOLEAN` | `TEXT` | Unsupported |
+| `INTEGER` | `TEXT` | Parse decimal INT64 text, allowing a sign and surrounding ASCII whitespace |
+| `FLOAT` | `TEXT` | Parse decimal or hexadecimal text, `NaN` and `Inf`/`Infinity` in any case, allowing a sign and surrounding ASCII whitespace; out-of-range values become infinity |
+| `BOOLEAN` | `TEXT` | Parse `true`, `t`, `yes`, `y`, `1`, `false`, `f`, `no`, `n` or `0` in any case, without whitespace |
 | `JSON`, `PROTO` | Any | Unsupported |
 
 `readRowkeyAsString`, `ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` (at the family
