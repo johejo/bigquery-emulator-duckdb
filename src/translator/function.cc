@@ -301,6 +301,15 @@ std::optional<std::string> RoundedValue(const Catalog& functions, const std::str
          QuoteLiteral(message) + ") ELSE " + name + " END)[1]";
 }
 
+// The key a comparison uses for the graph path `sql` holds, bound to `path`: its nodes' identities
+// followed by its edges'. A path has one more node than edges, so equal keys are equal sequences
+// of elements.
+std::string PathKey(const std::string& sql, const std::string& path) {
+  return "list_transform([" + sql + "], lambda " + path + ": list_transform(" + path +
+         R"(."$nodes", lambda _n: _n."$id") || list_transform()" + path +
+         R"(."$edges", lambda _e: _e."$id"))[1])";
+}
+
 }  // namespace
 
 std::optional<std::string> WrittenValue(const Catalog& functions, const std::string& value,
@@ -442,7 +451,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   const bool compares_graph_elements =
       functions.HasTypeUse(function, TypeUse::kComparesGraphElementKeys) &&
       !HasGraph(call.type()) && std::ranges::all_of(call.argument_list(), [](const auto& argument) {
-        return argument->type()->IsGraphElement();
+        return argument->type()->IsGraphElement() || argument->type()->IsGraphPath();
       });
   // Private graph metadata is not a SQL STRUCT's value. Opt functions in explicitly rather
   // than accidentally comparing properties, formatting metadata or serializing private IDs.
@@ -541,7 +550,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
         function == "$CASE_WITH_VALUE"
             ? i == 0 || (i % 2 == 1 && i + 1 < call.argument_list().size())
             : functions.HasTypeUse(function, TypeUse::kComparesCollationKeys);
-    if (compares_graph_elements) {
+    if (compares_graph_elements && argument->type()->IsGraphPath()) {
+      const std::string path = scope.context.FreshName("_p");
+      args.push_back(PathKey(*sql, path));
+    } else if (compares_graph_elements) {
       args.push_back("struct_extract(" + *sql + ", '$id')");
     } else if (compared_operand && !collation->empty()) {
       args.push_back(CollationKey(*sql, *collation, argument->type()));

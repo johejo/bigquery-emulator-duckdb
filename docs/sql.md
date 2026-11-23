@@ -20,7 +20,7 @@ rejected.
 
 | Section | Supported | Partial |
 | --- | --- | --- |
-| [Graphs](#graphs) | 3 | 2 |
+| [Graphs](#graphs) | 4 | 1 |
 | [Queries](#queries) | 36 | 3 |
 | [DML](#dml) | 9 | 0 |
 | [DDL](#ddl) | 27 | 6 |
@@ -35,7 +35,7 @@ rejected.
 | `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph property options, annotated properties or properties that call user-defined functions or read parameters, variables or constants. |
 | `DROP PROPERTY GRAPH` | Supported |  |
 | `GRAPH_EXPAND` | Supported | [Graph limits](compatibility.md#graphs). |
-| `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: function $EQUAL with graph values. |
+| `GRAPH_TABLE` | Supported | [Graph limits](compatibility.md#graphs). |
 | GQL queries | Supported | [Graph limits](compatibility.md#graphs). |
 
 ## Queries

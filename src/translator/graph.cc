@@ -638,7 +638,12 @@ std::optional<Relation> FlatGraphPath(
     std::ranges::transform(labels, std::back_inserter(label_names),
                            [](const auto* label) { return QuoteLiteral(label->Name()); });
     std::ranges::sort(label_names);
+    const auto defines = [&](const std::string& property) {
+      const googlesql::GraphPropertyDefinition* definition = nullptr;
+      return element_table->FindPropertyDefinitionByName(property, definition).ok();
+    };
     std::vector<std::string> fields;
+    std::vector<std::string> missing;
     for (const auto& property : column.type()->AsGraphElement()->property_types()) {
       const std::string name = QuoteIdentifier(property.name);
       const std::string output =
@@ -651,6 +656,7 @@ std::optional<Relation> FlatGraphPath(
         }
         outputs.push_back("CAST(NULL AS " + *type + ") AS " + output);
         fields.push_back(std::format("{} := q.{}", name, output));
+        missing.push_back(QuoteLiteral(property.name));
         continue;
       }
       const auto value = definition->GetValueExpression();
@@ -670,19 +676,22 @@ std::optional<Relation> FlatGraphPath(
       // DuckDB structs need a field even for a graph element with no properties.
       fields.emplace_back("\"$empty\" := TRUE");
     }
-    const auto pack = [&](const std::vector<std::string>& properties) {
+    const auto pack = [&](const std::vector<std::string>& properties,
+                          const std::vector<std::string>& undefined) {
       return std::format(
-          "struct_pack(\"$id\" := {}{}, \"$labels\" := [{}], "
-          "\"$properties\" := struct_pack({}))",
-          identity, endpoints, Join(label_names, ", "), Join(properties, ", "));
+          "struct_pack(\"$id\" := {}{}, \"$labels\" := [{}], \"$missing\" := "
+          "CAST([{}] AS VARCHAR[]), \"$properties\" := struct_pack({}))",
+          identity, endpoints, Join(label_names, ", "), Join(undefined, ", "),
+          Join(properties, ", "));
     };
-    projections.push_back(pack(fields) + " AS " + ColumnName(column.column_id()));
+    projections.push_back(pack(fields, missing) + " AS " + ColumnName(column.column_id()));
     const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();
     (is_edge ? path_edges : path_nodes)
         .push_back("struct_extract(q." + ColumnName(column.column_id()) + ", '$id')");
     if (path_type != nullptr) {
       const auto* target = is_edge ? path_type->edge_type() : path_type->node_type();
       std::vector<std::string> path_properties;
+      std::vector<std::string> path_missing;
       for (const auto& property : target->property_types()) {
         const auto property_type =
             DuckDbType(property.value_type, scope.context.timestamp_precision);
@@ -695,6 +704,9 @@ std::optional<Relation> FlatGraphPath(
         });
         const auto output =
             QuoteIdentifier("g" + std::to_string(column.column_id()) + "_" + property.name);
+        if (!present || !defines(property.name)) {
+          path_missing.push_back(QuoteLiteral(property.name));
+        }
         path_properties.push_back(
             QuoteIdentifier(property.name) +
             " := " + (present ? "q." + output : "CAST(NULL AS " + *property_type + ")"));
@@ -702,7 +714,7 @@ std::optional<Relation> FlatGraphPath(
       if (path_properties.empty()) {
         path_properties.emplace_back("\"$empty\" := TRUE");
       }
-      (is_edge ? edge_values : node_values).push_back(pack(path_properties));
+      (is_edge ? edge_values : node_values).push_back(pack(path_properties, path_missing));
     }
     result.columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
   }

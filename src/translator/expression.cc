@@ -15,6 +15,8 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/graph_element_type.h"
+#include "googlesql/public/types/graph_path_type.h"
 #include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -185,6 +187,49 @@ std::optional<std::string> ConstrainedCast(const googlesql::Type* type,
          " IS NULL THEN NULL ELSE " + result + " END)[1]";
 }
 
+// A coercion of graph elements to an element type with more properties, such as the common
+// supertype of IF's results. A property the source type lacks is NULL and, like one the element's
+// table does not define, is missing from the element; see MapToDuckDb.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): a cast's source and target, as CastValue's.
+std::optional<std::string> CastGraphElement(const googlesql::GraphElementType* from,
+                                            const googlesql::GraphElementType* to,
+                                            const std::string& sql, bool safe, Context& context) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  const std::string value = context.FreshName("_g");
+  std::vector<std::string> fields = {"\"$id\" := " + value + ".\"$id\""};
+  if (to->IsEdge()) {
+    fields.push_back("\"$source_id\" := " + value + ".\"$source_id\"");
+    fields.push_back("\"$destination_id\" := " + value + ".\"$destination_id\"");
+  }
+  fields.push_back("\"$labels\" := " + value + ".\"$labels\"");
+  std::vector<std::string> added;
+  std::vector<std::string> properties;
+  for (const auto& property : to->property_types()) {
+    const auto* source = from->FindPropertyType(property.name);
+    std::optional<std::string> cast;
+    if (source == nullptr) {
+      added.push_back(QuoteLiteral(property.name));
+      const auto type = DuckDbType(property.value_type, context.timestamp_precision);
+      cast = type ? std::optional("CAST(NULL AS " + *type + ")") : std::nullopt;
+    } else {
+      cast = CastValue(source->value_type, property.value_type,
+                       value + ".\"$properties\"." + QuoteIdentifier(source->name), safe, context);
+    }
+    if (!cast) {
+      return std::nullopt;
+    }
+    properties.push_back(QuoteIdentifier(property.name) + " := " + *cast);
+  }
+  if (properties.empty()) {
+    properties.emplace_back("\"$empty\" := TRUE");
+  }
+  fields.push_back("\"$missing\" := list_concat(" + value + ".\"$missing\", CAST([" +
+                   Join(added, ", ") + "] AS VARCHAR[]))");
+  fields.push_back("\"$properties\" := struct_pack(" + Join(properties, ", ") + ")");
+  return "list_transform([" + sql + "], lambda " + value + ": CASE WHEN " + value +
+         " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
+}
+
 // A cast to or from a RANGE's bound, which holds a microsecond TIMESTAMP at either precision;
 // see MapToDuckDb.
 std::optional<std::string> CastBound(const googlesql::Type* from, const googlesql::Type* to,
@@ -236,6 +281,32 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
       *result = "TRY(" + *result + ")";
     }
     return result;
+  }
+  if (from->IsGraphElement() && to->IsGraphElement()) {
+    return CastGraphElement(from->AsGraphElement(), to->AsGraphElement(), sql, safe, context);
+  }
+  if (from->IsGraphPath() && to->IsGraphPath()) {
+    const std::string path = context.FreshName("_gp");
+    std::vector<std::string> fields;
+    const auto transform = [&](const std::string& field, const std::string& element,
+                               const std::string& cast) {
+      return field + " := list_transform(" + path + "." + field + ", lambda " + element + ": " +
+             cast + ")";
+    };
+    for (const bool nodes : {true, false}) {
+      const std::string element = context.FreshName("_ge");
+      const auto cast = CastGraphElement(
+          nodes ? from->AsGraphPath()->node_type() : from->AsGraphPath()->edge_type(),
+          nodes ? to->AsGraphPath()->node_type() : to->AsGraphPath()->edge_type(), element, safe,
+          context);
+      if (!cast) {
+        return std::nullopt;
+      }
+      const std::string field = nodes ? "\"$nodes\"" : "\"$edges\"";
+      fields.push_back(transform(field, element, *cast));
+    }
+    return "list_transform([" + sql + "], lambda " + path + ": CASE WHEN " + path +
+           " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
   }
   if (from->IsArray() && to->IsArray()) {
     const std::string element = context.FreshName("_e");
