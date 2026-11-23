@@ -49,6 +49,14 @@
       "updateTime": "2026-10-02T03:50:23Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/graph-measures",
+      "file": "third_party/bigquery_docs/graph-measures.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/graph-measures",
+      "title": "Work with measures",
+      "sha256": "ab236a58971810fa1a77ea4bf8d13d357def5e3f62197ea078a567ae19695113",
+      "updateTime": "2026-11-16T18:11:05Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/hive-partitioned-queries",
       "file": "third_party/bigquery_docs/hive-partitioned-queries.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/hive-partitioned-queries",

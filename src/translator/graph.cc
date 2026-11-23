@@ -201,40 +201,83 @@ bool PortableProperty(const googlesql::ResolvedNode& node) {
   return std::ranges::all_of(children, [](const auto* child) { return PortableProperty(*child); });
 }
 
-// BigQuery allows COUNT(column) in graph measures but rejects the COUNT(*) overload.
-void CheckMeasure(const googlesql::ResolvedExpr& expr) {
+// Whether the node calls an aggregate function of a property, which for AGG is a measure.
+bool AggregatesProperty(const googlesql::ResolvedNode& node) {
+  std::vector<const googlesql::ResolvedNode*> properties;
+  node.GetDescendantsWithKinds({googlesql::RESOLVED_CATALOG_COLUMN_REF}, &properties);
+  return node.Is<googlesql::ResolvedAggregateFunctionCall>() && !properties.empty();
+}
+
+std::vector<const googlesql::ResolvedNode*> AggregateCalls(const googlesql::ResolvedExpr& expr) {
   std::vector<const googlesql::ResolvedNode*> calls;
   expr.GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_FUNCTION_CALL}, &calls);
+  if (expr.Is<googlesql::ResolvedAggregateFunctionCall>() &&
+      std::ranges::find(calls, &expr) == calls.end()) {
+    calls.push_back(&expr);
+  }
+  return calls;
+}
+
+// The aggregate functions BigQuery allows in graph measures.
+// third_party/bigquery_docs/graph-measures.md
+constexpr std::array kMeasureFunctions = {"sum", "avg", "min", "max", "count", "agg"};
+
+// BigQuery's errors for measures it rejects, as observed in
+// tests/e2e/goclient/testdata/scalars/graph/graph_expand.txt and
+// tests/e2e/goclient/testdata/scalars/graph/graph_expand_derived_measures.txt.
+void CheckMeasure(const googlesql::ResolvedExpr& expr, std::string_view name) {
+  const auto calls = AggregateCalls(expr);
   for (const auto* node : calls) {
     const auto* function = node->GetAs<googlesql::ResolvedAggregateFunctionCall>()->function();
-    if (function->IsGoogleSQLBuiltin() && function->Name() == "$count_star") {
+    if (!function->IsGoogleSQLBuiltin()) {
+      continue;
+    }
+    if (function->Name() == "$count_star") {
       throw std::invalid_argument(
           "COUNT(*) is not allowed in a measure expression in BigQuery. "
           "Please specify a column, e.g., COUNT(<column_name>).");
     }
+    if (std::ranges::find(kMeasureFunctions, absl::AsciiStrToLower(function->Name())) ==
+        kMeasureFunctions.end()) {
+      throw std::invalid_argument("Aggregate function " + function->Name() +
+                                  " is not allowed in a measure expression in BigQuery.");
+    }
+  }
+  if (std::ranges::none_of(calls, [](const auto* call) { return AggregatesProperty(*call); })) {
+    throw std::invalid_argument("Invalid measure expression '" + std::string(name) +
+                                "'. A measure expression must contain at least one aggregate "
+                                "function referencing a graph property.");
   }
 }
 
-bool SupportedMeasure(const googlesql::ResolvedExpr& expr, const googlesql::Table& table) {
-  if (!expr.Is<googlesql::ResolvedAggregateFunctionCall>()) {
+// The measure expressions BigQuery documents: scalar expressions over SUM, AVG, MIN, MAX and
+// COUNT calls, with or without DISTINCT, over the element table's properties, and AGG calls of
+// its other measures. GRAPH_EXPAND analyzes the saved definition again, so a measure, like a
+// computed property, calls only built-in functions.
+// third_party/bigquery_docs/graph-measures.md
+bool SupportedMeasureNodes(const googlesql::ResolvedNode& node) {
+  if (node.Is<googlesql::ResolvedAnalyticFunctionCall>()) {
     return false;
   }
-  const auto& call = *expr.GetAs<googlesql::ResolvedAggregateFunctionCall>();
-  if (!call.function()->IsGoogleSQLBuiltin() ||
-      (call.function()->Name() != "sum" && call.function()->Name() != "count") ||
-      call.argument_list_size() != 1 ||
-      !call.argument_list(0)->Is<googlesql::ResolvedCatalogColumnRef>() || call.distinct() ||
-      call.where_expr() != nullptr || call.having_modifier() != nullptr ||
-      !call.group_by_list().empty() || !call.order_by_item_list().empty() ||
-      call.limit() != nullptr) {
-    return false;
+  if (node.Is<googlesql::ResolvedAggregateFunctionCall>()) {
+    const auto& call = *node.GetAs<googlesql::ResolvedAggregateFunctionCall>();
+    if (!call.function()->IsGoogleSQLBuiltin() || call.where_expr() != nullptr ||
+        call.having_modifier() != nullptr || call.having_expr() != nullptr ||
+        !call.group_by_list().empty() || !call.order_by_item_list().empty() ||
+        call.limit() != nullptr ||
+        call.null_handling_modifier() !=
+            googlesql::ResolvedNonScalarFunctionCallBase::DEFAULT_NULL_HANDLING) {
+      return false;
+    }
   }
-  const auto& ref = *call.argument_list(0)->GetAs<googlesql::ResolvedCatalogColumnRef>();
-  // References to graph properties have a name but no catalog column pointer.
-  // Accept them only when they also identify the identically named physical column.
-  const auto* input =
-      table.FindColumnByName(ref.column() == nullptr ? ref.name() : ref.column()->Name());
-  return input != nullptr && (ref.column() == nullptr || ref.column() == input);
+  std::vector<const googlesql::ResolvedNode*> children;
+  node.GetChildNodes(&children);
+  return std::ranges::all_of(children,
+                             [](const auto* child) { return SupportedMeasureNodes(*child); });
+}
+
+bool SupportedMeasure(const googlesql::ResolvedExpr& expr) {
+  return PortableProperty(expr) && SupportedMeasureNodes(expr);
 }
 
 }  // namespace
@@ -254,7 +297,7 @@ std::optional<std::string> CreatePropertyGraph(
     for (const auto& element : *elements) {
       for (const auto& property : element->property_definition_list()) {
         if (property->is_measure()) {
-          CheckMeasure(*property->expr());
+          CheckMeasure(*property->expr(), property->property_declaration_name());
         }
       }
     }
@@ -339,8 +382,8 @@ std::optional<std::string> CreatePropertyGraph(
       std::vector<std::string> native_properties;
       for (const auto& property : element->property_definition_list()) {
         const auto column = Key(*property->expr(), table, false);
-        if (property->is_measure() && !SupportedMeasure(*property->expr(), *table.table())) {
-          return Unsupported(scope, "graph measures other than SUM(column) and COUNT(column)");
+        if (property->is_measure() && !SupportedMeasure(*property->expr())) {
+          return Unsupported(scope, "graph measures with modifiers other than DISTINCT");
         }
         if ((!property->is_measure() && !column && !PortableProperty(*property->expr())) ||
             !DuckDbType(property->expr()->type(), scope.context.timestamp_precision) ||

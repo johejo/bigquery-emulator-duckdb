@@ -32,6 +32,7 @@ cc_library(
         "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:json_value",
+        "@googlesql//googlesql/public:measure_expression",
         "@googlesql//googlesql/public:parse_resume_location",
         "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:strings",

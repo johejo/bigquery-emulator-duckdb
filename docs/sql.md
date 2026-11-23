@@ -20,7 +20,7 @@ rejected.
 
 | Section | Supported | Partial |
 | --- | --- | --- |
-| [Graphs](#graphs) | 2 | 3 |
+| [Graphs](#graphs) | 3 | 2 |
 | [Queries](#queries) | 36 | 3 |
 | [DML](#dml) | 9 | 0 |
 | [DDL](#ddl) | 27 | 6 |
@@ -32,9 +32,9 @@ rejected.
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph measures other than SUM(column) and COUNT(column); graph property options, annotated properties or properties that call user-defined functions or read parameters, variables or constants. |
+| `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph property options, annotated properties or properties that call user-defined functions or read parameters, variables or constants. |
 | `DROP PROPERTY GRAPH` | Supported |  |
-| `GRAPH_EXPAND` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: graph measures other than SUM(column) and COUNT(column). |
+| `GRAPH_EXPAND` | Supported | [Graph limits](compatibility.md#graphs). |
 | `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: function $EQUAL with graph values. |
 | GQL queries | Supported | [Graph limits](compatibility.md#graphs). |
 

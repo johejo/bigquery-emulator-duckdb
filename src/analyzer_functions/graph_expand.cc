@@ -15,6 +15,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -24,6 +25,7 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
+#include "googlesql/public/measure_expression.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/strings.h"
@@ -32,6 +34,10 @@
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "googlesql/resolved_ast/resolved_ast_builder.h"
+#include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
+#include "googlesql/resolved_ast/resolved_ast_rewrite_visitor.h"
+#include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "src/analyzer_functions/declarations.h"
 #include "src/analyzer_functions/functions.h"
 
@@ -260,57 +266,166 @@ std::string ColumnName(const googlesql::GraphElementTable& table, int column) {
   return table.GetTable()->GetColumn(column)->Name();
 }
 
+// A measure resolved against the properties of its element table: the expression's
+// ExpressionColumns name the table's properties and the measures it derives from.
 struct MeasureDefinition {
-  std::string function;
-  int input;
+  std::string sql;
+  const googlesql::ResolvedExpr* expr = nullptr;
+  // The body output that holds each referenced name's value, by lowercase name.
+  std::map<std::string, int> references;
   std::vector<int> keys;
 };
 
-void AllowMeasureExpression(googlesql::AnalyzerOptions& options) {
-  options.set_enabled_rewrites({});
-  options.set_allow_aggregate_standalone_expression(true);
+struct ResolvedMeasure {
+  std::string sql;
+  const googlesql::ResolvedExpr* expr;
+};
+
+std::set<std::string> ReferencedNames(const googlesql::ResolvedExpr& expr) {
+  std::vector<const googlesql::ResolvedNode*> columns;
+  expr.GetDescendantsWithKinds({googlesql::RESOLVED_EXPRESSION_COLUMN}, &columns);
+  std::set<std::string> names;
+  std::ranges::transform(columns, std::inserter(names, names.end()), [](const auto* column) {
+    return absl::AsciiStrToLower(
+        column->template GetAs<googlesql::ResolvedExpressionColumn>()->name());
+  });
+  return names;
 }
 
-absl::StatusOr<MeasureDefinition> ResolveMeasure(const Property& property,
-                                                 const googlesql::GraphElementTable& element,
-                                                 const googlesql::AnalyzerOptions& options,
-                                                 googlesql::Catalog& catalog,
-                                                 googlesql::TypeFactory& type_factory) {
-  googlesql::AnalyzerOptions measure_options(options.language());
-  AllowMeasureExpression(measure_options);
-  const auto& table = *element.GetTable();
-  measure_options.SetLookupCatalogColumnCallback(
-      [&](absl::string_view name) -> absl::StatusOr<const googlesql::Column*> {
-        return table.FindColumnByName(std::string(name));
-      });
-  std::unique_ptr<const googlesql::AnalyzerOutput> expression;
-  if (auto status = googlesql::AnalyzeExpression(property.sql, measure_options, &catalog,
-                                                 &type_factory, &expression);
-      !status.ok()) {
+// Resolves the element table's measures, by lowercase name, as the graph's DDL does: against its
+// other properties, so that a derived measure reads the measures it aggregates. A measure is
+// resolved once those it derives from are, in as many rounds as the longest chain of them.
+absl::StatusOr<std::map<std::string, ResolvedMeasure>> ResolveMeasures(
+    const googlesql::GraphElementTable& element, const googlesql::AnalyzerOptions& options,
+    googlesql::Catalog& catalog, googlesql::TypeFactory& type_factory,
+    std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>>& analyses) {
+  absl::flat_hash_set<const googlesql::GraphPropertyDefinition*> definitions;
+  if (auto status = element.GetPropertyDefinitions(definitions); !status.ok()) {
     return status;
   }
-  const auto* expr = expression->resolved_expr();
-  if (!expr->Is<googlesql::ResolvedAggregateFunctionCall>()) {
-    return Unsupported("with a non-aggregate measure expression");
-  }
-  const auto* call = expr->GetAs<googlesql::ResolvedAggregateFunctionCall>();
-  if (call->argument_list_size() != 1 ||
-      !call->argument_list(0)->Is<googlesql::ResolvedCatalogColumnRef>()) {
-    return Unsupported("with a measure not aggregating a source column");
-  }
-  const auto* input =
-      call->argument_list(0)->GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
-  for (int i = 0; i < table.NumColumns(); ++i) {
-    if (table.GetColumn(i) == input) {
-      return MeasureDefinition{
-          .function = call->function()->Name(),
-          .input = i,
-          .keys = element.GetKeyColumns(),
-      };
+  std::map<std::string, const googlesql::Type*> scalars;
+  std::map<std::string, std::string> pending;
+  for (const auto* definition : definitions) {
+    const auto& declaration = definition->GetDeclaration();
+    if (declaration.kind() == googlesql::GraphPropertyDeclaration::Kind::kMeasure) {
+      pending.emplace(declaration.Name(), definition->expression_sql());
+    } else {
+      scalars.emplace(declaration.Name(), declaration.Type());
     }
   }
-  return Unsupported("with a measure not aggregating a source column");
+  std::map<std::string, ResolvedMeasure> resolved;
+  while (!pending.empty()) {
+    googlesql::SimpleTable scope(element.Name());
+    for (const auto& [name, type] : scalars) {
+      if (auto status = scope.AddColumn(new googlesql::SimpleColumn(element.Name(), name, type),
+                                        /*is_owned=*/true);
+          !status.ok()) {
+        return status;
+      }
+    }
+    for (const auto& [name, measure] : resolved) {
+      const auto type = type_factory.MakeMeasureType(measure.expr->type());
+      if (!type.ok()) {
+        return type.status();
+      }
+      if (auto status = scope.AddColumn(new googlesql::SimpleColumn(element.Name(), name, *type),
+                                        /*is_owned=*/true);
+          !status.ok()) {
+        return status;
+      }
+    }
+    absl::Status first_error;
+    std::vector<std::string> done;
+    for (const auto& [name, sql] : pending) {
+      std::unique_ptr<const googlesql::AnalyzerOutput> analysis;
+      googlesql::AnalyzerOptions measure_options(options.language());
+      // Locate aggregates for UnrecognizedAggregate.
+      measure_options.set_parse_location_record_type(
+          googlesql::PARSE_LOCATION_RECORD_FULL_NODE_SCOPE);
+      const auto expr = googlesql::AnalyzeMeasureExpression(sql, scope, catalog, type_factory,
+                                                            measure_options, analysis);
+      if (!expr.ok()) {
+        if (first_error.ok()) {
+          first_error = expr.status();
+        }
+        continue;
+      }
+      resolved.emplace(name, ResolvedMeasure{.sql = sql, .expr = *expr});
+      analyses.push_back(std::move(analysis));
+      done.push_back(name);
+    }
+    if (done.empty()) {
+      return first_error;
+    }
+    for (const auto& name : done) {
+      pending.erase(name);
+    }
+  }
+  std::map<std::string, ResolvedMeasure> by_lowercase;
+  for (auto& [name, measure] : resolved) {
+    by_lowercase.emplace(absl::AsciiStrToLower(name), std::move(measure));
+  }
+  return by_lowercase;
 }
+
+// BigQuery accepts a measure that aggregates a property beside an aggregate of none, such as
+// SUM(amount) + COUNT(1), but GRAPH_EXPAND then fails on that aggregate as a name, as observed in
+// tests/e2e/goclient/testdata/scalars/graph/graph_expand_derived_measures.txt.
+absl::Status UnrecognizedAggregate(const ResolvedMeasure& measure, const std::string& prefix) {
+  std::vector<const googlesql::ResolvedNode*> calls;
+  measure.expr->GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_FUNCTION_CALL}, &calls);
+  if (measure.expr->Is<googlesql::ResolvedAggregateFunctionCall>()) {
+    calls.push_back(measure.expr);
+  }
+  std::vector<std::pair<int, std::string>> unrecognized;
+  for (const auto* call : calls) {
+    std::vector<const googlesql::ResolvedNode*> columns;
+    call->GetDescendantsWithKinds({googlesql::RESOLVED_EXPRESSION_COLUMN}, &columns);
+    const auto* range = call->GetParseLocationRangeOrNULL();
+    if (columns.empty() && range != nullptr) {
+      const int start = range->start().GetByteOffset();
+      unrecognized.emplace_back(start,
+                                measure.sql.substr(start, range->end().GetByteOffset() - start));
+    }
+  }
+  if (unrecognized.empty()) {
+    return absl::OkStatus();
+  }
+  std::ranges::sort(unrecognized);
+  return absl::InvalidArgumentError("Unrecognized name: `" + prefix + unrecognized.front().second +
+                                    "`");
+}
+
+// A result column that a measure expression reads: its name, and, for a measure it derives
+// from, its type. The measure rewriter identifies a measure by its type object.
+struct ResultColumn {
+  std::string name;
+  const googlesql::Type* measure_type = nullptr;
+};
+
+// Renames a measure expression's ExpressionColumns to the result columns that hold their values.
+class RenameExpressionColumns : public googlesql::ResolvedASTRewriteVisitor {
+ public:
+  explicit RenameExpressionColumns(const std::map<std::string, ResultColumn>& names)
+      : names_(names) {}
+
+ protected:
+  absl::StatusOr<std::unique_ptr<const googlesql::ResolvedNode>> PostVisitResolvedExpressionColumn(
+      std::unique_ptr<const googlesql::ResolvedExpressionColumn> node) override {
+    const auto found = names_.find(absl::AsciiStrToLower(node->name()));
+    if (found == names_.end()) {
+      return absl::InternalError("GRAPH_EXPAND measure references unknown column " + node->name());
+    }
+    auto builder = googlesql::ToBuilder(std::move(node)).set_name(found->second.name);
+    if (found->second.measure_type != nullptr) {
+      builder.set_type(found->second.measure_type);
+    }
+    return std::move(builder).Build();
+  }
+
+ private:
+  const std::map<std::string, ResultColumn>& names_;
+};
 
 // The GoogleSQL query that expands the graph: its node tables LEFT JOINed from the root along
 // the schema relationship graph. Flattened output prefixes each table's properties by its label.
@@ -318,6 +433,8 @@ struct ExpansionQuery {
   std::string sql;
   std::vector<GraphExpandColumn> columns;
   std::map<int, MeasureDefinition> measures;
+  // The measures' definitions borrow their resolved expressions from these outputs.
+  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> analyses;
 };
 
 absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
@@ -492,6 +609,7 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
   std::vector<std::vector<GraphExpandColumn>> columns(steps.size());
   std::vector<int> presence(steps.size());
   std::map<int, MeasureDefinition> measures;
+  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> analyses;
   for (std::size_t i = 0; i < steps.size(); ++i) {
     const Step& step = steps.at(i);
     const googlesql::GraphElementTable& element = *step.table;
@@ -515,28 +633,38 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
         }
       }
     }
-    std::vector<int> measure_outputs;
-    std::set<int> captured;
+    std::map<std::string, ResolvedMeasure> resolved_measures;
+    if (std::ranges::any_of(*properties, &Property::is_measure)) {
+      auto resolved = ResolveMeasures(element, options, *catalog, type_factory, analyses);
+      if (!resolved.ok()) {
+        return resolved.status();
+      }
+      resolved_measures = *std::move(resolved);
+      for (const auto& [name, measure] : resolved_measures) {
+        if (auto status = UnrecognizedAggregate(measure, flatten ? labels.at(&element) + "_" : "");
+            !status.ok()) {
+          return status;
+        }
+      }
+    }
+    // The body output of each measure and the projection of each other property, by lowercase
+    // name.
+    std::map<std::string, int> measure_outputs;
+    std::map<std::string, std::size_t> scalar_properties;
     for (std::size_t p = 0; p < properties->size(); ++p) {
       const auto& definition = properties->at(p);
-      if (!definition.is_measure) {
-        projections.push_back("(" + definition.sql + ") AS p" + std::to_string(p));
-      }
       const std::string& property = properties->at(p).name;
+      if (definition.is_measure) {
+        measure_outputs.emplace(absl::AsciiStrToLower(property), static_cast<int>(outputs.size()));
+      } else {
+        projections.push_back("(" + definition.sql + ") AS p" + std::to_string(p));
+        scalar_properties.emplace(absl::AsciiStrToLower(property), p);
+      }
       const std::string name = flatten ? labels.at(&element) + "_" + property : property;
       columns.at(i).push_back(
           {.name = name, .body_index = static_cast<int>(outputs.size()), .fields = {}});
       const std::string body_name = nested ? "v" + std::to_string(outputs.size()) : name;
       if (definition.is_measure) {
-        const int index = static_cast<int>(outputs.size());
-        auto measure = ResolveMeasure(definition, element, options, *catalog, type_factory);
-        if (!measure.ok()) {
-          return measure.status();
-        }
-        captured.insert(measure->input);
-        captured.insert(measure->keys.begin(), measure->keys.end());
-        measure_outputs.push_back(index);
-        measures.emplace(index, std::move(*measure));
         // The measure rewriter replaces AGG calls with aggregates over captured
         // columns. This slot has no runtime value but keeps the layout indexed.
         outputs.push_back("NULL AS " + googlesql::ToIdentifierLiteral(body_name));
@@ -547,23 +675,48 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
     }
     auto& join_columns = joined.at(i);
     if (!measure_outputs.empty()) {
-      std::map<int, int> sources;
-      for (const int j : captured) {
-        join_columns.insert(j);
+      // Measures capture the element's key and the properties they aggregate as pseudo-columns.
+      const auto add_pseudo = [&](const std::string& value) {
         const int index = static_cast<int>(outputs.size());
         const std::string name = "$graph_expand_" + std::to_string(index);
         columns.at(i).push_back(
             {.name = name, .body_index = index, .is_pseudo = true, .fields = {}});
-        outputs.push_back(alias + ".c" + std::to_string(j) + " AS " +
-                          googlesql::ToIdentifierLiteral(name));
-        sources.emplace(j, index);
+        outputs.push_back(value + " AS " + googlesql::ToIdentifierLiteral(name));
+        return index;
+      };
+      std::vector<int> keys;
+      for (const int j : element.GetKeyColumns()) {
+        join_columns.insert(j);
+        keys.push_back(add_pseudo(alias + ".c" + std::to_string(j)));
       }
-      // Convert physical source indices into the corresponding execution output indices.
-      for (const int index : measure_outputs) {
-        auto& measure = measures.at(index);
-        measure.input = sources.at(measure.input);
-        std::ranges::transform(measure.keys, measure.keys.begin(),
-                               [&](int key) { return sources.at(key); });
+      std::map<std::string, int> values;
+      for (const auto& [name, measure] : resolved_measures) {
+        for (const auto& referenced : ReferencedNames(*measure.expr)) {
+          if (measure_outputs.contains(referenced) || values.contains(referenced)) {
+            continue;
+          }
+          const auto property = scalar_properties.find(referenced);
+          if (property == scalar_properties.end()) {
+            return absl::InternalError("GRAPH_EXPAND measure references unknown property " +
+                                       referenced);
+          }
+          values.emplace(referenced, add_pseudo(alias + ".p" + std::to_string(property->second)));
+        }
+      }
+      for (const auto& [name, output] : measure_outputs) {
+        const auto& resolved = resolved_measures.at(name);
+        MeasureDefinition measure{
+            .sql = resolved.sql,
+            .expr = resolved.expr,
+            .references = {},
+            .keys = keys,
+        };
+        for (const auto& referenced : ReferencedNames(*resolved.expr)) {
+          const auto found = measure_outputs.find(referenced);
+          measure.references.emplace(
+              referenced, found == measure_outputs.end() ? values.at(referenced) : found->second);
+        }
+        measures.emplace(output, std::move(measure));
       }
     }
     std::vector<std::string> conditions;
@@ -622,18 +775,24 @@ absl::StatusOr<ExpansionQuery> BuildExpansionQuery(
       .sql = "SELECT " + absl::StrJoin(outputs, ", ") + " FROM " + absl::StrJoin(from, " "),
       .columns = std::move(columns.front()),
       .measures = std::move(measures),
+      .analyses = std::move(analyses),
   };
 }
 
 struct ResolvedExpansion {
   std::unique_ptr<const googlesql::AnalyzerOutput> body;
   std::vector<GraphExpandColumn> columns;
-  // Catalog measure metadata borrows the resolved expression from these outputs.
-  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> measure_expressions;
+  // Catalog measure metadata borrows the resolved expressions from these, which are renamed
+  // copies of expressions the analyses own.
+  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> measure_analyses;
+  std::vector<std::unique_ptr<const googlesql::ResolvedExpr>> measure_expressions;
   // Each ROW refers to a table describing its fields. Keep those tables with the call, not in
   // the catalog: the schema may differ for two calls to the same TVF in one statement.
   std::vector<std::unique_ptr<googlesql::SimpleTable>> row_tables;
   std::unique_ptr<googlesql::SimpleTable> result_table;
+  // The type of each measure's result column, by body index, created before any derived measure
+  // refers to it.
+  std::map<int, const googlesql::Type*> measure_types;
 
   [[nodiscard]] const googlesql::ResolvedQueryStmt& query() const {
     return *body->resolved_statement()->GetAs<googlesql::ResolvedQueryStmt>();
@@ -641,22 +800,18 @@ struct ResolvedExpansion {
 
   absl::StatusOr<std::unique_ptr<googlesql::SimpleTable>> TableSchema(
       const std::string& name, const std::vector<GraphExpandColumn>& fields,
-      const std::map<int, MeasureDefinition>& measures, const googlesql::AnalyzerOptions& options,
-      googlesql::Catalog& catalog, googlesql::TypeFactory& type_factory) {
+      const std::map<int, MeasureDefinition>& measures, googlesql::TypeFactory& type_factory) {
     auto table = std::make_unique<googlesql::SimpleTable>(name);
     std::map<int, int> field_indices;
     for (std::size_t i = 0; i < fields.size(); ++i) {
-      if (fields.at(i).is_pseudo) {
-        field_indices.emplace(fields.at(i).body_index, static_cast<int>(i));
-      }
+      field_indices.emplace(fields.at(i).body_index, static_cast<int>(i));
     }
     for (const auto& field : fields) {
       auto type = query().output_column_list(field.body_index)->column().annotated_type();
       googlesql::SimpleColumn::Attributes attributes;
       attributes.is_pseudo_column = field.is_pseudo;
       if (field.is_row) {
-        auto child =
-            TableSchema(field.name, field.fields, measures, options, catalog, type_factory);
+        auto child = TableSchema(field.name, field.fields, measures, type_factory);
         if (!child.ok()) {
           return child.status();
         }
@@ -668,40 +823,37 @@ struct ResolvedExpansion {
         type = googlesql::AnnotatedType(row, nullptr);
       } else if (const auto measure = measures.find(field.body_index); measure != measures.end()) {
         const auto& definition = measure->second;
-        googlesql::AnalyzerOptions measure_options(options.language());
-        AllowMeasureExpression(measure_options);
-        // The measure rewriter binds expression columns by name in this result schema,
-        // not by the physical column name in the graph definition.
-        const auto& input = fields.at(field_indices.at(definition.input));
-        const auto* input_type = query().output_column_list(definition.input)->column().type();
-        if (auto status = measure_options.AddExpressionColumn(input.name, input_type);
-            !status.ok()) {
-          return status;
+        // The measure rewriter binds expression columns by name in this result schema.
+        std::map<std::string, ResultColumn> names;
+        for (const auto& [referenced, index] : definition.references) {
+          const auto found = measure_types.find(index);
+          names.emplace(referenced,
+                        ResultColumn{
+                            .name = fields.at(field_indices.at(index)).name,
+                            .measure_type = found == measure_types.end() ? nullptr : found->second,
+                        });
         }
-        const std::string sql =
-            definition.function + "(" + googlesql::ToIdentifierLiteral(input.name) + ")";
-        std::unique_ptr<const googlesql::AnalyzerOutput> expression;
-        if (auto status = googlesql::AnalyzeExpression(sql, measure_options, &catalog,
-                                                       &type_factory, &expression);
-            !status.ok()) {
-          return status;
+        auto copy = googlesql::ResolvedASTDeepCopyVisitor::Copy(definition.expr);
+        if (!copy.ok()) {
+          return copy.status();
         }
-        const auto measure_type = type_factory.MakeMeasureType(expression->resolved_expr()->type());
-        if (!measure_type.ok()) {
-          return measure_type.status();
+        RenameExpressionColumns rename(names);
+        auto expr = rename.VisitAll<googlesql::ResolvedExpr>(*std::move(copy));
+        if (!expr.ok()) {
+          return expr.status();
         }
-        type = googlesql::AnnotatedType(*measure_type, nullptr);
+        type = googlesql::AnnotatedType(measure_types.at(field.body_index), nullptr);
         std::vector<int> keys;
         std::ranges::transform(definition.keys, std::back_inserter(keys),
                                [&](int index) { return field_indices.at(index); });
         auto metadata = googlesql::Column::ExpressionAttributes::Create(
-            googlesql::Column::ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION, sql,
-            expression->resolved_expr(), std::move(keys));
+            googlesql::Column::ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION,
+            definition.sql, expr->get(), std::move(keys));
         if (!metadata.ok()) {
           return metadata.status();
         }
         attributes.column_expression = std::move(*metadata);
-        measure_expressions.push_back(std::move(expression));
+        measure_expressions.push_back(*std::move(expr));
       }
       if (auto status = table->AddColumn(
               std::make_unique<googlesql::SimpleColumn>(name, field.name, type, attributes));
@@ -759,8 +911,16 @@ class GraphExpand : public googlesql::TableValuedFunction {
       return status;
     }
     expansion->columns = std::move(query->columns);
-    auto result = expansion->TableSchema("graph_expand", expansion->columns, query->measures,
-                                         *analyzer_options, *catalog, *type_factory);
+    expansion->measure_analyses = std::move(query->analyses);
+    for (const auto& [index, measure] : query->measures) {
+      auto type = type_factory->MakeMeasureType(measure.expr->type());
+      if (!type.ok()) {
+        return type.status();
+      }
+      expansion->measure_types.emplace(index, *type);
+    }
+    auto result =
+        expansion->TableSchema("graph_expand", expansion->columns, query->measures, *type_factory);
     if (!result.ok()) {
       return result.status();
     }

@@ -29,6 +29,7 @@
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/parse_helpers.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/sql_view.h"
 #include "googlesql/public/strings.h"
@@ -460,6 +461,16 @@ absl::Status CheckMaterializedView(const googlesql::ResolvedCreateMaterializedVi
   return tables == 1 ? absl::OkStatus() : unsupported("queries without a single base table");
 }
 
+// The measure rewriter rejects the AGG calls of a graph's derived measures, whose arguments are
+// properties rather than columns. A graph's definition needs no rewrite: GRAPH_EXPAND analyzes its
+// measures again, and the queries that read them rewrite them.
+void SkipDefinitionRewrites(std::string_view sql, googlesql::AnalyzerOptions& options) {
+  if (googlesql::GetStatementKind(sql, options.language()) ==
+      googlesql::RESOLVED_CREATE_PROPERTY_GRAPH_STMT) {
+    options.disable_rewrite(googlesql::REWRITE_MEASURE_TYPE);
+  }
+}
+
 // The options a statement of a request, or of the script `settings.script`, is analyzed with.
 absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(TimestampPrecision precision,
                                                            const AnalyzerSettings& settings,
@@ -782,6 +793,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
       }
     }
   }
+  SkipDefinitionRewrites(sql, *options);
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   const absl::Status status =
       googlesql::AnalyzeStatement(sql, *options, &catalog, &type_factory, &analyzer_output);
@@ -792,7 +804,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     const std::string_view message = status.message();
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
-        std::array<std::string_view, 13>{
+        std::array<std::string_view, 14>{
             "Unsupported primary key column ",
             "Duplicate column name ",
             "column attributes are unsupported for columns in WITH PARTITION COLUMNS clause",
@@ -806,6 +818,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
             "Analytic function BIGQUERYGOOGLESQL:TF_IDF ",
             "Window ORDER BY is not allowed for analytic function tf_idf",
             "Window framing clause is not allowed for analytic function tf_idf",
+            "Columns are not supported in graph measure property expressions",
         },
         [&](std::string_view prefix) { return message.starts_with(prefix); });
     // Of the invalid casts, those to JSON have been checked.
@@ -841,6 +854,20 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
         }
         checked = true;
       }
+    }
+    // GRAPH_EXPAND fails on an aggregate of no property beside one of a property as a name;
+    // BigQuery writes the call's location after that nested error.
+    static constexpr std::string_view kExpand = "Invalid table-valued function GRAPH_EXPAND [at ";
+    static constexpr std::string_view kName = "\nUnrecognized name: `";
+    if (const size_t name = message.rfind(kName);
+        line.starts_with(kExpand) && line.ends_with(']') && name != std::string_view::npos) {
+      std::string_view nested = message.substr(name + 1);
+      nested = nested.substr(0, nested.find('\n'));
+      if (const size_t at = nested.rfind(" [at "); at != std::string_view::npos) {
+        nested = nested.substr(0, at);
+      }
+      throw std::runtime_error("Invalid table-valued function GRAPH_EXPAND\n" +
+                               std::string(nested) + " at [" + line.substr(kExpand.size()));
     }
     if (checked) {
       if (const size_t at = line.rfind(" [at "); at != std::string::npos && line.ends_with(']')) {
@@ -932,8 +959,9 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
                                                       TimestampPrecision precision,
                                                       const AnalyzerSettings& settings) {
   GOOGLESQL_ASSIGN_OR_RETURN(
-      const googlesql::AnalyzerOptions options,
+      googlesql::AnalyzerOptions options,
       AnalyzerOptions(precision, settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
+  SkipDefinitionRewrites(segment.GetSegmentText(), options);
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   const absl::Status status = googlesql::AnalyzeStatement(
       segment.GetSegmentText(), options, &catalog, &type_factory, &analyzer_output);

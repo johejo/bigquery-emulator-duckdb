@@ -37,44 +37,44 @@ functions.
 - **SAFE. operator**: an operator with the `SAFE.` prefix.
 - **DuckDB aggregate** and **DuckDB window function**: a DuckDB aggregate or window function.
 
-| Category | Supported | Partial | Unsupported | Untested |
-| --- | --- | --- | --- | --- |
-| [AEAD encryption functions](#aead-encryption-functions) | 4 | 8 | 4 | 0 |
-| [Aggregate functions](#aggregate-functions) | 18 | 0 | 0 | 1 |
-| [Approximate aggregate functions](#approximate-aggregate-functions) | 4 | 0 | 0 | 0 |
-| [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
-| [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
-| [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
-| [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 | 0 |
-| [Conversion functions](#conversion-functions) | 4 | 0 | 0 | 0 |
-| [Date functions](#date-functions) | 12 | 0 | 0 | 0 |
-| [Datetime functions](#datetime-functions) | 8 | 0 | 0 | 0 |
-| [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
-| [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
-| [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 69 | 1 | 1 | 0 |
-| [Graph SQL functions](#graph-sql-functions) | 12 | 0 | 0 | 0 |
-| [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
-| [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
-| [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
-| [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
-| [KLL functions](#kll-functions) | 11 | 0 | 0 | 0 |
-| [Mathematical functions](#mathematical-functions) | 50 | 0 | 0 | 0 |
-| [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
-| [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
-| [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
-| [ObjectRef functions](#objectref-functions) | 1 | 1 | 3 | 0 |
-| [Range functions](#range-functions) | 8 | 0 | 0 | 0 |
-| [Search functions](#search-functions) | 1 | 1 | 0 | 0 |
-| [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
-| [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
-| [String functions](#string-functions) | 53 | 0 | 0 | 0 |
-| [Text analysis functions](#text-analysis-functions) | 3 | 0 | 0 | 0 |
-| [Time functions](#time-functions) | 8 | 0 | 0 | 0 |
-| [Time series functions](#time-series-functions) | 4 | 0 | 2 | 0 |
-| [Timestamp functions](#timestamp-functions) | 15 | 0 | 0 | 0 |
-| [Utility functions](#utility-functions) | 2 | 0 | 0 | 0 |
-| [Vector index functions](#vector-index-functions) | 0 | 0 | 1 | 0 |
+| Category | Supported | Partial | Unsupported |
+| --- | --- | --- | --- |
+| [AEAD encryption functions](#aead-encryption-functions) | 4 | 8 | 4 |
+| [Aggregate functions](#aggregate-functions) | 19 | 0 | 0 |
+| [Approximate aggregate functions](#approximate-aggregate-functions) | 4 | 0 | 0 |
+| [Array functions](#array-functions) | 11 | 0 | 0 |
+| [Bit functions](#bit-functions) | 1 | 0 | 0 |
+| [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 |
+| [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 |
+| [Conversion functions](#conversion-functions) | 4 | 0 | 0 |
+| [Date functions](#date-functions) | 12 | 0 | 0 |
+| [Datetime functions](#datetime-functions) | 8 | 0 | 0 |
+| [Debugging functions](#debugging-functions) | 1 | 0 | 0 |
+| [DLP functions](#dlp-functions) | 0 | 0 | 3 |
+| [Federated query functions](#federated-query-functions) | 0 | 1 | 0 |
+| [Geography functions](#geography-functions) | 69 | 1 | 1 |
+| [Graph SQL functions](#graph-sql-functions) | 12 | 0 | 0 |
+| [Hash functions](#hash-functions) | 5 | 0 | 0 |
+| [HLL functions](#hll-functions) | 4 | 0 | 0 |
+| [Interval functions](#interval-functions) | 4 | 0 | 0 |
+| [JSON functions](#json-functions) | 28 | 0 | 0 |
+| [KLL functions](#kll-functions) | 11 | 0 | 0 |
+| [Mathematical functions](#mathematical-functions) | 50 | 0 | 0 |
+| [Navigation functions](#navigation-functions) | 7 | 0 | 0 |
+| [Net functions](#net-functions) | 10 | 0 | 0 |
+| [Numbering functions](#numbering-functions) | 6 | 0 | 0 |
+| [ObjectRef functions](#objectref-functions) | 1 | 1 | 3 |
+| [Range functions](#range-functions) | 8 | 0 | 0 |
+| [Search functions](#search-functions) | 1 | 1 | 0 |
+| [Security functions](#security-functions) | 1 | 0 | 0 |
+| [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 |
+| [String functions](#string-functions) | 53 | 0 | 0 |
+| [Text analysis functions](#text-analysis-functions) | 3 | 0 | 0 |
+| [Time functions](#time-functions) | 8 | 0 | 0 |
+| [Time series functions](#time-series-functions) | 4 | 0 | 2 |
+| [Timestamp functions](#timestamp-functions) | 15 | 0 | 0 |
+| [Utility functions](#utility-functions) | 2 | 0 | 0 |
+| [Vector index functions](#vector-index-functions) | 0 | 0 | 1 |
 
 ## AEAD encryption functions
 
@@ -101,7 +101,7 @@ functions.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`AGG`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Untested |  | no sample for <measure<T1>> |
+| [`AGG`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported |  | See [Graphs](compatibility.md#graphs) for the measures it supports. |
 | [`ANY_VALUE`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`ARRAY_AGG`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |
 | [`ARRAY_CONCAT_AGG`](../third_party/bigquery_docs/reference/standard-sql/aggregate_functions.md) | Supported | DuckDB aggregate |  |

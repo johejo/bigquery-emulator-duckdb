@@ -1,0 +1,207 @@
+# The documented university graphs of setup.sql, without their property options, which the
+# emulator does not support. Their measures aggregate expressions, combine aggregates with scalar
+# operations, count distinct values and derive from other measures; AGG evaluates each aggregate
+# once per key.
+# third_party/bigquery_docs/graph-measures.md
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT College_college_name, AGG(Department_total_budget) AS college_budget,
+    AGG(Course_course_count) AS total_courses
+  FROM GRAPH_EXPAND('scalar_graph.SchoolGraph') GROUP BY College_college_name ORDER BY 1));
+=> "[{\"College_college_name\":\"College of Arts\",\"college_budget\":200000,\"total_courses\":1},{\"College_college_name\":\"College of Engineering\",\"college_budget\":900000,\"total_courses\":3}]"
+
+# The other measures of each college, from the documented rows and definitions: the courses of
+# Engineering have 3, 4 and 3 credits, and the one of Arts 2.
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT College_college_name, ROUND(AGG(Department_budget_with_overhead), 2) AS overhead,
+    AGG(Course_avg_credits) AS avg_credits, AGG(Course_major_course_count) AS major_courses,
+    AGG(Course_computed_avg_credits) AS computed_avg_credits
+  FROM GRAPH_EXPAND('scalar_graph.SchoolGraph') GROUP BY College_college_name ORDER BY 1));
+=> "[{\"College_college_name\":\"College of Arts\",\"overhead\":220000,\"avg_credits\":2,\"major_courses\":0,\"computed_avg_credits\":2},{\"College_college_name\":\"College of Engineering\",\"overhead\":990000,\"avg_credits\":3.3333333333333335,\"major_courses\":3,\"computed_avg_credits\":3.3333333333333335}]"
+
+# The documented hierarchical query reads measures inside nested structs.
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT DeptCourse.Department.dept_name AS department_name,
+    DeptCourse.Department.CollegeDept.College.college_name,
+    AGG(DeptCourse.Department.total_budget) AS total_budget, AGG(course_count) AS total_courses,
+    AGG(computed_avg_credits) AS computed_avg_credits
+  FROM GRAPH_EXPAND('scalar_graph.SchoolGraph', start_node => 'Course', flatten_results => FALSE)
+  GROUP BY department_name, college_name ORDER BY 1));
+=> "[{\"department_name\":\"Computer Science\",\"college_name\":\"College of Engineering\",\"total_budget\":500000,\"total_courses\":2,\"computed_avg_credits\":3.5},{\"department_name\":\"Fine Arts\",\"college_name\":\"College of Arts\",\"total_budget\":200000,\"total_courses\":1,\"computed_avg_credits\":2},{\"department_name\":\"Mechanical Engineering\",\"college_name\":\"College of Engineering\",\"total_budget\":400000,\"total_courses\":1,\"computed_avg_credits\":3}]"
+
+# A measure's expression inside the aggregate is evaluated for every expanded row, so the course
+# without a department is averaged in as a department with a budget of 0; the same expression as
+# a property is evaluated on the department rows, which exclude that course.
+SELECT TO_JSON_STRING(STRUCT(AGG(Department_avg_budget_inline) AS inline,
+  ROUND(AGG(Department_avg_budget_property), 2) AS property))
+FROM GRAPH_EXPAND('scalar_graph.SchoolGraphWithOrphan');
+=> "{\"inline\":275000,\"property\":366666.67}"
+
+# Joining the expansions of the documented graph's two root node tables on their shared
+# department aggregates each measure at its own grain.
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT C.College_college_name, AGG(C.Course_course_count) AS total_courses,
+    AGG(I.Instructor_total_salary) AS total_faculty_salary
+  FROM GRAPH_EXPAND('scalar_graph.SchoolGraphMultiRoot', start_node => 'Course') AS C
+  INNER JOIN GRAPH_EXPAND('scalar_graph.SchoolGraphMultiRoot', start_node => 'Instructor') AS I
+    ON C.Department_dept_id = I.Department_dept_id
+  GROUP BY C.College_college_name ORDER BY 1));
+=> "[{\"College_college_name\":\"College of Arts\",\"total_courses\":1,\"total_faculty_salary\":90000},{\"College_college_name\":\"College of Engineering\",\"total_courses\":3,\"total_faculty_salary\":345000}]"
+
+# The documented restrictions on measure expressions.
+CREATE PROPERTY GRAPH scalar_graph.MeasureGroupBy
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, dept_id, MEASURE(SUM(MAX(credits) GROUP BY dept_id)) AS total));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureNestedGroupBy
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, dept_id,
+      MEASURE(SUM(credits) + AVG(SUM(credits) GROUP BY dept_id)) AS total));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureWindow
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, MEASURE(SUM(credits) OVER ()) AS total));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureSubquery
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, MEASURE(SUM(credits) + (SELECT 1)) AS total));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureWhere
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, MEASURE(SUM(credits) + SUM(credits WHERE credits > 2)) AS total));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureOutsideAggregate
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, MEASURE(SUM(credits) + credits) AS total));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureCycle
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, MEASURE(AGG(b) + 1) AS a, MEASURE(AGG(a) + 1) AS b));
+=> error:
+CREATE PROPERTY GRAPH scalar_graph.MeasureAggDistinct
+  NODE TABLES (scalar_graph.MeasureCourse KEY (course_id)
+    PROPERTIES (course_id, credits, MEASURE(SUM(credits)) AS a, MEASURE(AGG(DISTINCT a)) AS b));
+=> error:
+
+# Observed with tools/bqanswers. L's ids 1 and 2 have the same amount, 100, and 3 has none; the
+# rows 5 and 6 of S match no L.
+#
+# DISTINCT applies to the values of distinct keys.
+CREATE PROPERTY GRAPH scalar_graph.MeasureDistinctValues
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(SUM(DISTINCT amount)) AS sum_distinct,
+      MEASURE(COUNT(DISTINCT amount)) AS count_distinct, MEASURE(AVG(DISTINCT amount)) AS avg_distinct))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+SELECT TO_JSON_STRING(STRUCT(AGG(L_sum_distinct) AS sum_distinct,
+  AGG(L_count_distinct) AS count_distinct, AGG(L_avg_distinct) AS avg_distinct))
+FROM GRAPH_EXPAND('scalar_graph.MeasureDistinctValues');
+=> "{\"sum_distinct\":100,\"count_distinct\":1,\"avg_distinct\":100}"
+
+# The expanded rows without a match share one key, NULL, so an expression evaluated for them
+# counts once.
+CREATE PROPERTY GRAPH scalar_graph.MeasureUnmatchedRows
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(AVG(COALESCE(amount, 0))) AS avg_inline,
+      MEASURE(COUNT(COALESCE(amount, 0))) AS count_inline,
+      MEASURE(SUM(COALESCE(amount, 0) + 1)) AS sum_inline, MEASURE(MIN(COALESCE(b, -1))) AS min_inline))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+SELECT TO_JSON_STRING(STRUCT(AGG(L_avg_inline) AS avg_inline, AGG(L_count_inline) AS count_inline,
+  AGG(L_sum_inline) AS sum_inline, AGG(L_min_inline) AS min_inline))
+FROM GRAPH_EXPAND('scalar_graph.MeasureUnmatchedRows');
+=> "{\"avg_inline\":50,\"count_inline\":4,\"sum_inline\":204,\"min_inline\":-1}"
+
+# Derived measures that combine AGG with other aggregates and change the result type.
+CREATE PROPERTY GRAPH scalar_graph.MeasureDerivedMixed
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(SUM(amount)) AS total, MEASURE(AGG(total) + SUM(b)) AS with_sum,
+      MEASURE(AGG(total) / 3) AS divided, MEASURE(AGG(with_sum) * COUNT(DISTINCT b)) AS nested))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+SELECT TO_JSON_STRING(STRUCT(AGG(L_with_sum) AS with_sum, AGG(L_divided) AS divided,
+  AGG(L_nested) AS nested))
+FROM GRAPH_EXPAND('scalar_graph.MeasureDerivedMixed');
+=> "{\"with_sum\":206,\"divided\":66.666666666666671,\"nested\":618}"
+
+# A derived measure grouped by the root table's key.
+CREATE PROPERTY GRAPH scalar_graph.MeasureDerivedGrouped
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(MAX(amount)) AS high, MEASURE(MIN(b)) AS low,
+      MEASURE(AGG(high) - AGG(low)) AS spread))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT S_id AS id, AGG(L_spread) AS spread
+  FROM GRAPH_EXPAND('scalar_graph.MeasureDerivedGrouped') GROUP BY S_id ORDER BY 1));
+=> "[{\"id\":1,\"spread\":99},{\"id\":2,\"spread\":99},{\"id\":3,\"spread\":98},{\"id\":4,\"spread\":null},{\"id\":5,\"spread\":null},{\"id\":6,\"spread\":null}]"
+
+# BigQuery rejects a measure over a column that is not a property, here `a`, whose property is
+# `amount`, aggregate functions other than SUM, AVG, MIN, MAX, COUNT and AGG, and measures without
+# an aggregate of a property.
+CREATE PROPERTY GRAPH scalar_graph.MeasureColumn
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(SUM(a)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Columns are not supported in graph measure property expressions at [4:19]
+CREATE PROPERTY GRAPH scalar_graph.MeasureCountOne
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(COUNT(1)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Invalid measure expression 'm'. A measure expression must contain at least one aggregate function referencing a graph property.
+CREATE PROPERTY GRAPH scalar_graph.MeasureSumOfConstant
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(SUM(1)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Invalid measure expression 'm'. A measure expression must contain at least one aggregate function referencing a graph property.
+CREATE PROPERTY GRAPH scalar_graph.MeasureCountOfConstantExpression
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(COUNT(1 + 1)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Invalid measure expression 'm'. A measure expression must contain at least one aggregate function referencing a graph property.
+CREATE PROPERTY GRAPH scalar_graph.MeasureWithoutAggregate
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(1) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Invalid measure expression 'm'. A measure expression must contain at least one aggregate function referencing a graph property.
+CREATE PROPERTY GRAPH scalar_graph.MeasureCountif
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(COUNTIF(amount > 1)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Aggregate function countif is not allowed in a measure expression in BigQuery.
+CREATE PROPERTY GRAPH scalar_graph.MeasureAnyValue
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(ANY_VALUE(amount)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Aggregate function any_value is not allowed in a measure expression in BigQuery.
+CREATE PROPERTY GRAPH scalar_graph.MeasureArrayAgg
+  NODE TABLES (scalar_graph.MeasureAmountRows AS S,
+    scalar_graph.MeasureAmounts AS L PROPERTIES (id, a AS amount, b,
+      MEASURE(ARRAY_AGG(amount IGNORE NULLS)) AS m))
+  EDGE TABLES (scalar_graph.MeasureAmountRows AS SL SOURCE KEY (lid) REFERENCES L (id)
+    DESTINATION KEY (id) REFERENCES S (id));
+=> error: Aggregate function array_agg is not allowed in a measure expression in BigQuery.
+
+# BigQuery accepts a measure that aggregates a property beside an aggregate of none, as in the
+# graphs of setup.sql, but GRAPH_EXPAND then fails on that aggregate as a name: "Invalid
+# table-valued function GRAPH_EXPAND", then on its own line the name and the call's location.
+SELECT TO_JSON_STRING(STRUCT(AGG(L_m) AS m)) AS result FROM GRAPH_EXPAND('scalar_graph.MeasureCountOneBeside')
+=> error contains: Unrecognized name: `L_COUNT(1)` at [1:61]
+SELECT TO_JSON_STRING(STRUCT(AGG(L_m) AS m)) AS result FROM GRAPH_EXPAND('scalar_graph.MeasureSumOfConstantBeside')
+=> error contains: Unrecognized name: `L_SUM(1)` at [1:61]
