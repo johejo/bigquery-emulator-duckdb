@@ -41,7 +41,7 @@ func TestBigtableExternal(t *testing.T) {
 	source := parent + "/tables/" + tableID
 	_, err = admin.CreateTable(ctx, &adminpb.CreateTableRequest{
 		Parent: parent, TableId: tableID,
-		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}, "decoded": {}, "texts": {}}},
+		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}, "decoded": {}, "texts": {}, "jsons": {}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -363,6 +363,47 @@ func TestBigtableExternal(t *testing.T) {
 	want = [][]bigquery.Value{{int64(-7), int64(7)}}
 	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
 		t.Fatalf("TEXT and BINARY INTEGER rows = %v, want %v", rows, want)
+	}
+
+	// JSON cells read as compact text whatever their encoding, as bigtable_json.api.yaml verifies.
+	if _, err := data.MutateRow(ctx, &btpb.MutateRowRequest{TableName: source, RowKey: []byte("jsons"), Mutations: []*btpb.Mutation{
+		{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: "jsons", ColumnQualifier: []byte("loose"), TimestampMicros: 1000, Value: []byte(`{"b": 1, "a": 2}`),
+		}}},
+		{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: "jsons", ColumnQualifier: []byte("loose"), TimestampMicros: 2000, Value: []byte(`null`),
+		}}},
+		{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: "jsons", ColumnQualifier: []byte("named"), TimestampMicros: 2000, Value: []byte(` [1, "x"] `),
+		}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	jsons := dataset.Table("json_cells")
+	if err := jsons.Create(ctx, &bigquery.TableMetadata{ExternalDataConfig: &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.Bigtable,
+		SourceURIs:   []string{uri},
+		Options: &bigquery.BigtableOptions{
+			IgnoreUnspecifiedColumnFamilies: true,
+			ColumnFamilies: []*bigquery.BigtableColumnFamily{
+				{FamilyID: "jsons", Type: "JSON", Columns: []*bigquery.BigtableColumn{
+					{Qualifier: "named", Encoding: "BINARY", OnlyReadLatest: true},
+				}},
+			},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	it, err = client.Query(`SELECT jsons.column[OFFSET(0)].cell[OFFSET(0)].value AS newest,
+		jsons.column[OFFSET(0)].cell[OFFSET(0)].value IS NULL AS newest_is_null,
+		jsons.column[OFFSET(0)].cell[OFFSET(1)].value AS oldest, jsons.named.cell.value AS named
+		FROM go_bigtable_external.json_cells`).Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = [][]bigquery.Value{{"null", false, `{"a":2,"b":1}`, `[1,"x"]`}}
+	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
+		t.Fatalf("JSON rows = %v, want %v", rows, want)
 	}
 
 	for _, options := range []string{

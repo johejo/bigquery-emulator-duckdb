@@ -1,0 +1,1268 @@
+{
+  "version": 1,
+  "cases": {
+    "array": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "[1,\"x\",null]"
+                },
+                {
+                  "v": "[1,\"x\",null]"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "bare": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "syntax error while parsing value - invalid literal; last read: 'a'",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "syntax error while parsing value - invalid literal; last read: 'a'",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "boolean": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "duplicate_key": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":1}"
+                },
+                {
+                  "v": "{\"a\":1}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "empty": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "attempting to parse an empty input; check that your input string or stream contains the expected JSON",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "attempting to parse an empty input; check that your input string or stream contains the expected JSON",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_binary": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_family_text": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_aprndhas6h7zyp37mrzzh6xxkm_encoding_family_text.t, error message: Invalid utf-8 encoding found At row:fixture, column_family:family, column:invalid_utf8 File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_aprndhas6h7zyp37mrzzh6xxkm_encoding_family_text.t, error message: Invalid utf-8 encoding found At row:fixture, column_family:family, column:invalid_utf8 File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "encoding_omitted": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "encoding_text": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "escape": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "\"é\\n\""
+                },
+                {
+                  "v": "\"é\\n\""
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "exponent_overflow": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "number overflow parsing '1e400'; error in JSON_TYPE expression",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "number overflow parsing '1e400'; error in JSON_TYPE expression",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "family_schema": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "columns": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "family"
+                },
+                {
+                  "v": "STRUCT<column ARRAY<STRUCT<name STRING, cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>>, probe_value STRUCT<cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.column"
+                },
+                {
+                  "v": "ARRAY<STRUCT<name STRING, cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.column.cell"
+                },
+                {
+                  "v": "ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.column.cell.timestamp"
+                },
+                {
+                  "v": "TIMESTAMP"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.column.cell.value"
+                },
+                {
+                  "v": "JSON"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.column.name"
+                },
+                {
+                  "v": "STRING"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.probe_value"
+                },
+                {
+                  "v": "STRUCT<cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.probe_value.cell"
+                },
+                {
+                  "v": "ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.probe_value.cell.timestamp"
+                },
+                {
+                  "v": "TIMESTAMP"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "family.probe_value.cell.value"
+                },
+                {
+                  "v": "JSON"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "rowkey"
+                },
+                {
+                  "v": "BYTES"
+                }
+              ]
+            }
+          ]
+        },
+        "create": {
+          "external": {
+            "bigtableOptions": {
+              "columnFamilies": [
+                {
+                  "columns": [
+                    {
+                      "fieldName": "probe_value",
+                      "qualifierString": "object"
+                    }
+                  ],
+                  "encoding": "TEXT",
+                  "familyId": "family",
+                  "type": "JSON"
+                }
+              ],
+              "ignoreUnspecifiedColumnFamilies": true
+            },
+            "sourceFormat": "BIGTABLE",
+            "sourceUris": [
+              "https://googleapis.com/bigtable/projects/johejo-sandbox2/instances/bqanswers/tables/bigtable-json-probe"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "rowkey",
+                "type": "BYTES"
+              },
+              {
+                "fields": [
+                  {
+                    "fields": [
+                      {
+                        "mode": "NULLABLE",
+                        "name": "name",
+                        "type": "STRING"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "mode": "NULLABLE",
+                            "name": "timestamp",
+                            "type": "TIMESTAMP"
+                          },
+                          {
+                            "mode": "NULLABLE",
+                            "name": "value",
+                            "type": "JSON"
+                          }
+                        ],
+                        "mode": "REPEATED",
+                        "name": "cell",
+                        "type": "RECORD"
+                      }
+                    ],
+                    "mode": "REPEATED",
+                    "name": "column",
+                    "type": "RECORD"
+                  },
+                  {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "mode": "NULLABLE",
+                            "name": "timestamp",
+                            "type": "TIMESTAMP"
+                          },
+                          {
+                            "mode": "NULLABLE",
+                            "name": "value",
+                            "type": "JSON"
+                          }
+                        ],
+                        "mode": "REPEATED",
+                        "name": "cell",
+                        "type": "RECORD"
+                      }
+                    ],
+                    "mode": "NULLABLE",
+                    "name": "probe_value",
+                    "type": "RECORD"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "family",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "status": 200
+        },
+        "unlisted": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "No matching signature for operator = for argument types: STRING, BYTES\n  Signature: T1 = T1\n    Unable to find common supertype for templated argument <T1>\n      Input types for <T1>: {STRING, BYTES} at [3:7]",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "No matching signature for operator = for argument types: STRING, BYTES\n  Signature: T1 = T1\n    Unable to find common supertype for templated argument <T1>\n      Input types for <T1>: {STRING, BYTES} at [3:7]",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "invalid_utf8": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_aprndhas6h7zyp37mrzzh6xxkm_invalid_utf8.t, error message: Invalid utf-8 encoding found At row:fixture, column_family:family, column:invalid_utf8 File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_aprndhas6h7zyp37mrzzh6xxkm_invalid_utf8.t, error message: Invalid utf-8 encoding found At row:fixture, column_family:family, column:invalid_utf8 File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "json_null": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "null"
+                },
+                {
+                  "v": "null"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "key_order": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":2,\"b\":1}"
+                },
+                {
+                  "v": "{\"a\":2,\"b\":1}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "large_int": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "12345678901234567890"
+                },
+                {
+                  "v": "12345678901234567890"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "nested": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":{\"b\":{\"c\":[{}]}}}"
+                },
+                {
+                  "v": "{\"a\":{\"b\":{\"c\":[{}]}}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "number": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "1.5"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "precise_float": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0.1"
+                },
+                {
+                  "v": "0.1"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "proto_binary_without_config": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: t, error message: PROTO_BINARY encoding for column: object in family: family requires both schema_bundle_id and proto_message_name to be set.",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: t, error message: PROTO_BINARY encoding for column: object in family: family requires both schema_bundle_id and proto_message_name to be set.",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "single_quote": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "syntax error while parsing object key - invalid literal; last read: '{''; expected string literal",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "syntax error while parsing object key - invalid literal; last read: '{''; expected string literal",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "string": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "\"x\""
+                },
+                {
+                  "v": "\"x\""
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "trailing": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "syntax error while parsing value - invalid literal; last read: '{} x'; expected end of input",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "syntax error while parsing value - invalid literal; last read: '{} x'; expected end of input",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "truncated": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "location": "q",
+                    "locationType": "parameter",
+                    "message": "syntax error while parsing value - unexpected end of input; expected '[', '{', or a literal",
+                    "reason": "invalidQuery"
+                  }
+                ],
+                "message": "syntax error while parsing value - unexpected end of input; expected '[', '{', or a literal",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "whitespace": {
+      "project": "johejo-sandbox2",
+      "run": "aprndhas6h7zyp37mrzzh6xxkm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":[1,2]}"
+                },
+                {
+                  "v": "{\"a\":[1,2]}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "is_sql_null",
+              "type": "BOOLEAN"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "named_unselected": {
+      "project": "johejo-sandbox2",
+      "run": "5o362n6qxpoicmmhclp6frq56h",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            }
+          ]
+        }
+      }
+    },
+    "string_family": {
+      "project": "johejo-sandbox2",
+      "run": "5o362n6qxpoicmmhclp6frq56h",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_5o362n6qxpoicmmhclp6frq56h_string_family.t, error message: Invalid utf-8 encoding found At row:fixture, column_family:family, column:invalid_utf8 File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_5o362n6qxpoicmmhclp6frq56h_string_family.t, error message: Invalid utf-8 encoding found At row:fixture, column_family:family, column:invalid_utf8 File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unlisted_bytes_family": {
+      "project": "johejo-sandbox2",
+      "run": "5o362n6qxpoicmmhclp6frq56h",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"a\":1,\"b\":\"x\"}"
+                },
+                {
+                  "v": "19"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "value",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "unlisted",
+              "type": "INTEGER"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

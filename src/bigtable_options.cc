@@ -66,6 +66,27 @@ void ValidateBigtableExternal(const GcsExternalData& definition) {
     if (duplicate != families.end()) {
       throw ApiError::Invalid("Duplicate Bigtable family: " + duplicate->family_id);
     }
+    for (const auto& family : families) {
+      // BigQuery's message, from bigtable_json.api.answers.json, for a JSON column of this
+      // encoding, which protoConfig, never accepted here, would complete.
+      const auto proto_json = std::ranges::find_if(family.columns, [&family](const auto& column) {
+        return column.cells.encoding == "PROTO_BINARY" &&
+               column.cells.type.value_or(family.cells.type.value_or("")) == "JSON" &&
+               !column.qualifier_encoded;
+      });
+      if (proto_json != family.columns.end()) {
+        throw ApiError::Invalid(
+            "PROTO_BINARY encoding for column: " + proto_json->qualifier + " in family: " +
+            family.family_id + " requires both schema_bundle_id and proto_message_name to be set.");
+      }
+      const bool proto = family.cells.encoding == "PROTO_BINARY" ||
+                         std::ranges::any_of(family.columns, [](const BigtableColumn& column) {
+                           return column.cells.encoding == "PROTO_BINARY";
+                         });
+      if (proto) {
+        throw ApiError::Unsupported("Bigtable cell encoding PROTO_BINARY");
+      }
+    }
   }
 }
 

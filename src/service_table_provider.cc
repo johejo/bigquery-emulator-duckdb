@@ -49,7 +49,7 @@ class ServiceTableProvider : public ExternalTableProvider {
   TableRead Read(GcsExternalData definition, std::vector<FieldSchema> schema,
                  std::string table_name) override {
     if (definition.format == "BIGTABLE") {
-      return BigtableExternalRead(std::move(definition), std::move(schema));
+      return BigtableExternalRead(std::move(definition), std::move(schema), std::move(table_name));
     }
     return GcsExternalRead(std::move(definition), std::move(schema), std::move(table_name), gcs_);
   }
