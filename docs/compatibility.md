@@ -504,7 +504,6 @@ both flattened and nested results. Other graph query forms do not support readin
   `ARRAY_AGG`, `ARRAY_CONCAT_AGG`, `STRING_AGG`, `LOGICAL_AND`, `LOGICAL_OR`, `BIT_AND`, `BIT_OR`
   and `BIT_XOR`; horizontal aggregates with collation; and `ORDER BY` or `LIMIT` on horizontal
   aggregates other than `ARRAY_AGG`, `ARRAY_CONCAT_AGG` and `STRING_AGG`.
-- `ELEMENT_ID`, `SOURCE_NODE_ID` and `DESTINATION_NODE_ID`.
 - Calls of `SAME` and `ALL_DIFFERENT` that mix nodes and edges.
 
 `ANY CHEAPEST` fails on a NULL, zero, negative, infinite or NaN `COST`, as documented, and on a
