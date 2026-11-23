@@ -11,6 +11,7 @@
 #include "src/file_read.h"
 #include "src/file_read_options.h"
 #include "src/temporary_files.h"
+#include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -27,9 +28,11 @@ std::string CsvRecordError(std::string_view detail, const RecordPosition& positi
 // adds it and may skip it, which leaves it out. With `bad`, each kept record's number comes first
 // when options.numbered_records is set, and its position is recorded. With `columns`, external
 // values are converted only for those columns, as for the typed reader's column projection.
+// With `cell_encoding`, the input is split into fields before decoding them.
 std::vector<FileSource> StageCsvSources(
     const std::vector<FileSource>& sources, const CsvReadOptions& options,
     const std::vector<FieldSchema>& schema, TemporaryFiles& files, BadRecords* bad = nullptr,
-    const std::optional<std::set<std::string>>& columns = std::nullopt);
+    const std::optional<std::set<std::string>>& columns = std::nullopt,
+    std::optional<TextEncoding> cell_encoding = std::nullopt);
 
 }  // namespace bigquery_emulator_duckdb

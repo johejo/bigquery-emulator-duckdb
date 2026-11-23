@@ -1,11 +1,14 @@
 version: 1
-# loading-data-cloud-storage-csv.md specifies that BigQuery uses the first byte of the
-# field delimiter. The file contains 'a', not 'ab', between fields, and the quoted 'a'
-# in the value is data.
-description: CSV external tables use the first byte of a multi-character field delimiter.
+# The CSV load guide specifies one byte as the delimiter and replacement of undecodable data.
+# The CSV options in reference/rest/v2/tables.md specify that a UTF-8 delimiter leaves its
+# remaining bytes in the field and that an ISO-8859-1 character is a single-byte separator.
+description: CSV external tables split at a single byte before decoding fields.
 vars:
   dataset: bqa_${run}_${case}
   prefix: gs://${bucket}/${run}/${case}
+  # "idas\n7a\"cab\"\n": the quoted 'a' is data, and the separator is 'a', not 'ab'.
+  contents: aWRhcwo3YSJjYWIiCg==
+  options: "skip_leading_rows = 1, field_delimiter = 'ab'"
 templates:
   ddl:
     steps:
@@ -17,8 +20,7 @@ templates:
             datasetReference: {datasetId: '${dataset}'}
             location: US
       - name: source
-        # "idas\n7a\"cab\"\n"
-        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: aWRhcwo3YSJjYWIiCg==}
+        gcs: {method: PUT, object: '${run}/${case}/a.csv', base64: '${contents}'}
       - name: create
         rest:
           method: POST
@@ -29,8 +31,7 @@ templates:
             timeoutMs: 200000
             query: >-
               CREATE EXTERNAL TABLE `${project}.${dataset}.t` ${schema}
-              OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'],
-              skip_leading_rows = 1, field_delimiter = 'ab')
+              OPTIONS (format = 'CSV', uris = ['${prefix}/a.csv'], ${options})
         observe: {status: /status, errors: /body/errors}
       - name: read
         rest:
@@ -64,3 +65,23 @@ cases:
     expect:
       create: {status: 200}
       read: {status: 200, rows: [{f: [{v: '7'}, {v: cab}]}]}
+  - name: iso_8859_1
+    template: ddl
+    vars:
+      schema: ''
+      # "idés\n7é\"café ü\"\n" in ISO-8859-1. The quoted separator is data.
+      contents: aWTpcwo36SJjYWbpIPwiCg==
+      options: "skip_leading_rows = 1, field_delimiter = 'é', encoding = 'ISO-8859-1'"
+    expect:
+      create: {status: 200}
+      read: {status: 200, rows: [{f: [{v: '7'}, {v: 'café ü'}]}]}
+  - name: utf8_first_byte
+    template: ddl
+    vars:
+      schema: (id INT64, s STRING)
+      # "7éplain\n" in UTF-8. Splitting at C3 leaves A9 at the start of the second field.
+      contents: N8OpcGxhaW4K
+      options: "field_delimiter = 'é', encoding = 'UTF-8'"
+    expect:
+      create: {status: 200}
+      read: {status: 200, rows: [{f: [{v: '7'}, {v: '�plain'}]}]}

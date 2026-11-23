@@ -18,6 +18,7 @@
 #include "src/gcs_uri.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
+#include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -146,7 +147,9 @@ std::string TableCommentStatement(const TableReference& table, TableMetadata met
            *external.skip_leading_rows > std::numeric_limits<int>::max())) {
         throw ApiError::Unsupported("CSV external table skip_leading_rows out of range");
       }
-      const char delimiter = ExternalCsvDelimiter(external.field_delimiter.value_or(","));
+      const TextEncoding encoding =
+          ParseTextEncoding(external.encoding.value_or("UTF-8")).value_or(TextEncoding::kUtf8);
+      const char delimiter = ExternalCsvDelimiter(external.field_delimiter.value_or(","), encoding);
       if (std::ranges::any_of(schema, [](const FieldSchema& field) {
             return field.mode == FieldMode::kRepeated || field.type == FieldType::kRecord;
           })) {

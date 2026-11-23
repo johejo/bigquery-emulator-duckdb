@@ -8,6 +8,7 @@
 #include "src/file_read.h"
 #include "src/file_read_options.h"
 #include "src/temporary_files.h"
+#include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -28,9 +29,11 @@ struct DetectedCsv {
 // `field_delimiter` detects one; `skip_leading_rows` is absent when the job leaves it out.
 // Without `rows`, the result has no sources, and a quote that does not close ends at the end of
 // its line rather than failing, as in BigQuery's detection for external tables. Values take an
-// external table's date and time `formats` as FormattedKind gives them.
+// external table's date and time `formats` as FormattedKind gives them. With `cell_encoding`,
+// the input is split into fields before decoding them.
 DetectedCsv DetectCsv(const std::vector<FileSource>& sources, std::string_view field_delimiter,
                       std::optional<int> skip_leading_rows, TemporaryFiles& downloads,
-                      bool rows = true, const DatetimeFormats& formats = {});
+                      bool rows = true, const DatetimeFormats& formats = DatetimeFormats(),
+                      std::optional<TextEncoding> cell_encoding = std::nullopt);
 
 }  // namespace bigquery_emulator_duckdb

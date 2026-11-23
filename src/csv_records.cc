@@ -8,7 +8,9 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/common/utf_util.h"
 #include "src/api_error.h"
+#include "src/text_encoding.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -23,6 +25,17 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
     CsvRecord record{.cells = {}, .line = line, .offset = i};
     while (true) {
       CsvCell cell;
+      const auto decode = [&] {
+        if (!dialect.cell_encoding) {
+          return;
+        }
+        if (*dialect.cell_encoding == TextEncoding::kUtf8) {
+          // Splitting at a multibyte separator's first byte can leave invalid UTF-8 in a field.
+          cell.text = googlesql::CoerceToWellFormedUTF8(cell.text);
+        } else {
+          cell.text = DecodeText(cell.text, *dialect.cell_encoding);
+        }
+      };
       if (dialect.quote && i < contents.size() && contents.at(i) == *dialect.quote) {
         cell.quoted = true;
         for (++i;; ++i) {
@@ -53,6 +66,7 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
                                      *dialect.quote);
         }
         if (record.error) {
+          decode();
           record.cells.emplace_back(std::move(cell));
           records.push_back(std::move(record));
           return records;
@@ -61,6 +75,7 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
       for (; !line_end() && contents.at(i) != dialect.delimiter; ++i) {
         cell.text += contents.at(i);
       }
+      decode();
       record.cells.push_back(cell.quoted || !cell.text.empty() ? std::optional(std::move(cell))
                                                                : std::nullopt);
       if (line_end()) {
@@ -82,13 +97,23 @@ std::vector<CsvRecord> ParseCsvRecords(std::string_view contents, const CsvDiale
   return records;
 }
 
-char ExternalCsvDelimiter(std::string_view option) {
+char ExternalCsvDelimiter(std::string_view option, TextEncoding encoding) {
   const char delimiter = option.empty() ? '\0' : option.front();
-  if (delimiter == '\0' || delimiter == '\n' || delimiter == '\r' || delimiter == '"' ||
-      static_cast<unsigned char>(delimiter) > 127) {
-    throw ApiError::Unsupported("CSV external table field_delimiter");
+  const auto lead = static_cast<unsigned char>(delimiter);
+  if (delimiter != '\0' && delimiter != '\n' && delimiter != '\r' && delimiter != '"') {
+    if (lead < 0x80 || encoding == TextEncoding::kUtf8) {
+      return delimiter;
+    }
+    // U+0080 through U+00FF are the two UTF-8 sequences starting with C2 and C3.
+    if (encoding == TextEncoding::kIso88591 && (lead == 0xc2 || lead == 0xc3) &&
+        option.size() >= 2) {
+      const auto tail = static_cast<unsigned char>(option.at(1));
+      if (tail >= 0x80 && tail <= 0xbf) {
+        return static_cast<char>(((lead & 0x03U) << 6U) | (tail & 0x3fU));
+      }
+    }
   }
-  return delimiter;
+  throw ApiError::Unsupported("CSV external table field_delimiter");
 }
 
 std::optional<char> ParseCsvQuote(const std::string& quote, const std::string& field_delimiter) {

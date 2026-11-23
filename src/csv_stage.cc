@@ -19,6 +19,7 @@
 #include "src/file_read.h"
 #include "src/file_read_options.h"
 #include "src/temporary_files.h"
+#include "src/text_encoding.h"
 
 // The rules below follow BigQuery's answers in
 // tests/e2e/scenarios/testdata/csv_options.api.answers.json, beyond what
@@ -129,11 +130,13 @@ std::vector<FileSource> StageCsvSources(const std::vector<FileSource>& sources,
                                         const CsvReadOptions& options,
                                         const std::vector<FieldSchema>& schema,
                                         TemporaryFiles& files, BadRecords* bad,
-                                        const std::optional<std::set<std::string>>& read_columns) {
+                                        const std::optional<std::set<std::string>>& read_columns,
+                                        std::optional<TextEncoding> cell_encoding) {
   const CsvDialect dialect{
       .delimiter = options.field_delimiter.front(),
       .quote = options.quote,
       .allow_quoted_newlines = options.allow_quoted_newlines,
+      .cell_encoding = cell_encoding,
   };
   const size_t columns = schema.size();
   std::vector<FileSource> staged;

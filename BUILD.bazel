@@ -1168,6 +1168,7 @@ cc_library(
     implementation_deps = [
         ":bigtable_options",
         ":csv_records",
+        ":text_encoding",
     ],
     deps = [
         ":api_error",
@@ -1305,7 +1306,11 @@ cc_library(
     srcs = ["src/csv_records.cc"],
     hdrs = ["src/csv_records.h"],
     copts = ["-std=c++20"],
-    implementation_deps = [":api_error"],
+    implementation_deps = [
+        ":api_error",
+        "@googlesql//googlesql/common:utf_util",
+    ],
+    deps = [":text_encoding"],
 )
 
 cc_library(
@@ -1381,6 +1386,7 @@ cc_library(
         ":file_read",
         ":file_read_options",
         ":temporary_files",
+        ":text_encoding",
     ],
 )
 
@@ -1400,6 +1406,7 @@ cc_library(
         ":file_read",
         ":file_read_options",
         ":temporary_files",
+        ":text_encoding",
     ],
 )
 
