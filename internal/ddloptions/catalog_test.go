@@ -68,6 +68,20 @@ func TestRejectsDuplicateSamples(t *testing.T) {
 	rejects(t, c, "duplicate sample")
 }
 
+func TestRejectsInvalidValueLabels(t *testing.T) {
+	t.Parallel()
+	c := load(t)
+	option := &c.Groups["schema_option_list"][0]
+	for _, labels := range []map[string]string{
+		{"not a sample": "short label"},
+		{option.Values[0]: " "},
+		{option.Values[0]: "two\nlines"},
+	} {
+		option.ValueLabels = labels
+		rejects(t, c, "invalid label for sample")
+	}
+}
+
 func TestRejectsStaleRestrictions(t *testing.T) {
 	t.Parallel()
 	c := load(t)
@@ -117,7 +131,9 @@ func TestOptionTemplatesReplaceTheContextTemplate(t *testing.T) {
 	}
 	var got []string
 	for _, k := range c.Cases() {
-		got = append(got, k.Queries...)
+		for _, q := range k.Queries {
+			got = append(got, q.SQL)
+		}
 	}
 	if strings.Join(got, "; ") != "CREATE T OPTIONS (b = 'z', a = 'x'); CREATE T OPTIONS (b = 'y')" {
 		t.Errorf("queries = %v", got)
@@ -148,8 +164,8 @@ func TestCasesSetOneOptionPerSample(t *testing.T) {
 	if len(cases) != 3 {
 		t.Fatalf("Cases() = %+v", cases)
 	}
-	if got := strings.Join(cases[0].Queries, "; "); got != "CREATE T OPTIONS (a = 'x'); CREATE T OPTIONS (a = NULL)" {
-		t.Errorf("queries = %s", got)
+	if got := cases[0].Queries; len(got) != 2 || got[0].SQL != "CREATE T OPTIONS (a = 'x')" || got[1].SQL != "CREATE T OPTIONS (a = NULL)" {
+		t.Errorf("queries = %v", got)
 	}
 	if cases[1].Source != "https://example.com/ddl#elsewhere" || cases[1].Queries != nil {
 		t.Errorf("an option without samples = %+v", cases[1])
@@ -169,8 +185,12 @@ func TestAssignmentOperators(t *testing.T) {
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(c.Cases()[0].Queries, "; "); got != "ALTER T SET OPTIONS (tags = []); ALTER T SET OPTIONS (tags += []); ALTER T SET OPTIONS (tags -= [])" {
-		t.Fatalf("queries = %s", got)
+	var got []string
+	for _, q := range c.Cases()[0].Queries {
+		got = append(got, q.SQL)
+	}
+	if strings.Join(got, "; ") != "ALTER T SET OPTIONS (tags = []); ALTER T SET OPTIONS (tags += []); ALTER T SET OPTIONS (tags -= [])" {
+		t.Fatalf("queries = %v", got)
 	}
 	for _, ops := range [][]string{{"=", "="}, {"invalid"}} {
 		c.Groups["g"][0].Operators = ops

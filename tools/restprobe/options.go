@@ -28,19 +28,19 @@ func probeOptions(w io.Writer, binary, path string) error {
 	cases := catalog.Cases()
 	type job struct {
 		k     int
-		query string
+		query ddloptions.Query
 	}
 	var jobs []job
 	for i, k := range cases {
-		for _, sql := range k.Queries {
-			jobs = append(jobs, job{i, sql})
+		for _, query := range k.Queries {
+			jobs = append(jobs, job{i, query})
 		}
 	}
 	probes := make([]probereport.Probe, len(jobs))
 	if err := parallel(len(jobs), func(i int) error {
 		setup := append(append([]string{}, optionFixture...), cases[jobs[i].k].Context.Setup...)
 		var err error
-		probes[i], err = probeQuery(binary, setup, jobs[i].query)
+		probes[i], err = probeQuery(binary, setup, jobs[i].query.SQL)
 		return err
 	}); err != nil {
 		return err
@@ -48,10 +48,6 @@ func probeOptions(w io.Writer, binary, path string) error {
 	results := make([][]probereport.Probe, len(cases))
 	for i, j := range jobs {
 		p := probes[i]
-		if p.Outcome == probereport.Unsupported {
-			// Partial rows identify the rejected form, rather than just repeating the option name.
-			p.Detail = "`" + j.query + "`"
-		}
 		results[j.k] = append(results[j.k], p)
 	}
 	return writeOptions(w, cases, results)
@@ -87,11 +83,16 @@ func writeOptions(w io.Writer, cases []ddloptions.Case, results [][]probereport.
 		counts := map[probereport.Outcome]int{}
 		rejected := map[string]bool{}
 		failures := map[string]bool{}
-		for _, p := range results[i] {
+		for j, p := range results[i] {
 			counts[p.Outcome]++
 			switch p.Outcome {
 			case probereport.Unsupported:
-				rejected[p.Detail] = true
+				query := k.Queries[j]
+				label := query.Label
+				if label == "" {
+					label = "`" + query.SQL + "`"
+				}
+				rejected[label] = true
 			case probereport.Broken:
 				failures[p.Detail] = true
 			case probereport.Untested:

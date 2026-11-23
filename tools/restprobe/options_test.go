@@ -13,8 +13,12 @@ func TestOptionsSharedHeading(t *testing.T) {
 	catalog := ddloptions.Catalog{
 		Source: "reference.md",
 		Groups: map[string][]ddloptions.Option{
-			"uri":     {{Name: "uris", Type: "STRING", Values: []string{"'https://example.com'"}}},
-			"options": {{Name: "bigtable_options", Type: "STRING", Values: []string{"'{}'"}}},
+			"uri": {{Name: "uris", Type: "STRING", Values: []string{"'https://example.com'"}}},
+			"options": {{
+				Name: "bigtable_options", Type: "STRING",
+				Values:      []string{"'{}'", "'a'", "'b'"},
+				ValueLabels: map[string]string{"'{}'": "accepted form", "'a'": "rejected form"},
+			}},
 		},
 		Contexts: []ddloptions.Context{
 			{Name: "Bigtable URI", Heading: "Bigtable", Group: "uri", Template: "CREATE T OPTIONS ({option})"},
@@ -27,7 +31,7 @@ func TestOptionsSharedHeading(t *testing.T) {
 	var output bytes.Buffer
 	if err := writeOptions(&output, catalog.Cases(), [][]probereport.Probe{
 		{{Outcome: probereport.Runs}},
-		{{Outcome: probereport.Unsupported}},
+		{{Outcome: probereport.Runs}, {Outcome: probereport.Unsupported}, {Outcome: probereport.Unsupported}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -35,10 +39,13 @@ func TestOptionsSharedHeading(t *testing.T) {
 	if strings.Count(report, "\n## Bigtable\n") != 1 || strings.Contains(report, "Bigtable URI") {
 		t.Fatalf("expected a single shared heading:\n%s", report)
 	}
+	if strings.Contains(report, "accepted form") || strings.Contains(report, "bigtable_options = 'a'") {
+		t.Fatalf("expected only rejected forms, using the label when present:\n%s", report)
+	}
 	for _, row := range []string{
 		"| [Bigtable](#bigtable) | 1 | 1 |",
 		"| [`uris`](reference.md#uri) | `STRING` | Supported |",
-		"| [`bigtable_options`](reference.md#options) | `STRING` | Unsupported |",
+		"| [`bigtable_options`](reference.md#options) | `STRING` | Partial | Unsupported: `CREATE T OPTIONS (uris = 'https://example.com', bigtable_options = 'b')`; rejected form. |",
 	} {
 		if !strings.Contains(report, row) {
 			t.Errorf("missing %q in report:\n%s", row, report)

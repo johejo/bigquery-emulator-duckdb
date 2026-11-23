@@ -15,12 +15,14 @@ import (
 
 // Option is one row of an option list: its name, its GoogleSQL type and SQL sample values.
 // Source is the anchor of the reference section that describes it, when that is not its group.
+// ValueLabels gives selected SQL sample values short descriptions for the support report.
 type Option struct {
-	Name      string   `json:"name"`
-	Type      string   `json:"type"`
-	Values    []string `json:"values,omitempty"`
-	Source    string   `json:"source,omitempty"`
-	Operators []string `json:"operators,omitempty"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"`
+	Values      []string          `json:"values,omitempty"`
+	ValueLabels map[string]string `json:"value_labels,omitempty"`
+	Source      string            `json:"source,omitempty"`
+	Operators   []string          `json:"operators,omitempty"`
 }
 
 // Context is a statement that takes the options of Group. Template holds {option} where a case
@@ -113,6 +115,11 @@ func (c *Catalog) Validate() error {
 				}
 				values[value] = true
 			}
+			for value, label := range option.ValueLabels {
+				if !values[value] || strings.TrimSpace(label) == "" || strings.ContainsAny(label, "\r\n") {
+					return fmt.Errorf("%s.%s: invalid label for sample %s", group, option.Name, value)
+				}
+			}
 		}
 	}
 	contexts := map[string]bool{}
@@ -174,7 +181,14 @@ type Case struct {
 	Context *Context
 	Option  Option
 	Source  string
-	Queries []string
+	Queries []Query
+}
+
+// Query pairs a probe statement with the label shown if it is rejected as unsupported.
+// When no label is set, the report shows the full statement.
+type Query struct {
+	SQL   string
+	Label string
 }
 
 // Cases lists the options each context takes, in the catalog's order. A case has no queries when
@@ -203,8 +217,10 @@ func (c *Catalog) Cases() []Case {
 				}
 				for _, op := range operators {
 					for _, value := range option.Values {
-						k.Queries = append(k.Queries,
-							strings.Replace(template, "{option}", option.Name+" "+op+" "+value, 1))
+						k.Queries = append(k.Queries, Query{
+							SQL:   strings.Replace(template, "{option}", option.Name+" "+op+" "+value, 1),
+							Label: option.ValueLabels[value],
+						})
 					}
 				}
 			}

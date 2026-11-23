@@ -294,7 +294,20 @@
       {
         "name": "bigtable_options",
         "type": "STRING",
-        "values": ["'{}'", "'{\"readRowkeyAsString\":true}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"STRING\",\"onlyReadLatest\":true}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierEncoded\":\"/w==\",\"fieldName\":\"named\",\"type\":\"BYTES\",\"onlyReadLatest\":true}]}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"BINARY\"}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierString\":\"number\",\"type\":\"INTEGER\"}]}]}'", "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"TEXT\"}]}'", "'{\"outputColumnFamiliesAsJson\":true}'"]
+        "values": [
+          "'{}'",
+          "'{\"readRowkeyAsString\":true}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"STRING\",\"onlyReadLatest\":true}]}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierEncoded\":\"/w==\",\"fieldName\":\"named\",\"type\":\"BYTES\",\"onlyReadLatest\":true}]}]}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"BINARY\"}]}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierString\":\"number\",\"type\":\"INTEGER\"}]}]}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"TEXT\"}]}'",
+          "'{\"outputColumnFamiliesAsJson\":true}'"
+        ],
+        "value_labels": {
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"TEXT\"}]}'": "`INTEGER` cells with `TEXT` encoding",
+          "'{\"outputColumnFamiliesAsJson\":true}'": "`outputColumnFamiliesAsJson: true`"
+        }
       },
       {
         "name": "compression",
@@ -1919,7 +1932,7 @@
       "name": "CREATE EXTERNAL TABLE",
       "implementation": "CREATE EXTERNAL TABLE",
       "group": "external_table_option_list",
-      "exclude": ["field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format", "max_bad_records"],
+      "exclude": ["bigtable_options", "field_delimiter", "skip_leading_rows", "allow_jagged_rows", "allow_quoted_newlines", "ignore_unknown_values", "preserve_ascii_control_characters", "null_marker", "null_markers", "quote", "encoding", "time_zone", "date_format", "datetime_format", "time_format", "timestamp_format", "max_bad_records"],
       "template": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', uris = ['gs://bucket/data.parquet'], {option})",
       "templates": {
         "format": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], {option})",

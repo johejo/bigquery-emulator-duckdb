@@ -146,22 +146,28 @@ file's path lacks those keys.
 
 ## Bigtable
 
-Bigtable supports BYTES and STRING cell values, and INTEGER cells with `BINARY` or omitted
-encoding (4- or 8-byte signed big-endian values). `readRowkeyAsString`,
-`ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` at the family and qualifier levels
-are supported. Use `columnFamilies[].columns` to expose individual qualifiers as named fields
-beside `family.column`; that array contains only the unlisted qualifiers. INTEGER with `TEXT`,
-FLOAT, BOOLEAN, JSON/PROTO values, `outputColumnFamiliesAsJson`, explicit schemas and
-GCS-specific read options are unsupported.
+See the [Bigtable DDL option table](options.md#create-external-table-bigtable) for probed forms
+and the [README](../README.md#bigtable-external-tables) for endpoint setup.
 
-Reading a named field matches only cells with that qualifier. Reading a whole family or
-`family.column` matches any cell in the family, even if it belongs to a named qualifier.
-A scan includes rows that match at least one of these reads. In an included row, a missing
-family or named qualifier is `NULL`. A scan that references no family, such as in
-`SELECT rowkey`, includes all source rows.
+| Cell type | Encoding | Read behavior |
+|---|---|---|
+| `BYTES`, `STRING` | — | Read as bytes or strings, respectively |
+| `INTEGER` | `BINARY` or omitted | Read as 4- or 8-byte signed big-endian integers |
+| `INTEGER` | `TEXT` | Unsupported |
+| `FLOAT`, `BOOLEAN`, `JSON`, `PROTO` | Any | Unsupported |
 
-Schemas are fixed at creation; queries read current source rows. Endpoint setup is in the
-[README](../README.md#bigtable-external-tables).
+`readRowkeyAsString`, `ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` (at the family
+and qualifier levels) are supported. `outputColumnFamiliesAsJson`, explicit schemas, and
+GCS-specific read options are unsupported. Schemas are fixed at creation; queries read current
+source rows.
+
+- **Named qualifiers:** `columnFamilies[].columns` exposes individual qualifiers as named
+  fields beside `family.column`. The `family.column` array contains only unlisted qualifiers.
+- **Row selection:** Reading a named field matches only cells with that qualifier. Reading a
+  whole family or `family.column` matches any cell in the family, including named qualifiers.
+  A scan includes rows with at least one match. A scan that references no family, such as
+  `SELECT rowkey`, includes all source rows.
+- **Missing values:** In an included row, a missing family or named qualifier is `NULL`.
 
 ## Updates and other interfaces
 
