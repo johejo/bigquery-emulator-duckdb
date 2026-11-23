@@ -391,11 +391,8 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, const duckdb
       const auto interval = IntervalFromDuckDb(
           {.months = stored.months, .days = stored.days, .micros = stored.micros});
       check(interval.status());
-      // Storage Read exposes microsecond precision even for intervals written with Arrow.
-      // The rounding direction for negative fractional microseconds is not verified.
-      if (interval->get_micros() < 0 && interval->get_nano_fractions() != 0) {
-        throw ApiError::Unsupported("Storage Read of negative sub-microsecond INTERVALs");
-      }
+      // Storage Read rounds down to microseconds. IntervalValue stores the floored
+      // microseconds separately from the nonnegative nanosecond remainder.
       const int64_t micros = interval->get_micros();
       if (arrow) {
         const auto nanos = static_cast<__int128>(micros) * googlesql::IntervalValue::kNanosInMicro;

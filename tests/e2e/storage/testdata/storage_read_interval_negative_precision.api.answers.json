@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "cases": {
+    "arrow_nanos": {
+      "project": "johejo-sandbox",
+      "run": "fqjdpa2cqt5iomi4gag56p42vf",
+      "steps": {
+        "append_nanos": {},
+        "read": {
+          "messages": [
+            {
+              "arrowRecordBatch": {
+                "serializedRecordBatch": "/////4gAAAAUAAAAAAAAAAwAFgAGAAUACAAMAAwAAAAAAwQAGAAAABAAAAAAAAAAAAAKABgADAAEAAgACgAAADwAAAAQAAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAw+P///////w=="
+              },
+              "arrowSchema": {
+                "serializedSchema": "/////9AAAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAEAAAAYAAAAAAASABgACAAGAAcADAAAABAAFAASAAAAAAABCxQAAAB0AAAACAAAABQAAAAAAAAABQAAAHZhbHVlAAAAAQAAAAwAAAAIAAwABAAIAAgAAAAkAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAYACAAGAAYAAAAAAAIA"
+              },
+              "rowCount": "1"
+            }
+          ]
+        },
+        "session": {
+          "arrowSchema": "/////9AAAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAEAAAAYAAAAAAASABgACAAGAAcADAAAABAAFAASAAAAAAABCxQAAAB0AAAACAAAABQAAAAAAAAABQAAAHZhbHVlAAAAAQAAAAwAAAAIAAwABAAIAAgAAAAkAAAABAAAABcAAABnb29nbGU6c3FsVHlwZTppbnRlcnZhbAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAYACAAGAAYAAAAAAAIA",
+          "code": "OK"
+        }
+      }
+    },
+    "avro_nanos": {
+      "project": "johejo-sandbox",
+      "run": "fqjdpa2cqt5iomi4gag56p42vf",
+      "steps": {
+        "append_nanos": {},
+        "read": {
+          "messages": [
+            {
+              "avroRows": {
+                "serializedBinaryRows": "AgAAAw=="
+              },
+              "avroSchema": {
+                "schema": "{\n    \"type\": \"record\",\n    \"name\": \"__root__\",\n    \"fields\": [\n        {\n            \"name\": \"value\",\n            \"type\": [\n                \"null\",\n                {\n                    \"type\": \"record\",\n                    \"namespace\": \"google.sqlType\",\n                    \"name\": \"INTERVAL\",\n                    \"fields\": [\n                        {\n                            \"name\": \"months\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"days\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"microseconds\",\n                            \"type\": \"long\"\n                        }\n                    ]\n                }\n            ]\n        }\n    ]\n}"
+              },
+              "rowCount": "1"
+            }
+          ]
+        },
+        "session": {
+          "avroSchema": "{\n    \"type\": \"record\",\n    \"name\": \"__root__\",\n    \"fields\": [\n        {\n            \"name\": \"value\",\n            \"type\": [\n                \"null\",\n                {\n                    \"type\": \"record\",\n                    \"namespace\": \"google.sqlType\",\n                    \"name\": \"INTERVAL\",\n                    \"fields\": [\n                        {\n                            \"name\": \"months\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"days\",\n                            \"type\": \"int\"\n                        },\n                        {\n                            \"name\": \"microseconds\",\n                            \"type\": \"long\"\n                        }\n                    ]\n                }\n            ]\n        }\n    ]\n}",
+          "code": "OK"
+        }
+      }
+    }
+  }
+}

@@ -101,16 +101,28 @@ func TestReadIntervals(t *testing.T) {
 	}
 }
 
+const intervalPrecisionDataset = "storage_read_interval_precision"
+
 func TestReadIntervalPrecision(t *testing.T) {
 	t.Parallel()
+	t.Run("positive", func(t *testing.T) {
+		checkReadIntervalPrecision(t, intervalPrecisionDataset, 1001)
+	})
+	t.Run("negative", func(t *testing.T) {
+		checkReadIntervalPrecision(t, "storage_read_interval_negative_precision", -1001)
+	})
+}
+
+func checkReadIntervalPrecision(t *testing.T, dataset string, nanos int64) {
+	t.Helper()
 	rest, read, write := clients(t)
-	observations := intervalObservations(t, "testdata/storage_read_interval_precision.api.answers.json")
-	path := table(t, rest, "storage_read_interval_precision", "value INTERVAL")
+	observations := intervalObservations(t, "testdata/"+dataset+".api.answers.json")
+	path := table(t, rest, dataset, "value INTERVAL")
 	builder := array.NewRecordBuilder(memory.DefaultAllocator, arrow.NewSchema([]arrow.Field{
 		{Name: "value", Type: arrow.FixedWidthTypes.MonthDayNanoInterval},
 	}, nil))
 	defer builder.Release()
-	builder.Field(0).(*array.MonthDayNanoIntervalBuilder).Append(arrow.MonthDayNanoInterval{Nanoseconds: 1001})
+	builder.Field(0).(*array.MonthDayNanoIntervalBuilder).Append(arrow.MonthDayNanoInterval{Nanoseconds: nanos})
 	record := builder.NewRecordBatch()
 	defer record.Release()
 	schema, batch, err := arrowtest.Encode(record)
@@ -134,8 +146,8 @@ func TestReadIntervalPrecision(t *testing.T) {
 		caseName := strings.ToLower(format.String()) + "_nanos"
 		t.Run(caseName, func(t *testing.T) {
 			want := observations[caseName].Steps
-			// The recording's first response contains the appended value; the other row is NULL.
-			if len(want.Read.Messages) != 2 {
+			// The first response contains the appended value. The positive recording also has a NULL row.
+			if len(want.Read.Messages) == 0 {
 				t.Fatal("missing BigQuery observation")
 			}
 			msg := want.Read.Messages[0]
@@ -159,25 +171,29 @@ func TestReadIntervalPrecision(t *testing.T) {
 			}
 		})
 	}
-	t.Run("arrow_wide", func(t *testing.T) {
-		const dataset = "storage_read_interval_wide"
-		path := table(t, rest, dataset, "wide INTERVAL")
-		query(t, rest, "INSERT INTO "+dataset+".rows VALUES (INTERVAL 3000000 HOUR)")
-		s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
-		rows, err := read.ReadRows(t.Context(), &storagepb.ReadRowsRequest{ReadStream: s.Streams[0].Name})
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = rows.Recv()
-		want := observations["arrow_wide"].Steps.Read.Error
-		_, detail, ok := strings.Cut(want.Error.Message, "': ")
-		if !ok || detail == "" || want.Code == "" {
-			t.Fatal("missing BigQuery overflow observation")
-		}
-		if status.Code(err).String() != want.Code || !strings.HasSuffix(status.Convert(err).Message(), detail) {
-			t.Fatalf("ReadRows error = %v, want %s with detail %q", err, want.Code, detail)
-		}
-	})
+}
+
+func TestReadIntervalArrowOverflow(t *testing.T) {
+	t.Parallel()
+	rest, read, _ := clients(t)
+	observations := intervalObservations(t, "testdata/"+intervalPrecisionDataset+".api.answers.json")
+	const dataset = "storage_read_interval_wide"
+	path := table(t, rest, dataset, "wide INTERVAL")
+	query(t, rest, "INSERT INTO "+dataset+".rows VALUES (INTERVAL 3000000 HOUR)")
+	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
+	rows, err := read.ReadRows(t.Context(), &storagepb.ReadRowsRequest{ReadStream: s.Streams[0].Name})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = rows.Recv()
+	want := observations["arrow_wide"].Steps.Read.Error
+	_, detail, ok := strings.Cut(want.Error.Message, "': ")
+	if !ok || detail == "" || want.Code == "" {
+		t.Fatal("missing BigQuery overflow observation")
+	}
+	if status.Code(err).String() != want.Code || !strings.HasSuffix(status.Convert(err).Message(), detail) {
+		t.Fatalf("ReadRows error = %v, want %s with detail %q", err, want.Code, detail)
+	}
 }
 
 func intervalArrowReader(t *testing.T, schema, batch []byte) *ipc.Reader {
