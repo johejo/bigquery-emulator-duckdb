@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <memory>
 #include <string>
@@ -33,16 +34,6 @@
 #include "src/googlesql_geography/input.h"
 
 namespace bigquery_emulator_duckdb {
-
-void ValidateStorageWriteSchema(const std::vector<FieldSchema>& schema) {
-  for (const auto& field : schema) {
-    if (field.max_length) {
-      throw ApiError::Invalid(
-          "Storage Write does not support parameterized STRING or BYTES columns");
-    }
-    ValidateStorageWriteSchema(field.fields);
-  }
-}
 
 namespace {
 
@@ -179,12 +170,28 @@ bool ProtoType(const FieldSchema& field, const FieldDescriptor& descriptor) {
   }
 }
 
+void CheckProtoLength(std::string_view text, const FieldSchema& field) {
+  if (!field.max_length) {
+    return;
+  }
+  auto length = static_cast<int64_t>(text.size());
+  if (field.type == FieldType::kString) {
+    const auto characters = googlesql::LengthUtf8(text);
+    Check(characters.status());
+    length = *characters;
+  }
+  if (length > *field.max_length) {
+    throw ApiError::Invalid(std::format(
+        "Field value: {}({}) has maximum length {} but got a value with length {} on field {}.",
+        FieldTypeName(field.type), *field.max_length, *field.max_length, length, field.name));
+  }
+}
+
 void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>& schema,
                    int depth) {
   if (depth > 15) {
     throw ApiError::Invalid("Writer schema exceeds maximum nesting depth");
   }
-  ValidateStorageWriteSchema(schema);
   for (int i = 0; i < descriptor.field_count(); ++i) {
     const auto& input = *descriptor.field(i);
     const auto& field = Destination(schema, input.name());
@@ -234,6 +241,7 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
   if (input.cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
     const std::string text =
         repeated ? r->GetRepeatedString(message, &input, index) : r->GetString(message, &input);
+    CheckProtoLength(text, field);
     if (input.type() != FieldDescriptor::TYPE_BYTES) {
       if (field.type == FieldType::kInterval) {
         const auto value = googlesql::IntervalValue::ParseFromString(

@@ -45,6 +45,15 @@ std::string RoundedInsertValue(const function_catalog::Catalog& functions, const
   return *rounded;
 }
 
+// BigQuery checks lengths during protobuf decoding but not for Arrow. Neither staging
+// nor publishing should check lengths again; keep the other destination constraints.
+void ClearStorageWriteLengths(FieldSchema& field) {
+  field.max_length.reset();
+  for (auto& child : field.fields) {
+    ClearStorageWriteLengths(child);
+  }
+}
+
 // Convert a returned default from REST cells to the named input values used for staged
 // writes. Keep decimal strings and bytes intact and format timestamps without a float roundtrip.
 json StorageDefaultValue(const json& value, const FieldSchema& field) {
@@ -157,11 +166,15 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
     }
     std::vector<std::string> statements;
     constexpr InsertValueOptions options{.allow_interval_nanos = true};
+    auto write_schema = schema;
+    for (auto& field : write_schema) {
+      ClearStorageWriteLengths(field);
+    }
     for (size_t index = 0; index < rows.size(); ++index) {
       const auto& row = rows.at(index);
       std::vector<std::string> columns;
       std::vector<std::string> values;
-      for (const auto& field : schema) {
+      for (const auto& field : write_schema) {
         columns.push_back(QuoteIdentifier(field.name));
         const auto value = row.find(field.name);
         try {

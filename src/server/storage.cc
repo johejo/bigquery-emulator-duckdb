@@ -175,13 +175,10 @@ void CheckSchemaChange(const std::vector<FieldSchema>& before,
     CheckSchemaChange(field.fields, found->fields);
   }
   for (const auto& field : after) {
-    if (std::ranges::find(before, field.name, &FieldSchema::name) == before.end()) {
-      if (field.mode == FieldMode::kRequired) {
-        Fail(grpc::StatusCode::UNIMPLEMENTED,
-             "Storage Write does not support adding required destination fields");
-      }
-      // Staged rows can be published without another AppendRows call to validate the schema.
-      ValidateStorageWriteSchema({field});
+    if (field.mode == FieldMode::kRequired &&
+        std::ranges::find(before, field.name, &FieldSchema::name) == before.end()) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support adding required destination fields");
     }
   }
 }

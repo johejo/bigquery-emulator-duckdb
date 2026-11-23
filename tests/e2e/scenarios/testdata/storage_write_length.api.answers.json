@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "cases": {
+    "arrow_bytes_at_limit": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "appendResult": {},
+          "code": "OK"
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "00ff"
+                }
+              ]
+            }
+          ],
+          "totalRows": "1"
+        }
+      }
+    },
+    "arrow_bytes_mixed": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "appendResult": {},
+          "code": "OK"
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "00ff"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "00ff01"
+                }
+              ]
+            }
+          ],
+          "totalRows": "2"
+        }
+      }
+    },
+    "arrow_string_at_limit": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "appendResult": {},
+          "code": "OK"
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "é界"
+                }
+              ]
+            }
+          ],
+          "totalRows": "1"
+        }
+      }
+    },
+    "arrow_string_mixed": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "appendResult": {},
+          "code": "OK"
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "é界"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "é界x"
+                }
+              ]
+            }
+          ],
+          "totalRows": "2"
+        }
+      }
+    },
+    "proto_bytes_at_limit": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "appendResult": {},
+          "code": "OK"
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "00ff"
+                }
+              ]
+            }
+          ],
+          "totalRows": "1"
+        }
+      }
+    },
+    "proto_bytes_mixed": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error": {
+            "code": 3,
+            "details": [
+              {
+                "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                "detail": "INVALID_ARGUMENT: Field value: BYTES(2) has maximum length 2 but got a value with length 3 on field value. [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+              }
+            ],
+            "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_ascc5pk6stpmuigjj2fskdoxbi_proto_bytes_mixed/tables/t/streams/_default"
+          },
+          "rowErrors": [
+            {
+              "code": "FIELDS_ERROR",
+              "index": "1",
+              "message": "Field value: BYTES(2) has maximum length 2 but got a value with length 3 on field value."
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "totalRows": "0"
+        }
+      }
+    },
+    "proto_string_at_limit": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "appendResult": {},
+          "code": "OK"
+        },
+        "query": {
+          "jobComplete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "é界"
+                }
+              ]
+            }
+          ],
+          "totalRows": "1"
+        }
+      }
+    },
+    "proto_string_mixed": {
+      "project": "johejo-sandbox",
+      "run": "ascc5pk6stpmuigjj2fskdoxbi",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error": {
+            "code": 3,
+            "details": [
+              {
+                "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                "detail": "INVALID_ARGUMENT: Field value: STRING(2) has maximum length 2 but got a value with length 3 on field value. [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+              }
+            ],
+            "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_ascc5pk6stpmuigjj2fskdoxbi_proto_string_mixed/tables/t/streams/_default"
+          },
+          "rowErrors": [
+            {
+              "code": "FIELDS_ERROR",
+              "index": "1",
+              "message": "Field value: STRING(2) has maximum length 2 but got a value with length 3 on field value."
+            }
+          ]
+        },
+        "query": {
+          "jobComplete": true,
+          "totalRows": "0"
+        }
+      }
+    }
+  }
+}

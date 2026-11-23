@@ -28,9 +28,6 @@ class StorageFieldMismatch : public std::invalid_argument {
   FieldType type;
 };
 
-// Rejects column options that cannot be honored when decoding or publishing staged rows.
-void ValidateStorageWriteSchema(const std::vector<FieldSchema>& schema);
-
 // Validates text fields shared by the protobuf and Arrow writers. In particular, JSON null
 // stays inside a string, distinct from SQL NULL.
 std::string DecodeStorageText(std::string_view text, FieldType type, std::string_view name);
