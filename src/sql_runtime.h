@@ -216,12 +216,12 @@ class SqlRuntime {
   // as SelectFields takes them, unless it is empty.
   TableDataPage ListTableData(TableReference table, int64_t start_index, int64_t max_results,
                               std::string_view selected_fields);
-  // Materializes a Storage Read snapshot of the selected fields, or all of them, without
-  // creating a query job. The restriction is parsed as one GoogleSQL expression before it is
-  // included in the SELECT.
+  // Materializes a Storage Read snapshot without creating a query job. With snapshot_micros,
+  // reads the table at the given Unix timestamp rather than at session creation. The restriction
+  // is parsed as one GoogleSQL expression before it is included in the SELECT.
   std::shared_ptr<const StorageSnapshot> ReadStorageTable(
       TableReference table, const std::vector<std::string>& selected_fields,
-      const std::string& restriction);
+      const std::string& restriction, std::optional<int64_t> snapshot_micros);
   // Validates and inserts the whole Storage Write batch in one transaction. With validate_only,
   // rolls it back, for pending/buffered appends, and materializes omitted column defaults in
   // rows so publication never re-evaluates them. Checks the schema in that same transaction.

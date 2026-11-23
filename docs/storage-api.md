@@ -19,6 +19,9 @@ finalization. Explicit streams retain offsets across connections within the proc
 Read sessions materialize a snapshot in memory and expire after six hours. Arrow and Avro
 output support scalar types, STRUCTs and arrays, including decimals and temporal types.
 A RANGE column is a struct of `start` and `end`, which is null where unbounded, as in BigQuery.
+If `snapshot_time` is set, the read uses the same history and has the same limits as
+[`FOR SYSTEM_TIME AS OF`](compatibility.md#time-travel).
+
 INTERVAL columns are unsupported. The [support table](storage.md) lists the request options
 the emulator rejects.
 

@@ -323,8 +323,15 @@ var sections = []section{
 				&storagepb.ReadSession_TableReadOptions{SelectedFields: []string{"value"}}, nil)},
 			{"row restrictions", readSession(stringSchema, storagepb.DataFormat_ARROW,
 				&storagepb.ReadSession_TableReadOptions{RowRestriction: "value = 'probe'"}, nil)},
-			{"historical snapshots", readSession(stringSchema, storagepb.DataFormat_ARROW, nil,
-				&storagepb.ReadSession_TableModifiers{SnapshotTime: timestamppb.New(time.Now().Add(-time.Minute))})},
+			{"historical snapshots", func(ctx context.Context, e *env) error {
+				path, err := e.filledTable(ctx)
+				if err != nil {
+					return err
+				}
+				_, err = e.session(ctx, path, storagepb.DataFormat_ARROW, nil,
+					&storagepb.ReadSession_TableModifiers{SnapshotTime: timestamppb.Now()})
+				return err
+			}},
 			{"sampling", readSession(stringSchema, storagepb.DataFormat_ARROW,
 				&storagepb.ReadSession_TableReadOptions{SamplePercentage: proto.Float64(50)}, nil)},
 			{"Arrow response compression (LZ4)", readSession(stringSchema, storagepb.DataFormat_ARROW,

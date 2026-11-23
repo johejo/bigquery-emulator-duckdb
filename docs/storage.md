@@ -23,7 +23,7 @@ RPC list the forms the emulator rejected.
 
 | RPC | Status | Notes |
 | --- | --- | --- |
-| `CreateReadSession` | Partial | See [Reading rows](storage-api.md#reading-rows). Unsupported: INTERVAL columns; historical snapshots; sampling. |
+| `CreateReadSession` | Partial | See [Reading rows](storage-api.md#reading-rows). Unsupported: INTERVAL columns; sampling. |
 | `ReadRows` | Partial | Unsupported: serialization options. |
 | `SplitReadStream` | Supported |  |
 
