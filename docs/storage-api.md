@@ -29,9 +29,11 @@ the emulator rejects.
 
 Protobuf scalar fields, STRUCTs and repeated fields are supported. GEOGRAPHY fields take strings
 as `tabledata.insertAll` does; see [GEOGRAPHY values](compatibility.md#geography-values).
-Parameterized STRING and BYTES columns are unsupported in both encodings. Protobuf accepts
-INTERVAL as a string in canonical `Y-M D H:M:S[.F]` format, with up to six fractional digits;
-`google.protobuf.Duration` and custom annotations are unsupported.
+Protobuf accepts INTERVAL as a string in canonical `Y-M D H:M:S[.F]` format, with up to six
+fractional digits; `google.protobuf.Duration` and custom annotations are unsupported.
+
+As in BigQuery, protobuf rejects an entire batch if a value exceeds its `STRING(L)` or
+`BYTES(L)` limit. Arrow writes preserve over-limit values without truncating them.
 
 Arrow accepts the documented [Storage Write Arrow mappings](../third_party/bigquery_docs/supported-data-types.md),
 as well as signed `Int64` for INT64 and `Time64(MICROSECOND)` for TIME. The

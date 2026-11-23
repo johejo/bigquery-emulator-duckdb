@@ -417,7 +417,6 @@ json StorageArrowDecoder::DecodeValue(const ArrowArrayView* col, int64_t row, co
 
 StorageArrowDecoder::StorageArrowDecoder(std::string_view wire_schema,
                                          const std::vector<FieldSchema>& destination) {
-  ValidateStorageWriteSchema(destination);
   ArrowError error{};
   auto* decoder = decoder_.get();
   Check(ArrowIpcDecoderInit(decoder), error);

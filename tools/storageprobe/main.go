@@ -225,18 +225,21 @@ func readSession(schema bigquery.Schema, format storagepb.DataFormat, options *s
 	}
 }
 
-// appendTo appends value to the STRING field `value` of the default stream of a new table of the
-// schema.
+// appendTo appends a protobuf STRING or BYTES value to the field `value` of a new table.
 func appendTo(schema bigquery.Schema, value string) func(context.Context, *env) error {
 	return func(ctx context.Context, e *env) error {
 		path, err := e.table(ctx, schema)
 		if err != nil {
 			return err
 		}
+		field := stringField("value")
+		if schema[0].Type == bigquery.BytesFieldType {
+			field.Type = descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum()
+		}
 		return e.send(ctx, &storagepb.AppendRowsRequest{WriteStream: path + "/streams/_default",
 			Rows: &storagepb.AppendRowsRequest_ProtoRows{ProtoRows: &storagepb.AppendRowsRequest_ProtoData{
 				WriterSchema: &storagepb.ProtoSchema{ProtoDescriptor: &descriptorpb.DescriptorProto{
-					Name: proto.String("Row"), Field: []*descriptorpb.FieldDescriptorProto{stringField("value")}}},
+					Name: proto.String("Row"), Field: []*descriptorpb.FieldDescriptorProto{field}}},
 				Rows: &storagepb.ProtoRows{SerializedRows: [][]byte{append([]byte{0x0a, byte(len(value))}, value...)}}}}})
 	}
 }
@@ -462,8 +465,14 @@ var sections = []section{
 			{"column defaults", columnDefaults(false, false)},
 			{"connection missing-value defaults", columnDefaults(true, false)},
 			{"per-column missing-value defaults", columnDefaults(false, true)},
-			{"parameterized STRING columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType,
-				MaxLength: 10}}, "probe")},
+			{"protobuf STRING(L) columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType,
+				MaxLength: 2}}, "é界")},
+			{"protobuf BYTES(L) columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.BytesFieldType,
+				MaxLength: 2}}, "\x00\xff")},
+			{"Arrow STRING(L) columns", arrowAppendField(bigquery.FieldSchema{Type: bigquery.StringFieldType, MaxLength: 2},
+				arrow.BinaryTypes.String, "é界")},
+			{"Arrow BYTES(L) columns", arrowAppendField(bigquery.FieldSchema{Type: bigquery.BytesFieldType, MaxLength: 2},
+				arrow.BinaryTypes.Binary, "AP8=")},
 			{"JSON columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.JSONFieldType}}, `{"a": 1}`)},
 			{"GEOGRAPHY columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.GeographyFieldType}}, "POINT(1 2)")},
 			{"canonical INTERVAL strings in protobuf", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.IntervalFieldType}}, "0-0 1 0:0:0")},
