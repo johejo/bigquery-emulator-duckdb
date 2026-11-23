@@ -84,6 +84,13 @@ absl::StatusOr<std::string> Json(std::string_view text) {
       message.remove_prefix(colon + 2);
     }
     return absl::InvalidArgumentError(message);
+  } catch (const json::out_of_range& error) {
+    // Such as "number overflow parsing '1e400'", after the exception's id.
+    std::string_view message = error.what();
+    if (const auto id = message.find("] "); id != std::string_view::npos) {
+      message.remove_prefix(id + 2);
+    }
+    return absl::InvalidArgumentError(message);
   }
 }
 

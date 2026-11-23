@@ -159,7 +159,8 @@ and the [README](../README.md#bigtable-external-tables) for endpoint setup.
 | `INTEGER` | `TEXT` | Parse decimal INT64 text, allowing a sign and surrounding ASCII whitespace |
 | `FLOAT` | `TEXT` | Parse decimal or hexadecimal text, `NaN` and `Inf`/`Infinity` in any case, allowing a sign and surrounding ASCII whitespace; out-of-range values become infinity |
 | `BOOLEAN` | `TEXT` | Parse `true`, `t`, `yes`, `y`, `1`, `false`, `f`, `no`, `n` or `0` in any case, without whitespace |
-| `JSON`, `PROTO` | Any | Unsupported |
+| `JSON` | `TEXT`, `BINARY` or omitted | Parse a JSON document as compact text, keeping the first of duplicate keys; a query that reads an invalid document fails |
+| `JSON` | `PROTO_BINARY` | Unsupported; table creation fails as BigQuery's does for a column that sets it without `protoConfig` |
 
 `readRowkeyAsString`, `ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` (at the family
 and qualifier levels) are supported. `outputColumnFamiliesAsJson`, explicit schemas, and
@@ -173,6 +174,8 @@ source rows.
   A scan includes rows with at least one match. A scan that references no family, such as
   `SELECT rowkey`, includes all source rows.
 - **Missing values:** In an included row, a missing family or named qualifier is `NULL`.
+- **UTF-8:** A query fails on a `STRING` or `JSON` cell that is not valid UTF-8 when it reads
+  the cell's named field, or when it reads any part of the family and the cell is unlisted.
 
 ## Updates and other interfaces
 

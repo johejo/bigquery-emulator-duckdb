@@ -33,9 +33,11 @@
 #include "google/cloud/options.h"
 #include "google/cloud/project.h"
 #include "google/cloud/status.h"
+#include "googlesql/common/utf_util.h"
 #include "src/api_error.h"
 #include "src/bigtable_options.h"
 #include "src/duckdb_sql.h"
+#include "src/external_values.h"
 #include "src/field_schema.h"
 #include "src/schema_sql.h"
 #include "src/statement_resources.h"
@@ -90,6 +92,8 @@ FieldSchema CellSchema(const BigtableCellOptions& defaults,
 }
 
 struct FamilyRead {
+  // The external table's name, which BigQuery's read errors give.
+  std::string_view table;
   const FieldSchema& schema;
   // A read of `column` counts every cell in the family, though its array excludes promoted cells.
   const std::set<size_t>* fields;
@@ -150,8 +154,26 @@ std::string TextCellLiteral(std::string_view value, FieldType type) {
   throw ApiError::Invalid("Could not convert cell value " + std::string(value) + ".");
 }
 
+// A JSON cell's text, whatever its encoding, as BigQuery's answers in
+// bigtable_json.api.answers.json show. BigQuery fails a query that reads an invalid document with
+// nlohmann's message, and a number out of range with a suffix of its own.
+std::string JsonCellLiteral(std::string_view value) {
+  const auto json = ExternalValue(FieldType::kJson, value);
+  if (!json.ok()) {
+    std::string message(json.status().message());
+    if (message.starts_with("number overflow")) {
+      message += "; error in JSON_TYPE expression";
+    }
+    throw ApiError::InvalidQuery(message);
+  }
+  return QuoteLiteral(*json);
+}
+
 // BINARY cells hold HBase Bytes.toBytes encodings, as BigtableColumnFamily.type documents.
 std::string CellLiteral(std::string_view value, FieldType type, bool text) {
+  if (type == FieldType::kJson) {
+    return JsonCellLiteral(value);
+  }
   if (text) {
     return TextCellLiteral(value, type);
   }
@@ -209,13 +231,35 @@ std::optional<std::string> ReadFamily(const FamilyRead& read, const cbt::Row& ro
   std::map<std::string, std::vector<std::string>> unlisted;
   std::vector<std::vector<std::string>> named(fields.size());
   bool present = false;
+  const std::string* previous_qualifier = nullptr;
   for (const auto& cell : row.cells()) {
     if (cell.family_name() != read.schema.name) {
       continue;
     }
     present |= fallback;
-    if (const auto found = read.promoted.find(cell.column_qualifier());
-        found != read.promoted.end()) {
+    // ReadRows orders a family's cells by qualifier, and versions newest first.
+    const bool newest =
+        previous_qualifier == nullptr || *previous_qualifier != cell.column_qualifier();
+    previous_qualifier = &cell.column_qualifier();
+    const auto found = read.promoted.find(cell.column_qualifier());
+    const FieldSchema& cell_schema =
+        found == read.promoted.end() ? fallback_cell : fields.at(found->second).fields.front();
+    // BigQuery checks the UTF-8 of each STRING or JSON version it reads, of an unlisted cell even
+    // when the query reads none, but not of an unread named column or a version onlyReadLatest
+    // leaves out, as bigtable_json.api.answers.json and the STRING versions TestBigtableExternal
+    // reads show.
+    if ((found == read.promoted.end() || read.Reads(found->second)) &&
+        (newest || cell_schema.mode == FieldMode::kRepeated)) {
+      const FieldType type = cell_schema.fields.back().type;
+      if ((type == FieldType::kString || type == FieldType::kJson) &&
+          !googlesql::IsWellFormedUTF8(cell.value())) {
+        throw ApiError::Invalid(
+            "Error while reading table: " + std::string(read.table) +
+            ", error message: Invalid utf-8 encoding found At row:" + row.row_key() +
+            ", column_family:" + read.schema.name + ", column:" + cell.column_qualifier());
+      }
+    }
+    if (found != read.promoted.end()) {
       const size_t field = found->second;
       if (read.Reads(field)) {
         present = true;
@@ -314,11 +358,12 @@ std::vector<FieldSchema> DetectBigtableSchema(const GcsExternalData& definition)
   return schema;
 }
 
-TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema) {
+TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSchema> schema,
+                               std::string table_name) {
   return FieldProjectedRead{
       .prepare =
-          [definition = std::move(definition),
-           schema = std::move(schema)](TableReadContext& context) {
+          [definition = std::move(definition), schema = std::move(schema),
+           table_name = std::move(table_name)](TableReadContext& context) {
             ValidateBigtableExternal(definition);
             const BigtableSource source = ParseBigtableSource(definition);
             google::cloud::Options connection_options;
@@ -342,6 +387,7 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
               }
               const auto selected = context.fields.find(field.name);
               FamilyRead read{
+                  .table = table_name,
                   .schema = field,
                   .fields = selected == context.fields.end() ? nullptr : &selected->second,
                   .promoted = {},

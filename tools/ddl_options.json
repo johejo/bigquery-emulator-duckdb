@@ -304,9 +304,12 @@
           "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"FLOAT\",\"encoding\":\"BINARY\"}]}'",
           "'{\"columnFamilies\":[{\"familyId\":\"family\",\"columns\":[{\"qualifierString\":\"flag\",\"type\":\"BOOLEAN\"}]}]}'",
           "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"INTEGER\",\"encoding\":\"TEXT\"}]}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"JSON\",\"encoding\":\"TEXT\"}]}'",
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"JSON\",\"encoding\":\"PROTO_BINARY\",\"protoConfig\":{\"schemaBundleId\":\"bundle\",\"protoMessageName\":\"example.Message\"}}]}'",
           "'{\"outputColumnFamiliesAsJson\":true}'"
         ],
         "value_labels": {
+          "'{\"columnFamilies\":[{\"familyId\":\"family\",\"type\":\"JSON\",\"encoding\":\"PROTO_BINARY\",\"protoConfig\":{\"schemaBundleId\":\"bundle\",\"protoMessageName\":\"example.Message\"}}]}'": "`PROTO_BINARY` encoding",
           "'{\"outputColumnFamiliesAsJson\":true}'": "`outputColumnFamiliesAsJson: true`"
         }
       },

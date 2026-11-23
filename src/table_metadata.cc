@@ -434,12 +434,14 @@ bool ParseBigtableCells(BigtableCellOptions& cells, const std::string& key, cons
   if (key == "type") {
     cells.type = BigtableOptionString(key, value);
     if (*cells.type != "BYTES" && *cells.type != "STRING" && *cells.type != "INTEGER" &&
-        *cells.type != "FLOAT" && *cells.type != "BOOLEAN") {
+        *cells.type != "FLOAT" && *cells.type != "BOOLEAN" && *cells.type != "JSON") {
       throw ApiError::Unsupported("Bigtable cell type " + *cells.type);
     }
   } else if (key == "encoding") {
     cells.encoding = BigtableOptionString(key, value);
-    if (*cells.encoding != "BINARY" && *cells.encoding != "TEXT") {
+    // ValidateBigtableExternal rejects PROTO_BINARY, which requires an unsupported protoConfig.
+    if (*cells.encoding != "BINARY" && *cells.encoding != "TEXT" &&
+        *cells.encoding != "PROTO_BINARY") {
       throw ApiError::Unsupported("Bigtable cell encoding " + *cells.encoding);
     }
   } else if (key == "onlyReadLatest") {

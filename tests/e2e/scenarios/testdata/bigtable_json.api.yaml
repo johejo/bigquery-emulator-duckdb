@@ -1,0 +1,515 @@
+version: 1
+# Recorded on BigQuery in runs aprndhas6h7zyp37mrzzh6xxkm and 5o362n6qxpoicmmhclp6frq56h (the
+# named_unselected, unlisted_bytes_family and string_family cases); see the adjacent answers file.
+description: >-
+  Verify how JSON Bigtable cells are read: every encoding but PROTO_BINARY reads text, the JSON
+  value kinds, whitespace, key order, duplicate keys, large numbers, escapes, JSON null, empty
+  cells, invalid text, which cells' UTF-8 is checked, and the schema a JSON family reports.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project
+# as the URI below. For example, in Bash:
+#   table=bigtable-json-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=family
+#   mutations=
+#   cell() { mutations+="${mutations:+,}{\"setCell\":{\"familyName\":\"family\",\"columnQualifier\":\"$(printf %s "$1" | base64 -w0)\",\"timestampMicros\":\"1000\",\"value\":\"$(printf %s "$2" | base64 -w0)\"}}"; }
+#   cell object '{"a":1,"b":"x"}'; cell key_order '{"b":1,"a":2}';
+#   cell whitespace ' { "a" : [ 1 , 2 ] } '; cell array '[1,"x",null]'; cell string '"x"';
+#   cell number '1.5'; cell large_int '12345678901234567890';
+#   cell precise_float '0.1000000000000000055511151231257827'; cell exponent '1e400';
+#   cell boolean 'true'; cell json_null 'null'; cell duplicate_key '{"a":1,"a":2}';
+#   cell escape '"é\n"'; cell nested '{"a":{"b":{"c":[{}]}}}'; cell empty '';
+#   cell truncated '{"a":'; cell bare 'abc'; cell trailing '{} x'; cell single_quote "{'a':1}";
+#   cell invalid_utf8 $'"\xff"';
+#   curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#     -H 'Content-Type: application/json' \
+#     "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#     -d "{\"rowKey\":\"Zml4dHVyZQ==\",\"mutations\":[$mutations]}"
+# The request is idempotent, so it can be repeated after a transient failure.
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-json-probe
+  table_options:
+    ignoreUnspecifiedColumnFamilies: true
+    columnFamilies:
+      - familyId: family
+        columns: ['${column}']
+  create_body:
+    tableReference: {tableId: t}
+    externalDataConfiguration:
+      sourceFormat: BIGTABLE
+      sourceUris: ['${uri}']
+      bigtableOptions: '${table_options}'
+  read_body:
+    location: US
+    useLegacySql: false
+    timeoutMs: 100000
+    query: >-
+      SELECT family.probe_value.cell.value,
+        TO_JSON_STRING(family.probe_value.cell.value) AS serialized,
+        family.probe_value.cell.value IS NULL AS is_sql_null
+      FROM `${project}.${dataset}.t`
+  created: {status: 200}
+  success:
+    status: 200
+    complete: true
+    schema:
+      - {mode: NULLABLE, name: value, type: JSON}
+      - {mode: NULLABLE, name: serialized, type: STRING}
+      - {mode: NULLABLE, name: is_sql_null, type: BOOLEAN}
+    rows: [{f: [{v: '${value}'}, {v: '${value}'}, {v: 'false'}]}]
+  parse_rejection: {status: 400, reason: invalidQuery, message: '${message}'}
+  # The full message names deployment-specific zones and clusters.
+  read_rejection: {status: 400, reason: invalid}
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        observe: {status: /status, complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        observe: {status: /status, reason: /body/error/errors/0/reason, message: /body/error/message}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject_read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject_create:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        expectFailure: true
+        # The full message names the table being read.
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  family_read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions:
+                ignoreUnspecifiedColumnFamilies: true
+                columnFamilies: ['${family}']
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t`
+        observe: {complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  family_reject:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions:
+                ignoreUnspecifiedColumnFamilies: true
+                columnFamilies: ['${family}']
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t`
+        expectFailure: true
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: encoding_text
+    template: read
+    vars:
+      value: '{"a":1,"b":"x"}'
+      column: {qualifierString: object, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: encoding_omitted
+    template: read
+    vars:
+      value: '{"a":1,"b":"x"}'
+      column: {qualifierString: object, fieldName: probe_value, type: JSON, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: encoding_binary
+    template: read
+    vars:
+      value: '{"a":1,"b":"x"}'
+      column: {qualifierString: object, fieldName: probe_value, type: JSON, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: encoding_family_text
+    # A JSON family checks the UTF-8 of every cell it reads, including invalid_utf8, which the query
+    # does not select.
+    template: reject_read
+    vars:
+      table_options:
+        ignoreUnspecifiedColumnFamilies: true
+        columnFamilies:
+          - familyId: family
+            type: JSON
+            encoding: TEXT
+            columns: [{qualifierString: object, fieldName: probe_value, onlyReadLatest: true}]
+    expect: {create: '${created}', read: '${read_rejection}'}
+  - name: proto_binary_without_config
+    template: reject_create
+    vars:
+      column: {qualifierString: object, fieldName: probe_value, type: JSON, encoding: PROTO_BINARY, onlyReadLatest: true}
+    expect: {create: {status: 400, reason: invalid}}
+  - name: key_order
+    template: read
+    vars:
+      value: '{"a":2,"b":1}'
+      column: {qualifierString: key_order, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: whitespace
+    template: read
+    vars:
+      value: '{"a":[1,2]}'
+      column: {qualifierString: whitespace, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: array
+    template: read
+    vars:
+      value: '[1,"x",null]'
+      column: {qualifierString: array, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: string
+    template: read
+    vars:
+      value: '"x"'
+      column: {qualifierString: string, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: number
+    template: read
+    vars:
+      value: '1.5'
+      column: {qualifierString: number, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: large_int
+    template: read
+    vars:
+      value: '12345678901234567890'
+      column: {qualifierString: large_int, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: precise_float
+    template: read
+    vars:
+      value: '0.1'
+      column: {qualifierString: precise_float, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: exponent_overflow
+    template: reject
+    vars:
+      message: 'number overflow parsing ''1e400''; error in JSON_TYPE expression'
+      column: {qualifierString: exponent, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${parse_rejection}'}
+  - name: boolean
+    template: read
+    vars:
+      value: 'true'
+      column: {qualifierString: boolean, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: json_null
+    template: read
+    vars:
+      value: 'null'
+      column: {qualifierString: json_null, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: duplicate_key
+    template: read
+    vars:
+      value: '{"a":1}'
+      column: {qualifierString: duplicate_key, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: escape
+    template: read
+    vars:
+      value: '"é\n"'
+      column: {qualifierString: escape, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: nested
+    template: read
+    vars:
+      value: '{"a":{"b":{"c":[{}]}}}'
+      column: {qualifierString: nested, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: empty
+    template: reject
+    vars:
+      message: 'attempting to parse an empty input; check that your input string or stream contains the expected JSON'
+      column: {qualifierString: empty, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${parse_rejection}'}
+  - name: truncated
+    template: reject
+    vars:
+      message: 'syntax error while parsing value - unexpected end of input; expected ''['', ''{'', or a literal'
+      column: {qualifierString: truncated, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${parse_rejection}'}
+  - name: bare
+    template: reject
+    vars:
+      message: 'syntax error while parsing value - invalid literal; last read: ''a'''
+      column: {qualifierString: bare, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${parse_rejection}'}
+  - name: trailing
+    template: reject
+    vars:
+      message: 'syntax error while parsing value - invalid literal; last read: ''{} x''; expected end of input'
+      column: {qualifierString: trailing, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${parse_rejection}'}
+  - name: single_quote
+    template: reject
+    vars:
+      message: 'syntax error while parsing object key - invalid literal; last read: ''{''''; expected string literal'
+      column: {qualifierString: single_quote, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${parse_rejection}'}
+  - name: invalid_utf8
+    template: reject_read
+    vars:
+      column: {qualifierString: invalid_utf8, fieldName: probe_value, type: JSON, encoding: TEXT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${read_rejection}'}
+  - name: family_schema
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions:
+                ignoreUnspecifiedColumnFamilies: true
+                columnFamilies:
+                  - familyId: family
+                    type: JSON
+                    encoding: TEXT
+                    columns: [{qualifierString: object, fieldName: probe_value}]
+        observe: {status: /status, schema: /body/schema, external: /body/externalDataConfiguration}
+      - name: columns
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            query: >-
+              SELECT field_path, data_type
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS`
+              WHERE table_name = 't' ORDER BY field_path
+        observe: {rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create:
+        status: 200
+        external:
+          sourceFormat: BIGTABLE
+          sourceUris: ['${uri}']
+          bigtableOptions:
+            ignoreUnspecifiedColumnFamilies: true
+            columnFamilies:
+              - familyId: family
+                type: JSON
+                encoding: TEXT
+                columns: [{qualifierString: object, fieldName: probe_value}]
+        schema:
+          fields:
+            - {mode: NULLABLE, name: rowkey, type: BYTES}
+            - name: family
+              type: RECORD
+              mode: NULLABLE
+              fields:
+                - name: column
+                  type: RECORD
+                  mode: REPEATED
+                  fields:
+                    - {mode: NULLABLE, name: name, type: STRING}
+                    - name: cell
+                      type: RECORD
+                      mode: REPEATED
+                      fields:
+                        - {mode: NULLABLE, name: timestamp, type: TIMESTAMP}
+                        - {mode: NULLABLE, name: value, type: JSON}
+                - name: probe_value
+                  type: RECORD
+                  mode: NULLABLE
+                  fields:
+                    - name: cell
+                      type: RECORD
+                      mode: REPEATED
+                      fields:
+                        - {mode: NULLABLE, name: timestamp, type: TIMESTAMP}
+                        - {mode: NULLABLE, name: value, type: JSON}
+      columns:
+        rows:
+          - {f: [{v: family}, {v: 'STRUCT<column ARRAY<STRUCT<name STRING, cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>>, probe_value STRUCT<cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>>'}]}
+          - {f: [{v: family.column}, {v: 'ARRAY<STRUCT<name STRING, cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>>'}]}
+          - {f: [{v: family.column.cell}, {v: 'ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>'}]}
+          - {f: [{v: family.column.cell.timestamp}, {v: 'TIMESTAMP'}]}
+          - {f: [{v: family.column.cell.value}, {v: 'JSON'}]}
+          - {f: [{v: family.column.name}, {v: 'STRING'}]}
+          - {f: [{v: family.probe_value}, {v: 'STRUCT<cell ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>>'}]}
+          - {f: [{v: family.probe_value.cell}, {v: 'ARRAY<STRUCT<timestamp TIMESTAMP, value JSON>>'}]}
+          - {f: [{v: family.probe_value.cell.timestamp}, {v: 'TIMESTAMP'}]}
+          - {f: [{v: family.probe_value.cell.value}, {v: 'JSON'}]}
+          - {f: [{v: rowkey}, {v: 'BYTES'}]}
+  - name: named_unselected
+    # An unread named column's cells are not checked.
+    template: family_read
+    vars:
+      select: family.doc.cell.value
+      family:
+        familyId: family
+        columns:
+          - {qualifierString: object, fieldName: doc, type: JSON, onlyReadLatest: true}
+          - {qualifierString: invalid_utf8, fieldName: bad, type: JSON, onlyReadLatest: true}
+    expect:
+      create: {status: 200}
+      read:
+        complete: true
+        schema: [{mode: NULLABLE, name: value, type: JSON}]
+        rows: [{f: [{v: '{"a":1,"b":"x"}'}]}]
+  - name: unlisted_bytes_family
+    # Unlisted BYTES cells are not checked.
+    template: family_read
+    vars:
+      select: family.doc.cell.value, ARRAY_LENGTH(family.column) AS unlisted
+      family:
+        familyId: family
+        columns:
+          - {qualifierString: object, fieldName: doc, type: JSON, onlyReadLatest: true}
+    expect:
+      create: {status: 200}
+      read:
+        complete: true
+        schema: [{mode: NULLABLE, name: value, type: JSON}, {mode: NULLABLE, name: unlisted, type: INTEGER}]
+        rows: [{f: [{v: '{"a":1,"b":"x"}'}, {v: '19'}]}]
+  - name: string_family
+    # Unlisted STRING cells are checked, though the query reads none.
+    template: family_reject
+    vars:
+      select: family.doc.cell.value
+      family:
+        familyId: family
+        type: STRING
+        columns:
+          - {qualifierString: object, fieldName: doc, onlyReadLatest: true}
+    expect: {create: {status: 200}, read: '${read_rejection}'}

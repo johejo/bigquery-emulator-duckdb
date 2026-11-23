@@ -2174,10 +2174,12 @@ cc_library(
         ":api_error",
         ":bigtable_options",
         ":duckdb_sql",
+        ":external_values",
         ":schema_sql",
         "@abseil-cpp//absl/strings",
         "@google_cloud_cpp//:bigtable",
         "@google_cloud_cpp//:common",
+        "@googlesql//googlesql/common:utf_util",
     ],
     deps = [
         ":field_schema",

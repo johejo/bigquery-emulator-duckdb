@@ -171,3 +171,39 @@ func seedBigtableTextEncoding(t *testing.T, project string) {
 		t.Fatal(err)
 	}
 }
+
+// Mirrors the fixture described in bigtable_json.api.yaml.
+func seedBigtableJSON(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-json-probe", map[string]*adminpb.ColumnFamily{"family": {}})
+	var mutations []*btpb.Mutation
+	for _, cell := range [][2]string{
+		{"object", `{"a":1,"b":"x"}`},
+		{"key_order", `{"b":1,"a":2}`},
+		{"whitespace", ` { "a" : [ 1 , 2 ] } `},
+		{"array", `[1,"x",null]`},
+		{"string", `"x"`},
+		{"number", "1.5"},
+		{"large_int", "12345678901234567890"},
+		{"precise_float", "0.1000000000000000055511151231257827"},
+		{"exponent", "1e400"},
+		{"boolean", "true"},
+		{"json_null", "null"},
+		{"duplicate_key", `{"a":1,"a":2}`},
+		{"escape", `"\u00e9\n"`},
+		{"nested", `{"a":{"b":{"c":[{}]}}}`},
+		{"empty", ""},
+		{"truncated", `{"a":`},
+		{"bare", "abc"},
+		{"trailing", "{} x"},
+		{"single_quote", "{'a':1}"},
+		{"invalid_utf8", "\"\xff\""},
+	} {
+		mutations = append(mutations, bigtableCell("family", cell[0], cell[1], 1000))
+	}
+	if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+		TableName: table, RowKey: []byte("fixture"), Mutations: mutations,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
