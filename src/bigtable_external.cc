@@ -1,7 +1,9 @@
 #include "src/bigtable_external.h"
 
 #include <algorithm>
+#include <array>
 #include <bit>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -95,21 +97,53 @@ struct FamilyRead {
   }
 };
 
+uint64_t BigEndianBits(std::string_view value) {
+  return std::accumulate(value.begin(), value.end(), uint64_t{0}, [](uint64_t prefix, char byte) {
+    return (prefix << 8U) | static_cast<unsigned char>(byte);
+  });
+}
+
+[[noreturn]] void ThrowCellSize(std::string_view value, size_t expected) {
+  throw ApiError::Invalid("Incorrect cell value size. Expected: " + std::to_string(expected) +
+                          ", Actual: " + std::to_string(value.size()));
+}
+
+// BINARY cells hold HBase Bytes.toBytes encodings, as BigtableColumnFamily.type documents.
 std::string CellLiteral(std::string_view value, FieldType type) {
-  if (type != FieldType::kInteger) {
-    return Bytes(value, type == FieldType::kString);
+  switch (type) {
+    case FieldType::kInteger: {
+      // BigQuery accepts both HBase Bytes.toBytes(int) and Bytes.toBytes(long).
+      if (value.size() != sizeof(int32_t) && value.size() != sizeof(int64_t)) {
+        ThrowCellSize(value, sizeof(int64_t));
+      }
+      const uint64_t bits = BigEndianBits(value);
+      return value.size() == sizeof(int32_t)
+                 ? std::to_string(std::bit_cast<int32_t>(static_cast<uint32_t>(bits)))
+                 : std::to_string(std::bit_cast<int64_t>(bits));
+    }
+    case FieldType::kFloat: {
+      // BigQuery accepts both HBase Bytes.toBytes(float) and Bytes.toBytes(double).
+      if (value.size() != sizeof(float) && value.size() != sizeof(double)) {
+        ThrowCellSize(value, sizeof(double));
+      }
+      const uint64_t bits = BigEndianBits(value);
+      const double number = value.size() == sizeof(float)
+                                ? std::bit_cast<float>(static_cast<uint32_t>(bits))
+                                : std::bit_cast<double>(bits);
+      std::array<char, 32> text{};
+      const auto result = std::to_chars(text.begin(), text.end(), number);
+      // The string cast spells NaN, infinities and -0, which DuckDB numeric literals cannot.
+      return "CAST('" + std::string(text.begin(), result.ptr) + "' AS DOUBLE)";
+    }
+    case FieldType::kBoolean:
+      // As HBase Bytes.toBoolean does, BigQuery reads any nonzero byte as true.
+      if (value.size() != 1) {
+        ThrowCellSize(value, 1);
+      }
+      return value.front() == '\x00' ? "false" : "true";
+    default:
+      return Bytes(value, type == FieldType::kString);
   }
-  // BigQuery accepts both HBase Bytes.toBytes(int) and Bytes.toBytes(long).
-  if (value.size() != sizeof(int32_t) && value.size() != sizeof(int64_t)) {
-    throw ApiError::Invalid("Incorrect cell value size. Expected: 8, Actual: " +
-                            std::to_string(value.size()));
-  }
-  const uint64_t bits = std::accumulate(
-      value.begin(), value.end(), uint64_t{0},
-      [](uint64_t prefix, char byte) { return (prefix << 8U) | static_cast<unsigned char>(byte); });
-  return value.size() == sizeof(int32_t)
-             ? std::to_string(std::bit_cast<int32_t>(static_cast<uint32_t>(bits)))
-             : std::to_string(std::bit_cast<int64_t>(bits));
 }
 
 void AppendCell(std::vector<std::string>& versions, const cbt::Cell& cell,

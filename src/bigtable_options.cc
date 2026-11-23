@@ -18,8 +18,8 @@ void ValidateCellOptions(const BigtableCellOptions& family,
                          const BigtableCellOptions& column = {}) {
   const auto& type = column.type ? column.type : family.type;
   const auto& encoding = column.encoding ? column.encoding : family.encoding;
-  if (type == "INTEGER" && encoding == "TEXT") {
-    throw ApiError::Unsupported("Bigtable INTEGER cells with TEXT encoding");
+  if (type && *type != "BYTES" && *type != "STRING" && encoding == "TEXT") {
+    throw ApiError::Unsupported("Bigtable " + *type + " cells with TEXT encoding");
   }
 }
 

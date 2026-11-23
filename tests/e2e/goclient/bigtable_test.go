@@ -41,7 +41,7 @@ func TestBigtableExternal(t *testing.T) {
 	source := parent + "/tables/" + tableID
 	_, err = admin.CreateTable(ctx, &adminpb.CreateTableRequest{
 		Parent: parent, TableId: tableID,
-		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}}},
+		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}, "other_family": {}, "integers": {}, "decoded": {}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -270,10 +270,73 @@ func TestBigtableExternal(t *testing.T) {
 		t.Fatalf("BINARY INTEGER rows = %v, want %v", rows, want)
 	}
 
+	// HBase Bytes.toBytes(double) stores the IEEE 754 bits in big-endian order, and
+	// Bytes.toBytes(boolean) stores 0xff for true and 0x00 for false.
+	decodedCell := func(qualifier string, ts int64, value []byte) *btpb.Mutation {
+		return &btpb.Mutation{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{
+			FamilyName: "decoded", ColumnQualifier: []byte(qualifier), TimestampMicros: ts, Value: value,
+		}}}
+	}
+	if _, err := data.MutateRow(ctx, &btpb.MutateRowRequest{TableName: source, RowKey: []byte("decoded"), Mutations: []*btpb.Mutation{
+		decodedCell("ratio", 1000, binary.BigEndian.AppendUint64(nil, math.Float64bits(math.Inf(-1)))),
+		decodedCell("ratio", 2000, binary.BigEndian.AppendUint64(nil, math.Float64bits(-2.5))),
+		decodedCell("flag", 1000, []byte{0x00}),
+		decodedCell("flag", 2000, []byte{0xff}),
+		decodedCell("loose", 2000, binary.BigEndian.AppendUint64(nil, math.Float64bits(math.Pi))),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	decoded := dataset.Table("floats_booleans")
+	if err := decoded.Create(ctx, &bigquery.TableMetadata{ExternalDataConfig: &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.Bigtable,
+		SourceURIs:   []string{uri},
+		Options: &bigquery.BigtableOptions{
+			IgnoreUnspecifiedColumnFamilies: true,
+			ColumnFamilies: []*bigquery.BigtableColumnFamily{
+				{FamilyID: "decoded", Type: "FLOAT", Encoding: "BINARY", Columns: []*bigquery.BigtableColumn{
+					{Qualifier: "ratio"},
+					{Qualifier: "flag", Type: "BOOLEAN"},
+				}},
+			},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	decodedMeta, err := decoded.Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []struct {
+		field *bigquery.FieldSchema
+		want  bigquery.FieldType
+	}{
+		{decodedMeta.Schema[1].Schema[0].Schema[1].Schema[1], bigquery.FloatFieldType},   // decoded.column.cell.value
+		{decodedMeta.Schema[1].Schema[1].Schema[0].Schema[1], bigquery.FloatFieldType},   // decoded.ratio.cell.value
+		{decodedMeta.Schema[1].Schema[2].Schema[0].Schema[1], bigquery.BooleanFieldType}, // decoded.flag.cell.value
+	} {
+		if value.field.Name != "value" || value.field.Type != value.want {
+			t.Fatalf("expected %s value schema, got %+v", value.want, value.field)
+		}
+	}
+	it, err = client.Query(`SELECT decoded.ratio.cell[OFFSET(0)].value AS newest_ratio,
+		decoded.ratio.cell[OFFSET(1)].value AS oldest_ratio,
+		decoded.flag.cell[OFFSET(0)].value AS newest_flag, decoded.flag.cell[OFFSET(1)].value AS oldest_flag,
+		decoded.column[OFFSET(0)].cell[OFFSET(0)].value AS loose
+		FROM go_bigtable_external.floats_booleans`).Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = [][]bigquery.Value{{-2.5, math.Inf(-1), true, false, math.Pi}}
+	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
+		t.Fatalf("BINARY FLOAT and BOOLEAN rows = %v, want %v", rows, want)
+	}
+
 	for _, options := range []string{
 		`{"outputColumnFamiliesAsJson":true}`,
 		`{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"TEXT"}]}`,
 		`{"columnFamilies":[{"familyId":"family","type":"INTEGER","encoding":"BINARY","columns":[{"qualifierString":"qualifier","encoding":"TEXT"}]}]}`,
+		`{"columnFamilies":[{"familyId":"family","type":"FLOAT","encoding":"TEXT"}]}`,
+		`{"columnFamilies":[{"familyId":"family","columns":[{"qualifierString":"qualifier","type":"BOOLEAN","encoding":"TEXT"}]}]}`,
 	} {
 		query := fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_external.rejected OPTIONS (format='CLOUD_BIGTABLE', uris='%s', bigtable_options='%s')`, uri, options)
 		if err := wait(ctx, client.Query(query)); err == nil || !strings.Contains(err.Error(), "does not support") {

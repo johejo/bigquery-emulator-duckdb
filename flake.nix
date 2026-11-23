@@ -51,6 +51,7 @@
             just
             python3
             cppcheck
+            google-cloud-bigtable-tool
           ];
           # The shell and apps use the same build tools and standard shell utilities. Test and
           # editor tools must not affect action keys, even when nested inside another shell.

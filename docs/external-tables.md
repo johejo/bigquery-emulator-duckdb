@@ -153,8 +153,10 @@ and the [README](../README.md#bigtable-external-tables) for endpoint setup.
 |---|---|---|
 | `BYTES`, `STRING` | — | Read as bytes or strings, respectively |
 | `INTEGER` | `BINARY` or omitted | Read as 4- or 8-byte signed big-endian integers |
-| `INTEGER` | `TEXT` | Unsupported |
-| `FLOAT`, `BOOLEAN`, `JSON`, `PROTO` | Any | Unsupported |
+| `FLOAT` | `BINARY` or omitted | Read as 4- or 8-byte big-endian IEEE 754 values |
+| `BOOLEAN` | `BINARY` or omitted | Read one byte: 0x00 as false, any other value as true |
+| `INTEGER`, `FLOAT`, `BOOLEAN` | `TEXT` | Unsupported |
+| `JSON`, `PROTO` | Any | Unsupported |
 
 `readRowkeyAsString`, `ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` (at the family
 and qualifier levels) are supported. `outputColumnFamiliesAsJson`, explicit schemas, and

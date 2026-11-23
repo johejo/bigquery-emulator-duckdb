@@ -1,0 +1,162 @@
+version: 1
+# Recorded on BigQuery in run uzdilxwqcsjrlxhg35bery7a4u; see the adjacent answers file.
+description: Verify the default FLOAT and BOOLEAN encoding and accepted binary cell values.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project
+# as the URI below. For example, in Bash:
+#   table=bigtable-float-boolean-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=family
+#   for pair in double:P/gAAAAAAAA= single:P8AAAA== three:AAAA true:/w== one:AQ== two:AP8=; do
+#     qualifier=$(printf '%s' "${pair%%:*}" | base64 -w0)
+#     curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#       -H 'Content-Type: application/json' \
+#       "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#       -d "{\"rowKey\":\"Zml4dHVyZQ==\",\"mutations\":[{\"setCell\":{\"familyName\":\"family\",\"columnQualifier\":\"$qualifier\",\"timestampMicros\":\"1000\",\"value\":\"${pair#*:}\"}}]}"
+#   done
+# double is Bytes.toBytes(1.5), single is Bytes.toBytes(1.5f) and true is Bytes.toBytes(true).
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-float-boolean-probe
+  table_options:
+    ignoreUnspecifiedColumnFamilies: true
+    columnFamilies:
+      - familyId: family
+        columns: ['${column}']
+  create_body:
+    tableReference: {tableId: t}
+    externalDataConfiguration:
+      sourceFormat: BIGTABLE
+      sourceUris: ['${uri}']
+      bigtableOptions: '${table_options}'
+  read_body:
+    location: US
+    useLegacySql: false
+    timeoutMs: 100000
+    query: SELECT family.probe_value.cell.value FROM `${project}.${dataset}.t`
+  created:
+    status: 200
+    options: '${table_options}'
+    schema:
+      - {name: rowkey, mode: NULLABLE, type: BYTES}
+      - name: family
+        mode: NULLABLE
+        type: RECORD
+        fields:
+          - name: column
+            mode: REPEATED
+            type: RECORD
+            fields:
+              - {name: name, mode: NULLABLE, type: STRING}
+              - name: cell
+                mode: REPEATED
+                type: RECORD
+                fields:
+                  - {name: timestamp, mode: NULLABLE, type: TIMESTAMP}
+                  - {name: value, mode: NULLABLE, type: BYTES}
+          - name: probe_value
+            mode: NULLABLE
+            type: RECORD
+            fields:
+              - name: cell
+                mode: NULLABLE
+                type: RECORD
+                fields:
+                  - {name: timestamp, mode: NULLABLE, type: TIMESTAMP}
+                  - {name: value, mode: NULLABLE, type: '${value_type}'}
+  success:
+    complete: true
+    schema: [{name: value, mode: NULLABLE, type: '${value_type}'}]
+    rows: [{f: [{v: '${value}'}]}]
+  rejection: {status: 400, reason: invalid}
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status, schema: /body/schema/fields, options: /body/externalDataConfiguration/bigtableOptions}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        observe: {complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows, errors: /body/errors}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status, schema: /body/schema/fields, options: /body/externalDataConfiguration/bigtableOptions}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        # The full message contains deployment-specific source and destination paths.
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: float_omitted_encoding
+    template: read
+    vars:
+      value_type: FLOAT
+      value: '1.5'
+      column: {qualifierString: double, fieldName: probe_value, type: FLOAT, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: float_binary_four_bytes
+    template: read
+    vars:
+      value_type: FLOAT
+      value: '1.5'
+      column: {qualifierString: single, fieldName: probe_value, type: FLOAT, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: float_binary_three_bytes
+    template: reject
+    vars:
+      value_type: FLOAT
+      column: {qualifierString: three, fieldName: probe_value, type: FLOAT, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
+  - name: boolean_omitted_encoding
+    template: read
+    vars:
+      value_type: BOOLEAN
+      value: 'true'
+      column: {qualifierString: 'true', fieldName: probe_value, type: BOOLEAN, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: boolean_binary_one
+    template: read
+    vars:
+      value_type: BOOLEAN
+      value: 'true'
+      column: {qualifierString: one, fieldName: probe_value, type: BOOLEAN, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${success}'}
+  - name: boolean_binary_two_bytes
+    template: reject
+    vars:
+      value_type: BOOLEAN
+      column: {qualifierString: two, fieldName: probe_value, type: BOOLEAN, encoding: BINARY, onlyReadLatest: true}
+    expect: {create: '${created}', read: '${rejection}'}
