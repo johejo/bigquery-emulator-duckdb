@@ -67,6 +67,15 @@ cc_library(
 )
 
 cc_library(
+    name = "change_data_capture",
+    srcs = ["src/change_data_capture.cc"],
+    hdrs = ["src/change_data_capture.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":duckdb_sql"],
+    deps = [":references"],
+)
+
+cc_library(
     name = "timestamp_precision",
     hdrs = ["src/timestamp_precision.h"],
     visibility = ["//:__subpackages__"],
@@ -1149,6 +1158,7 @@ cc_library(
     implementation_deps = [
         ":backend",
         ":backend_error",
+        ":change_data_capture",
         ":duckdb_catalog",
         ":duckdb_sql",
         ":table_metadata",
@@ -1455,6 +1465,7 @@ cc_library(
         ":analyzer",
         ":backend_error",
         ":catalog",
+        ":change_data_capture",
         ":column_default",
         ":column_metadata",
         ":ddl_write",

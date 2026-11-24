@@ -44,7 +44,8 @@ std::vector<std::string> DiscardHistoryStatements(const TableReference& table,
 std::vector<std::string> RenameHistoryStatements(const TableReference& table, int64_t creation_time,
                                                  const std::string& table_id);
 
-// Drops the history of the tables of `project` that were dropped or replaced since. Another sweep
+// Drops the history of the tables of `project` that were dropped or replaced since, and the change
+// data capture sequence numbers, which ChangeSequenceTable names the same way. Another sweep
 // running meanwhile can make it skip some, which a later one drops.
 void SweepHistory(Backend& backend, const std::string& project);
 

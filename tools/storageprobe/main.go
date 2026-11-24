@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -244,6 +245,34 @@ func appendTo(schema bigquery.Schema, value string) func(context.Context, *env) 
 	}
 }
 
+// changeAppend upserts and deletes the primary key `value` of a new table, with sequence numbers
+// if sequenced.
+func changeAppend(sequenced bool) func(context.Context, *env) error {
+	return func(ctx context.Context, e *env) error {
+		e.tables++
+		id := "t" + strconv.Itoa(e.tables)
+		if err := e.rest.Dataset("probe").Table(id).Create(ctx, &bigquery.TableMetadata{Schema: stringSchema,
+			TableConstraints: &bigquery.TableConstraints{PrimaryKey: &bigquery.PrimaryKey{Columns: []string{"value"}}}}); err != nil {
+			return err
+		}
+		fields := []*descriptorpb.FieldDescriptorProto{stringField("value"), stringField("_CHANGE_TYPE"), stringField("_CHANGE_SEQUENCE_NUMBER")}
+		for i, field := range fields {
+			field.Number = proto.Int32(int32(i + 1))
+		}
+		change := func(kind, sequence string) []byte {
+			data := protowire.AppendString(protowire.AppendTag(slices.Clone(row), 2, protowire.BytesType), kind)
+			if sequenced {
+				data = protowire.AppendString(protowire.AppendTag(data, 3, protowire.BytesType), sequence)
+			}
+			return data
+		}
+		return e.send(ctx, &storagepb.AppendRowsRequest{WriteStream: "projects/" + project + "/datasets/probe/tables/" + id + "/streams/_default",
+			Rows: &storagepb.AppendRowsRequest_ProtoRows{ProtoRows: &storagepb.AppendRowsRequest_ProtoData{
+				WriterSchema: &storagepb.ProtoSchema{ProtoDescriptor: &descriptorpb.DescriptorProto{Name: proto.String("Row"), Field: fields}},
+				Rows:         &storagepb.ProtoRows{SerializedRows: [][]byte{change("UPSERT", "1"), change("DELETE", "2")}}}}})
+	}
+}
+
 // columnDefaults exercises an omitted schema column and a missing value in the descriptor.
 func columnDefaults(connection bool, perColumn bool) func(context.Context, *env) error {
 	return func(ctx context.Context, e *env) error {
@@ -388,7 +417,7 @@ var sections = []section{
 			{"BUFFERED", createStream(storagepb.WriteStream_BUFFERED)},
 			{"PENDING", createStream(storagepb.WriteStream_PENDING)},
 		}},
-		{"AppendRows", "See [Write limitations](storage-api.md#write-limitations).", []form{
+		{"AppendRows", "See [Write limitations](storage-api.md#write-limitations) and [Change data capture](storage-api.md#change-data-capture).", []form{
 			{"default streams", func(ctx context.Context, e *env) error {
 				_, err := e.filledTable(ctx)
 				return err
@@ -464,6 +493,8 @@ var sections = []section{
 				}
 				return e.append(ctx, stream.Name, nil)
 			}},
+			{"change data capture UPSERT and DELETE rows", changeAppend(false)},
+			{"change data capture sequence numbers", changeAppend(true)},
 			{"column defaults", columnDefaults(false, false)},
 			{"connection missing-value defaults", columnDefaults(true, false)},
 			{"per-column missing-value defaults", columnDefaults(false, true)},

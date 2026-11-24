@@ -32,7 +32,7 @@ RPC list the forms the emulator rejected.
 | RPC | Status | Notes |
 | --- | --- | --- |
 | `CreateWriteStream` | Supported | See [Lifetime and persistence](storage-api.md#lifetime-and-persistence). |
-| `AppendRows` | Supported | See [Write limitations](storage-api.md#write-limitations). |
+| `AppendRows` | Supported | See [Write limitations](storage-api.md#write-limitations) and [Change data capture](storage-api.md#change-data-capture). |
 | `GetWriteStream` | Supported | See [Write limitations](storage-api.md#write-limitations). |
 | `FinalizeWriteStream` | Supported |  |
 | `FlushRows` | Supported |  |

@@ -46,6 +46,11 @@ class StorageProtoDecoder {
   [[nodiscard]] nlohmann::json Decode(
       const std::string& bytes, bool default_missing = false,
       const std::unordered_map<std::string, bool>& missing = {}) const;
+  // Whether the writer schema has a `_CHANGE_TYPE` field, whose rows change data capture applies.
+  // Decode then gives each row its `_CHANGE_TYPE` and `_CHANGE_SEQUENCE_NUMBER`, or null.
+  [[nodiscard]] bool WritesChanges() const;
+  // Whether it has either pseudocolumn.
+  [[nodiscard]] bool HasChangeColumns() const;
 
  private:
   class Impl;

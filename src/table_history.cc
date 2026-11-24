@@ -13,6 +13,7 @@
 #include "absl/time/time.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/change_data_capture.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
@@ -147,6 +148,10 @@ void SweepHistory(Backend& backend, const std::string& project) {
         "WHERE t.dataset_id = h.dataset_id AND t.table_id = h.table_id AND t.creation_time = "
         "h.creation_time)",
         HistoryTable(project), tables));
+    backend.Execute(std::format(
+        "DELETE FROM {} AS s WHERE NOT EXISTS (SELECT 1 FROM ({}) AS t WHERE t.dataset_id = "
+        "s.dataset_id AND t.table_id = s.table_id AND t.creation_time = s.creation_time)",
+        ChangeSequenceTable(project), tables));
     // NOLINTNEXTLINE(bugprone-empty-catch): the next sweep drops what a conflict left.
   } catch (const BackendError&) {
   }

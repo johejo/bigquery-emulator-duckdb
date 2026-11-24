@@ -17,6 +17,14 @@
       "updateTime": "2026-10-02T03:43:03Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/change-data-capture",
+      "file": "third_party/bigquery_docs/change-data-capture.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/change-data-capture",
+      "title": "Stream table updates with change data capture ingestion",
+      "sha256": "210e0024cce5757c3796b27f5d472e597d49bd6b157084772e00cdaf5ae04297",
+      "updateTime": "2026-10-28T18:31:13Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/default-values",
       "file": "third_party/bigquery_docs/default-values.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/default-values",

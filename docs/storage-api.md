@@ -54,6 +54,25 @@ Tables persisted without creation metadata cannot return default-stream creation
 
 Decimal input must fit NUMERIC's scale of 9 or BIGNUMERIC's scale of 38 exactly.
 
+## Change data capture
+
+Protobuf rows with a `_CHANGE_TYPE` field on the default stream apply
+[change data capture](../third_party/bigquery_docs/change-data-capture.md) to a table with a
+primary key. The emulator applies each change when it appends it, so queries always see every
+change, as BigQuery's do without `max_staleness`; that table option remains unsupported, and
+`upsert_stream_apply_watermark` is always null. An `UPSERT` replaces the key's row, and
+`_CHANGE_SEQUENCE_NUMBER` values order changes to the same key. Sequence numbers persist with
+`--data-dir`, and those of a deleted key last two days.
+
+These forms are unsupported until BigQuery's behavior is verified:
+
+- `_CHANGE_TYPE` values other than `UPSERT` and `DELETE`, including `INSERT`, a missing value
+  and other letter cases, and connections that mix change rows with other rows.
+- Rows without a primary key value, and changes to a key that several rows share.
+- Comparing sequence numbers that differ only in trailing zero sections, such as `A` and `A/0`,
+  and empty sequence numbers.
+- Collated primary key columns, and primary keys of more than 16 columns.
+
 ## Lifetime and persistence
 
 Storage session and stream state, offsets, and unpublished BUFFERED/PENDING rows are

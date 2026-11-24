@@ -754,6 +754,8 @@ class WriteService final : public pb::BigQueryWrite::Service {
     std::string arrow_schema;
     std::unique_ptr<StorageArrowDecoder> arrow_decoder;
     std::shared_ptr<WriteState> lease;
+    // Whether the connection wrote change data capture rows, once it wrote any.
+    std::optional<bool> changes;
   };
 
   // The table that a stream writes to, or the default stream `appended` appends to. BigQuery names
@@ -846,6 +848,8 @@ class WriteService final : public pb::BigQueryWrite::Service {
     return found->second;
   }
 
+  // Appends one request's rows. A writer schema with `_CHANGE_TYPE` writes change data capture
+  // rows, third_party/bigquery_docs/change-data-capture.md, which only the default stream takes.
   void Append(const pb::AppendRowsRequest& request, Connection& connection,
               pb::AppendRowsResponse& response) {
     if (request.ByteSizeLong() >= size_t{20} * 1024 * 1024) {
@@ -992,9 +996,26 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (!response.row_errors().empty()) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, RowErrors(name));
     }
+    const bool changes = !arrow && connection.decoder->WritesChanges();
+    if (!arrow && connection.decoder->HasChangeColumns() && !changes) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support _CHANGE_SEQUENCE_NUMBER without _CHANGE_TYPE");
+    }
+    if (changes && !IsDefault(name)) {
+      Fail(grpc::StatusCode::INVALID_ARGUMENT,
+           "Change data capture rows require the default stream. Entity: " + name);
+    }
+    if (connection.changes.has_value() && *connection.changes != changes) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support mixing change data capture and other rows in an "
+           "AppendRows connection");
+    }
+    connection.changes = changes;
     const bool staging = state->metadata.type() != pb::WriteStream::COMMITTED;
-    const auto errors =
-        emulator_.WriteStorageRows(state->table, state->schema, rows, state->storage_id, staging);
+    const auto errors = changes ? emulator_.WriteStorageChanges(state->table, state->schema, rows,
+                                                                state->storage_id)
+                                : emulator_.WriteStorageRows(state->table, state->schema, rows,
+                                                             state->storage_id, staging);
     for (const auto& error : errors) {
       auto* row = response.add_row_errors();
       row->set_index(static_cast<int64_t>(error.index));
