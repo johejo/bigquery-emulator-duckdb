@@ -491,6 +491,7 @@ std::optional<std::string> GraphElementSource(const googlesql::Table& table, con
     return std::nullopt;
   }
   std::vector<std::string> projections;
+  projections.reserve(view->NumColumns());
   for (int i = 0; i < view->NumColumns(); ++i) {
     projections.push_back(relation->columns.at(query.column_list(i).column_id()) + " AS " +
                           QuoteIdentifier(view->GetColumn(i)->Name()));
