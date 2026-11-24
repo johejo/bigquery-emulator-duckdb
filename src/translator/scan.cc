@@ -698,11 +698,11 @@ std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, cons
     const auto name = QuoteIdentifier(scope.context.FreshName("call_arg"));
     arguments.push_back(*sql + " AS " + name);
     nested.table_function_arguments.emplace(absl::AsciiStrToLower(names.at(i)),
-                                            input_alias + "." + name);
+                                            std::format("{}.{}", input_alias, name));
   }
   if (!arguments.empty()) {
-    input.sql = "SELECT " + input_alias + ".*, " + Join(arguments, ", ") + " FROM (" + input.sql +
-                ") AS " + input_alias;
+    input.sql = std::format("SELECT {}.*, {} FROM ({}) AS {}", input_alias, Join(arguments, ", "),
+                            input.sql, input_alias);
   }
   const auto relation = Scan(body, nested);
   if (!relation) {
