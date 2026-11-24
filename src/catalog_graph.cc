@@ -63,8 +63,9 @@ absl::Status BigQueryCatalog::FindPropertyGraph(absl::Span<const std::string> pa
       return absl::NotFoundError("Property graph not found");
     }
     auto catalog = std::make_unique<GraphCatalog>(*this, type_factory_);
-    const googlesql::AnalyzerOptions analyzer_options(
-        AnalyzerLanguageOptions(timestamp_precision_));
+    googlesql::AnalyzerOptions analyzer_options(AnalyzerLanguageOptions(timestamp_precision_));
+    // The graph catalog needs each element's table and column names, even for a SQL view.
+    analyzer_options.disable_rewrite(googlesql::REWRITE_INLINE_SQL_VIEWS);
     // The statement's analysis comes first among the artifacts it adds.
     const auto statement_index = graph_artifacts_.size();
     auto status = googlesql::AddPropertyGraphFromCreatePropertyGraphStmt(

@@ -138,6 +138,15 @@ steps:
               query: CREATE PROPERTY GRAPH persist.g NODE TABLES (persist.t KEY (a) LABEL Item PROPERTIES (a) LABEL Stored NO PROPERTIES)
               useLegacySql: false
     test: current.res.status == 200
+  graph_over_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: CREATE PROPERTY GRAPH persist.g_view NODE TABLES (persist.v KEY (a) LABEL Item PROPERTIES (a))
+              useLegacySql: false
+    test: current.res.status == 200
   python_routine:
     req:
       /projects/test/queries:

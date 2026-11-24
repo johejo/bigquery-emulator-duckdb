@@ -1166,7 +1166,14 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       throw ApiError::NotFound("Property graph not found");
     }
     try {
-      backend.Execute(translation.sql, setup);
+      if (creating && !translation.sql.empty()) {
+        backend.Execute(translation.sql, setup);
+      } else if (exists && !previous.rows.String(0, 1).empty()) {
+        // Drop a registered graph when it is deleted or replaced by a graph over views.
+        // On restart registration may have failed because an input table changed.
+        backend.Execute("DROP PROPERTY GRAPH IF EXISTS " +
+                        DuckPGQName({graph.project_id, graph.dataset_id, graph.table_id}));
+      }
     } catch (const BackendError& error) {
       if (std::string_view(error.what()).find("Incomplete edge") != std::string_view::npos) {
         throw ApiError::UnsupportedQuery("property graphs with incomplete edges");

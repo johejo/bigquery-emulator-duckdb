@@ -324,6 +324,25 @@ steps:
     test: |
       current.res.status == 200 &&
       current.res.body.rows == [{"f": [{"v": "1"}, {"v": [{"v": "x"}, {"v": "y"}]}]}]
+  graph_over_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                CREATE OR REPLACE VIEW persist.v AS SELECT a + 1 AS a, b FROM persist.t;
+                GRAPH persist.g_view MATCH (n:Item) RETURN n.a AS a;
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "2"}]}]
+  drop_graph_over_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'DROP PROPERTY GRAPH persist.g_view', useLegacySql: false}
+    test: current.res.status == 200
   python_routine:
     req:
       /projects/test/queries:

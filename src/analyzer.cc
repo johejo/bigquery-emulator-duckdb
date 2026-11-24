@@ -468,6 +468,8 @@ void SkipDefinitionRewrites(std::string_view sql, googlesql::AnalyzerOptions& op
   if (googlesql::GetStatementKind(sql, options.language()) ==
       googlesql::RESOLVED_CREATE_PROPERTY_GRAPH_STMT) {
     options.disable_rewrite(googlesql::REWRITE_MEASURE_TYPE);
+    // The graph stores the name of a view, not the query it runs today.
+    options.disable_rewrite(googlesql::REWRITE_INLINE_SQL_VIEWS);
   }
 }
 
