@@ -198,15 +198,16 @@ func sqlType(group, name, text string) string {
 	return text
 }
 
-// prose holds the options the reference describes in prose instead of NAME/VALUE rows.
-var prose = map[string]ddloptions.Option{
+// inlineOptions holds the options the reference documents outside NAME/VALUE tables.
+var inlineOptions = map[string]ddloptions.Option{
 	"generated_column_options": {Name: "asynchronous", Type: "BOOL", Values: []string{"TRUE"},
 		Source: "create_table_statement"},
-	"bigtable_uri_option": {Name: "uris", Type: "STRING", Source: "external_table_option_list"},
+	"bigtable_uri_option":   {Name: "uris", Type: "STRING", Source: "external_table_option_list"},
+	"undrop_schema_options": {Name: "location", Type: "STRING", Source: "undrop_schema_statement"},
 }
 
 // refresh replaces the catalog's names and types with the reference's, keeping samples, contexts
-// and the options described in prose.
+// and the options documented outside tables.
 func refresh(catalog *ddloptions.Catalog, r io.Reader) error {
 	tables, err := optionTables(r)
 	if err != nil {
@@ -244,7 +245,7 @@ func refresh(catalog *ddloptions.Catalog, r io.Reader) error {
 		}
 		groups[group] = options
 	}
-	for group, definition := range prose {
+	for group, definition := range inlineOptions {
 		option := definition
 		if old, ok := previous(group, definition.Name); ok {
 			option.Values = old.Values

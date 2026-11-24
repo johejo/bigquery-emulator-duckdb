@@ -19,19 +19,24 @@ func TestOptionsSharedHeading(t *testing.T) {
 				Values:      []string{"'{}'", "'a'", "'b'"},
 				ValueLabels: map[string]string{"'{}'": "accepted form", "'a'": "rejected form"},
 			}},
+			"blocked": {{Name: "description", Type: "STRING", Values: []string{"'probe'"}}},
 		},
 		Contexts: []ddloptions.Context{
 			{Name: "Bigtable URI", Heading: "Bigtable", Group: "uri", Template: "CREATE T OPTIONS ({option})"},
 			{Name: "Bigtable", Group: "options", Template: "CREATE T OPTIONS (uris = 'https://example.com', {option})"},
+			{Name: "ALTER T", Group: "blocked", Template: "ALTER T SET OPTIONS ({option})"},
 		},
 	}
 	if err := catalog.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
-	if err := writeOptions(&output, catalog.Cases(), [][]probereport.Probe{
-		{{Outcome: probereport.Runs}},
-		{{Outcome: probereport.Runs}, {Outcome: probereport.Unsupported}, {Outcome: probereport.Unsupported}},
+	runs := optionProbe{Probe: probereport.Probe{Outcome: probereport.Runs}}
+	unsupported := optionProbe{Probe: probereport.Probe{Outcome: probereport.Unsupported}}
+	if err := writeOptions(&output, catalog.Cases(), [][]optionProbe{
+		{runs},
+		{runs, unsupported, unsupported},
+		{{Probe: unsupported.Probe, blockedBy: "CREATE T"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -45,6 +50,7 @@ func TestOptionsSharedHeading(t *testing.T) {
 	for _, row := range []string{
 		"| [Bigtable](#bigtable) | 1 | 1 |",
 		"| [`uris`](reference.md#uri) | `STRING` | Supported |",
+		"| [`description`](reference.md#blocked) | `STRING` | Unsupported | Blocked by unsupported setup: `CREATE T`. |",
 		"| [`bigtable_options`](reference.md#options) | `STRING` | Partial | Unsupported: `CREATE T OPTIONS (uris = 'https://example.com', bigtable_options = 'b')`; rejected form. |",
 	} {
 		if !strings.Contains(report, row) {

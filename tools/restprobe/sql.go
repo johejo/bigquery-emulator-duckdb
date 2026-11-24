@@ -54,6 +54,14 @@ func query(url, sql, dataset string) (string, bool, error) {
 	return message, failed, nil
 }
 
+type probeSetupError struct {
+	statement, message string
+}
+
+func (e *probeSetupError) Error() string {
+	return fmt.Sprintf("setup failed: %s: %s", e.statement, e.message)
+}
+
 // probeQuery runs sql on a fresh emulator holding the fixture and classifies the outcome.
 func probeQuery(binary string, setup []string, sql string) (probereport.Probe, error) {
 	emulator, err := startEmulator(binary)
@@ -67,7 +75,7 @@ func probeQuery(binary string, setup []string, sql string) (probereport.Probe, e
 			return probereport.Probe{}, err
 		}
 		if failed {
-			return probereport.Probe{}, fmt.Errorf("setup failed: %s: %s", statement, message)
+			return probereport.Probe{}, &probeSetupError{statement, message}
 		}
 	}
 	message, failed, err := query(emulator.URL, sql, sqlDataset)
@@ -91,6 +99,20 @@ func classify(sql, message string) probereport.Probe {
 		return probereport.Probe{Outcome: probereport.Unsupported, Detail: name}
 	}
 	if prefix := analyzerError.FindString(message); prefix != "" {
+		diagnostic, _, _ := strings.Cut(analyzerMessage, " [at ")
+		for _, suffix := range []string{" is not a supported object type", " is not a supported nested object type"} {
+			if object, ok := strings.CutSuffix(diagnostic, suffix); ok {
+				return probereport.Probe{Outcome: probereport.Unsupported, Detail: object}
+			}
+		}
+		// These documented BigQuery forms are missing from the GoogleSQL parser or catalog.
+		switch {
+		case diagnostic == "Syntax error: Expected end of input but got keyword REBUILD" &&
+			strings.HasPrefix(sql, "ALTER SEARCH INDEX ") && strings.HasSuffix(sql, " REBUILD"):
+			return probereport.Probe{Outcome: probereport.Unsupported, Detail: "ALTER SEARCH INDEX REBUILD"}
+		case diagnostic == "Function not found: AI.EMBED" && strings.Contains(sql, "GENERATED ALWAYS AS (AI.EMBED("):
+			return probereport.Probe{Outcome: probereport.Unsupported, Detail: "AI.EMBED"}
+		}
 		// A feature whose language option the emulator leaves off is one it does
 		// not support rather than a query the probe got wrong.
 		if feature, _, ok := strings.Cut(message[len(prefix):], " not supported"); ok {

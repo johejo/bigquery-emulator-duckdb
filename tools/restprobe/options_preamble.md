@@ -17,7 +17,8 @@ rejected samples by statement or by a short label from the catalog.
 
 - **Supported**: every sample runs.
 - **Partial**: some samples run, and the emulator rejects the others as unsupported.
-- **Unsupported**: the emulator rejects every sample as unsupported.
+- **Unsupported**: the emulator rejects every sample or its required setup as unsupported.
+  A setup failure is noted separately because the option itself was not reached.
 - **Broken**: a statement fails during execution, which is a bug.
 - **Untested**: the catalog has no sample for the option yet.
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -58,8 +59,11 @@ func TestNewOptionsAndGroupsHaveNoGuessedSamplesOrTemplates(t *testing.T) {
 	if got := c.Groups["table_option_list"][1]; !reflect.DeepEqual(got, ddloptions.Option{Name: "new_option", Type: "BOOL"}) {
 		t.Errorf("new option = %+v", got)
 	}
-	added := c.Contexts[len(c.Contexts)-1]
-	if added.Group != "new_option_list" || added.Template != "" {
+	i := slices.IndexFunc(c.Contexts, func(c ddloptions.Context) bool { return c.Group == "new_option_list" })
+	if i < 0 {
+		t.Fatal("missing context for new_option_list")
+	}
+	if added := c.Contexts[i]; added.Template != "" {
 		t.Errorf("new context = %+v", added)
 	}
 	if got := c.Groups["new_option_list"][0].Type; got != "ARRAY<STRUCT<STRING,STRING>>" {

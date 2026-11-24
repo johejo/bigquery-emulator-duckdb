@@ -99,8 +99,14 @@ func TestRejectsOptionsHiddenByContextRestrictions(t *testing.T) {
 func TestRejectsInvalidTemplates(t *testing.T) {
 	t.Parallel()
 	c := load(t)
-	context(c, "generated_column_options").Template = "CREATE TABLE n (a INT64)"
-	rejects(t, c, "template must contain {option} exactly once")
+	for _, template := range []string{
+		"CREATE TABLE n (a INT64)",
+		"CREATE TABLE n OPTIONS ({name})",
+		"CREATE TABLE n OPTIONS ({option} {assignment})",
+	} {
+		context(c, "generated_column_options").Template = template
+		rejects(t, c, "template needs {option} or both {name} and {assignment}")
+	}
 }
 
 func TestRejectsInvalidOptionTemplates(t *testing.T) {
@@ -110,7 +116,7 @@ func TestRejectsInvalidOptionTemplates(t *testing.T) {
 	rejects(t, c, "template for an option the context does not take: field_delimiter")
 	c = load(t)
 	context(c, "external_table_option_list").Templates["uris"] = "CREATE EXTERNAL TABLE n"
-	rejects(t, c, "uris: template must contain {option} exactly once")
+	rejects(t, c, "uris: template needs {option} or both {name} and {assignment}")
 }
 
 func TestOptionTemplatesReplaceTheContextTemplate(t *testing.T) {
@@ -156,15 +162,18 @@ func TestCasesSetOneOptionPerSample(t *testing.T) {
 			{Name: "b", Type: "BOOL", Source: "elsewhere"},
 		}},
 		Contexts: []Context{
-			{Name: "CREATE T", Group: "g", Template: "CREATE T OPTIONS ({option})"},
+			{Name: "CREATE T", Group: "g", Template: "CREATE T OPTIONS (`scope.{name}` {assignment})"},
 			{Name: "CREATE U", Group: "g", Only: []string{"a"}},
 		},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
 	}
 	cases := c.Cases()
 	if len(cases) != 3 {
 		t.Fatalf("Cases() = %+v", cases)
 	}
-	if got := cases[0].Queries; len(got) != 2 || got[0].SQL != "CREATE T OPTIONS (a = 'x')" || got[1].SQL != "CREATE T OPTIONS (a = NULL)" {
+	if got := cases[0].Queries; len(got) != 2 || got[0].SQL != "CREATE T OPTIONS (`scope.a` = 'x')" || got[1].SQL != "CREATE T OPTIONS (`scope.a` = NULL)" {
 		t.Errorf("queries = %v", got)
 	}
 	if cases[1].Source != "https://example.com/ddl#elsewhere" || cases[1].Queries != nil {

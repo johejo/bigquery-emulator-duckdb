@@ -5,23 +5,24 @@
       {
         "name": "location",
         "type": "STRING",
-        "values": [
-          "'US'"
-        ]
+        "values": ["'EU'"]
       },
       {
         "name": "replica_kms_key",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'projects/test/locations/eu/keyRings/r/cryptoKeys/k'"]
       }
     ],
     "alter_capacity_commitment_option_list": [
       {
         "name": "plan",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'THREE_YEAR'"]
       },
       {
         "name": "renewal_plan",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ANNUAL'"]
       }
     ],
     "alter_connection_option_list": [
@@ -43,33 +44,40 @@
     "alter_datapolicy_option_list": [
       {
         "name": "data_policy_type",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'DATA_MASKING_POLICY'"]
       },
       {
         "name": "masking_expression",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'DEFAULT_MASKING_VALUE'"]
       }
     ],
     "alter_reservation_option_list": [
       {
         "name": "ignore_idle_slots",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "slot_capacity",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["300"]
       },
       {
         "name": "target_job_concurrency",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["10"]
       },
       {
         "name": "autoscale_max_slots",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["400"]
       },
       {
         "name": "secondary_location",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'us-east4'"]
       },
       {
         "name": "is_primary",
@@ -87,29 +95,35 @@
     "assignment_option_list": [
       {
         "name": "assignee",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'projects/test'"]
       },
       {
         "name": "job_type",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'QUERY'"]
       },
       {
         "name": "scheduling_policy_max_slots",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["100"]
       },
       {
         "name": "scheduling_policy_concurrency",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["10"]
       }
     ],
     "bi_capacity_options_list": [
       {
         "name": "size_gb",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["250", "0"]
       },
       {
         "name": "preferred_tables",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['test.d.t']", "NULL"]
       }
     ],
     "bigtable_uri_option": [
@@ -123,19 +137,23 @@
     "capacity_commitment_option_list": [
       {
         "name": "plan",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ANNUAL'"]
       },
       {
         "name": "renewal_plan",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ANNUAL'"]
       },
       {
         "name": "slot_count",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["100"]
       },
       {
         "name": "edition",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ENTERPRISE'"]
       }
     ],
     "column_option_list": [
@@ -211,7 +229,8 @@
     "connection_option_list": [
       {
         "name": "connection_type",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'CLOUD_RESOURCE'"]
       },
       {
         "name": "friendly_name",
@@ -231,11 +250,13 @@
     "datapolicy_option_list": [
       {
         "name": "data_policy_type",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'RAW_DATA_ACCESS_POLICY'"]
       },
       {
         "name": "masking_expression",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ALWAYS_NULL'"]
       }
     ],
     "external_schema_option_list": [
@@ -270,7 +291,8 @@
       },
       {
         "name": "external_source",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'google-cloudspanner:/projects/test/instances/probe/databases/probe'"]
       },
       {
         "name": "tags",
@@ -503,15 +525,18 @@
       },
       {
         "name": "endpoint",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'https://us-central1-test.cloudfunctions.net/probe'"]
       },
       {
         "name": "user_defined_context",
-        "type": "ARRAY<STRUCT<STRING,STRING>>"
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": ["[('key', 'value')]"]
       },
       {
         "name": "max_batching_rows",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["10"]
       },
       {
         "name": "runtime_version",
@@ -791,51 +816,63 @@
       },
       {
         "name": "default_time_zone",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'America/Chicago'", "NULL"]
       },
       {
         "name": "default_query_job_timeout_ms",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["1800000"]
       },
       {
         "name": "default_interactive_query_queue_timeout_ms",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["1800000", "-1"]
       },
       {
         "name": "default_batch_query_queue_timeout_ms",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["1800000", "-1"]
       },
       {
         "name": "default_query_optimizer_options",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'adaptive=on'"]
       },
       {
         "name": "query_runtime",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'advanced'"]
       },
       {
         "name": "enable_global_queries_execution",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "enable_global_queries_data_access",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "reservation_override_mode",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ALLOW_ANY_OVERRIDE'"]
       },
       {
         "name": "reusable_column_aliases_mode",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'on'"]
       },
       {
         "name": "disable_on_demand_billing",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "default_location",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'europe-west6'"]
       }
     ],
     "procedure_option_list": [
@@ -856,7 +893,8 @@
       },
       {
         "name": "engine",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'SPARK'"]
       },
       {
         "name": "runtime_version",
@@ -864,35 +902,43 @@
       },
       {
         "name": "container_image",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'us-docker.pkg.dev/test/images/probe'"]
       },
       {
         "name": "properties",
-        "type": "ARRAY<STRUCT<STRING,STRING>>"
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": ["[('spark.executor.instances', '3')]"]
       },
       {
         "name": "main_file_uri",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'gs://probe/main.py'"]
       },
       {
         "name": "main_class",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'example.Main'"]
       },
       {
         "name": "py_file_uris",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['gs://probe/lib.py']"]
       },
       {
         "name": "jar_uris",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['gs://probe/lib.jar']"]
       },
       {
         "name": "file_uris",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['gs://probe/file.txt']"]
       },
       {
         "name": "archive_uris",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['gs://probe/archive.zip']"]
       }
     ],
     "project_set_options_list": [
@@ -905,101 +951,125 @@
       },
       {
         "name": "default_time_zone",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'America/New_York'", "NULL"]
       },
       {
         "name": "default_query_job_timeout_ms",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["1800000"]
       },
       {
         "name": "default_interactive_query_queue_timeout_ms",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["1800000", "-1"]
       },
       {
         "name": "default_batch_query_queue_timeout_ms",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["1800000", "-1"]
       },
       {
         "name": "default_query_optimizer_options",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'adaptive=on'"]
       },
       {
         "name": "default_cloud_resource_connection_id",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'probe'"]
       },
       {
         "name": "default_sql_dialect_option",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'default_google_sql'"]
       },
       {
         "name": "query_runtime",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'advanced'"]
       },
       {
         "name": "enable_reservation_based_fairness",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "enable_global_queries_execution",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "enable_global_queries_data_access",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "reservation_override_mode",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ALLOW_ANY_OVERRIDE'"]
       },
       {
         "name": "reusable_column_aliases_mode",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'on'"]
       },
       {
         "name": "default_location",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'europe-west6'"]
       }
     ],
     "reservation_option_list": [
       {
         "name": "ignore_idle_slots",
-        "type": "BOOL"
+        "type": "BOOL",
+        "values": ["TRUE"]
       },
       {
         "name": "slot_capacity",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["100"]
       },
       {
         "name": "target_job_concurrency",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["10"]
       },
       {
         "name": "edition",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'ENTERPRISE_PLUS'"]
       },
       {
         "name": "autoscale_max_slots",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["400"]
       },
       {
         "name": "secondary_location",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'us-east4'"]
       },
       {
         "name": "max_slots",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["500"]
       },
       {
         "name": "scaling_mode",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'AUTOSCALE_ONLY'"]
       },
       {
         "name": "scheduling_policy_max_slots",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["100"]
       },
       {
         "name": "scheduling_policy_concurrency",
-        "type": "INT64"
+        "type": "INT64",
+        "values": ["10"]
       },
       {
         "name": "labels",
@@ -1530,6 +1600,14 @@
         ]
       }
     ],
+    "undrop_schema_options": [
+      {
+        "name": "location",
+        "type": "STRING",
+        "source": "undrop_schema_statement",
+        "values": ["'US'"]
+      }
+    ],
     "vector_index_option_list": [
       {
         "name": "index_type",
@@ -1564,7 +1642,8 @@
       },
       {
         "name": "lexical_search_columns",
-        "type": "ARRAY<STRING>"
+        "type": "ARRAY<STRING>",
+        "values": ["['title']"]
       }
     ],
     "view_column_option_list": [
@@ -1705,6 +1784,21 @@
       "implementation": "CREATE TABLE"
     },
     {
+      "name": "CREATE TABLE LIKE",
+      "group": "table_option_list",
+      "template": "CREATE TABLE n LIKE t OPTIONS ({option})"
+    },
+    {
+      "name": "CREATE TABLE COPY",
+      "group": "table_option_list",
+      "template": "CREATE TABLE n COPY t OPTIONS ({option})"
+    },
+    {
+      "name": "CREATE TABLE CLONE",
+      "group": "table_option_list",
+      "template": "CREATE TABLE n CLONE t OPTIONS ({option})"
+    },
+    {
       "name": "ALTER TABLE SET OPTIONS",
       "group": "table_set_options_list",
       "template": "ALTER TABLE t SET OPTIONS ({option})",
@@ -1816,15 +1910,27 @@
     },
     {
       "name": "CREATE MATERIALIZED VIEW replica",
-      "group": "materialized_view_replica_option_list"
+      "group": "materialized_view_replica_option_list",
+      "setup": ["CREATE MATERIALIZED VIEW d.source_mv AS SELECT id, COUNT(*) AS n FROM d.t GROUP BY id"],
+      "template": "CREATE MATERIALIZED VIEW d.n OPTIONS ({option}) AS REPLICA OF d.source_mv"
     },
     {
       "name": "CREATE EXTERNAL SCHEMA",
-      "group": "external_schema_option_list"
+      "group": "external_schema_option_list",
+      "setup": ["CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')"],
+      "template": "CREATE EXTERNAL SCHEMA e WITH CONNECTION `test.us.probe` OPTIONS (external_source = 'google-cloudspanner:/projects/test/instances/probe/databases/probe', {option})",
+      "templates": {
+        "external_source": "CREATE EXTERNAL SCHEMA e WITH CONNECTION `test.us.probe` OPTIONS ({option})"
+      }
     },
     {
       "name": "CREATE FUNCTION remote",
       "group": "function_option_list",
+      "setup": ["CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')"],
+      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 REMOTE WITH CONNECTION test.us.probe OPTIONS (endpoint = 'https://us-central1-test.cloudfunctions.net/probe', {option})",
+      "templates": {
+        "endpoint": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 REMOTE WITH CONNECTION test.us.probe OPTIONS ({option})"
+      },
       "only": [
         "description",
         "endpoint",
@@ -1855,82 +1961,178 @@
     },
     {
       "name": "CREATE AGGREGATE FUNCTION SQL",
-      "group": "sql-udaf-function-option-list"
+      "group": "sql-udaf-function-option-list",
+      "template": "CREATE AGGREGATE FUNCTION d.f(x INT64) RETURNS INT64 AS (SUM(x)) OPTIONS ({option})"
     },
     {
       "name": "CREATE AGGREGATE FUNCTION JavaScript",
-      "group": "javascript-udaf-function-option-list"
+      "group": "javascript-udaf-function-option-list",
+      "template": "CREATE AGGREGATE FUNCTION d.f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js OPTIONS ({option}) AS 'export function initialState() {return {sum: 0};} export function aggregate(state, x) {state.sum += x;} export function merge(state, partial) {state.sum += partial.sum;} export function finalize(state) {return state.sum;}'"
     },
     {
       "name": "CREATE PROCEDURE Spark",
       "group": "procedure_option_list",
+      "template": "CREATE PROCEDURE d.p() WITH CONNECTION `test.us.probe` OPTIONS (engine = 'SPARK', {option}) LANGUAGE PYTHON AS 'print(1)'",
+      "templates": {
+        "engine": "CREATE PROCEDURE d.p() WITH CONNECTION `test.us.probe` OPTIONS ({option}) LANGUAGE PYTHON AS 'print(1)'",
+        "main_file_uri": "CREATE PROCEDURE d.p() WITH CONNECTION `test.us.probe` OPTIONS (engine = 'SPARK', {option}) LANGUAGE PYTHON",
+        "main_class": "CREATE PROCEDURE d.p() WITH CONNECTION `test.us.probe` OPTIONS (engine = 'SPARK', jar_uris = ['gs://probe/app.jar'], {option}) LANGUAGE JAVA"
+      },
       "exclude": [
         "strict_mode"
       ]
     },
     {
       "name": "CREATE CAPACITY",
-      "group": "capacity_commitment_option_list"
+      "group": "capacity_commitment_option_list",
+      "template": "CREATE CAPACITY `test.region-us.probe` OPTIONS (plan = 'ANNUAL', slot_count = 100, {option})",
+      "templates": {
+        "plan": "CREATE CAPACITY `test.region-us.probe` OPTIONS (slot_count = 100, {option})",
+        "slot_count": "CREATE CAPACITY `test.region-us.probe` OPTIONS (plan = 'ANNUAL', {option})"
+      }
     },
     {
       "name": "CREATE RESERVATION",
-      "group": "reservation_option_list"
+      "group": "reservation_option_list",
+      "template": "CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100, {option})",
+      "templates": {
+        "edition": "CREATE RESERVATION `test.region-us.probe` OPTIONS (slot_capacity = 100, {option})",
+        "slot_capacity": "CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', {option})",
+        "max_slots": "CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100, ignore_idle_slots = TRUE, scaling_mode = 'AUTOSCALE_ONLY', {option})",
+        "scaling_mode": "CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100, ignore_idle_slots = TRUE, max_slots = 500, {option})"
+      }
     },
     {
       "name": "CREATE ASSIGNMENT",
-      "group": "assignment_option_list"
+      "group": "assignment_option_list",
+      "setup": ["CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE', slot_capacity = 100)"],
+      "template": "CREATE ASSIGNMENT `test.region-us.probe.assignment` OPTIONS (assignee = 'projects/test', job_type = 'QUERY', {option})",
+      "templates": {
+        "assignee": "CREATE ASSIGNMENT `test.region-us.probe.assignment` OPTIONS (job_type = 'QUERY', {option})",
+        "job_type": "CREATE ASSIGNMENT `test.region-us.probe.assignment` OPTIONS (assignee = 'projects/test', {option})"
+      }
     },
     {
       "name": "CREATE SEARCH INDEX",
-      "group": "index_option_list"
+      "group": "index_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING)"],
+      "template": "CREATE SEARCH INDEX idx ON d.docs(ALL COLUMNS) OPTIONS ({option})"
     },
     {
       "name": "CREATE SEARCH INDEX column",
-      "group": "index_column_option_list"
+      "group": "index_column_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING)"],
+      "template": "CREATE SEARCH INDEX idx ON d.docs(title OPTIONS ({option}))"
+    },
+    {
+      "name": "CREATE SEARCH INDEX ALL COLUMNS WITH COLUMN OPTIONS",
+      "group": "index_column_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING)"],
+      "template": "CREATE SEARCH INDEX idx ON d.docs(ALL COLUMNS WITH COLUMN OPTIONS(title OPTIONS ({option})))"
     },
     {
       "name": "CREATE VECTOR INDEX",
-      "group": "vector_index_option_list"
+      "group": "vector_index_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING, embedding ARRAY<FLOAT64>)"],
+      "template": "CREATE VECTOR INDEX idx ON d.docs(embedding) OPTIONS (index_type = 'IVF', {option})",
+      "templates": {
+        "index_type": "CREATE VECTOR INDEX idx ON d.docs(embedding) OPTIONS ({option})",
+        "tree_ah_options": "CREATE VECTOR INDEX idx ON d.docs(embedding) OPTIONS (index_type = 'TREE_AH', {option})"
+      }
     },
     {
       "name": "CREATE DATA_POLICY",
-      "group": "datapolicy_option_list"
+      "group": "datapolicy_option_list",
+      "template": "CREATE DATA_POLICY `test.region-us.probe` OPTIONS ({option})",
+      "templates": {
+        "masking_expression": "CREATE DATA_POLICY `test.region-us.probe` OPTIONS (data_policy_type = 'DATA_MASKING_POLICY', {option})"
+      }
     },
     {
       "name": "CREATE CONNECTION",
-      "group": "connection_option_list"
+      "group": "connection_option_list",
+      "template": "CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE', {option})",
+      "templates": {
+        "connection_type": "CREATE CONNECTION `us.probe` OPTIONS ({option})"
+      }
     },
     {
       "name": "ALTER SCHEMA ADD REPLICA",
-      "group": "add_replica_options_list"
+      "group": "add_replica_options_list",
+      "setup": ["CREATE SCHEMA primary_data OPTIONS (location = 'US')"],
+      "template": "ALTER SCHEMA primary_data ADD REPLICA eu OPTIONS (location = 'EU', {option})",
+      "templates": {
+        "location": "ALTER SCHEMA primary_data ADD REPLICA eu OPTIONS ({option})"
+      }
     },
     {
       "name": "ALTER ORGANIZATION SET OPTIONS",
-      "group": "organization_set_options_list"
+      "group": "organization_set_options_list",
+      "template": "ALTER ORGANIZATION SET OPTIONS (`region-us.{name}` {assignment})",
+      "templates": {
+        "default_location": "ALTER ORGANIZATION SET OPTIONS ({option})"
+      }
     },
     {
       "name": "ALTER PROJECT SET OPTIONS",
-      "group": "project_set_options_list"
+      "group": "project_set_options_list",
+      "template": "ALTER PROJECT test SET OPTIONS (`region-us.{name}` {assignment})",
+      "templates": {
+        "default_location": "ALTER PROJECT test SET OPTIONS ({option})"
+      }
     },
     {
       "name": "ALTER BI_CAPACITY SET OPTIONS",
-      "group": "bi_capacity_options_list"
+      "group": "bi_capacity_options_list",
+      "template": "ALTER BI_CAPACITY `test.region-us.default` SET OPTIONS ({option})"
     },
     {
       "name": "ALTER CAPACITY SET OPTIONS",
-      "group": "alter_capacity_commitment_option_list"
+      "group": "alter_capacity_commitment_option_list",
+      "setup": ["CREATE CAPACITY `test.region-us.probe` OPTIONS (plan = 'ANNUAL', slot_count = 100)"],
+      "template": "ALTER CAPACITY `test.region-us.probe` SET OPTIONS ({option})"
     },
     {
       "name": "ALTER RESERVATION SET OPTIONS",
-      "group": "alter_reservation_option_list"
+      "group": "alter_reservation_option_list",
+      "setup": ["CREATE RESERVATION `test.region-us.probe` OPTIONS (edition = 'ENTERPRISE_PLUS', slot_capacity = 100)"],
+      "template": "ALTER RESERVATION `test.region-us.probe` SET OPTIONS ({option})"
+    },
+    {
+      "name": "ALTER SEARCH INDEX SET OPTIONS",
+      "group": "index_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING)", "CREATE SEARCH INDEX idx ON d.docs(title)"],
+      "template": "ALTER SEARCH INDEX idx ON d.docs SET OPTIONS ({option}) REBUILD"
+    },
+    {
+      "name": "ALTER SEARCH INDEX ADD COLUMN",
+      "group": "index_column_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING, body STRING)", "CREATE SEARCH INDEX idx ON d.docs(title)"],
+      "template": "ALTER SEARCH INDEX idx ON d.docs ADD COLUMN body OPTIONS ({option})"
+    },
+    {
+      "name": "ALTER SEARCH INDEX ALTER COLUMN SET OPTIONS",
+      "group": "index_column_option_list",
+      "setup": ["CREATE TABLE d.docs (title STRING)", "CREATE SEARCH INDEX idx ON d.docs(title)"],
+      "template": "ALTER SEARCH INDEX idx ON d.docs ALTER COLUMN title SET OPTIONS ({option}) REBUILD"
     },
     {
       "name": "ALTER DATA_POLICY SET OPTIONS",
-      "group": "alter_datapolicy_option_list"
+      "group": "alter_datapolicy_option_list",
+      "setup": ["CREATE DATA_POLICY `test.region-us.probe` OPTIONS (data_policy_type = 'DATA_MASKING_POLICY', masking_expression = 'ALWAYS_NULL')"],
+      "template": "ALTER DATA_POLICY `test.region-us.probe` SET OPTIONS ({option})"
     },
     {
       "name": "ALTER CONNECTION SET OPTIONS",
-      "group": "alter_connection_option_list"
+      "group": "alter_connection_option_list",
+      "setup": ["CREATE CONNECTION `us.probe` OPTIONS (connection_type = 'CLOUD_RESOURCE')"],
+      "template": "ALTER CONNECTION `us.probe` SET OPTIONS ({option})"
+    },
+    {
+      "name": "UNDROP SCHEMA",
+      "group": "undrop_schema_options",
+      "setup": ["CREATE SCHEMA e OPTIONS (location = 'US')", "DROP SCHEMA e"],
+      "template": "UNDROP SCHEMA e OPTIONS ({option})"
     },
     {
       "name": "CREATE EXTERNAL TABLE",
@@ -1954,7 +2156,14 @@
     },
     {
       "name": "CREATE TABLE generated column",
-      "group": "generated_column_options"
+      "group": "generated_column_options",
+      "template": "CREATE TABLE d.n (content STRING, embedding STRUCT<result ARRAY<FLOAT64>, status STRING> GENERATED ALWAYS AS (AI.EMBED(content, connection_id => 'US.probe', endpoint => 'text-embedding-005')) STORED OPTIONS ({option}))"
+    },
+    {
+      "name": "ALTER TABLE ADD COLUMN generated column",
+      "group": "generated_column_options",
+      "setup": ["CREATE TABLE d.docs (content STRING)"],
+      "template": "ALTER TABLE d.docs ADD COLUMN embedding STRUCT<result ARRAY<FLOAT64>, status STRING> GENERATED ALWAYS AS (AI.EMBED(content, connection_id => 'US.probe', endpoint => 'text-embedding-005')) STORED OPTIONS ({option})"
     },
     {
       "name": "CREATE EXTERNAL TABLE Bigtable URI",
