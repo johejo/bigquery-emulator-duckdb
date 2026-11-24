@@ -136,7 +136,8 @@ SqlRuntime::SqlRuntime(
   // All projects must be attached before graph definitions can refer to their tables.
   for (const Project& project : projects_) {
     const auto graphs =
-        backend_.Execute("SELECT native_sql FROM " + PropertyGraphsTable(project.project_id));
+        backend_.Execute("SELECT native_sql FROM " + PropertyGraphsTable(project.project_id) +
+                         " WHERE native_sql <> ''");
     for (size_t row = 0; row < graphs.rows.size(); ++row) {
       try {
         backend_.Execute(graphs.rows.String(row, 0));

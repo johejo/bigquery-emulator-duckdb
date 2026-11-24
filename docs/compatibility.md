@@ -483,8 +483,13 @@ Graph DDL rejects:
   other than columns.
 - Property options and computed properties that call user-defined functions or read query
   parameters, system variables or named constants.
-- Views as element tables and graph options.
-- Edges whose endpoint nodes do not exist when the graph is created.
+- Materialized and value-table views as element tables, and graph options.
+- For graphs backed only by tables, edges whose endpoint nodes do not exist when the graph is
+  created.
+
+Ordinary SQL views can back node and edge tables with explicit keys. Queries use the current
+view definition, not a copy taken when the graph was created. Graph queries cannot use views
+that read external tables or tables with required partition filters.
 
 `GRAPH_EXPAND` requires literal arguments. It supports `AGG` over graph measures in
 both flattened and nested results. Other graph query forms do not support reading measures.

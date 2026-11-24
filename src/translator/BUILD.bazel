@@ -74,6 +74,7 @@ cc_library(
         "@googlesql//googlesql/public:constant_evaluator",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:id_string",
+        "@googlesql//googlesql/public:sql_view",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",

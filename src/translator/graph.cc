@@ -17,8 +17,10 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/property_graph.h"
+#include "googlesql/public/sql_view.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -29,6 +31,7 @@
 #include "src/language_options.h"
 #include "src/references.h"
 #include "src/table_path.h"
+#include "src/table_source.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -324,23 +327,36 @@ std::optional<std::string> CreatePropertyGraph(
   std::vector<std::string> native_edges;
   std::vector<std::string> sql_nodes;
   std::vector<std::string> sql_edges;
+  bool uses_view = false;
   for (const bool edge : {false, true}) {
     for (const auto& element : edge ? create.edge_table_list() : create.node_table_list()) {
       if (!element->input_scan()->Is<googlesql::ResolvedTableScan>() ||
           element->label_name_list().empty() || element->dynamic_label() != nullptr ||
           element->dynamic_properties() != nullptr) {
-        return Unsupported(scope, "graph element tables with views or dynamic properties");
+        return Unsupported(scope, "graph element tables with dynamic properties");
       }
       const auto& table = *element->input_scan()->GetAs<googlesql::ResolvedTableScan>();
       if (table.for_system_time_expr() != nullptr || !table.hint_list().empty()) {
         return Unsupported(scope, "graph element table modifiers");
       }
       const auto* stored = dynamic_cast<const BigQueryTable*>(table.table());
-      const auto description = stored == nullptr ? std::nullopt : stored->Describe();
-      if (stored == nullptr || stored->ReadQuery() ||
-          (description && description->metadata.require_partition_filter)) {
-        return Unsupported(
-            scope, "graph element tables with external storage or required partition filters");
+      if (const auto* view = dynamic_cast<const googlesql::SQLView*>(table.table())) {
+        const auto path = SplitTablePath({view->FullName()});
+        auto* source = scope.context.defaults.source;
+        const auto definition = source != nullptr && path.size() == 3
+                                    ? source->FindView(path.at(0), path.at(1), path.at(2))
+                                    : std::nullopt;
+        if (!definition || definition->materialized || view->IsValueTable()) {
+          return Unsupported(scope, "graph element tables with materialized or value-table views");
+        }
+        uses_view = true;
+      } else {
+        const auto description = stored == nullptr ? std::nullopt : stored->Describe();
+        if (stored == nullptr || stored->ReadQuery() ||
+            (description && description->metadata.require_partition_filter)) {
+          return Unsupported(
+              scope, "graph element tables with external storage or required partition filters");
+        }
       }
       const auto keys = Keys(element->key_list(), table, false);
       if (!keys || element->key_list().empty()) {
@@ -436,6 +452,11 @@ std::optional<std::string> CreatePropertyGraph(
   scope.context.statement.property_graph_definition =
       "CREATE PROPERTY GRAPH " + quoted_graph + " NODE TABLES (" + Join(sql_nodes, ", ") + ")" +
       (sql_edges.empty() ? "" : " EDGE TABLES (" + Join(sql_edges, ", ") + ")");
+  // DuckPGQ cannot register views. All emulator graph queries use the saved definition, so
+  // a graph over views has no native DDL to execute or replay on startup.
+  if (uses_view) {
+    return std::string{};
+  }
   // Graphs have a private name in DuckPGQ because its registry is database-wide.
   return "CREATE OR REPLACE PROPERTY GRAPH " + DuckPGQName(parts) + " VERTEX TABLES (" +
          Join(native_nodes, ", ") + ")" +
@@ -443,6 +464,40 @@ std::optional<std::string> CreatePropertyGraph(
 }
 
 namespace {
+
+// Read a view as the current GoogleSQL query for it, just like a relational read. In particular,
+// do not read the physical DuckDB view, whose definition can contain placeholders for routines.
+std::optional<std::string> GraphElementSource(const googlesql::Table& table, const Scope& scope) {
+  const auto* view = dynamic_cast<const googlesql::SQLView*>(&table);
+  if (view == nullptr) {
+    return QuoteIdentifierPath(table.FullName());
+  }
+  const auto& query = *view->view_query();
+  // This private scan is not part of the caller's partition-filter or field-use analysis.
+  std::vector<const googlesql::ResolvedNode*> inputs;
+  query.GetDescendantsWithKinds({googlesql::RESOLVED_TABLE_SCAN}, &inputs);
+  for (const auto* input : inputs) {
+    const auto* stored =
+        dynamic_cast<const BigQueryTable*>(input->GetAs<googlesql::ResolvedTableScan>()->table());
+    const auto description = stored == nullptr ? std::nullopt : stored->Describe();
+    if (stored != nullptr &&
+        (stored->ReadQuery() || (description && description->metadata.require_partition_filter))) {
+      return Unsupported(scope,
+                         "graph views reading external storage or required partition filters");
+    }
+  }
+  const auto relation = Scan(query, Scope{.context = scope.context});
+  if (!relation) {
+    return std::nullopt;
+  }
+  std::vector<std::string> projections;
+  projections.reserve(view->NumColumns());
+  for (int i = 0; i < view->NumColumns(); ++i) {
+    projections.push_back(relation->columns.at(query.column_list(i).column_id()) + " AS " +
+                          QuoteIdentifier(view->GetColumn(i)->Name()));
+  }
+  return "(SELECT " + Join(projections, ", ") + relation->From() + ")";
+}
 
 // A flat path also exposes private traversal columns used to compose and repeat paths.
 std::optional<Relation> FlatGraphPath(
@@ -588,8 +643,11 @@ std::optional<Relation> FlatGraphPath(
       }
     }
     const auto* element_table = element.target_element_table_list(0);
-    tables.push_back(QuoteIdentifierPath(element_table->GetTable()->FullName()) + " AS " +
-                     variable);
+    const auto relation_sql = GraphElementSource(*element_table->GetTable(), scope);
+    if (!relation_sql) {
+      return std::nullopt;
+    }
+    tables.push_back(*relation_sql + " AS " + variable);
     std::vector<std::string> keys;
     for (size_t i = 0; i < element_table->GetKeyColumns().size(); ++i) {
       const auto output =

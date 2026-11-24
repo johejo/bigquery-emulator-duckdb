@@ -1,0 +1,17 @@
+# CREATE PROPERTY GRAPH accepts views as the input to element tables, with explicit keys.
+# third_party/bigquery_docs/reference/standard-sql/graph-schema-statements.md
+CREATE FUNCTION scalar_graph.view_graph_display(s STRING) AS (UPPER(s));
+CREATE VIEW scalar_graph.ViewPeople AS
+  SELECT id, scalar_graph.view_graph_display(name) AS display FROM scalar_graph.Person;
+CREATE VIEW scalar_graph.ViewKnows AS
+  SELECT id, src, dst FROM scalar_graph.Knows WHERE id IN (10, 11);
+CREATE PROPERTY GRAPH scalar_graph.ViewGraph
+  NODE TABLES (scalar_graph.ViewPeople KEY (id))
+  EDGE TABLES (scalar_graph.ViewKnows KEY (id)
+    SOURCE KEY (src) REFERENCES ViewPeople (id)
+    DESTINATION KEY (dst) REFERENCES ViewPeople (id));
+SELECT STRING_AGG(CONCAT(src, '>', dst), ',' ORDER BY src, dst)
+FROM GRAPH_TABLE(scalar_graph.ViewGraph
+  MATCH (a:ViewPeople)-[:ViewKnows]->(b:ViewPeople)
+  RETURN a.display AS src, b.display AS dst)
+=> "ALEX>DANA,DANA>ALEX"
