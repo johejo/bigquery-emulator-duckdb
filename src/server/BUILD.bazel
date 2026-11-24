@@ -62,6 +62,7 @@ cc_library(
         ":storage_codec",
         "//:api_error",
         "//:backend",
+        "//:change_data_capture",
         "//:emulator",
         "//:field_schema",
         "//:project",

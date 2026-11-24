@@ -229,11 +229,12 @@ class SqlRuntime {
                                             const std::vector<FieldSchema>& schema,
                                             nlohmann::json& rows, int64_t storage_id,
                                             bool validate_only = false);
-  // Applies a Storage Write batch of change data capture rows, each with a `_CHANGE_TYPE` and an
-  // optional `_CHANGE_SEQUENCE_NUMBER`, in one transaction: a change takes effect unless an
-  // earlier one to the same primary key had a higher sequence number. An UPSERT replaces the
-  // key's rows, and a DELETE removes them. Throws ApiError::Invalid for a table without a primary
-  // key, and returns the errors of rows whose values cannot be written.
+  // Applies a Storage Write batch of change data capture rows, each with a `_CHANGE_TYPE` of
+  // "UPSERT" or "DELETE" and an optional `_CHANGE_SEQUENCE_NUMBER`, in one transaction, in order:
+  // a change takes effect unless an earlier one to the same primary key had a higher sequence
+  // number. An UPSERT gives every row with its key its values, or inserts a row when none has it,
+  // and a DELETE removes them. Records the table's apply watermark. Throws ApiError::Invalid for
+  // a table without a primary key, and returns the errors of rows whose values cannot be written.
   std::vector<InsertError> WriteStorageChanges(TableReference table,
                                                const std::vector<FieldSchema>& schema,
                                                const nlohmann::json& rows, int64_t storage_id);

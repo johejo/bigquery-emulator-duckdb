@@ -437,9 +437,27 @@ json StorageProtoDecoder::Decode(const std::string& bytes, bool default_missing,
   if (!message->ParseFromString(bytes)) {
     throw ApiError::Invalid("Invalid serialized protobuf row");
   }
-  json row = ProtoMessage(*message, impl_->schema, default_missing, &missing);
+  const auto* reflection = message->GetReflection();
+  const auto deletes = [&] {
+    return std::ranges::any_of(impl_->pseudocolumns, [&](const FieldDescriptor* field) {
+      return field->name() == kChangeTypeColumn && reflection->HasField(*message, field) &&
+             ParseChangeType(reflection->GetString(*message, field)) == ChangeType::kDelete;
+    });
+  };
+  json row;
+  if (deletes()) {
+    // A DELETE row needs only its key, so BigQuery takes it without its REQUIRED columns.
+    std::vector<FieldSchema> schema = impl_->schema;
+    for (FieldSchema& field : schema) {
+      if (field.mode == FieldMode::kRequired) {
+        field.mode = FieldMode::kNullable;
+      }
+    }
+    row = ProtoMessage(*message, schema, default_missing, &missing);
+  } else {
+    row = ProtoMessage(*message, impl_->schema, default_missing, &missing);
+  }
   for (const FieldDescriptor* field : impl_->pseudocolumns) {
-    const auto* reflection = message->GetReflection();
     row[std::string(field->name())] = reflection->HasField(*message, field)
                                           ? json(reflection->GetString(*message, field))
                                           : json(nullptr);

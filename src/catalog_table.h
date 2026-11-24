@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -47,6 +48,7 @@ class BigQueryTable : public googlesql::SimpleTable {
   [[nodiscard]] std::optional<TableRead> ReadQuery() const;
   [[nodiscard]] std::optional<std::string> DmlTargetFilter(const std::string& alias) const;
   [[nodiscard]] TableWriteRestriction WriteRestriction() const;
+  [[nodiscard]] std::optional<int64_t> UpsertApplyWatermark() const;
   [[nodiscard]] TableReference reference() const {
     return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};
   }

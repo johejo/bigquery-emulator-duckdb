@@ -1,7 +1,7 @@
 #include "src/change_data_capture.h"
 
+#include <algorithm>
 #include <charconv>
-#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -9,61 +9,67 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <variant>
+#include <vector>
 
+#include "absl/strings/match.h"
+#include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
 
+std::optional<ChangeType> ParseChangeType(std::string_view value) {
+  if (absl::EqualsIgnoreCase(value, "INSERT")) {
+    return ChangeType::kInsert;
+  }
+  if (absl::EqualsIgnoreCase(value, "UPSERT")) {
+    return ChangeType::kUpsert;
+  }
+  if (absl::EqualsIgnoreCase(value, "DELETE")) {
+    return ChangeType::kDelete;
+  }
+  return std::nullopt;
+}
+
 std::string ChangeSequence::Text() const {
-  return std::format("{}:{:016X}/{:016X}/{:016X}/{:016X}", count, sections.at(0), sections.at(1),
-                     sections.at(2), sections.at(3));
+  std::string text;
+  for (const uint64_t section : sections) {
+    text += std::format("{}{:016X}", text.empty() ? "" : "/", section);
+  }
+  return text;
 }
 
-std::optional<ChangeSequence> ChangeSequence::FromText(std::string_view text) {
-  if (text.size() < 2 || text.at(1) != ':' || text.at(0) < '1' || text.at(0) > '4') {
-    return std::nullopt;
+std::variant<ChangeSequence, std::string> ParseChangeSequence(std::string_view text) {
+  std::vector<std::string_view> sections;
+  for (size_t start = 0;;) {
+    const size_t slash = text.find('/', start);
+    sections.push_back(text.substr(start, slash - start));
+    if (slash == std::string_view::npos) {
+      break;
+    }
+    start = slash + 1;
   }
-  auto sequence = ParseChangeSequence(text.substr(2));
-  if (!sequence || sequence->count != 4) {
-    return std::nullopt;
-  }
-  sequence->count = text.at(0) - '0';
-  return sequence;
-}
-
-std::optional<ChangeSequence> ParseChangeSequence(std::string_view text) {
   ChangeSequence sequence;
-  while (true) {
-    if (sequence.count == 4) {
-      return std::nullopt;
-    }
-    const size_t slash = text.find('/');
-    const std::string_view section = text.substr(0, slash);
-    if (section.empty() || section.size() > 16) {
-      return std::nullopt;
-    }
+  if (std::ranges::any_of(sections, &std::string_view::empty)) {
+    return "Empty segment is disallowed for the " + std::string(kChangeSequenceColumn) +
+           ". Val: " + std::string(text);
+  }
+  for (const std::string_view section : sections) {
     uint64_t value = 0;
     const auto [end, error] =
         std::from_chars(section.data(), section.data() + section.size(), value, 16);
-    if (error != std::errc() || end != section.data() + section.size()) {
-      return std::nullopt;
+    if (section.size() > 16 || error != std::errc() || end != section.data() + section.size()) {
+      if (sections.size() > 1) {
+        throw ApiError::Unsupported("a " + std::string(kChangeSequenceColumn) +
+                                    " of several sections with one that is not hexadecimal");
+      }
+      return "invalid hex segment for " + std::string(kChangeSequenceColumn) + ":" +
+             std::string(section);
     }
-    sequence.sections.at(sequence.count++) = value;
-    if (slash == std::string_view::npos) {
-      return sequence;
-    }
-    text.remove_prefix(slash + 1);
+    sequence.sections.push_back(value);
   }
-}
-
-std::optional<std::strong_ordering> CompareChangeSequences(const ChangeSequence& a,
-                                                           const ChangeSequence& b) {
-  const auto order = a.sections <=> b.sections;
-  if (order == std::strong_ordering::equal && a.count != b.count) {
-    return std::nullopt;
-  }
-  return order;
+  return sequence;
 }
 
 std::string ChangeSequenceTable(const std::string& project) {
@@ -79,9 +85,26 @@ std::string CreateChangeSequencesStatement(const std::string& project) {
       ChangeSequenceTable(project));
 }
 
+std::string UpsertTablesTable(const std::string& project) {
+  return QuoteIdentifier(project) + ".main.emulator_upsert_tables";
+}
+
+std::string CreateUpsertTablesStatement(const std::string& project) {
+  return std::format(
+      "CREATE TABLE IF NOT EXISTS {} (dataset_id VARCHAR NOT NULL, table_id VARCHAR NOT NULL, "
+      "creation_time BIGINT NOT NULL, applied_millis BIGINT NOT NULL, "
+      "PRIMARY KEY (dataset_id, table_id, creation_time))",
+      UpsertTablesTable(project));
+}
+
 std::string ChangeSequencesOf(const TableReference& table, int64_t creation_time) {
   return std::format("dataset_id = {} AND table_id = {} AND creation_time = {}",
                      QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id), creation_time);
+}
+
+std::string UpsertApplyWatermarkQuery(const TableReference& table, int64_t creation_time) {
+  return std::format("SELECT applied_millis FROM {} WHERE {}", UpsertTablesTable(table.project_id),
+                     ChangeSequencesOf(table, creation_time));
 }
 
 }  // namespace bigquery_emulator_duckdb

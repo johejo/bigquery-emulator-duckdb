@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -12,9 +11,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
-#include "absl/strings/match.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -253,6 +252,10 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
     key_fields.push_back(&*field);
   }
   const int64_t creation_time = HistoryCreationTime(table, info.metadata);
+  if (creation_time == 0) {
+    throw ApiError::Unsupported(
+        "UPSERT and DELETE rows on tables created before the emulator recorded creation times");
+  }
   auto write_schema = schema;
   for (auto& field : write_schema) {
     ClearStorageWriteLengths(field);
@@ -264,61 +267,35 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
     bool deletes = false;
     std::optional<ChangeSequence> sequence;
     std::vector<std::string> key_values;
+    bool null_key = false;
     std::string key;
   };
   std::vector<Change> changes(rows.size());
   for (size_t index = 0; index < rows.size(); ++index) {
     const json& row = rows.at(index);
     Change& change = changes.at(index);
-    const auto type = row.find(kChangeTypeColumn);
-    const std::string type_text =
-        type != row.end() && type->is_string() ? type->get<std::string>() : "";
-    if (type_text == "UPSERT" || type_text == "DELETE") {
-      change.deletes = type_text == "DELETE";
-    } else if (type == row.end() || type->is_null() ||
-               absl::EqualsIgnoreCase(type_text, "UPSERT") ||
-               absl::EqualsIgnoreCase(type_text, "DELETE") ||
-               absl::EqualsIgnoreCase(type_text, "INSERT")) {
-      // Whether BigQuery takes INSERT, a missing value or other cases is not known.
-      throw ApiError::Unsupported(std::string(kChangeTypeColumn) + " values other than " +
-                                  "UPSERT and DELETE");
-    } else {
-      return {{.index = index, .message = "The given value is not a valid CHANGE_TYPE"}};
-    }
+    change.deletes = row.at(kChangeTypeColumn) == "DELETE";
     const auto sequence = row.find(kChangeSequenceColumn);
     if (sequence != row.end() && !sequence->is_null()) {
-      const std::string text = sequence->get<std::string>();
-      if (text.empty()) {
-        throw ApiError::Unsupported("empty " + std::string(kChangeSequenceColumn) + " values");
+      auto parsed = ParseChangeSequence(sequence->get<std::string>());
+      if (auto* message = std::get_if<std::string>(&parsed)) {
+        return {{.index = index, .message = std::move(*message)}};
       }
-      if (creation_time == 0) {
-        throw ApiError::Unsupported(std::string(kChangeSequenceColumn) +
-                                    " on tables created before the emulator recorded creation "
-                                    "times");
-      }
-      change.sequence = ParseChangeSequence(text);
-      if (!change.sequence) {
-        return {
-            {
-                .index = index,
-                .message = "Invalid " + std::string(kChangeSequenceColumn) + ": " + text,
-            },
-        };
-      }
+      change.sequence = std::get<ChangeSequence>(std::move(parsed));
     }
     for (const FieldSchema* field : key_fields) {
       const auto value = row.find(field->name);
-      if (value == row.end() || value->is_null()) {
-        throw ApiError::Unsupported(
-            "change data capture rows without a value for primary key "
-            "column " +
-            field->name);
-      }
+      change.null_key = change.null_key || value == row.end() || value->is_null();
       try {
-        change.key_values.push_back(RoundedInsertValue(functions_, *value, *field, options));
+        change.key_values.push_back(
+            value == row.end() ? "NULL" : RoundedInsertValue(functions_, *value, *field, options));
       } catch (const ApiError& error) {
         return {{.index = index, .message = error.what()}};
       }
+    }
+    // What a later change to a key with a NULL value does is not known.
+    if (change.null_key && (change.deletes || change.sequence)) {
+      throw ApiError::Unsupported("DELETE rows and sequence numbers for NULL primary key values");
     }
   }
   std::unique_lock<absl::Mutex> kept;
@@ -370,61 +347,43 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
         ChangeSequenceTable(table.project_id), ChangeSequencesOf(table, creation_time),
         now - kDeleteRetentionMicros, keys_query));
     for (const auto& row : stored.TextRows()) {
-      const auto sequence = ChangeSequence::FromText(row.at(1).value_or(""));
-      if (!sequence) {
+      const auto sequence = ParseChangeSequence(row.at(1).value_or(""));
+      if (!std::holds_alternative<ChangeSequence>(sequence)) {
         throw ApiError::Internal("Invalid recorded change sequence: " + row.at(1).value_or(""));
       }
-      recorded[*row.at(0)] = {.sequence = *sequence, .deleted = row.at(2) == "true"};
-    }
-
-    // The row whose change takes effect for each key, in the order the keys first appear.
-    std::unordered_map<std::string, size_t> effective;
-    std::vector<std::string> order;
-    std::set<std::string> sequenced;
-    for (size_t index = 0; index < changes.size(); ++index) {
-      const Change& change = changes.at(index);
-      const auto previous = recorded.find(change.key);
-      if (change.sequence && previous != recorded.end()) {
-        const auto compared = CompareChangeSequences(*change.sequence, previous->second.sequence);
-        if (!compared) {
-          throw ApiError::Unsupported("comparing " + std::string(kChangeSequenceColumn) +
-                                      " values that differ only in trailing zero sections");
-        }
-        // Of equal sequence numbers, the change ingested last takes effect.
-        if (*compared == std::strong_ordering::less) {
-          continue;
-        }
-      }
-      if (change.sequence) {
-        recorded[change.key] = {.sequence = *change.sequence, .deleted = change.deletes};
-        sequenced.insert(change.key);
-      }
-      if (effective.emplace(change.key, index).second) {
-        order.push_back(change.key);
-      } else {
-        effective[change.key] = index;
-      }
+      recorded[*row.at(0)] = {
+          .sequence = std::get<ChangeSequence>(sequence),
+          .deleted = row.at(2) == "true",
+      };
     }
 
     std::vector<std::string> columns;
     std::ranges::transform(write_schema, std::back_inserter(columns),
                            [](const FieldSchema& field) { return QuoteIdentifier(field.name); });
-    for (const std::string& changed : order) {
-      const size_t index = effective.at(changed);
+    std::set<std::string> sequenced;
+    // Each change, in order, replaces every row with its key, which BigQuery does not enforce:
+    // an UPSERT gives each of them its values, or inserts one row when none has the key.
+    for (size_t index = 0; index < changes.size(); ++index) {
       const Change& change = changes.at(index);
+      if (change.sequence) {
+        const auto previous = recorded.find(change.key);
+        // Of equal sequence numbers, the change ingested last takes effect.
+        if (previous != recorded.end() && *change.sequence < previous->second.sequence) {
+          continue;
+        }
+        recorded[change.key] = {.sequence = *change.sequence, .deleted = change.deletes};
+        sequenced.insert(change.key);
+      }
       std::vector<std::string> conditions;
       conditions.reserve(key_fields.size());
       for (size_t column = 0; column < key_fields.size(); ++column) {
-        conditions.push_back(QuoteIdentifier(key_fields.at(column)->name) + " = " +
-                             change.key_values.at(column));
+        conditions.push_back(QuoteIdentifier(key_fields.at(column)->name) +
+                             " IS NOT DISTINCT FROM " + change.key_values.at(column));
       }
-      // BigQuery does not enforce the key, and what a change does to a key that several rows
-      // share is not known.
       const QueryResult removed = session->Execute(
           std::format("DELETE FROM {} WHERE {}", QualifiedName(table), Join(conditions, " AND ")));
-      if (removed.affected_rows > 1) {
-        throw ApiError::Unsupported(
-            "change data capture rows whose primary key several rows share");
+      if (change.null_key && removed.affected_rows > 0) {
+        throw ApiError::Unsupported("UPSERT rows for NULL primary key values that rows have");
       }
       if (change.deletes) {
         continue;
@@ -438,8 +397,10 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
                                ? "DEFAULT"
                                : RoundedInsertValue(functions_, *value, field, options));
         }
-        session->Execute(std::format("INSERT INTO {} ({}) VALUES ({})", QualifiedName(table),
-                                     Join(columns, ", "), Join(values, ", ")));
+        const std::string tuple = "(" + Join(values, ", ") + ")";
+        const std::vector<std::string> tuples(std::max<size_t>(removed.affected_rows, 1), tuple);
+        session->Execute(std::format("INSERT INTO {} ({}) VALUES {}", QualifiedName(table),
+                                     Join(columns, ", "), Join(tuples, ", ")));
       } catch (const ApiError& error) {
         return {{.index = index, .message = error.what()}};
       } catch (const BackendError& error) {
@@ -454,6 +415,9 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
                       QuoteLiteral(table.table_id), creation_time, QuoteLiteral(changed),
                       QuoteLiteral(state.sequence.Text()), state.deleted ? "true" : "false", now));
     }
+    session->Execute(std::format(
+        "INSERT OR REPLACE INTO {} VALUES ({}, {}, {}, {})", UpsertTablesTable(table.project_id),
+        QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id), creation_time, now / 1000));
     session->Transaction("COMMIT");
     return {};
   } catch (const BackendError& error) {

@@ -71,7 +71,11 @@ cc_library(
     srcs = ["src/change_data_capture.cc"],
     hdrs = ["src/change_data_capture.h"],
     copts = ["-std=c++20"],
-    implementation_deps = [":duckdb_sql"],
+    implementation_deps = [
+        ":api_error",
+        ":duckdb_sql",
+        "@abseil-cpp//absl/strings",
+    ],
     deps = [":references"],
 )
 
@@ -2251,6 +2255,7 @@ cc_library(
         ":api_error",
         ":backend",
         ":backend_error",
+        ":change_data_capture",
         ":duckdb_catalog",
         ":duckdb_sql",
         ":field_schema",

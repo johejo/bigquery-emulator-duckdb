@@ -12,6 +12,7 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/api_error.h"
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -78,7 +79,11 @@ bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
   return true;
 }
 
-std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope) {
+// The target of UPDATE, DELETE, MERGE or, if `truncates`, TRUNCATE TABLE, which BigQuery rejects
+// on a table that Storage Write UPSERT and DELETE rows changed until it applied them all. The
+// emulator applies them at once but cannot tell when BigQuery would, so it rejects them always.
+std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope,
+                                bool truncates = false) {
   if (!table.hint_list().empty() || table.for_system_time_expr() != nullptr ||
       table.lock_mode() != nullptr || table.table()->IsValueTable() ||
       table.column_list_size() != table.column_index_list_size()) {
@@ -86,6 +91,15 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   }
   if (!WritableDmlTable(table.table(), scope)) {
     return std::nullopt;
+  }
+  if (const auto* stored = dynamic_cast<const BigQueryTable*>(table.table());
+      stored != nullptr && stored->UpsertApplyWatermark().has_value()) {
+    if (truncates) {
+      return Unsupported(scope, "TRUNCATE TABLE on a table that UPSERT and DELETE rows changed");
+    }
+    throw ApiError::Invalid(
+        "DELETE/UPDATE/MERGE DMLs are currently not supported over tables that had UPSERT "
+        "streams.");
   }
   Target target{
       .table = QuoteIdentifierPath(table.table()->FullName()),
@@ -419,7 +433,7 @@ std::optional<std::string> Truncate(const googlesql::ResolvedTruncateStmt& trunc
   if (truncate.where_expr() != nullptr) {
     return Unsupported(scope, "TRUNCATE TABLE with WHERE");
   }
-  const auto target = DmlTarget(*truncate.table_scan(), scope);
+  const auto target = DmlTarget(*truncate.table_scan(), scope, /*truncates=*/true);
   if (!target) {
     return std::nullopt;
   }

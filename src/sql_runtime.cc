@@ -131,6 +131,7 @@ SqlRuntime::SqlRuntime(
       }
       backend_.Execute(CreatePartitionPolicyHistoryStatement(project.project_id));
       backend_.Execute(CreateChangeSequencesStatement(project.project_id));
+      backend_.Execute(CreateUpsertTablesStatement(project.project_id));
     } catch (const BackendError& error) {
       throw ApiError::Internal("Failed to open " + database + ": " + error.what());
     }

@@ -67,6 +67,13 @@ class TableSource {
                                                          : TableWriteRestriction::kNone;
   }
 
+  // When UPSERT and DELETE rows of Storage Write change data capture last changed `table`, in
+  // milliseconds since the Unix epoch, or nothing for a table they never changed. BigQuery rejects
+  // mutating DML on such a table and reports the time as its upsert_stream_apply_watermark.
+  virtual std::optional<int64_t> UpsertApplyWatermark(const TableReference& /*table*/) {
+    return std::nullopt;
+  }
+
   // A query of the rows `table` had at `time`, in microseconds since the Unix epoch, for FOR
   // SYSTEM_TIME AS OF: InvalidArgument for a time BigQuery cannot read the table at, and
   // Unimplemented for one whose rows the emulator did not keep, as for every table by default.

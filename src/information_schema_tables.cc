@@ -370,6 +370,11 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
         ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query,
                              view_description->materialized));
       }
+      const std::optional<int64_t> watermark =
+          view_query.has_value()
+              ? std::nullopt
+              : context.source.UpsertApplyWatermark(
+                    {.project_id = project, .dataset_id = dataset.dataset_id, .table_id = table});
       rows.push_back(
           Concat(Identity(dataset, table),
                  {
@@ -397,7 +402,7 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
                      ddl,
                      default_collation.has_value() ? String(*default_collation) : kNull,
                      kNull,
-                     kNull,
+                     watermark.has_value() ? String(FormatMillis(*watermark)) : kNull,
                  }));
     }
   }

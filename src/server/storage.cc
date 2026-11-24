@@ -34,6 +34,7 @@
 #include "grpcpp/support/sync_stream.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/change_data_capture.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/project.h"
@@ -754,8 +755,9 @@ class WriteService final : public pb::BigQueryWrite::Service {
     std::string arrow_schema;
     std::unique_ptr<StorageArrowDecoder> arrow_decoder;
     std::shared_ptr<WriteState> lease;
-    // Whether the connection wrote change data capture rows, once it wrote any.
-    std::optional<bool> changes;
+    // Whether the connection writes UPSERT and DELETE rows rather than inserts, once its first
+    // row decided it.
+    std::optional<bool> upserts;
   };
 
   // The table that a stream writes to, or the default stream `appended` appends to. BigQuery names
@@ -848,8 +850,101 @@ class WriteService final : public pb::BigQueryWrite::Service {
     return found->second;
   }
 
-  // Appends one request's rows. A writer schema with `_CHANGE_TYPE` writes change data capture
-  // rows, third_party/bigquery_docs/change-data-capture.md, which only the default stream takes.
+  // Checks the `_CHANGE_TYPE` of each of `rows`, third_party/bigquery_docs/change-data-capture.md,
+  // against the connection's mode: its first row decides whether a default stream connection
+  // writes inserts, as rows without a `_CHANGE_TYPE` do, or UPSERT and DELETE rows, which need a
+  // primary key; an explicit stream writes only inserts. Returns whether `rows` are UPSERT and
+  // DELETE rows, whose `_CHANGE_TYPE` it spells in capitals, and removes the pseudocolumns of
+  // inserts.
+  bool CheckChangeTypes(json& rows, bool arrow, Connection& connection, const WriteState& state,
+                        pb::AppendRowsResponse& response) {
+    const std::string& name = state.metadata.name();
+    const bool typed = !arrow && connection.decoder->WritesChanges();
+    if (!arrow && connection.decoder->HasChangeColumns() && !typed) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support _CHANGE_SEQUENCE_NUMBER without _CHANGE_TYPE");
+    }
+    if (arrow && connection.upserts.value_or(false)) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support Arrow rows in a connection that writes UPSERT and "
+           "DELETE rows");
+    }
+    const auto keyed = [&] { return !DestinationInfo(state.table).metadata.primary_key.empty(); };
+    const auto require_key = [&] {
+      if (!keyed()) {
+        throw ConnectionError(grpc::StatusCode::INVALID_ARGUMENT,
+                              "Create UPSERT stream is not supported for primary key disabled "
+                              "table: " +
+                                  ProjectNumber(state.table.project_id) + ":" +
+                                  state.table.dataset_id + "." + state.table.table_id +
+                                  " for now. Entity: " + name);
+      }
+    };
+    if (connection.upserts.value_or(false)) {
+      require_key();
+    }
+    for (size_t index = 0; index < rows.size(); ++index) {
+      json& row = rows.at(index);
+      const auto found = row.find(kChangeTypeColumn);
+      const std::string value =
+          found != row.end() && found->is_string() ? found->get<std::string>() : "";
+      const std::optional<ChangeType> type =
+          value.empty() ? ChangeType::kInsert : ParseChangeType(value);
+      std::string error;
+      if (!type.has_value()) {
+        if (connection.upserts.has_value()) {
+          Fail(grpc::StatusCode::UNIMPLEMENTED,
+               "Storage Write does not support unknown _CHANGE_TYPE values after a connection's "
+               "first row");
+        }
+        error = "The given value is not a valid CHANGE_TYPE: " + value;
+      } else {
+        if (!connection.upserts.has_value()) {
+          connection.upserts = IsDefault(name) && *type != ChangeType::kInsert;
+          if (*connection.upserts) {
+            require_key();
+          }
+        }
+        if (*connection.upserts && *type == ChangeType::kInsert) {
+          error = value.empty()
+                      ? "Field value of _change_type cannot be empty."
+                      : "The given value is not a valid CHANGE_TYPE in upsert mode: " + value;
+        } else if (!*connection.upserts && *type != ChangeType::kInsert) {
+          error = "The given value is not a valid CHANGE_TYPE in insert mode: " + value;
+        } else if (*connection.upserts) {
+          *found = *type == ChangeType::kUpsert ? "UPSERT" : "DELETE";
+        }
+      }
+      if (!error.empty()) {
+        auto* row_error = response.add_row_errors();
+        row_error->set_index(static_cast<int64_t>(index));
+        row_error->set_code(pb::RowError::FIELDS_ERROR);
+        row_error->set_message(error);
+      }
+    }
+    if (!response.row_errors().empty()) {
+      Fail(grpc::StatusCode::INVALID_ARGUMENT, RowErrors(name));
+    }
+    if (connection.upserts.value_or(false)) {
+      return true;
+    }
+    if (typed && !rows.empty() && !keyed()) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support _CHANGE_TYPE on tables without a primary key");
+    }
+    for (json& row : rows) {
+      if (const auto sequence = row.find(kChangeSequenceColumn);
+          sequence != row.end() && !sequence->is_null()) {
+        Fail(grpc::StatusCode::UNIMPLEMENTED,
+             "Storage Write does not support _CHANGE_SEQUENCE_NUMBER on inserts");
+      }
+      row.erase(kChangeTypeColumn);
+      row.erase(kChangeSequenceColumn);
+    }
+    return false;
+  }
+
+  // Appends one request's rows.
   void Append(const pb::AppendRowsRequest& request, Connection& connection,
               pb::AppendRowsResponse& response) {
     if (request.ByteSizeLong() >= size_t{20} * 1024 * 1024) {
@@ -996,23 +1091,9 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (!response.row_errors().empty()) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, RowErrors(name));
     }
-    const bool changes = !arrow && connection.decoder->WritesChanges();
-    if (!arrow && connection.decoder->HasChangeColumns() && !changes) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write does not support _CHANGE_SEQUENCE_NUMBER without _CHANGE_TYPE");
-    }
-    if (changes && !IsDefault(name)) {
-      Fail(grpc::StatusCode::INVALID_ARGUMENT,
-           "Change data capture rows require the default stream. Entity: " + name);
-    }
-    if (connection.changes.has_value() && *connection.changes != changes) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write does not support mixing change data capture and other rows in an "
-           "AppendRows connection");
-    }
-    connection.changes = changes;
+    const bool upserts = CheckChangeTypes(rows, arrow, connection, *state, response);
     const bool staging = state->metadata.type() != pb::WriteStream::COMMITTED;
-    const auto errors = changes ? emulator_.WriteStorageChanges(state->table, state->schema, rows,
+    const auto errors = upserts ? emulator_.WriteStorageChanges(state->table, state->schema, rows,
                                                                 state->storage_id)
                                 : emulator_.WriteStorageRows(state->table, state->schema, rows,
                                                              state->storage_id, staging);
