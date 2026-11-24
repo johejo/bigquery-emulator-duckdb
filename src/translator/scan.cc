@@ -26,6 +26,7 @@
 #include "absl/time/time.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
+#include "googlesql/public/sql_tvf.h"
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
@@ -651,6 +652,63 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   return result;
 }
 
+// Bind scalar arguments in the caller's projection, once per working row. Translate the
+// stored body in its own scope: its column IDs belong to a separate analyzer invocation.
+std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, const Scope& scope,
+                                     Relation& input, const std::string& input_alias) {
+  const auto* function = dynamic_cast<const googlesql::SQLTableValuedFunction*>(tvf.tvf());
+  if (function == nullptr || function->query() == nullptr || !tvf.hint_list().empty()) {
+    return Unsupported(scope, "GQL CALL of a non-SQL or hinted table function");
+  }
+  const auto& body = *function->query();
+  std::vector<const googlesql::ResolvedNode*> calls;
+  body.GetDescendantsSatisfying(&googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCallBase>,
+                                &calls);
+  for (const auto* node : calls) {
+    const auto* call = node->GetAs<googlesql::ResolvedFunctionCallBase>();
+    if (call->function()->function_options().volatility == googlesql::FunctionEnums::VOLATILE) {
+      // DuckDB can evaluate a lateral right side just once for equal arguments.
+      return Unsupported(scope, "volatile SQL table function body in GQL CALL");
+    }
+  }
+  Scope nested{.context = scope.context};
+  const auto names = function->GetArgumentNames();
+  std::vector<std::string> arguments;
+  for (int i = 0; i < tvf.argument_list_size(); ++i) {
+    const auto* expr = tvf.argument_list(i)->expr();
+    if (expr == nullptr) {
+      return Unsupported(scope, "non-scalar table function argument in GQL CALL");
+    }
+    const auto sql = Expression(*expr, scope, {});
+    if (!sql) {
+      return std::nullopt;
+    }
+    const auto name = QuoteIdentifier(scope.context.FreshName("call_arg"));
+    arguments.push_back(*sql + " AS " + name);
+    nested.table_function_arguments.emplace(absl::AsciiStrToLower(names.at(i)),
+                                            input_alias + "." + name);
+  }
+  if (!arguments.empty()) {
+    input.sql = "SELECT " + input_alias + ".*, " + Join(arguments, ", ") + " FROM (" + input.sql +
+                ") AS " + input_alias;
+  }
+  const auto relation = Scan(body, nested);
+  if (!relation) {
+    return std::nullopt;
+  }
+  Relation result;
+  std::vector<std::string> projections;
+  for (int i = 0; i < tvf.column_list_size(); ++i) {
+    const auto name = ColumnName(tvf.column_list(i).column_id());
+    const auto source = body.column_list(tvf.column_index_list(i)).column_id();
+    projections.push_back(relation->columns.at(source) + " AS " + name);
+    result.columns.emplace(tvf.column_list(i).column_id(), "q." + name);
+  }
+  result.sql =
+      "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) + relation->From();
+  return result;
+}
+
 // Projects `columns` of a relation, positionally renamed to `names`.
 std::optional<std::vector<std::string>> Renamed(
     const Relation& relation, const std::vector<googlesql::ResolvedColumn>& columns,
@@ -1188,10 +1246,11 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   }
   if (scan.Is<googlesql::ResolvedGraphCallScan>()) {
     const auto& call = *scan.GetAs<googlesql::ResolvedGraphCallScan>();
-    if (!call.subquery()->Is<googlesql::ResolvedGraphTableScan>()) {
-      return Unsupported(scope, "GQL CALL of a table-valued function");
+    const auto* tvf = dynamic_cast<const googlesql::ResolvedTVFScan*>(call.subquery());
+    if (tvf == nullptr && !call.subquery()->Is<googlesql::ResolvedGraphTableScan>()) {
+      return Unsupported(scope, "GQL CALL of a rewritten table function");
     }
-    const auto input = Scan(*call.input_scan(), scope);
+    auto input = Scan(*call.input_scan(), scope);
     if (!input) {
       return std::nullopt;
     }
@@ -1209,7 +1268,8 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
         nested.outer[id] = left + "." + ColumnName(id);
       }
     }
-    const auto subquery = Scan(*call.subquery(), nested);
+    const auto subquery =
+        tvf == nullptr ? Scan(*call.subquery(), nested) : GraphCallTvf(*tvf, nested, *input, left);
     if (!subquery) {
       return std::nullopt;
     }

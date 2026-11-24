@@ -22,6 +22,10 @@ otherwise mark working functions as known errors. The fallback is limited to Bas
 feature-independent vectors, including SAFE calls. Drop it once the reference implementation
 supports Base32.
 
+`graph_call.patch` leaves the direct TVF of a GQL `CALL` intact: the generic TVF inliner
+cannot bind arguments that reference a working-table column. The emulator translates that
+scan as a lateral SQL table function call instead.
+
 `graph_measures.patch` preserves measure declarations and their expression SQL in the simple
 property-graph catalog. It skips scalar analysis of those expressions; `GRAPH_EXPAND` analyzes
 them against the result schema and supplies the element key to the measure rewriter.

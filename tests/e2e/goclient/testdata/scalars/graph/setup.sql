@@ -1,4 +1,8 @@
 CREATE SCHEMA IF NOT EXISTS scalar_graph;
+CREATE TABLE FUNCTION scalar_graph.echo_name(arg STRING) AS (SELECT arg AS col);
+CREATE TABLE FUNCTION scalar_graph.keep_names(arg STRING) AS (
+  SELECT CONCAT(arg, ':', arg) AS doubled FROM (SELECT 1) WHERE arg != 'Dana'
+);
 CREATE TABLE scalar_graph.Person (id INT64, name STRING);
 INSERT scalar_graph.Person VALUES (1, 'Alex'), (2, 'Dana'), (3, 'Lee');
 CREATE TABLE scalar_graph.Knows (id INT64, src INT64, dst INT64);
