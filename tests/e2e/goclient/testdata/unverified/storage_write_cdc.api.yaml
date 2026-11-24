@@ -14,95 +14,9 @@ vars:
       - {name: _CHANGE_TYPE, number: 4, type: TYPE_STRING, label: LABEL_OPTIONAL}
       - {name: _CHANGE_SEQUENCE_NUMBER, number: 5, type: TYPE_STRING, label: LABEL_OPTIONAL}
 cases:
-  - name: insert_then_upsert
+  - name: missing_change_type_without_primary_key
     description: >-
-      Whether a default stream connection whose first row is an INSERT rejects a later UPSERT, as an explicit stream does, and how.
-    steps:
-      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
-      - name: create_table
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-      - name: append
-        grpc:
-          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
-          headers: {x-goog-request-params: "write_stream=${stream}"}
-          requests:
-            - writeStream: ${stream}
-              protoRows:
-                writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGSU5TRVJU"]}
-            - protoRows: {rows: {serializedRows: ["CAESAWIYASIGVVBTRVJU"]}}
-        observe:
-          code: /code
-          result0: /messages/0/appendResult
-          error0: /messages/0/error
-          rowErrors0: /messages/0/rowErrors
-          result1: /messages/1/appendResult
-          error1: /messages/1/error
-          rowErrors1: /messages/1/rowErrors
-      - name: check
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-    cleanup:
-      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: unknown_change_type_after_upsert
-    description: >-
-      The row error for an unknown _CHANGE_TYPE once the connection writes UPSERT rows.
-    steps:
-      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
-      - name: create_table
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-      - name: append
-        grpc:
-          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
-          headers: {x-goog-request-params: "write_stream=${stream}"}
-          requests:
-            - writeStream: ${stream}
-              protoRows:
-                writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGVVBTRVJU"]}
-            - protoRows: {rows: {serializedRows: ["CAESAWIYASIFTUVSR0U="]}}
-        observe:
-          code: /code
-          result0: /messages/0/appendResult
-          error0: /messages/0/error
-          rowErrors0: /messages/0/rowErrors
-          result1: /messages/1/appendResult
-          error1: /messages/1/error
-          rowErrors1: /messages/1/rowErrors
-      - name: check
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-    cleanup:
-      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: insert_without_primary_key
-    description: >-
-      Whether INSERT rows need a primary key.
+      Whether a table without a primary key rejects a writer schema with the pseudocolumns when the first row has no _CHANGE_TYPE, as it does when the row is an INSERT.
     steps:
       - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
       - name: create_table
@@ -122,11 +36,12 @@ cases:
             - writeStream: ${stream}
               protoRows:
                 writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGSU5TRVJU"]}
+                rows: {serializedRows: ["CAESAWEYAQ=="]}
         observe:
           code: /code
           result0: /messages/0/appendResult
-          error0: /messages/0/error
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
           rowErrors0: /messages/0/rowErrors
       - name: check
         rest:
@@ -139,9 +54,9 @@ cases:
         observe: {error: /body/error, rows: /body/rows}
     cleanup:
       - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: explicit_stream_insert
+  - name: explicit_stream_without_primary_key
     description: >-
-      Whether an explicit stream takes INSERT rows.
+      What an explicit stream answers for an INSERT row on a table without a primary key.
     steps:
       - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
       - name: create_table
@@ -149,7 +64,7 @@ cases:
           method: POST
           path: /bigquery/v2/projects/${project}/queries
           body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
+            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64, name STRING, salary INT64)"
             useLegacySql: false
             location: US
         observe: {error: /body/error, rows: /body/rows}
@@ -159,7 +74,47 @@ cases:
           headers: {x-goog-request-params: "parent=${table}"}
           requests:
             - {parent: "${table}", writeStream: {type: COMMITTED}}
-        bind: {stream: /messages/0/name}
+        bind: {explicit: /messages/0/name}
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers: {x-goog-request-params: "write_stream=${explicit}"}
+          requests:
+            - writeStream: ${explicit}
+              protoRows:
+                writerSchema: {protoDescriptor: "${descriptor}"}
+                rows: {serializedRows: ["CAESAWEYASIGSU5TRVJU"]}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
+          rowErrors0: /messages/0/rowErrors
+      - name: check
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+    cleanup:
+      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
+  - name: unknown_change_type_after_insert
+    description: >-
+      The row error for an unknown _CHANGE_TYPE once the connection writes INSERT rows.
+    steps:
+      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
       - name: append
         grpc:
           method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
@@ -169,131 +124,16 @@ cases:
               protoRows:
                 writerSchema: {protoDescriptor: "${descriptor}"}
                 rows: {serializedRows: ["CAESAWEYASIGSU5TRVJU"]}
+            - protoRows: {rows: {serializedRows: ["CAISAWIYASIFTUVSR0U="]}}
         observe:
           code: /code
           result0: /messages/0/appendResult
-          error0: /messages/0/error
-          rowErrors0: /messages/0/rowErrors
-      - name: check
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-    cleanup:
-      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: insert_with_sequence
-    description: >-
-      Whether an INSERT row takes a sequence number.
-    steps:
-      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
-      - name: create_table
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-      - name: append
-        grpc:
-          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
-          headers: {x-goog-request-params: "write_stream=${stream}"}
-          requests:
-            - writeStream: ${stream}
-              protoRows:
-                writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGSU5TRVJUKgEx"]}
-        observe:
-          code: /code
-          result0: /messages/0/appendResult
-          error0: /messages/0/error
-          rowErrors0: /messages/0/rowErrors
-      - name: check
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-    cleanup:
-      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: invalid_sequence_digit_in_second_section
-    description: >-
-      Whether the row error names the section or the whole sequence number.
-    steps:
-      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
-      - name: create_table
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-      - name: append
-        grpc:
-          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
-          headers: {x-goog-request-params: "write_stream=${stream}"}
-          requests:
-            - writeStream: ${stream}
-              protoRows:
-                writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGVVBTRVJUKgUxL1hZWg=="]}
-        observe:
-          code: /code
-          result0: /messages/0/appendResult
-          error0: /messages/0/error
-          rowErrors0: /messages/0/rowErrors
-      - name: check
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-    cleanup:
-      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: null_key_upsert_twice
-    description: >-
-      Whether an UPSERT with a NULL key replaces a row with a NULL key.
-    steps:
-      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
-      - name: create_table
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-      - name: append
-        grpc:
-          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
-          headers: {x-goog-request-params: "write_stream=${stream}"}
-          requests:
-            - writeStream: ${stream}
-              protoRows:
-                writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["EgFhGAEiBlVQU0VSVA=="]}
-            - protoRows: {rows: {serializedRows: ["EgFiGAEiBlVQU0VSVA=="]}}
-        observe:
-          code: /code
-          result0: /messages/0/appendResult
-          error0: /messages/0/error
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
           rowErrors0: /messages/0/rowErrors
           result1: /messages/1/appendResult
-          error1: /messages/1/error
+          errorCode1: /messages/1/error/code
+          error1: /messages/1/error/message
           rowErrors1: /messages/1/rowErrors
       - name: check
         rest:
@@ -306,9 +146,104 @@ cases:
         observe: {error: /body/error, rows: /body/rows}
     cleanup:
       - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: null_key_delete
+  - name: insert_invalid_sequence
     description: >-
-      Whether a DELETE with a NULL key removes a row with a NULL key.
+      Whether an INSERT row checks its sequence number.
+    steps:
+      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers: {x-goog-request-params: "write_stream=${stream}"}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema: {protoDescriptor: "${descriptor}"}
+                rows: {serializedRows: ["CAESAWEYASIGSU5TRVJUKgNYWVo="]}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
+          rowErrors0: /messages/0/rowErrors
+      - name: check
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+    cleanup:
+      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
+  - name: insert_sequence_then_lower_upsert
+    description: >-
+      Whether the sequence number of an INSERT row orders a later UPSERT of its key with a lower one.
+    steps:
+      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+      - name: insert
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers: {x-goog-request-params: "write_stream=${stream}"}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema: {protoDescriptor: "${descriptor}"}
+                rows: {serializedRows: ["CAESAWEYASIGSU5TRVJUKgE1"]}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
+          rowErrors0: /messages/0/rowErrors
+      - name: upsert
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers: {x-goog-request-params: "write_stream=${stream}"}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema: {protoDescriptor: "${descriptor}"}
+                rows: {serializedRows: ["CAESAWIYASIGVVBTRVJUKgEx"]}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
+          rowErrors0: /messages/0/rowErrors
+      - name: check
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+    cleanup:
+      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
+  - name: null_key_upsert_over_dml
+    description: >-
+      Whether an UPSERT with a NULL key replaces a row with a NULL key that DML inserted.
     steps:
       - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
       - name: create_table
@@ -337,11 +272,12 @@ cases:
             - writeStream: ${stream}
               protoRows:
                 writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["IgZERUxFVEU="]}
+                rows: {serializedRows: ["EgFiGAEiBlVQU0VSVA=="]}
         observe:
           code: /code
           result0: /messages/0/appendResult
-          error0: /messages/0/error
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
           rowErrors0: /messages/0/rowErrors
       - name: check
         rest:
@@ -354,9 +290,9 @@ cases:
         observe: {error: /body/error, rows: /body/rows}
     cleanup:
       - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: null_key_with_sequence
+  - name: null_key_delete_after_upsert
     description: >-
-      Whether an UPSERT with a NULL key takes a sequence number.
+      Whether a DELETE with a NULL key removes the row an UPSERT with a NULL key inserted.
     steps:
       - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
       - name: create_table
@@ -376,12 +312,18 @@ cases:
             - writeStream: ${stream}
               protoRows:
                 writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["EgFhGAEiBlVQU0VSVCoBMQ=="]}
+                rows: {serializedRows: ["EgFhGAEiBlVQU0VSVA=="]}
+            - protoRows: {rows: {serializedRows: ["IgZERUxFVEU="]}}
         observe:
           code: /code
           result0: /messages/0/appendResult
-          error0: /messages/0/error
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
           rowErrors0: /messages/0/rowErrors
+          result1: /messages/1/appendResult
+          errorCode1: /messages/1/error/code
+          error1: /messages/1/error/message
+          rowErrors1: /messages/1/rowErrors
       - name: check
         rest:
           method: POST
@@ -393,9 +335,9 @@ cases:
         observe: {error: /body/error, rows: /body/rows}
     cleanup:
       - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: truncate_after_changes
+  - name: null_key_lower_sequence
     description: >-
-      Whether TRUNCATE TABLE is rejected as DELETE, UPDATE and MERGE are.
+      Whether sequence numbers order UPSERT rows with a NULL key.
     steps:
       - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
       - name: create_table
@@ -415,13 +357,104 @@ cases:
             - writeStream: ${stream}
               protoRows:
                 writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGVVBTRVJU"]}
+                rows: {serializedRows: ["EgFhGAEiBlVQU0VSVCoBNQ=="]}
+            - protoRows: {rows: {serializedRows: ["EgFiGAEiBlVQU0VSVCoBMQ=="]}}
         observe:
           code: /code
           result0: /messages/0/appendResult
-          error0: /messages/0/error
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
           rowErrors0: /messages/0/rowErrors
-      - name: after0
+          result1: /messages/1/appendResult
+          errorCode1: /messages/1/error/code
+          error1: /messages/1/error/message
+          rowErrors1: /messages/1/rowErrors
+      - name: check
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+    cleanup:
+      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
+  - name: null_key_delete_with_sequence
+    description: >-
+      Whether a DELETE with a NULL key and a sequence number orders a later UPSERT with a NULL key and a lower one.
+    steps:
+      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers: {x-goog-request-params: "write_stream=${stream}"}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema: {protoDescriptor: "${descriptor}"}
+                rows: {serializedRows: ["IgZERUxFVEUqATU="]}
+            - protoRows: {rows: {serializedRows: ["EgFhGAEiBlVQU0VSVCoBMQ=="]}}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
+          rowErrors0: /messages/0/rowErrors
+          result1: /messages/1/appendResult
+          errorCode1: /messages/1/error/code
+          error1: /messages/1/error/message
+          rowErrors1: /messages/1/rowErrors
+      - name: check
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+    cleanup:
+      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
+  - name: truncate_then_lower_sequence
+    description: >-
+      Whether a sequence number recorded before TRUNCATE TABLE orders a later UPSERT of its key.
+    steps:
+      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
+            useLegacySql: false
+            location: US
+        observe: {error: /body/error, rows: /body/rows}
+      - name: first
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers: {x-goog-request-params: "write_stream=${stream}"}
+          requests:
+            - writeStream: ${stream}
+              protoRows:
+                writerSchema: {protoDescriptor: "${descriptor}"}
+                rows: {serializedRows: ["CAESAWEYASIGVVBTRVJUKgE1"]}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
+          rowErrors0: /messages/0/rowErrors
+      - name: truncate
         rest:
           method: POST
           path: /bigquery/v2/projects/${project}/queries
@@ -430,32 +463,7 @@ cases:
             useLegacySql: false
             location: US
         observe: {error: /body/error, rows: /body/rows}
-      - name: check
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "SELECT id, name, salary FROM `${project}.${dataset}.t` ORDER BY id"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-    cleanup:
-      - {name: delete_dataset, rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
-  - name: insert_dml_after_changes
-    description: >-
-      Whether INSERT DML is allowed right after UPSERT rows.
-    steps:
-      - {name: create_dataset, rest: {method: POST, path: "/bigquery/v2/projects/${project}/datasets", body: {datasetReference: {datasetId: "${dataset}"}, location: US}}}
-      - name: create_table
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "CREATE TABLE `${project}.${dataset}.t` (id INT64 PRIMARY KEY NOT ENFORCED, name STRING, salary INT64)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
-      - name: append
+      - name: second
         grpc:
           method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
           headers: {x-goog-request-params: "write_stream=${stream}"}
@@ -463,21 +471,13 @@ cases:
             - writeStream: ${stream}
               protoRows:
                 writerSchema: {protoDescriptor: "${descriptor}"}
-                rows: {serializedRows: ["CAESAWEYASIGVVBTRVJU"]}
+                rows: {serializedRows: ["CAESAWIYASIGVVBTRVJUKgEx"]}
         observe:
           code: /code
           result0: /messages/0/appendResult
-          error0: /messages/0/error
+          errorCode0: /messages/0/error/code
+          error0: /messages/0/error/message
           rowErrors0: /messages/0/rowErrors
-      - name: after0
-        rest:
-          method: POST
-          path: /bigquery/v2/projects/${project}/queries
-          body:
-            query: "INSERT `${project}.${dataset}.t` VALUES (2, 'b', 2)"
-            useLegacySql: false
-            location: US
-        observe: {error: /body/error, rows: /body/rows}
       - name: check
         rest:
           method: POST

@@ -293,10 +293,6 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
         return {{.index = index, .message = error.what()}};
       }
     }
-    // What a later change to a key with a NULL value does is not known.
-    if (change.null_key && (change.deletes || change.sequence)) {
-      throw ApiError::Unsupported("DELETE rows and sequence numbers for NULL primary key values");
-    }
   }
   std::unique_lock<absl::Mutex> kept;
   try {
@@ -334,9 +330,10 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
       changes.at(index).key = key_texts.at(index).at(0).value_or("");
     }
 
-    // The sequence number in effect for each key, and whether it deleted the key.
+    // The sequence number in effect for each key, and whether it deleted the key, or for a key
+    // with a NULL value, that an UPSERT row inserted it, and its sequence number if it had one.
     struct Recorded {
-      ChangeSequence sequence;
+      std::optional<ChangeSequence> sequence;
       bool deleted = false;
     };
     std::unordered_map<std::string, Recorded> recorded;
@@ -347,14 +344,17 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
         ChangeSequenceTable(table.project_id), ChangeSequencesOf(table, creation_time),
         now - kDeleteRetentionMicros, keys_query));
     for (const auto& row : stored.TextRows()) {
-      const auto sequence = ParseChangeSequence(row.at(1).value_or(""));
-      if (!std::holds_alternative<ChangeSequence>(sequence)) {
-        throw ApiError::Internal("Invalid recorded change sequence: " + row.at(1).value_or(""));
+      const std::string text = row.at(1).value_or("");
+      Recorded& state = recorded[*row.at(0)];
+      state.deleted = row.at(2) == "true";
+      if (text.empty()) {
+        continue;
       }
-      recorded[*row.at(0)] = {
-          .sequence = std::get<ChangeSequence>(sequence),
-          .deleted = row.at(2) == "true",
-      };
+      const auto sequence = ParseChangeSequence(text);
+      if (!std::holds_alternative<ChangeSequence>(sequence)) {
+        throw ApiError::Internal("Invalid recorded change sequence: " + text);
+      }
+      state.sequence = std::get<ChangeSequence>(sequence);
     }
 
     std::vector<std::string> columns;
@@ -365,13 +365,35 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
     // an UPSERT gives each of them its values, or inserts one row when none has the key.
     for (size_t index = 0; index < changes.size(); ++index) {
       const Change& change = changes.at(index);
-      if (change.sequence) {
-        const auto previous = recorded.find(change.key);
-        // Of equal sequence numbers, the change ingested last takes effect.
-        if (previous != recorded.end() && *change.sequence < previous->second.sequence) {
+      const auto previous = recorded.find(change.key);
+      const bool upserted = change.null_key && previous != recorded.end();
+      if (change.null_key) {
+        // A key with a NULL value matches the row an UPSERT row inserted, but a DELETE row leaves
+        // the rows DML inserted. What one does to rows of both, and how sequence numbers order
+        // them, is not known.
+        if (previous != recorded.end() &&
+            (change.deletes || change.sequence || previous->second.sequence)) {
+          throw ApiError::Unsupported(
+              "UPSERT rows with sequence numbers and DELETE rows for NULL primary key values that "
+              "an UPSERT row inserted");
+        }
+        if (change.deletes) {
+          if (change.sequence) {
+            throw ApiError::Unsupported(
+                "DELETE rows with sequence numbers for NULL primary key "
+                "values");
+          }
           continue;
         }
-        recorded[change.key] = {.sequence = *change.sequence, .deleted = change.deletes};
+        recorded[change.key] = {.sequence = change.sequence, .deleted = false};
+        sequenced.insert(change.key);
+      } else if (change.sequence) {
+        // Of equal sequence numbers, the change ingested last takes effect.
+        if (previous != recorded.end() && previous->second.sequence &&
+            *change.sequence < *previous->second.sequence) {
+          continue;
+        }
+        recorded[change.key] = {.sequence = change.sequence, .deleted = change.deletes};
         sequenced.insert(change.key);
       }
       std::vector<std::string> conditions;
@@ -382,8 +404,8 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
       }
       const QueryResult removed = session->Execute(
           std::format("DELETE FROM {} WHERE {}", QualifiedName(table), Join(conditions, " AND ")));
-      if (change.null_key && removed.affected_rows > 0) {
-        throw ApiError::Unsupported("UPSERT rows for NULL primary key values that rows have");
+      if (change.null_key && removed.affected_rows != (upserted ? 1 : 0)) {
+        throw ApiError::Unsupported("UPSERT rows for NULL primary key values that DML inserted");
       }
       if (change.deletes) {
         continue;
@@ -409,11 +431,12 @@ std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
     }
     for (const std::string& changed : sequenced) {
       const Recorded& state = recorded.at(changed);
-      session->Execute(
-          std::format("INSERT OR REPLACE INTO {} VALUES ({}, {}, {}, {}, {}, {}, {})",
-                      ChangeSequenceTable(table.project_id), QuoteLiteral(table.dataset_id),
-                      QuoteLiteral(table.table_id), creation_time, QuoteLiteral(changed),
-                      QuoteLiteral(state.sequence.Text()), state.deleted ? "true" : "false", now));
+      session->Execute(std::format("INSERT OR REPLACE INTO {} VALUES ({}, {}, {}, {}, {}, {}, {})",
+                                   ChangeSequenceTable(table.project_id),
+                                   QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id),
+                                   creation_time, QuoteLiteral(changed),
+                                   QuoteLiteral(state.sequence ? state.sequence->Text() : ""),
+                                   state.deleted ? "true" : "false", now));
     }
     session->Execute(std::format(
         "INSERT OR REPLACE INTO {} VALUES ({}, {}, {}, {})", UpsertTablesTable(table.project_id),

@@ -107,6 +107,36 @@
         "create_table": {}
       }
     },
+    "explicit_stream_insert": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {
+            "offset": "0"
+          }
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
     "insert_after_upsert": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -179,6 +209,48 @@
         "create_table": {}
       }
     },
+    "insert_dml_after_changes": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "after0": {},
+        "append": {
+          "code": "OK",
+          "result0": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "2"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
     "insert_only": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -207,6 +279,101 @@
         "create_table": {}
       }
     },
+    "insert_then_upsert": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error1": {
+            "code": 3,
+            "details": [
+              {
+                "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                "detail": "INVALID_ARGUMENT: The given value is not a valid CHANGE_TYPE in insert mode: UPSERT [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+              }
+            ],
+            "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_bnz3dt6h7d5onqncoittnlw7gh_insert_then_upsert/tables/t/streams/_default"
+          },
+          "result0": {},
+          "rowErrors1": [
+            {
+              "code": "FIELDS_ERROR",
+              "message": "The given value is not a valid CHANGE_TYPE in insert mode: UPSERT"
+            }
+          ]
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
+    "insert_with_sequence": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
+    "insert_without_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "details": [
+                {
+                  "type_url": "type.googleapis.com/google.cloud.bigquery.storage.v1.StorageError",
+                  "value": "CAcSdHByb2plY3RzL2pvaGVqby1zYW5kYm94L2RhdGFzZXRzL2JxYV9ibnozZHQ2aDdkNW9ucW5jb2l0dG5sdzdnaF9pbnNlcnRfd2l0aG91dF9wcmltYXJ5X2tleS90YWJsZXMvdC9zdHJlYW1zL19kZWZhdWx0GjJTY2hlbWEgbWlzbWF0Y2ggZHVlIHRvIGV4dHJhIGZpZWxkcyBpbiB1c2VyIHNjaGVtYQ=="
+                }
+              ],
+              "message": "Input schema has more fields than BigQuery schema, extra fields: '_change_type,_change_sequence_number' Entity: projects/johejo-sandbox/datasets/bqa_bnz3dt6h7d5onqncoittnlw7gh_insert_without_primary_key/tables/t/streams/_default"
+            },
+            "messages": []
+          }
+        },
+        "create_table": {}
+      }
+    },
     "invalid_sequence_digit": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -222,6 +389,33 @@
               }
             ],
             "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_ax7v4shipmaq5t34kngneyicy4_invalid_sequence_digit/tables/t/streams/_default"
+          },
+          "rowErrors0": [
+            {
+              "code": "FIELDS_ERROR",
+              "message": "invalid hex segment for _CHANGE_SEQUENCE_NUMBER:XYZ"
+            }
+          ]
+        },
+        "check": {},
+        "create_table": {}
+      }
+    },
+    "invalid_sequence_digit_in_second_section": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error0": {
+            "code": 3,
+            "details": [
+              {
+                "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                "detail": "INVALID_ARGUMENT: invalid hex segment for _CHANGE_SEQUENCE_NUMBER:XYZ [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+              }
+            ],
+            "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_bnz3dt6h7d5onqncoittnlw7gh_invalid_sequence_digit_in_second_section/tables/t/streams/_default"
           },
           "rowErrors0": [
             {
@@ -337,6 +531,92 @@
     "null_key": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
+    "null_key_delete": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {},
+        "seed": {}
+      }
+    },
+    "null_key_upsert_twice": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {},
+          "result1": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
+    "null_key_with_sequence": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
       "steps": {
         "append": {
           "code": "OK",
@@ -546,6 +826,19 @@
         "create_table": {}
       }
     },
+    "truncate_after_changes": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "after0": {},
+        "append": {
+          "code": "OK",
+          "result0": {}
+        },
+        "check": {},
+        "create_table": {}
+      }
+    },
     "unknown_change_type": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -570,6 +863,50 @@
           ]
         },
         "check": {},
+        "create_table": {}
+      }
+    },
+    "unknown_change_type_after_upsert": {
+      "project": "johejo-sandbox",
+      "run": "bnz3dt6h7d5onqncoittnlw7gh",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error1": {
+            "code": 3,
+            "details": [
+              {
+                "@type": "type.googleapis.com/google.rpc.DebugInfo",
+                "detail": "INVALID_ARGUMENT: The given value is not a valid CHANGE_TYPE: MERGE [type.googleapis.com/util.MessageSetPayload='[cloud.helix.vortex.VortexStatus] { error_code: CONVERTER_FIELD_VALUE_ERROR component: CONVERTER is_public_error: true }']"
+              }
+            ],
+            "message": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_bnz3dt6h7d5onqncoittnlw7gh_unknown_change_type_after_upsert/tables/t/streams/_default"
+          },
+          "result0": {},
+          "rowErrors1": [
+            {
+              "code": "FIELDS_ERROR",
+              "message": "The given value is not a valid CHANGE_TYPE: MERGE"
+            }
+          ]
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
         "create_table": {}
       }
     },

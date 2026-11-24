@@ -50,4 +50,6 @@ std::optional<int64_t> BigQueryTable::UpsertApplyWatermark() const {
   return source_.UpsertApplyWatermark(reference());
 }
 
+bool BigQueryTable::RecordsChangeKeys() const { return source_.RecordsChangeKeys(reference()); }
+
 }  // namespace bigquery_emulator_duckdb

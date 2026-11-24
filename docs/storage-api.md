@@ -67,18 +67,20 @@ none has it, and `_CHANGE_SEQUENCE_NUMBER` values order changes to the same key.
 persist with `--data-dir`, and those of a deleted key last two days.
 
 A table that `UPSERT` and `DELETE` rows changed reports when they last did as its
-`upsert_stream_apply_watermark`, and rejects `UPDATE`, `DELETE` and `MERGE` statements. BigQuery
-accepts them again once it has applied every change and no upsert stream is active, which the
-emulator cannot tell, so it rejects them for as long as the table exists.
+`upsert_stream_apply_watermark`, and rejects `UPDATE`, `DELETE` and `MERGE` statements; `INSERT`
+and `TRUNCATE TABLE` still run. BigQuery accepts the others again once it has applied every change
+and no upsert stream is active, which the emulator cannot tell, so it rejects them for as long as
+the table exists.
 
 These forms are unsupported until BigQuery's behavior is verified:
 
-- `_CHANGE_TYPE` values that are not `INSERT`, `UPSERT` or `DELETE` after a connection's first
-  row, `INSERT` rows on a table without a primary key, and sequence numbers on `INSERT` rows.
-- `DELETE` rows and sequence numbers for a `NULL` primary key value, and `UPSERT` rows for one
-  that rows already have.
-- Sequence numbers of several sections with one that is not hexadecimal.
-- `TRUNCATE TABLE` on a table that `UPSERT` and `DELETE` rows changed.
+- `_CHANGE_TYPE` values that are not `INSERT`, `UPSERT` or `DELETE` after an `INSERT` first row,
+  writer schemas with `_CHANGE_TYPE` on a table without a primary key unless the first row is
+  an `INSERT` on the default stream, and invalid sequence numbers on `INSERT` rows.
+- For a `NULL` primary key value: `UPSERT` rows when DML inserted a row with it, `DELETE` rows
+  after an `UPSERT` row inserted one, and sequence numbers on later changes to it.
+- `TRUNCATE TABLE` on a table that changes with sequence numbers or `NULL` primary key values
+  changed.
 - Collated primary key columns, and primary keys of more than 16 columns.
 
 ## Lifetime and persistence

@@ -14,9 +14,12 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/log/absl_log.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/mutex.h"
 #include "google/cloud/bigquery/storage/v1/storage.grpc.pb.h"
 #include "google/cloud/bigquery/storage/v1/storage.pb.h"
@@ -883,6 +886,13 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (connection.upserts.value_or(false)) {
       require_key();
     }
+    // What an explicit stream answers for change data capture rows on a table without a primary
+    // key is not known.
+    if (typed && !IsDefault(name) && !keyed()) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support _CHANGE_TYPE in explicit streams of tables without a "
+           "primary key");
+    }
     for (size_t index = 0; index < rows.size(); ++index) {
       json& row = rows.at(index);
       const auto found = row.find(kChangeTypeColumn);
@@ -892,10 +902,10 @@ class WriteService final : public pb::BigQueryWrite::Service {
           value.empty() ? ChangeType::kInsert : ParseChangeType(value);
       std::string error;
       if (!type.has_value()) {
-        if (connection.upserts.has_value()) {
+        if (connection.upserts.has_value() && !*connection.upserts) {
           Fail(grpc::StatusCode::UNIMPLEMENTED,
-               "Storage Write does not support unknown _CHANGE_TYPE values after a connection's "
-               "first row");
+               "Storage Write does not support unknown _CHANGE_TYPE values in a connection that "
+               "writes inserts");
         }
         error = "The given value is not a valid CHANGE_TYPE: " + value;
       } else {
@@ -903,6 +913,19 @@ class WriteService final : public pb::BigQueryWrite::Service {
           connection.upserts = IsDefault(name) && *type != ChangeType::kInsert;
           if (*connection.upserts) {
             require_key();
+          } else if (!value.empty() && !keyed()) {
+            // A table without a primary key has no pseudocolumns, so BigQuery takes them for
+            // fields its schema lacks.
+            std::vector<std::string> extra;
+            for (const auto& field : connection.descriptor.field()) {
+              if (field.name() == kChangeTypeColumn || field.name() == kChangeSequenceColumn) {
+                extra.push_back(absl::AsciiStrToLower(field.name()));
+              }
+            }
+            throw ConnectionError(grpc::StatusCode::INVALID_ARGUMENT,
+                                  "Input schema has more fields than BigQuery schema, extra "
+                                  "fields: '" +
+                                      absl::StrJoin(extra, ",") + "' Entity: " + name);
           }
         }
         if (*connection.upserts && *type == ChangeType::kInsert) {
@@ -930,13 +953,17 @@ class WriteService final : public pb::BigQueryWrite::Service {
     }
     if (typed && !rows.empty() && !keyed()) {
       Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write does not support _CHANGE_TYPE on tables without a primary key");
+           "Storage Write does not support rows without _CHANGE_TYPE on tables without a primary "
+           "key when the writer schema has it");
     }
     for (json& row : rows) {
+      // BigQuery takes a sequence number on an insert, which the emulator does not record.
       if (const auto sequence = row.find(kChangeSequenceColumn);
-          sequence != row.end() && !sequence->is_null()) {
+          sequence != row.end() && sequence->is_string() &&
+          !std::holds_alternative<ChangeSequence>(
+              ParseChangeSequence(sequence->get<std::string>()))) {
         Fail(grpc::StatusCode::UNIMPLEMENTED,
-             "Storage Write does not support _CHANGE_SEQUENCE_NUMBER on inserts");
+             "Storage Write does not support invalid _CHANGE_SEQUENCE_NUMBER values on inserts");
       }
       row.erase(kChangeTypeColumn);
       row.erase(kChangeSequenceColumn);

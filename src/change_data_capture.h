@@ -35,9 +35,7 @@ struct ChangeSequence {
   [[nodiscard]] std::string Text() const;
 };
 
-// The sequence number `text` spells, or the message of the row error BigQuery gives for it. Throws
-// ApiError::Unsupported for a section that is not hexadecimal in text of several sections, for
-// which BigQuery's message is not known.
+// The sequence number `text` spells, or the message of the row error BigQuery gives for it.
 std::variant<ChangeSequence, std::string> ParseChangeSequence(std::string_view text);
 
 // The table that records, for each primary key that a change data capture row with a sequence
@@ -46,6 +44,8 @@ std::variant<ChangeSequence, std::string> ParseChangeSequence(std::string_view t
 // name a table by its dataset, table and creation time, as its time travel history does, since
 // DuckDB renumbers table OIDs when it opens a database, and a key by the canonical JSON array of
 // its values. A table with a primary key cannot be renamed, so they need not follow renames.
+// It also records each key with a NULL value that an UPSERT row inserted, with an empty sequence
+// number if the row had none, since such a key replaces only the rows that UPSERT rows inserted.
 std::string ChangeSequenceTable(const std::string& project);
 std::string CreateChangeSequencesStatement(const std::string& project);
 // The table that records, by the same names, the tables that UPSERT and DELETE rows changed and
@@ -57,6 +57,9 @@ std::string ChangeSequencesOf(const TableReference& table, int64_t creation_time
 // The query of the watermark, in milliseconds since the Unix epoch, of `table`, created at
 // `creation_time`, which has no row when no UPSERT or DELETE row changed the table.
 std::string UpsertApplyWatermarkQuery(const TableReference& table, int64_t creation_time);
+// The query whether the change sequence table records a key of `table`, created at
+// `creation_time`, which has a row only if it does.
+std::string ChangeSequencesQuery(const TableReference& table, int64_t creation_time);
 
 // How long BigQuery keeps a deleted key's sequence number to order the changes that arrive after
 // it out of order.

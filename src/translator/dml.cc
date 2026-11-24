@@ -79,9 +79,10 @@ bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
   return true;
 }
 
-// The target of UPDATE, DELETE, MERGE or, if `truncates`, TRUNCATE TABLE, which BigQuery rejects
-// on a table that Storage Write UPSERT and DELETE rows changed until it applied them all. The
-// emulator applies them at once but cannot tell when BigQuery would, so it rejects them always.
+// The target of UPDATE, DELETE, MERGE or, if `truncates`, TRUNCATE TABLE. BigQuery rejects all but
+// TRUNCATE TABLE on a table that Storage Write UPSERT and DELETE rows changed until it applied them
+// all. The emulator applies them at once but cannot tell when BigQuery would, so it rejects them
+// always.
 std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope,
                                 bool truncates = false) {
   if (!table.hint_list().empty() || table.for_system_time_expr() != nullptr ||
@@ -95,11 +96,18 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   if (const auto* stored = dynamic_cast<const BigQueryTable*>(table.table());
       stored != nullptr && stored->UpsertApplyWatermark().has_value()) {
     if (truncates) {
-      return Unsupported(scope, "TRUNCATE TABLE on a table that UPSERT and DELETE rows changed");
+      // Whether a later change still compares with the sequence numbers and NULL keys of rows
+      // TRUNCATE TABLE removed is not known.
+      if (stored->RecordsChangeKeys()) {
+        return Unsupported(scope,
+                           "TRUNCATE TABLE on a table that change data capture rows with "
+                           "sequence numbers or NULL primary key values changed");
+      }
+    } else {
+      throw ApiError::Invalid(
+          "DELETE/UPDATE/MERGE DMLs are currently not supported over tables that had UPSERT "
+          "streams.");
     }
-    throw ApiError::Invalid(
-        "DELETE/UPDATE/MERGE DMLs are currently not supported over tables that had UPSERT "
-        "streams.");
   }
   Target target{
       .table = QuoteIdentifierPath(table.table()->FullName()),

@@ -188,6 +188,16 @@ class DuckDbTableSource : public TableSource {
     return result.rows.empty() ? std::nullopt : std::optional(result.rows.Int64(0, 0));
   }
 
+  bool RecordsChangeKeys(const TableReference& table) override {
+    if (!project_ids_.contains(table.project_id)) {
+      return false;
+    }
+    const auto comment = RelationComment(backend_, RelationType::kTable, table);
+    const int64_t creation_time = comment ? CommentMetadata(*comment).creation_time : 0;
+    return creation_time != 0 &&
+           !backend_.Execute(ChangeSequencesQuery(table, creation_time)).rows.empty();
+  }
+
   absl::StatusOr<std::string> TimeTravelQuery(const TableReference& table, int64_t time) override {
     const auto comment = RelationComment(backend_, RelationType::kTable, table);
     if (!comment.has_value() || !project_ids_.contains(table.project_id)) {

@@ -73,6 +73,9 @@ class TableSource {
   virtual std::optional<int64_t> UpsertApplyWatermark(const TableReference& /*table*/) {
     return std::nullopt;
   }
+  // Whether the emulator records keys of `table` to order or match later UPSERT and DELETE rows,
+  // which an emptied table would leave behind.
+  virtual bool RecordsChangeKeys(const TableReference& /*table*/) { return false; }
 
   // A query of the rows `table` had at `time`, in microseconds since the Unix epoch, for FOR
   // SYSTEM_TIME AS OF: InvalidArgument for a time BigQuery cannot read the table at, and

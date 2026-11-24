@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "absl/strings/match.h"
-#include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
 
@@ -60,10 +59,6 @@ std::variant<ChangeSequence, std::string> ParseChangeSequence(std::string_view t
     const auto [end, error] =
         std::from_chars(section.data(), section.data() + section.size(), value, 16);
     if (section.size() > 16 || error != std::errc() || end != section.data() + section.size()) {
-      if (sections.size() > 1) {
-        throw ApiError::Unsupported("a " + std::string(kChangeSequenceColumn) +
-                                    " of several sections with one that is not hexadecimal");
-      }
       return "invalid hex segment for " + std::string(kChangeSequenceColumn) + ":" +
              std::string(section);
     }
@@ -104,6 +99,11 @@ std::string ChangeSequencesOf(const TableReference& table, int64_t creation_time
 
 std::string UpsertApplyWatermarkQuery(const TableReference& table, int64_t creation_time) {
   return std::format("SELECT applied_millis FROM {} WHERE {}", UpsertTablesTable(table.project_id),
+                     ChangeSequencesOf(table, creation_time));
+}
+
+std::string ChangeSequencesQuery(const TableReference& table, int64_t creation_time) {
+  return std::format("SELECT 1 FROM {} WHERE {} LIMIT 1", ChangeSequenceTable(table.project_id),
                      ChangeSequencesOf(table, creation_time));
 }
 

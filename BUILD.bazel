@@ -72,7 +72,6 @@ cc_library(
     hdrs = ["src/change_data_capture.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":api_error",
         ":duckdb_sql",
         "@abseil-cpp//absl/strings",
     ],
