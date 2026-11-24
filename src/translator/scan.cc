@@ -671,6 +671,18 @@ std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, cons
       return Unsupported(scope, "volatile SQL table function body in GQL CALL");
     }
   }
+  // The body is not part of the caller's partition-filter or field-use analysis.
+  std::vector<const googlesql::ResolvedNode*> tables;
+  body.GetDescendantsWithKinds({googlesql::RESOLVED_TABLE_SCAN}, &tables);
+  for (const auto* table : tables) {
+    const auto* stored =
+        dynamic_cast<const BigQueryTable*>(table->GetAs<googlesql::ResolvedTableScan>()->table());
+    const auto description = stored == nullptr ? std::nullopt : stored->Describe();
+    if (stored != nullptr &&
+        (stored->ReadQuery() || (description && description->metadata.require_partition_filter))) {
+      return Unsupported(scope, "GQL CALL reading external storage or required partition filters");
+    }
+  }
   Scope nested{.context = scope.context};
   const auto names = function->GetArgumentNames();
   std::vector<std::string> arguments;
