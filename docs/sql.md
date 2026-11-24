@@ -20,7 +20,7 @@ rejected.
 
 | Section | Supported | Partial |
 | --- | --- | --- |
-| [Graphs](#graphs) | 4 | 1 |
+| [Graphs](#graphs) | 3 | 2 |
 | [Queries](#queries) | 36 | 3 |
 | [DML](#dml) | 9 | 0 |
 | [DDL](#ddl) | 27 | 6 |
@@ -36,7 +36,7 @@ rejected.
 | `DROP PROPERTY GRAPH` | Supported |  |
 | `GRAPH_EXPAND` | Supported | [Graph limits](compatibility.md#graphs). |
 | `GRAPH_TABLE` | Supported | [Graph limits](compatibility.md#graphs). |
-| GQL queries | Supported | [Graph limits](compatibility.md#graphs). |
+| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: TVF arguments other than fixed scalar types. |
 
 ## Queries
 

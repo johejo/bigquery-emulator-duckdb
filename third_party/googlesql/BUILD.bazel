@@ -1,6 +1,7 @@
 exports_files([
     "compliance.patch",
     "compliance_expected_results.patch",
+    "graph_call.patch",
     "graph_measures.patch",
     "openssl.patch",
 ])

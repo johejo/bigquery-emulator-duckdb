@@ -1,4 +1,4 @@
-# Inline CALL examples and semantics from BigQuery's GQL statement reference.
+# CALL examples and semantics from BigQuery's GQL statement reference.
 # Expected tables are reduced to one cell, with deterministic ordering.
 # third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
 
@@ -164,3 +164,25 @@ RETURN p
 # tools/bqanswers.
 SELECT (SELECT STRING_AGG(FORMAT('%s:%d', name, correlated), ',' ORDER BY name) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (p:Person) CALL (p, k) { RETURN p.name AS name, k AS correlated } RETURN name, correlated)) FROM (SELECT 7 AS k)
 => "Alex:7,Dana:7,Lee:7"
+
+# The named TVF example passes the working row's property and renames the result with YIELD.
+SELECT STRING_AGG(name, ',' ORDER BY name) FROM GRAPH_TABLE(scalar_graph.FinGraph
+  MATCH (p:Person)
+  CALL scalar_graph.echo_name(p.name) YIELD col AS name
+  RETURN name)
+=> "Alex,Dana,Lee"
+
+# OPTIONAL CALL retains the input row for which the TVF returns no rows.
+SELECT STRING_AGG(CONCAT(name, '=', IFNULL(doubled, 'NULL')), ',' ORDER BY name)
+FROM GRAPH_TABLE(scalar_graph.FinGraph
+  MATCH (p:Person)
+  OPTIONAL CALL scalar_graph.keep_names(p.name)
+  RETURN p.name AS name, doubled)
+=> "Alex=Alex:Alex,Dana=NULL,Lee=Lee:Lee"
+
+# Bare CALL drops that input row; a repeated argument reference still reads the same binding.
+SELECT STRING_AGG(doubled, ',' ORDER BY doubled) FROM GRAPH_TABLE(scalar_graph.FinGraph
+  MATCH (p:Person)
+  CALL scalar_graph.keep_names(p.name)
+  RETURN doubled)
+=> "Alex:Alex,Lee:Lee"

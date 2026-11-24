@@ -80,6 +80,8 @@ struct Scope {
   std::map<std::string, WithQuery> with = {};
   // The recursive query being defined, which a ResolvedRecursiveRefScan reads.
   std::optional<WithQuery> recursive = {};
+  // Scalar arguments of the SQL table function whose body is being translated.
+  std::map<std::string, std::string> table_function_arguments = {};
   std::string graph_name = {};
   const googlesql::PropertyGraph* property_graph = nullptr;
   // The alias of the element table whose computed property is being read, which qualifies the

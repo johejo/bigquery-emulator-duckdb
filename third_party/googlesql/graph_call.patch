@@ -1,0 +1,71 @@
+diff --git a/googlesql/analyzer/rewriters/rewriter_relevance_checker.cc b/googlesql/analyzer/rewriters/rewriter_relevance_checker.cc
+--- a/googlesql/analyzer/rewriters/rewriter_relevance_checker.cc
++++ b/googlesql/analyzer/rewriters/rewriter_relevance_checker.cc
+@@ -19,4 +19,5 @@
+ #include <memory>
+ #include <optional>
++#include <utility>
+ #include <vector>
+ 
+@@ -324,4 +325,13 @@
+     return DefaultVisit(node);
+   }
+ 
++  absl::Status VisitResolvedGraphCallScan(
++      const ResolvedGraphCallScan* node) override {
++    // Keep this in sync with the SQL TVF inliner, or rewriting never converges.
++    const auto* previous = std::exchange(graph_call_tvf_, node->subquery());
++    const auto status = DefaultVisit(node);
++    graph_call_tvf_ = previous;
++    return status;
++  }
++
+   absl::Status VisitResolvedTVFScan(const ResolvedTVFScan* node) override {
+@@ -345,4 +355,5 @@
+-    if (node->tvf()->Is<SQLTableValuedFunction>() ||
+-        node->tvf()->Is<TemplatedSQLTVF>()) {
++    if (node != graph_call_tvf_ &&
++        (node->tvf()->Is<SQLTableValuedFunction>() ||
++         node->tvf()->Is<TemplatedSQLTVF>())) {
+       applicable_rewrites_->insert(ResolvedASTRewrite::REWRITE_INLINE_SQL_TVFS);
+     }
+@@ -463,1 +474,2 @@
+   absl::btree_set<ResolvedASTRewrite>* applicable_rewrites_;
++  const ResolvedScan* graph_call_tvf_ = nullptr;
+diff --git a/googlesql/analyzer/rewriters/sql_function_inliner.cc b/googlesql/analyzer/rewriters/sql_function_inliner.cc
+--- a/googlesql/analyzer/rewriters/sql_function_inliner.cc
++++ b/googlesql/analyzer/rewriters/sql_function_inliner.cc
+@@ -978,4 +978,17 @@ class SqlTableFunctionInlineVistor : public ResolvedASTDeepCopyVisitor {
+       : column_factory_(column_factory) {}
+ 
+  private:
++  absl::Status VisitResolvedGraphCallScan(
++      const ResolvedGraphCallScan* scan) override {
++    // A GQL CALL is lateral, but the inliner's argument CTEs cannot capture
++    // columns. Preserve the direct TVF scan for the emulator to lower instead.
++    if (!scan->subquery()->Is<ResolvedTVFScan>()) {
++      return CopyVisitResolvedGraphCallScan(scan);
++    }
++    const auto* previous = std::exchange(graph_call_tvf_, scan->subquery());
++    const auto status = CopyVisitResolvedGraphCallScan(scan);
++    graph_call_tvf_ = previous;
++    return status;
++  }
++
+   absl::StatusOr<bool> IsCallInlinable(const ResolvedTVFScan* scan) {
+@@ -994,4 +1007,7 @@ class SqlTableFunctionInlineVistor : public ResolvedASTDeepCopyVisitor {
+   }
+ 
+   absl::Status VisitResolvedTVFScan(const ResolvedTVFScan* tvf_scan) override {
++    if (tvf_scan == graph_call_tvf_) {
++      return CopyVisitResolvedTVFScan(tvf_scan);
++    }
+     GOOGLESQL_ASSIGN_OR_RETURN(bool inlinable, IsCallInlinable(tvf_scan));
+@@ -1196,6 +1212,7 @@ class SqlTableFunctionInlineVistor : public ResolvedASTDeepCopyVisitor {
+ 
+  private:
+   ColumnFactory* column_factory_;
++  const ResolvedScan* graph_call_tvf_ = nullptr;
+ };
+ 
+ class SqlTvfInliner : public Rewriter {

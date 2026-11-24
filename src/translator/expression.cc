@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/constant.h"
@@ -641,6 +642,14 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       return std::nullopt;
     }
     return column->second;
+  }
+  if (expr.Is<googlesql::ResolvedArgumentRef>()) {
+    const auto name = expr.GetAs<googlesql::ResolvedArgumentRef>()->name();
+    const auto argument = scope.table_function_arguments.find(absl::AsciiStrToLower(name));
+    if (argument == scope.table_function_arguments.end()) {
+      return Unsupported(scope, "unbound SQL table function argument");
+    }
+    return argument->second;
   }
   if (expr.Is<googlesql::ResolvedArrayAggregate>()) {
     return ArrayAggregate(*expr.GetAs<googlesql::ResolvedArrayAggregate>(), scope, columns);
