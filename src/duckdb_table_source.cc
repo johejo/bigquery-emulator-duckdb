@@ -16,6 +16,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/change_data_capture.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_table_provider.h"
@@ -172,6 +173,29 @@ class DuckDbTableSource : public TableSource {
 
   TableWriteRestriction WriteRestriction(const TableReference& table) override {
     return TableWriteRestrictionOf(backend_, table);
+  }
+
+  std::optional<int64_t> UpsertApplyWatermark(const TableReference& table) override {
+    if (!project_ids_.contains(table.project_id)) {
+      return std::nullopt;
+    }
+    const auto comment = RelationComment(backend_, RelationType::kTable, table);
+    const int64_t creation_time = comment ? CommentMetadata(*comment).creation_time : 0;
+    if (creation_time == 0) {
+      return std::nullopt;
+    }
+    const QueryResult result = backend_.Execute(UpsertApplyWatermarkQuery(table, creation_time));
+    return result.rows.empty() ? std::nullopt : std::optional(result.rows.Int64(0, 0));
+  }
+
+  bool RecordsChangeKeys(const TableReference& table) override {
+    if (!project_ids_.contains(table.project_id)) {
+      return false;
+    }
+    const auto comment = RelationComment(backend_, RelationType::kTable, table);
+    const int64_t creation_time = comment ? CommentMetadata(*comment).creation_time : 0;
+    return creation_time != 0 &&
+           !backend_.Execute(ChangeSequencesQuery(table, creation_time)).rows.empty();
   }
 
   absl::StatusOr<std::string> TimeTravelQuery(const TableReference& table, int64_t time) override {

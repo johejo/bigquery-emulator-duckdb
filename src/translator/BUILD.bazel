@@ -249,6 +249,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":query",
+        "//:api_error",
         "//:catalog_table",
         "//:duckdb_sql",
         "//:field_schema",

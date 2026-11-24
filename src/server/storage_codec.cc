@@ -29,6 +29,7 @@
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/change_data_capture.h"
 #include "src/field_schema.h"
 #include "src/googlesql_geography/geojson.h"
 #include "src/googlesql_geography/input.h"
@@ -124,6 +125,10 @@ std::string DecodeStorageText(std::string_view text, FieldType type, std::string
 
 namespace {
 
+bool IsChangePseudocolumn(std::string_view name) {
+  return name == kChangeTypeColumn || name == kChangeSequenceColumn;
+}
+
 const FieldSchema& Destination(const std::vector<FieldSchema>& schema, std::string_view name) {
   const auto found = std::ranges::find(schema, name, &FieldSchema::name);
   if (found == schema.end()) {
@@ -194,6 +199,13 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
   }
   for (int i = 0; i < descriptor.field_count(); ++i) {
     const auto& input = *descriptor.field(i);
+    if (depth == 0 && IsChangePseudocolumn(input.name())) {
+      if (input.type() != FieldDescriptor::TYPE_STRING || input.is_repeated()) {
+        throw ApiError::Invalid("Writer schema field " + std::string(input.name()) +
+                                " must be an optional string");
+      }
+      continue;
+    }
     const auto& field = Destination(schema, input.name());
     if (input.containing_oneof() != nullptr || input.is_map()) {
       throw ApiError::Invalid("Storage Write does not support oneof or map fields");
@@ -399,7 +411,14 @@ class StorageProtoDecoder::Impl {
     }
     ValidateProto(*built->message_type(0), schema, 0);
     prototype = factory.GetPrototype(built->message_type(0));
+    for (const std::string_view name : {kChangeTypeColumn, kChangeSequenceColumn}) {
+      if (const auto* field = built->message_type(0)->FindFieldByName(name); field != nullptr) {
+        pseudocolumns.push_back(field);
+      }
+    }
   }
+  // The change data capture pseudocolumns of the writer schema.
+  std::vector<const FieldDescriptor*> pseudocolumns;
   std::vector<FieldSchema> schema;
   google::protobuf::DescriptorPool pool;
   google::protobuf::DynamicMessageFactory factory;
@@ -418,7 +437,40 @@ json StorageProtoDecoder::Decode(const std::string& bytes, bool default_missing,
   if (!message->ParseFromString(bytes)) {
     throw ApiError::Invalid("Invalid serialized protobuf row");
   }
-  return ProtoMessage(*message, impl_->schema, default_missing, &missing);
+  const auto* reflection = message->GetReflection();
+  const auto deletes = [&] {
+    return std::ranges::any_of(impl_->pseudocolumns, [&](const FieldDescriptor* field) {
+      return field->name() == kChangeTypeColumn && reflection->HasField(*message, field) &&
+             ParseChangeType(reflection->GetString(*message, field)) == ChangeType::kDelete;
+    });
+  };
+  json row;
+  if (deletes()) {
+    // A DELETE row needs only its key, so BigQuery takes it without its REQUIRED columns.
+    std::vector<FieldSchema> schema = impl_->schema;
+    for (FieldSchema& field : schema) {
+      if (field.mode == FieldMode::kRequired) {
+        field.mode = FieldMode::kNullable;
+      }
+    }
+    row = ProtoMessage(*message, schema, default_missing, &missing);
+  } else {
+    row = ProtoMessage(*message, impl_->schema, default_missing, &missing);
+  }
+  for (const FieldDescriptor* field : impl_->pseudocolumns) {
+    row[std::string(field->name())] = reflection->HasField(*message, field)
+                                          ? json(reflection->GetString(*message, field))
+                                          : json(nullptr);
+  }
+  return row;
 }
+
+bool StorageProtoDecoder::WritesChanges() const {
+  return std::ranges::any_of(impl_->pseudocolumns, [](const FieldDescriptor* field) {
+    return field->name() == kChangeTypeColumn;
+  });
+}
+
+bool StorageProtoDecoder::HasChangeColumns() const { return !impl_->pseudocolumns.empty(); }
 
 }  // namespace bigquery_emulator_duckdb

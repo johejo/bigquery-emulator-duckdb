@@ -54,6 +54,35 @@ Tables persisted without creation metadata cannot return default-stream creation
 
 Decimal input must fit NUMERIC's scale of 9 or BIGNUMERIC's scale of 38 exactly.
 
+## Change data capture
+
+Protobuf rows with a `_CHANGE_TYPE` field apply
+[change data capture](../third_party/bigquery_docs/change-data-capture.md). On the default
+stream, the first row of a connection decides whether it writes inserts, as rows with `INSERT` or
+no `_CHANGE_TYPE` do, or `UPSERT` and `DELETE` rows, which need a table with a primary key;
+explicit streams write only inserts. The emulator applies each change when it appends it, so
+queries always see every change, as BigQuery's do without `max_staleness`; that table option
+remains unsupported. An `UPSERT` gives every row with its key its values, or inserts a row when
+none has it, and `_CHANGE_SEQUENCE_NUMBER` values order changes to the same key. Sequence numbers
+persist with `--data-dir`, and those of a deleted key last two days.
+
+A table that `UPSERT` and `DELETE` rows changed reports when they last did as its
+`upsert_stream_apply_watermark`, and rejects `UPDATE`, `DELETE` and `MERGE` statements; `INSERT`
+and `TRUNCATE TABLE` still run. BigQuery accepts the others again once it has applied every change
+and no upsert stream is active, which the emulator cannot tell, so it rejects them for as long as
+the table exists.
+
+These forms are unsupported until BigQuery's behavior is verified:
+
+- `_CHANGE_TYPE` values that are not `INSERT`, `UPSERT` or `DELETE` after an `INSERT` first row,
+  writer schemas with `_CHANGE_TYPE` on a table without a primary key unless the first row is
+  an `INSERT` on the default stream, and invalid sequence numbers on `INSERT` rows.
+- For a `NULL` primary key value: `UPSERT` rows when DML inserted a row with it, `DELETE` rows
+  after an `UPSERT` row inserted one, and sequence numbers on later changes to it.
+- `TRUNCATE TABLE` on a table that changes with sequence numbers or `NULL` primary key values
+  changed.
+- Collated primary key columns, and primary keys of more than 16 columns.
+
 ## Lifetime and persistence
 
 Storage session and stream state, offsets, and unpublished BUFFERED/PENDING rows are

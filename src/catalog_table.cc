@@ -1,6 +1,7 @@
 #include "src/catalog_table.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -44,5 +45,11 @@ std::optional<std::string> BigQueryTable::DmlTargetFilter(const std::string& ali
 TableWriteRestriction BigQueryTable::WriteRestriction() const {
   return source_.WriteRestriction(reference());
 }
+
+std::optional<int64_t> BigQueryTable::UpsertApplyWatermark() const {
+  return source_.UpsertApplyWatermark(reference());
+}
+
+bool BigQueryTable::RecordsChangeKeys() const { return source_.RecordsChangeKeys(reference()); }
 
 }  // namespace bigquery_emulator_duckdb

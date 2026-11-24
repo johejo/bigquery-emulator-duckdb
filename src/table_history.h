@@ -44,8 +44,9 @@ std::vector<std::string> DiscardHistoryStatements(const TableReference& table,
 std::vector<std::string> RenameHistoryStatements(const TableReference& table, int64_t creation_time,
                                                  const std::string& table_id);
 
-// Drops the history of the tables of `project` that were dropped or replaced since. Another sweep
-// running meanwhile can make it skip some, which a later one drops.
+// Drops the history of the tables of `project` that were dropped or replaced since, and their
+// change data capture records, which ChangeSequenceTable and UpsertTablesTable name the same way.
+// Another sweep running meanwhile can make it skip some, which a later one drops.
 void SweepHistory(Backend& backend, const std::string& project);
 
 // The query that reads the rows `table`, created at `creation_time`, had at `time`, in microseconds

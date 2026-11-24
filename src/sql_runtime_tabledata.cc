@@ -2,20 +2,26 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/synchronization/mutex.h"
+#include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/change_data_capture.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -23,6 +29,7 @@
 #include "src/references.h"
 #include "src/schema_sql.h"
 #include "src/sql_runtime.h"
+#include "src/table_metadata.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -207,6 +214,234 @@ std::vector<InsertError> SqlRuntime::WriteStorageRows(TableReference table,
       }
     }
     session->Transaction(validate_only ? "ROLLBACK" : "COMMIT");
+    return {};
+  } catch (const BackendError& error) {
+    throw ApiError::Invalid(error.what());
+  }
+}
+
+std::vector<InsertError> SqlRuntime::WriteStorageChanges(TableReference table,
+                                                         const std::vector<FieldSchema>& schema,
+                                                         const json& rows, int64_t storage_id) {
+  const auto expiration_lock = expiration_mutex_.LockCatalog();
+  table.project_id = ResolveProject(table.project_id);
+  const TableInfo info =
+      GetTable(table, /*include_row_count=*/false, /*expire=*/true, &expiration_lock);
+  table = info.reference;
+  if (info.view_query) {
+    throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
+  }
+  RejectReadOnlyWrite(info);
+  const std::vector<std::string> key = PrimaryKeyColumns(info.metadata.primary_key, info.schema);
+  if (key.empty()) {
+    throw ApiError::Invalid("Change data capture requires a table with a primary key: " +
+                            TableName(table));
+  }
+  if (key.size() > 16) {
+    throw ApiError::Unsupported("change data capture on primary keys of more than 16 columns");
+  }
+  std::vector<const FieldSchema*> key_fields;
+  for (const std::string& name : key) {
+    const auto field = std::ranges::find(schema, name, &FieldSchema::name);
+    if (field == schema.end()) {
+      throw ApiError::Invalid("Storage Write does not support destination schema changes");
+    }
+    if (field->collation.has_value() && !field->collation->empty()) {
+      throw ApiError::Unsupported("change data capture on collated primary key columns");
+    }
+    key_fields.push_back(&*field);
+  }
+  const int64_t creation_time = HistoryCreationTime(table, info.metadata);
+  if (creation_time == 0) {
+    throw ApiError::Unsupported(
+        "UPSERT and DELETE rows on tables created before the emulator recorded creation times");
+  }
+  auto write_schema = schema;
+  for (auto& field : write_schema) {
+    ClearStorageWriteLengths(field);
+  }
+  constexpr InsertValueOptions options{.allow_interval_nanos = true};
+
+  // What each row asks for, and the SQL of its key's values.
+  struct Change {
+    bool deletes = false;
+    std::optional<ChangeSequence> sequence;
+    std::vector<std::string> key_values;
+    bool null_key = false;
+    std::string key;
+  };
+  std::vector<Change> changes(rows.size());
+  for (size_t index = 0; index < rows.size(); ++index) {
+    const json& row = rows.at(index);
+    Change& change = changes.at(index);
+    change.deletes = row.at(kChangeTypeColumn) == "DELETE";
+    const auto sequence = row.find(kChangeSequenceColumn);
+    if (sequence != row.end() && !sequence->is_null()) {
+      auto parsed = ParseChangeSequence(sequence->get<std::string>());
+      if (auto* message = std::get_if<std::string>(&parsed)) {
+        return {{.index = index, .message = std::move(*message)}};
+      }
+      change.sequence = std::get<ChangeSequence>(std::move(parsed));
+    }
+    for (const FieldSchema* field : key_fields) {
+      const auto value = row.find(field->name);
+      change.null_key = change.null_key || value == row.end() || value->is_null();
+      try {
+        change.key_values.push_back(
+            value == row.end() ? "NULL" : RoundedInsertValue(functions_, *value, *field, options));
+      } catch (const ApiError& error) {
+        return {{.index = index, .message = error.what()}};
+      }
+    }
+  }
+  std::unique_lock<absl::Mutex> kept;
+  try {
+    const auto session = backend_.NewSession();
+    session->Transaction("BEGIN TRANSACTION");
+    const QueryResult identity =
+        session->Execute("SELECT table_oid FROM " +
+                         RelationsQuery(table.project_id, table.dataset_id, table.table_id) +
+                         " WHERE type = 'TABLE'");
+    if (identity.rows.empty() || identity.rows.Int64(0, 0) != storage_id) {
+      throw ApiError::NotFound("The Storage Write destination table was dropped or replaced");
+    }
+    CheckWritableTable(*session, table);
+    if (SchemaToJson(TableSchema(*session, table)) != SchemaToJson(schema)) {
+      throw ApiError::Invalid("Storage Write does not support destination schema changes");
+    }
+    kept = std::unique_lock(HistoryMutex(table));
+    (void)KeepVersion(*session, table);
+    if (rows.empty()) {
+      session->Transaction("COMMIT");
+      return {};
+    }
+
+    // DuckDB spells each key canonically, as the change sequence table records it.
+    std::vector<std::string> selects;
+    selects.reserve(changes.size());
+    for (size_t index = 0; index < changes.size(); ++index) {
+      selects.push_back(std::format("SELECT {} AS i, CAST(json_array({}) AS VARCHAR) AS key", index,
+                                    Join(changes.at(index).key_values, ", ")));
+    }
+    const std::string keys_query = Join(selects, " UNION ALL ");
+    const auto keys = session->Execute("SELECT key FROM (" + keys_query + ") ORDER BY i");
+    const auto key_texts = keys.TextRows();
+    for (size_t index = 0; index < changes.size(); ++index) {
+      changes.at(index).key = key_texts.at(index).at(0).value_or("");
+    }
+
+    // The sequence number in effect for each key, and whether it deleted the key, or for a key
+    // with a NULL value, that an UPSERT row inserted it, and its sequence number if it had one.
+    struct Recorded {
+      std::optional<ChangeSequence> sequence;
+      bool deleted = false;
+    };
+    std::unordered_map<std::string, Recorded> recorded;
+    const int64_t now = absl::ToUnixMicros(absl::Now());
+    const auto stored = session->Execute(std::format(
+        "SELECT key, sequence, CAST(deleted AS VARCHAR) FROM {} WHERE {} AND (NOT deleted OR "
+        "changed_micros >= {}) AND key IN (SELECT key FROM ({}))",
+        ChangeSequenceTable(table.project_id), ChangeSequencesOf(table, creation_time),
+        now - kDeleteRetentionMicros, keys_query));
+    for (const auto& row : stored.TextRows()) {
+      const std::string text = row.at(1).value_or("");
+      Recorded& state = recorded[*row.at(0)];
+      state.deleted = row.at(2) == "true";
+      if (text.empty()) {
+        continue;
+      }
+      const auto sequence = ParseChangeSequence(text);
+      if (!std::holds_alternative<ChangeSequence>(sequence)) {
+        throw ApiError::Internal("Invalid recorded change sequence: " + text);
+      }
+      state.sequence = std::get<ChangeSequence>(sequence);
+    }
+
+    std::vector<std::string> columns;
+    std::ranges::transform(write_schema, std::back_inserter(columns),
+                           [](const FieldSchema& field) { return QuoteIdentifier(field.name); });
+    std::set<std::string> sequenced;
+    // Each change, in order, replaces every row with its key, which BigQuery does not enforce:
+    // an UPSERT gives each of them its values, or inserts one row when none has the key.
+    for (size_t index = 0; index < changes.size(); ++index) {
+      const Change& change = changes.at(index);
+      const auto previous = recorded.find(change.key);
+      const bool upserted = change.null_key && previous != recorded.end();
+      if (change.null_key) {
+        // A key with a NULL value matches the row an UPSERT row inserted, but a DELETE row leaves
+        // the rows DML inserted. What one does to rows of both, and how sequence numbers order
+        // them, is not known.
+        if (previous != recorded.end() &&
+            (change.deletes || change.sequence || previous->second.sequence)) {
+          throw ApiError::Unsupported(
+              "UPSERT rows with sequence numbers and DELETE rows for NULL primary key values that "
+              "an UPSERT row inserted");
+        }
+        if (change.deletes) {
+          if (change.sequence) {
+            throw ApiError::Unsupported(
+                "DELETE rows with sequence numbers for NULL primary key "
+                "values");
+          }
+          continue;
+        }
+        recorded[change.key] = {.sequence = change.sequence, .deleted = false};
+        sequenced.insert(change.key);
+      } else if (change.sequence) {
+        // Of equal sequence numbers, the change ingested last takes effect.
+        if (previous != recorded.end() && previous->second.sequence &&
+            *change.sequence < *previous->second.sequence) {
+          continue;
+        }
+        recorded[change.key] = {.sequence = change.sequence, .deleted = change.deletes};
+        sequenced.insert(change.key);
+      }
+      std::vector<std::string> conditions;
+      conditions.reserve(key_fields.size());
+      for (size_t column = 0; column < key_fields.size(); ++column) {
+        conditions.push_back(QuoteIdentifier(key_fields.at(column)->name) +
+                             " IS NOT DISTINCT FROM " + change.key_values.at(column));
+      }
+      const QueryResult removed = session->Execute(
+          std::format("DELETE FROM {} WHERE {}", QualifiedName(table), Join(conditions, " AND ")));
+      if (change.null_key && removed.affected_rows != (upserted ? 1 : 0)) {
+        throw ApiError::Unsupported("UPSERT rows for NULL primary key values that DML inserted");
+      }
+      if (change.deletes) {
+        continue;
+      }
+      const json& row = rows.at(index);
+      try {
+        std::vector<std::string> values;
+        for (const auto& field : write_schema) {
+          const auto value = row.find(field.name);
+          values.push_back(value == row.end()
+                               ? "DEFAULT"
+                               : RoundedInsertValue(functions_, *value, field, options));
+        }
+        const std::string tuple = "(" + Join(values, ", ") + ")";
+        const std::vector<std::string> tuples(std::max<size_t>(removed.affected_rows, 1), tuple);
+        session->Execute(std::format("INSERT INTO {} ({}) VALUES {}", QualifiedName(table),
+                                     Join(columns, ", "), Join(tuples, ", ")));
+      } catch (const ApiError& error) {
+        return {{.index = index, .message = error.what()}};
+      } catch (const BackendError& error) {
+        return {{.index = index, .message = error.what()}};
+      }
+    }
+    for (const std::string& changed : sequenced) {
+      const Recorded& state = recorded.at(changed);
+      session->Execute(std::format("INSERT OR REPLACE INTO {} VALUES ({}, {}, {}, {}, {}, {}, {})",
+                                   ChangeSequenceTable(table.project_id),
+                                   QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id),
+                                   creation_time, QuoteLiteral(changed),
+                                   QuoteLiteral(state.sequence ? state.sequence->Text() : ""),
+                                   state.deleted ? "true" : "false", now));
+    }
+    session->Execute(std::format(
+        "INSERT OR REPLACE INTO {} VALUES ({}, {}, {}, {})", UpsertTablesTable(table.project_id),
+        QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id), creation_time, now / 1000));
+    session->Transaction("COMMIT");
     return {};
   } catch (const BackendError& error) {
     throw ApiError::Invalid(error.what());
