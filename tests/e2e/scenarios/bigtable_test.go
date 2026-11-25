@@ -261,3 +261,30 @@ func seedBigtableJSONFamilyTypes(t *testing.T, project string) {
 		}
 	}
 }
+
+// Mirrors the fixture described in bigtable_row_key_filters.api.yaml.
+func seedBigtableRowKeyFilters(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-row-key-filter-probe", map[string]*adminpb.ColumnFamily{"family": {}})
+	for key, value := range map[string]string{"good": "ok", "bad": "\xff"} {
+		if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+			TableName: table, RowKey: []byte(key), Mutations: []*btpb.Mutation{bigtableCell("family", "q", value, 1000)},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Mirrors the fixture described in bigtable_utf8_keys.api.yaml and
+// known_bugs/bigtable_qualifier_names.api.yaml.
+func seedBigtableUTF8Keys(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-utf8-key-probe", map[string]*adminpb.ColumnFamily{"family": {}})
+	for key, qualifier := range map[string]string{"\xff": "q", "good": "\xff"} {
+		if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+			TableName: table, RowKey: []byte(key), Mutations: []*btpb.Mutation{bigtableCell("family", qualifier, "ok", 1000)},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

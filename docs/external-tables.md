@@ -175,7 +175,10 @@ source rows.
   `SELECT rowkey`, includes all source rows.
 - **Missing values:** In an included row, a missing family or named qualifier is `NULL`.
 - **UTF-8:** A query fails on a `STRING` or `JSON` cell that is not valid UTF-8 when it reads
-  the cell's named field, or when it reads any part of the family and the cell is unlisted.
+  the cell's named field, or when it reads any part of the family and the cell is unlisted, and
+  on a row key that is not valid UTF-8 with `readRowkeyAsString`, even in a row that a filter on
+  `rowkey` drops. A read of `family.column` rejects an unlisted qualifier that is not valid UTF-8
+  as unsupported, where BigQuery gives a `STRING` name that holds its bytes.
 - **JSON families:** With `outputColumnFamiliesAsJson`, each family is a `JSON` column whose
   keys are qualifiers, or field names for named qualifiers. Each value is an array of
   `{"timestamp": microseconds, "value": ...}` versions, newest first, or the newest version alone

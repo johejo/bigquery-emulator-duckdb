@@ -28,6 +28,7 @@ cc_library(
         "function.cc",
         "gap_fill.cc",
         "graph.cc",
+        "read_keys.cc",
         "scan.cc",
     ],
     hdrs = [
@@ -86,6 +87,7 @@ cc_library(
     visibility = ["//:__pkg__"],
     deps = [
         ":context",
+        "//:key_ranges",
         "//:timestamp_precision",
     ],
 )

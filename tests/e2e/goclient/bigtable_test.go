@@ -2,11 +2,13 @@ package goclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -404,5 +406,128 @@ func TestBigtableExternal(t *testing.T) {
 	want = [][]bigquery.Value{{"null", false, `{"a":2,"b":1}`, `[1,"x"]`}}
 	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
 		t.Fatalf("JSON rows = %v, want %v", rows, want)
+	}
+}
+
+// Row key filters keep the rows that BigQuery's comparison operators, IN, BETWEEN and
+// STARTS_WITH keep, which order BYTES and STRING values by their bytes, as Bigtable orders row
+// keys (third_party/bigquery_docs/reference/standard-sql/operators.md). Filters do not reach
+// a scan through LIMIT, an outer join or a WITH query referenced twice.
+func TestBigtableRowKeyFilters(t *testing.T) {
+	t.Parallel()
+	client := newClient(t)
+	host := os.Getenv("BIGTABLE_EMULATOR_HOST")
+	if host == "" {
+		t.Fatal("BIGTABLE_EMULATOR_HOST is required; run just e2e")
+	}
+	ctx := t.Context()
+	conn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Subtests run in parallel after this function returns; cleanups run after them.
+	t.Cleanup(func() { _ = conn.Close() })
+	admin := adminpb.NewBigtableTableAdminClient(conn)
+	data := btpb.NewBigtableClient(conn)
+	parent := "projects/test/instances/test"
+	// Creates a Bigtable table of rows with `keys` and returns its URI.
+	create := func(tableID string, keys []string) string {
+		t.Helper()
+		source := parent + "/tables/" + tableID
+		if _, err := admin.CreateTable(ctx, &adminpb.CreateTableRequest{
+			Parent: parent, TableId: tableID,
+			Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = admin.DeleteTable(context.Background(), &adminpb.DeleteTableRequest{Name: source})
+		})
+		for _, key := range keys {
+			if _, err := data.MutateRow(ctx, &btpb.MutateRowRequest{TableName: source, RowKey: []byte(key), Mutations: []*btpb.Mutation{
+				{Mutation: &btpb.Mutation_SetCell_{SetCell: &btpb.Mutation_SetCell{FamilyName: "family", ColumnQualifier: []byte("q"), TimestampMicros: 1000, Value: []byte("v")}}},
+			}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return "https://googleapis.com/bigtable/" + source
+	}
+	keys := []string{"a", "ab", "abc", "b", "b\xff", "b\xff\xff", "c", "z", "\xc3\xa9", "\xff", "\xff\xff"}
+	raw := create("go-bigtable-row-key-filters", keys)
+	// Every key of the STRING table is valid UTF-8.
+	text := create("go-bigtable-row-key-filters-text", []string{"a", "c", "z", "\xc3\xa9", "\xe6\x97\xa5"})
+	newDataset(t, client, "go_bigtable_row_key_filters")
+	for _, ddl := range []string{
+		fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_row_key_filters.raw OPTIONS (format = 'CLOUD_BIGTABLE', uris = '%s')`, raw),
+		fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_row_key_filters.text OPTIONS (format = 'CLOUD_BIGTABLE', uris = '%s',
+  bigtable_options = '{"readRowkeyAsString":true}')`, text),
+	} {
+		if err := wait(ctx, client.Query(ddl)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, test := range []struct {
+		name       string
+		sql        string
+		parameters []bigquery.QueryParameter
+		want       []string
+	}{
+		{name: "equal", sql: `SELECT rowkey FROM raw WHERE rowkey = b'ab'`, want: []string{"ab"}},
+		{name: "missing", sql: `SELECT rowkey FROM raw WHERE rowkey = b'aa'`},
+		{name: "range", sql: `SELECT rowkey FROM raw WHERE rowkey > b'ab' AND rowkey <= b'b'`, want: []string{"abc", "b"}},
+		{name: "constant first", sql: `SELECT rowkey FROM raw WHERE b'b' > rowkey`, want: []string{"a", "ab", "abc"}},
+		{name: "at least", sql: `SELECT rowkey FROM raw WHERE rowkey >= b'z'`, want: []string{"z", "\xc3\xa9", "\xff", "\xff\xff"}},
+		{name: "between", sql: `SELECT rowkey FROM raw WHERE rowkey BETWEEN b'ab' AND b'b'`, want: []string{"ab", "abc", "b"}},
+		{name: "empty between", sql: `SELECT rowkey FROM raw WHERE rowkey BETWEEN b'b' AND b'a'`},
+		{name: "in", sql: `SELECT rowkey FROM raw WHERE rowkey IN (b'c', b'a', NULL, b'zz')`, want: []string{"a", "c"}},
+		{name: "prefix", sql: `SELECT rowkey FROM raw WHERE STARTS_WITH(rowkey, b'ab')`, want: []string{"ab", "abc"}},
+		{name: "prefix ending in 0xff", sql: `SELECT rowkey FROM raw WHERE STARTS_WITH(rowkey, b'b\xff')`, want: []string{"b\xff", "b\xff\xff"}},
+		{name: "prefix of 0xff", sql: `SELECT rowkey FROM raw WHERE STARTS_WITH(rowkey, b'\xff')`, want: []string{"\xff", "\xff\xff"}},
+		{name: "empty prefix", sql: `SELECT rowkey FROM raw WHERE STARTS_WITH(rowkey, b'') AND rowkey < b'ab'`, want: []string{"a"}},
+		{name: "or", sql: `SELECT rowkey FROM raw WHERE rowkey = b'a' OR rowkey > b'z'`, want: []string{"a", "\xc3\xa9", "\xff", "\xff\xff"}},
+		{name: "or with another column", sql: `SELECT rowkey FROM raw WHERE rowkey = b'a' OR ARRAY_LENGTH(family.column) = 0`, want: []string{"a"}},
+		{name: "disjoint", sql: `SELECT rowkey FROM raw WHERE rowkey < b'b' AND rowkey > b'b'`},
+		{name: "below empty", sql: `SELECT rowkey FROM raw WHERE rowkey <= b''`},
+		{name: "above empty", sql: `SELECT COUNT(*) FROM raw WHERE rowkey > b''`, want: []string{fmt.Sprint(len(keys))}},
+		{name: "where false", sql: `SELECT rowkey FROM raw WHERE FALSE AND rowkey = b'a'`},
+		{name: "named parameter", sql: `SELECT rowkey FROM raw WHERE rowkey = @key`, parameters: []bigquery.QueryParameter{{Name: "key", Value: []byte("abc")}}, want: []string{"abc"}},
+		{name: "positional parameter", sql: `SELECT rowkey FROM raw WHERE rowkey < ?`, parameters: []bigquery.QueryParameter{{Value: []byte("ab")}}, want: []string{"a"}},
+		{name: "script variable", sql: `DECLARE key BYTES DEFAULT b'c'; SELECT rowkey FROM raw WHERE rowkey >= key AND rowkey < b'zz'`, want: []string{"c", "z"}},
+		{name: "unnest", sql: `SELECT rowkey FROM raw, UNNEST(family.column) AS col WHERE rowkey = b'b'`, want: []string{"b"}},
+		{name: "inner join", sql: `SELECT x.rowkey FROM raw AS x JOIN raw AS y ON x.rowkey = y.rowkey AND y.rowkey = b'c'`, want: []string{"c"}},
+		{name: "subquery", sql: `SELECT rowkey FROM (SELECT rowkey FROM raw) WHERE rowkey = b'b'`, want: []string{"b"}},
+		{name: "limit", sql: `SELECT rowkey FROM (SELECT rowkey FROM raw ORDER BY rowkey LIMIT 2) WHERE rowkey >= b'ab'`, want: []string{"ab"}},
+		{name: "outer join", sql: `SELECT x.rowkey FROM raw AS x LEFT JOIN raw AS y ON x.rowkey = b'a' AND y.rowkey = b'b' WHERE x.rowkey < b'b'`, want: []string{"a", "ab", "abc"}},
+		{name: "aggregate", sql: `SELECT rowkey FROM (SELECT rowkey, COUNT(*) AS n FROM raw GROUP BY rowkey) WHERE rowkey = b'c'`, want: []string{"c"}},
+		{name: "with", sql: `WITH k AS (SELECT rowkey FROM raw) SELECT rowkey FROM k WHERE rowkey = b'a' UNION ALL SELECT rowkey FROM k WHERE rowkey = b'b'`, want: []string{"a", "b"}},
+		{name: "string", sql: `SELECT CAST(rowkey AS BYTES) FROM text WHERE rowkey > 'z' AND rowkey < '日'`, want: []string{"\xc3\xa9"}},
+		{name: "string prefix", sql: `SELECT CAST(rowkey AS BYTES) FROM text WHERE STARTS_WITH(rowkey, 'é')`, want: []string{"\xc3\xa9"}},
+		{name: "string parameter", sql: `SELECT CAST(rowkey AS BYTES) FROM text WHERE rowkey IN (@key, 'c')`, parameters: []bigquery.QueryParameter{{Name: "key", Value: "é"}}, want: []string{"c", "\xc3\xa9"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			q := client.Query(test.sql)
+			q.DefaultDatasetID = "go_bigtable_row_key_filters"
+			q.Parameters = test.parameters
+			rows, err := q.Read(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, row := range readRows(t, rows) {
+				switch value := row[0].(type) {
+				case []byte:
+					got = append(got, string(value))
+				case int64:
+					got = append(got, fmt.Sprint(value))
+				default:
+					t.Fatalf("row = %v", row)
+				}
+			}
+			slices.Sort(got)
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("rows = %q, want %q", got, test.want)
+			}
+		})
 	}
 }

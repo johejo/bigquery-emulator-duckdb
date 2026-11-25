@@ -18,7 +18,11 @@
 
 namespace googlesql {
 class PropertyGraph;
-}
+// Declared rather than included: every translator includes this header, and the resolved AST's
+// headers take about 30s to parse.
+class ResolvedExpr;
+class ResolvedTableScan;
+}  // namespace googlesql
 
 namespace bigquery_emulator_duckdb::function_catalog {
 class Catalog;
@@ -62,6 +66,10 @@ struct Context {
   int next_name = 0;
   // Only columns read by field: complete reads and non-struct columns have no entry.
   std::map<int, std::set<size_t>> read_fields = {};
+  // For each table scan, the filters whose conjuncts every row the scan returns must satisfy,
+  // such as WHERE directly above it, so that a read can skip rows outside a key's ranges.
+  std::map<const googlesql::ResolvedTableScan*, std::vector<const googlesql::ResolvedExpr*>>
+      scan_filters = {};
 
   // A name no other call returns, for WITH queries and lambda parameters.
   std::string FreshName(std::string_view prefix) {

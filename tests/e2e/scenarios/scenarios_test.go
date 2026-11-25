@@ -65,6 +65,13 @@ func testScenarios(t *testing.T, pattern string, knownBug bool) {
 			if filepath.Base(path) == "bigtable_json_families_types.api.yaml" {
 				seedBigtableJSONFamilyTypes(t, project)
 			}
+			if filepath.Base(path) == "bigtable_row_key_filters.api.yaml" {
+				seedBigtableRowKeyFilters(t, project)
+			}
+			if filepath.Base(path) == "bigtable_utf8_keys.api.yaml" ||
+				filepath.Base(path) == "bigtable_qualifier_names.api.yaml" {
+				seedBigtableUTF8Keys(t, project)
+			}
 			for _, c := range file.Cases {
 				t.Run(c.Name, func(t *testing.T) {
 					t.Parallel()

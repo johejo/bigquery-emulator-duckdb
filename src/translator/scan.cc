@@ -37,6 +37,7 @@
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/function_catalog/catalog.h"
+#include "src/key_ranges.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
@@ -1381,8 +1382,19 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
                " WHERE error('The emulator reads an external table in a view only through its "
                "GoogleSQL query')";
       }
+      std::optional<KeyRanges> keys;
+      if (const auto* projected =
+              definition ? std::get_if<FieldProjectedRead>(&*definition) : nullptr;
+          projected != nullptr && !projected->key_column.empty()) {
+        for (int i = 0; i < table->column_list_size(); ++i) {
+          if (table->table()->GetColumn(table->column_index_list(i))->Name() ==
+              projected->key_column) {
+            keys = ScanKeyRanges(*table, table->column_list(i).column_id(), scope);
+          }
+        }
+      }
       return StatementResources::ReadQuery(stored_table->reference(), definition,
-                                           scope.context.resources, names, fields);
+                                           scope.context.resources, names, fields, keys);
     }();
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +

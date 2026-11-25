@@ -1,0 +1,78 @@
+version: 1
+# Recorded on BigQuery in run z7peu7e5ieiqozfishc24trdmm; see the adjacent answers file. BigQuery
+# fails each query on the cell of the row "bad", which every filter on rowkey drops.
+description: Verify that a filter on rowkey does not keep a query from failing on a cell of a row it drops.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project as the URI
+# below. The row "bad" holds a cell that is not valid UTF-8; "good" holds "ok". In Bash:
+#   table=bigtable-row-key-filter-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=family
+#   for pair in Z29vZA==:b2s= YmFk:/w==; do
+#     curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#       -H 'Content-Type: application/json' \
+#       "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#       -d "{\"rowKey\":\"${pair%%:*}\",\"mutations\":[{\"setCell\":{\"familyName\":\"family\",\"columnQualifier\":\"cQ==\",\"timestampMicros\":\"1000\",\"value\":\"${pair#*:}\"}}]}"
+#   done
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-row-key-filter-probe
+  create_body:
+    tableReference: {tableId: t}
+    externalDataConfiguration:
+      sourceFormat: BIGTABLE
+      sourceUris: ['${uri}']
+      bigtableOptions:
+        ignoreUnspecifiedColumnFamilies: true
+        columnFamilies:
+          - {familyId: family, type: STRING, onlyReadLatest: true}
+  read_body:
+    location: US
+    useLegacySql: false
+    timeoutMs: 100000
+    query: SELECT rowkey, family.column[SAFE_OFFSET(0)].cell.value FROM `${project}.${dataset}.t` WHERE ${filter}
+  rejection: {status: 400, reason: invalid}
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        # The full message also names the Bigtable cluster that served the read.
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: equal
+    template: read
+    vars: {filter: "rowkey = b'good'"}
+    expect: {create: {status: 200}, read: '${rejection}'}
+  - name: range
+    template: read
+    vars: {filter: "rowkey > b'c'"}
+    expect: {create: {status: 200}, read: '${rejection}'}
+  - name: prefix
+    template: read
+    vars: {filter: "STARTS_WITH(rowkey, b'go')"}
+    expect: {create: {status: 200}, read: '${rejection}'}
+  # Restricts no keys, for comparison.
+  - name: unrestricted
+    template: read
+    vars: {filter: "rowkey = b'good' OR LENGTH(rowkey) = 0"}
+    expect: {create: {status: 200}, read: '${rejection}'}
