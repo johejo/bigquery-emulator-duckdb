@@ -1,0 +1,280 @@
+version: 1
+# Recorded on BigQuery in run e65zd4sbxy476oahix5z3wkqtg; see the adjacent answers file.
+description: >-
+  Observe Bigtable external tables with outputColumnFamiliesAsJson: the schema each family
+  reports, the JSON a family reads as for each cell type and encoding, versions, onlyReadLatest,
+  named columns, qualifiers and values that are not UTF-8, rows without the family, and the DDL form.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project
+# as the URI below. For example, in Bash:
+#   table=bigtable-json-families-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=text,raw,number
+#   b64() { printf '%b' "$1" | base64 -w0; }
+#   cell() { mutations+="${mutations:+,}{\"setCell\":{\"familyName\":\"$1\",\"columnQualifier\":\"$(b64 "$2")\",\"timestampMicros\":\"$3\",\"value\":\"$(b64 "$4")\"}}"; }
+#   row() {
+#     curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#       -H 'Content-Type: application/json' \
+#       "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#       -d "{\"rowKey\":\"$(b64 "$1")\",\"mutations\":[$mutations]}"
+#     mutations=
+#   }
+#   mutations=
+#   cell text a 1000 x; cell text a 2000 y; cell text b 1000 ''
+#   cell raw q 1000 '\xff\x00'; cell raw '\xfe' 1000 v
+#   cell number n 1000 '\x00\x00\x00\x00\x00\x00\x00\x01'; cell number t 1000 12
+#   row r1
+#   cell number n 1000 '\x00\x00\x00\x00\x00\x00\x00\x02'
+#   row r2
+# The requests are idempotent, so they can be repeated after a transient failure.
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-json-families-probe
+  select: '*'
+  table_options:
+    outputColumnFamiliesAsJson: true
+  created: {status: 200}
+  # The full message names deployment-specific zones and clusters.
+  read_rejection: {status: 400, reason: invalid}
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions: '${table_options}'
+        observe: {status: /status, schema: /body/schema/fields}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          schema: /body/schema/fields
+          bigtable_options: /body/externalDataConfiguration/bigtableOptions
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t` ORDER BY rowkey
+        observe: {status: /status, complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions: '${table_options}'
+        observe: {status: /status, schema: /body/schema/fields}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          schema: /body/schema/fields
+          bigtable_options: /body/externalDataConfiguration/bigtableOptions
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t` ORDER BY rowkey
+        expectFailure: true
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  # Unlisted families come in no fixed order, so these leave out the schema.
+  read_unlisted:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions: '${table_options}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t` ORDER BY rowkey
+        observe: {status: /status, complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  reject_unlisted:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions: '${table_options}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t` ORDER BY rowkey
+        expectFailure: true
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: all_families
+    # Families the options leave out read as BYTES, which the JSON gives as strings, so raw's value
+    # that is not UTF-8 fails the read.
+    template: reject_unlisted
+    expect: {"create": {"status": 200}, "read": "${read_rejection}"}
+  - name: json_type_access
+    # A family is a JSON column that JSON functions and field access read.
+    template: read_unlisted
+    vars:
+      select: "rowkey, JSON_TYPE(text) AS kind, text.a AS a, TO_JSON_STRING(text) AS serialized"
+    expect: {"create": {"status": 200}, "read": {"status": 200, "complete": true, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "kind", "type": "STRING"}, {"mode": "NULLABLE", "name": "a", "type": "JSON"}, {"mode": "NULLABLE", "name": "serialized", "type": "STRING"}], "rows": [{"f": [{"v": "cjE="}, {"v": "object"}, {"v": "[{\"timestamp\":2000,\"value\":\"y\"},{\"timestamp\":1000,\"value\":\"x\"}]"}, {"v": "{\"a\":[{\"timestamp\":2000,\"value\":\"y\"},{\"timestamp\":1000,\"value\":\"x\"}],\"b\":[{\"timestamp\":1000,\"value\":\"\"}]}"}]}]}}
+  - name: typed_families
+    template: read
+    vars:
+      table_options: {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text", "type": "STRING"}, {"familyId": "number", "type": "INTEGER", "columns": [{"qualifierString": "t", "encoding": "TEXT"}]}]}
+    expect: {"create": {"status": 200, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}]}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text", "type": "STRING"}, {"familyId": "number", "type": "INTEGER", "columns": [{"qualifierString": "t", "encoding": "TEXT"}]}]}}, "read": {"status": 200, "complete": true, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}], "rows": [{"f": [{"v": "cjE="}, {"v": "{\"a\":[{\"timestamp\":2000,\"value\":\"y\"},{\"timestamp\":1000,\"value\":\"x\"}],\"b\":[{\"timestamp\":1000,\"value\":\"\"}]}"}, {"v": "{\"n\":[{\"timestamp\":1000,\"value\":1}],\"t\":[{\"timestamp\":1000,\"value\":12}]}"}]}, {"f": [{"v": "cjI="}, {"v": null}, {"v": "{\"n\":[{\"timestamp\":1000,\"value\":2}]}"}]}]}}
+  - name: only_read_latest
+    template: read
+    vars:
+      table_options: {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text", "onlyReadLatest": true}]}
+    expect: {"create": {"status": 200, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}]}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text", "onlyReadLatest": true}]}}, "read": {"status": 200, "complete": true, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}], "rows": [{"f": [{"v": "cjE="}, {"v": "{\"a\":{\"timestamp\":2000,\"value\":\"y\"},\"b\":{\"timestamp\":1000,\"value\":\"\"}}"}]}]}}
+  - name: named_column
+    # A named column is keyed by its field name, in place of its qualifier.
+    template: read
+    vars:
+      table_options: {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text", "columns": [{"qualifierString": "a", "fieldName": "first", "type": "STRING", "onlyReadLatest": true}]}]}
+    expect: {"create": {"status": 200, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}]}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text", "columns": [{"qualifierString": "a", "fieldName": "first", "type": "STRING", "onlyReadLatest": true}]}]}}, "read": {"status": 200, "complete": true, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}], "rows": [{"f": [{"v": "cjE="}, {"v": "{\"b\":[{\"timestamp\":1000,\"value\":\"\"}],\"first\":{\"timestamp\":2000,\"value\":\"y\"}}"}]}]}}
+  - name: rowkey_as_string
+    template: read
+    vars:
+      table_options: {"outputColumnFamiliesAsJson": true, "readRowkeyAsString": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "number", "type": "INTEGER", "columns": [{"qualifierString": "t", "encoding": "TEXT"}]}]}
+    expect: {"create": {"status": 200, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "STRING"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}]}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "STRING"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "readRowkeyAsString": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "number", "type": "INTEGER", "columns": [{"qualifierString": "t", "encoding": "TEXT"}]}]}}, "read": {"status": 200, "complete": true, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "STRING"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}], "rows": [{"f": [{"v": "r1"}, {"v": "{\"n\":[{\"timestamp\":1000,\"value\":1}],\"t\":[{\"timestamp\":1000,\"value\":12}]}"}]}, {"f": [{"v": "r2"}, {"v": "{\"n\":[{\"timestamp\":1000,\"value\":2}]}"}]}]}}
+  - name: string_not_utf8
+    # raw holds a value that is not UTF-8.
+    template: reject
+    vars:
+      table_options: {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "raw", "type": "STRING"}]}
+    expect: {"create": {"status": 200, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "raw", "type": "JSON"}]}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "raw", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "raw", "type": "STRING"}]}}, "read": "${read_rejection}"}
+  - name: rowkey_only
+    # r2, which has no text cells, is read when the query reads no family.
+    template: read
+    vars:
+      select: "rowkey"
+      table_options: {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text"}]}
+    expect: {"create": {"status": 200, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}]}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "text", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "text"}]}}, "read": {"status": 200, "complete": true, "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}], "rows": [{"f": [{"v": "cjE="}]}, {"f": [{"v": "cjI="}]}]}}
+  - name: ddl
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: >-
+              CREATE EXTERNAL TABLE `${project}.${dataset}.t` OPTIONS (format = 'CLOUD_BIGTABLE',
+              uris = ['${uri}'], bigtable_options = '{"outputColumnFamiliesAsJson": true,
+              "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "number",
+              "type": "INTEGER", "columns": [{"qualifierString": "t", "encoding": "TEXT"}]}]}')
+        observe: {status: /status, complete: /body/jobComplete}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          schema: /body/schema/fields
+          bigtable_options: /body/externalDataConfiguration/bigtableOptions
+      - name: options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: >-
+              SELECT option_value FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS`
+              WHERE option_name = 'bigtable_options'
+        observe: {status: /status, rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    # INFORMATION_SCHEMA.TABLE_OPTIONS lists no bigtable_options.
+    expect: {"create": {"status": 200, "complete": true}, "get": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "number", "type": "JSON"}], "bigtable_options": {"outputColumnFamiliesAsJson": true, "ignoreUnspecifiedColumnFamilies": true, "columnFamilies": [{"familyId": "number", "type": "INTEGER", "columns": [{"qualifierString": "t", "encoding": "TEXT"}]}]}}, "options": {"status": 200}}

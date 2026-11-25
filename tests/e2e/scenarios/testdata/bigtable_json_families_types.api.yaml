@@ -1,0 +1,102 @@
+version: 1
+# Recorded on BigQuery in run 554sjwxyd3osi3kvccmruds5ov; see the adjacent answers file.
+description: >-
+  Verify more of outputColumnFamiliesAsJson than bigtable_json_families.api.yaml: the JSON of
+  FLOAT, BOOLEAN and JSON cells, a qualifier that is not UTF-8, and that a scan that reads one
+  family leaves out rows without it.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project
+# as the URI below. For example, in Bash:
+#   table=bigtable-json-families-types-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=float,boolean,json,qualifier,other
+#   b64() { printf '%b' "$1" | base64 -w0; }
+#   cell() { mutations+="${mutations:+,}{\"setCell\":{\"familyName\":\"$1\",\"columnQualifier\":\"$(b64 "$2")\",\"timestampMicros\":\"1000\",\"value\":\"$(b64 "$3")\"}}"; }
+#   row() {
+#     curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#       -H 'Content-Type: application/json' \
+#       "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#       -d "{\"rowKey\":\"$(b64 "$1")\",\"mutations\":[$mutations]}"
+#     mutations=
+#   }
+#   mutations=
+#   cell float double '\x3f\xf8\x00\x00\x00\x00\x00\x00'; cell float nan '\x7f\xf8\x00\x00\x00\x00\x00\x00'
+#   cell float infinity '\x7f\xf0\x00\x00\x00\x00\x00\x00'; cell float text '1.5'
+#   cell boolean flag '\x01'; cell boolean text 'true'
+#   cell json doc '{"b":1,"a":[true]}'; cell json text '"x"'
+#   cell qualifier '\xfe' v
+#   row r1
+#   cell other q v
+#   row r2
+# The requests are idempotent, so they can be repeated after a transient failure.
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-json-families-types-probe
+  select: '*'
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            externalDataConfiguration:
+              sourceFormat: BIGTABLE
+              sourceUris: ['${uri}']
+              bigtableOptions:
+                outputColumnFamiliesAsJson: true
+                ignoreUnspecifiedColumnFamilies: true
+                columnFamilies: ['${family}']
+        observe: {status: /status, schema: /body/schema/fields}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            location: US
+            useLegacySql: false
+            timeoutMs: 100000
+            query: SELECT ${select} FROM `${project}.${dataset}.t` ORDER BY rowkey
+        observe: {status: /status, complete: /body/jobComplete, schema: /body/schema/fields, rows: /body/rows}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: float_binary
+    # NaN and infinity are null; float.text is TEXT.
+    template: read
+    vars:
+      family: {familyId: float, type: FLOAT, columns: [{qualifierString: text, encoding: TEXT}]}
+    expect: {"create": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "float", "type": "JSON"}], "status": 200}, "read": {"complete": true, "rows": [{"f": [{"v": "cjE="}, {"v": "{\"double\":[{\"timestamp\":1000,\"value\":1.5}],\"infinity\":[{\"timestamp\":1000,\"value\":null}],\"nan\":[{\"timestamp\":1000,\"value\":null}],\"text\":[{\"timestamp\":1000,\"value\":1.5}]}"}]}], "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "float", "type": "JSON"}], "status": 200}}
+  - name: boolean_binary
+    template: read
+    vars:
+      family: {familyId: boolean, type: BOOLEAN, columns: [{qualifierString: text, encoding: TEXT}]}
+    expect: {"create": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "boolean", "type": "JSON"}], "status": 200}, "read": {"complete": true, "rows": [{"f": [{"v": "cjE="}, {"v": "{\"flag\":[{\"timestamp\":1000,\"value\":true}],\"text\":[{\"timestamp\":1000,\"value\":true}]}"}]}], "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "boolean", "type": "JSON"}], "status": 200}}
+  - name: json_cells
+    # A JSON cell is embedded as its document.
+    template: read
+    vars:
+      family: {familyId: json, type: JSON}
+    expect: {"create": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "json", "type": "JSON"}], "status": 200}, "read": {"complete": true, "rows": [{"f": [{"v": "cjE="}, {"v": "{\"doc\":[{\"timestamp\":1000,\"value\":{\"a\":[true],\"b\":1}}],\"text\":[{\"timestamp\":1000,\"value\":\"x\"}]}"}]}], "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "json", "type": "JSON"}], "status": 200}}
+  - name: qualifier_not_utf8
+    # The qualifier \xfe becomes U+FFFD.
+    template: read
+    vars:
+      family: {familyId: qualifier}
+    expect: {"create": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "qualifier", "type": "JSON"}], "status": 200}, "read": {"complete": true, "rows": [{"f": [{"v": "cjE="}, {"v": "{\"�\":[{\"timestamp\":1000,\"value\":\"v\"}]}"}]}], "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "qualifier", "type": "JSON"}], "status": 200}}
+  - name: one_family
+    # r2, which has no qualifier cells, is not read.
+    template: read
+    vars:
+      family: {familyId: qualifier, type: STRING}
+      select: rowkey, qualifier IS NULL AS missing
+    expect: {"create": {"schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "qualifier", "type": "JSON"}], "status": 200}, "read": {"complete": true, "rows": [{"f": [{"v": "cjE="}, {"v": "false"}]}], "schema": [{"mode": "NULLABLE", "name": "rowkey", "type": "BYTES"}, {"mode": "NULLABLE", "name": "missing", "type": "BOOLEAN"}], "status": 200}}

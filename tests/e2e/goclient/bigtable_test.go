@@ -405,13 +405,4 @@ func TestBigtableExternal(t *testing.T) {
 	if rows := readRows(t, it); !reflect.DeepEqual(rows, want) {
 		t.Fatalf("JSON rows = %v, want %v", rows, want)
 	}
-
-	for _, options := range []string{
-		`{"outputColumnFamiliesAsJson":true}`,
-	} {
-		query := fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_external.rejected OPTIONS (format='CLOUD_BIGTABLE', uris='%s', bigtable_options='%s')`, uri, options)
-		if err := wait(ctx, client.Query(query)); err == nil || !strings.Contains(err.Error(), "does not support") {
-			t.Fatalf("unsupported options %s: %v", options, err)
-		}
-	}
 }

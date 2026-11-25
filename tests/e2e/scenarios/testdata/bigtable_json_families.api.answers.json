@@ -1,0 +1,719 @@
+{
+  "version": 1,
+  "cases": {
+    "all_families": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "raw",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "raw",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_e65zd4sbxy476oahix5z3wkqtg_all_families.t, error message: Invalid utf-8 encoding found;  Error processing Cloud Bigtable projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-families-probe at column_family: raw",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_e65zd4sbxy476oahix5z3wkqtg_all_families.t, error message: Invalid utf-8 encoding found;  Error processing Cloud Bigtable projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-families-probe at column_family: raw",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "ddl": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "complete": true,
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "encoding": "TEXT",
+                    "qualifierString": "t"
+                  }
+                ],
+                "familyId": "number",
+                "type": "INTEGER"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ]
+        },
+        "options": {
+          "status": 200
+        }
+      }
+    },
+    "json_type_access": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "raw",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "raw",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "cjE="
+                },
+                {
+                  "v": "object"
+                },
+                {
+                  "v": "[{\"timestamp\":2000,\"value\":\"y\"},{\"timestamp\":1000,\"value\":\"x\"}]"
+                },
+                {
+                  "v": "{\"a\":[{\"timestamp\":2000,\"value\":\"y\"},{\"timestamp\":1000,\"value\":\"x\"}],\"b\":[{\"timestamp\":1000,\"value\":\"\"}]}"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "kind",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "a",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "serialized",
+              "type": "STRING"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "named_column": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "fieldName": "first",
+                    "onlyReadLatest": true,
+                    "qualifierString": "a",
+                    "type": "STRING"
+                  }
+                ],
+                "familyId": "text"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "cjE="
+                },
+                {
+                  "v": "{\"b\":[{\"timestamp\":1000,\"value\":\"\"}],\"first\":{\"timestamp\":2000,\"value\":\"y\"}}"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "only_read_latest": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "familyId": "text",
+                "onlyReadLatest": true
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "cjE="
+                },
+                {
+                  "v": "{\"a\":{\"timestamp\":2000,\"value\":\"y\"},\"b\":{\"timestamp\":1000,\"value\":\"\"}}"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "rowkey_as_string": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "columns": [
+                  {
+                    "encoding": "TEXT",
+                    "qualifierString": "t"
+                  }
+                ],
+                "familyId": "number",
+                "type": "INTEGER"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true,
+            "readRowkeyAsString": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "r1"
+                },
+                {
+                  "v": "{\"n\":[{\"timestamp\":1000,\"value\":1}],\"t\":[{\"timestamp\":1000,\"value\":12}]}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "r2"
+                },
+                {
+                  "v": "{\"n\":[{\"timestamp\":1000,\"value\":2}]}"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "STRING"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "rowkey_only": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "familyId": "text"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "cjE="
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "cjI="
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            }
+          ],
+          "status": 200
+        }
+      }
+    },
+    "string_not_utf8": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "raw",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "familyId": "raw",
+                "type": "STRING"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "raw",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_e65zd4sbxy476oahix5z3wkqtg_string_not_utf8.t, error message: Invalid utf-8 encoding found;  Error processing Cloud Bigtable projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-families-probe at column_family: raw",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_e65zd4sbxy476oahix5z3wkqtg_string_not_utf8.t, error message: Invalid utf-8 encoding found;  Error processing Cloud Bigtable projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-json-families-probe at column_family: raw",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "typed_families": {
+      "project": "johejo-sandbox2",
+      "run": "e65zd4sbxy476oahix5z3wkqtg",
+      "steps": {
+        "create": {
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        },
+        "get": {
+          "bigtable_options": {
+            "columnFamilies": [
+              {
+                "familyId": "text",
+                "type": "STRING"
+              },
+              {
+                "columns": [
+                  {
+                    "encoding": "TEXT",
+                    "qualifierString": "t"
+                  }
+                ],
+                "familyId": "number",
+                "type": "INTEGER"
+              }
+            ],
+            "ignoreUnspecifiedColumnFamilies": true,
+            "outputColumnFamiliesAsJson": true
+          },
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ]
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "cjE="
+                },
+                {
+                  "v": "{\"a\":[{\"timestamp\":2000,\"value\":\"y\"},{\"timestamp\":1000,\"value\":\"x\"}],\"b\":[{\"timestamp\":1000,\"value\":\"\"}]}"
+                },
+                {
+                  "v": "{\"n\":[{\"timestamp\":1000,\"value\":1}],\"t\":[{\"timestamp\":1000,\"value\":12}]}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "cjI="
+                },
+                {
+                  "v": null
+                },
+                {
+                  "v": "{\"n\":[{\"timestamp\":1000,\"value\":2}]}"
+                }
+              ]
+            }
+          ],
+          "schema": [
+            {
+              "mode": "NULLABLE",
+              "name": "rowkey",
+              "type": "BYTES"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "text",
+              "type": "JSON"
+            },
+            {
+              "mode": "NULLABLE",
+              "name": "number",
+              "type": "JSON"
+            }
+          ],
+          "status": 200
+        }
+      }
+    }
+  }
+}

@@ -162,8 +162,8 @@ and the [README](../README.md#bigtable-external-tables) for endpoint setup.
 | `JSON` | `TEXT`, `BINARY` or omitted | Parse a JSON document as compact text, keeping the first of duplicate keys; a query that reads an invalid document fails |
 | `JSON` | `PROTO_BINARY` | Unsupported; table creation fails as BigQuery's does for a column that sets it without `protoConfig` |
 
-`readRowkeyAsString`, `ignoreUnspecifiedColumnFamilies`, and `onlyReadLatest` (at the family
-and qualifier levels) are supported. `outputColumnFamiliesAsJson`, explicit schemas, and
+`readRowkeyAsString`, `ignoreUnspecifiedColumnFamilies`, `outputColumnFamiliesAsJson` and
+`onlyReadLatest` (at the family and qualifier levels) are supported. Explicit schemas and
 GCS-specific read options are unsupported. Schemas are fixed at creation; queries read current
 source rows.
 
@@ -176,6 +176,13 @@ source rows.
 - **Missing values:** In an included row, a missing family or named qualifier is `NULL`.
 - **UTF-8:** A query fails on a `STRING` or `JSON` cell that is not valid UTF-8 when it reads
   the cell's named field, or when it reads any part of the family and the cell is unlisted.
+- **JSON families:** With `outputColumnFamiliesAsJson`, each family is a `JSON` column whose
+  keys are qualifiers, or field names for named qualifiers. Each value is an array of
+  `{"timestamp": microseconds, "value": ...}` versions, newest first, or the newest version alone
+  where `onlyReadLatest` applies. `BYTES` and `STRING` cells give strings, so a query that reads
+  the family fails on any cell that is not valid UTF-8. `INTEGER`, `FLOAT` and `BOOLEAN` cells
+  give numbers and booleans, with `null` for NaN and infinities, and `JSON` cells give their
+  documents. A qualifier that is not valid UTF-8 has U+FFFD in place of each invalid sequence.
 
 ## Updates and other interfaces
 

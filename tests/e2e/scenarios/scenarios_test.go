@@ -59,6 +59,12 @@ func testScenarios(t *testing.T, pattern string, knownBug bool) {
 			if filepath.Base(path) == "bigtable_json.api.yaml" {
 				seedBigtableJSON(t, project)
 			}
+			if filepath.Base(path) == "bigtable_json_families.api.yaml" {
+				seedBigtableJSONFamilies(t, project)
+			}
+			if filepath.Base(path) == "bigtable_json_families_types.api.yaml" {
+				seedBigtableJSONFamilyTypes(t, project)
+			}
 			for _, c := range file.Cases {
 				t.Run(c.Name, func(t *testing.T) {
 					t.Parallel()
