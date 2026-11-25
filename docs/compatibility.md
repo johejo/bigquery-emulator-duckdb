@@ -510,6 +510,6 @@ both flattened and nested results. Other graph query forms do not support readin
   aggregates other than `ARRAY_AGG`, `ARRAY_CONCAT_AGG` and `STRING_AGG`.
 - Calls of `SAME` and `ALL_DIFFERENT` that mix nodes and edges.
 
-`ANY CHEAPEST` fails on a NULL, zero, negative, infinite or NaN `COST`, as documented, and on a
-path whose total cost overflows its type, even where the query's result does not depend on which
-path it selects, such as `COUNT(*)`; BigQuery raises these errors only where it does.
+`ANY CHEAPEST` can raise errors for invalid edge costs or overflowing path costs in some queries
+whose results do not depend on which path is chosen. A plain `COUNT(*)` over one unfiltered,
+flat `MATCH` pattern does not evaluate costs.

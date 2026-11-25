@@ -943,11 +943,12 @@ std::optional<Relation> WithCost(
 // `_graph_cost` when any edge in the pattern has a COST.
 std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, const Scope& scope,
                                   const googlesql::GraphPathType* path_type = nullptr,
-                                  const googlesql::Type* cost_type = nullptr) {
+                                  const googlesql::Type* cost_type = nullptr,
+                                  bool omit_cost = false) {
   if (!path.hint_list().empty() || !path.path_hint_list().empty()) {
     return Unsupported(scope, "graph hints");
   }
-  if (cost_type == nullptr && path.path_cost() != nullptr) {
+  if (!omit_cost && cost_type == nullptr && path.path_cost() != nullptr) {
     cost_type = path.path_cost()->cost_supertype();
   }
   if (path.search_prefix() != nullptr &&
@@ -1226,7 +1227,8 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
     std::string order;
     if (path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::SHORTEST) {
       order = " ORDER BY length(q._graph_edges)";
-    } else if (path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::CHEAPEST) {
+    } else if (!omit_cost &&
+               path.search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::CHEAPEST) {
       order = " ORDER BY q._graph_cost";
     }
     result->sql =
@@ -1249,7 +1251,8 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, 
 
 }  // namespace
 
-std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, const Scope& scope) {
+std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, const Scope& scope,
+                                  bool count_only) {
   if (scope.graph_name.empty() || scan.input_scan_list().empty()) {
     return Unsupported(scope, "graph patterns without a graph or paths");
   }
@@ -1271,7 +1274,17 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
   std::vector<std::string> paths;
   std::vector<std::string> projections;
   for (const auto& path : scan.input_scan_list()) {
-    const auto match = GraphPath(*path, scope);
+    // Only a flat path can discard its cost here. Nested path selections can affect
+    // which endpoint pairs survive, even if the chosen path is not returned.
+    const bool omit_cost =
+        count_only && scan.filter_expr() == nullptr && scan.input_scan_list_size() == 1 &&
+        path->search_prefix() != nullptr &&
+        path->search_prefix()->type() == googlesql::ResolvedGraphPathSearchPrefix::CHEAPEST &&
+        std::ranges::all_of(path->input_scan_list(), [](const auto& part) {
+          return part->template Is<googlesql::ResolvedGraphElementScan>();
+        });
+    const auto match =
+        GraphPath(*path, scope, /*path_type=*/nullptr, /*cost_type=*/nullptr, omit_cost);
     if (!match) {
       return std::nullopt;
     }
