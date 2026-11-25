@@ -271,9 +271,10 @@ BigQuery loads as NULL.
 - `ST_ASGEOJSON` splits lines and polygons at the antimeridian and closes polygons enclosing
   a pole along the map boundary. Tessellated coordinates can differ from BigQuery in their
   last digits; clipped polygon order, ring starts and boundary vertices can also differ, and
-  lines and polygon edges through a pole can have different intermediate vertices. Some
-  polygons that touch a pole and also need to be split at the antimeridian are unsupported,
-  as are degenerate antimeridian cuts.
+  lines and polygon edges through a pole can have different intermediate vertices. A line
+  through a pole that follows the antimeridian may retain a portion BigQuery clips away.
+  Ambiguous cuts, including some polygons with a ring vertex at an antimeridian corner,
+  are unsupported.
 - Planar polygons with an edge along a pole, including GeoJSON polygons such as
   `ST_ASGEOJSON`'s full polygon, are unsupported.
 

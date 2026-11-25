@@ -236,7 +236,7 @@ functions.
 | [`ST_ANGLE`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_AREA`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_ASBINARY`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
-| [`ST_ASGEOJSON`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_ASGEOJSON of a POLYGON with a polar antimeridian cut. |
+| [`ST_ASGEOJSON`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_ASGEOJSON of a POLYGON with ambiguous antimeridian cuts. |
 | [`ST_ASTEXT`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_AZIMUTH`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
 | [`ST_BOUNDARY`](../third_party/bigquery_docs/reference/standard-sql/geography_functions.md) | Supported | S2 function |  |
