@@ -3,6 +3,13 @@ CREATE TABLE FUNCTION scalar_graph.echo_name(arg STRING) AS (SELECT arg AS col);
 CREATE TABLE FUNCTION scalar_graph.keep_names(arg STRING) AS (
   SELECT CONCAT(arg, ':', arg) AS doubled FROM (SELECT 1) WHERE arg != 'Dana'
 );
+CREATE TABLE FUNCTION scalar_graph.return_names(t TABLE<name STRING>) AS (SELECT * FROM t);
+CREATE TABLE FUNCTION scalar_graph.count_people(t TABLE<id INT64, name STRING>) AS (
+  SELECT COUNT(*) AS n FROM t
+);
+CREATE TABLE FUNCTION scalar_graph.count_names(t TABLE<name STRING, id INT64>, min_id INT64) AS (
+  SELECT COUNT(*) AS n FROM t WHERE id >= min_id AND name IS NOT NULL
+);
 CREATE TABLE scalar_graph.Person (id INT64, name STRING);
 INSERT scalar_graph.Person VALUES (1, 'Alex'), (2, 'Dana'), (3, 'Lee');
 CREATE TABLE scalar_graph.Knows (id INT64, src INT64, dst INT64);

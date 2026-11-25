@@ -47,6 +47,7 @@ const ResourceMask& RoutineFields() {
                                              "arguments.name",
                                              "arguments.argumentKind",
                                              "arguments.dataType",
+                                             "arguments.tableType",
                                              "arguments.mode",
                                              "returnType",
                                              "returnTableType",
@@ -887,6 +888,18 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body, std::str
     const v2::Routine::Argument::ArgumentKind kind = argument.argument_kind();
     if ((procedure || tvf) && kind == v2::Routine::Argument::ANY_TYPE) {
       throw ApiError::Unsupported("procedure or TVF arguments of ANY TYPE");
+    }
+    if (kind == v2::Routine::Argument::FIXED_TABLE) {
+      if (!tvf) {
+        throw ApiError::Invalid("Only table functions can have FIXED_TABLE arguments");
+      }
+      if (!argument.has_table_type() || argument.has_data_type()) {
+        throw ApiError::Invalid("FIXED_TABLE arguments require tableType instead of dataType");
+      }
+      continue;
+    }
+    if (argument.has_table_type()) {
+      throw ApiError::Invalid("Only FIXED_TABLE arguments can have tableType");
     }
     if (kind != v2::Routine::Argument::ARGUMENT_KIND_UNSPECIFIED &&
         kind != v2::Routine::Argument::FIXED_TYPE && kind != v2::Routine::Argument::ANY_TYPE) {

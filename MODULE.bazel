@@ -97,6 +97,7 @@ archive_override(
         "//third_party/googlesql:compliance.patch",
         "//third_party/googlesql:compliance_expected_results.patch",
         "//third_party/googlesql:graph_call.patch",
+        "//third_party/googlesql:table_function_arguments.patch",
         "//third_party/googlesql:graph_measures.patch",
         "//third_party/googlesql:openssl.patch",
     ],

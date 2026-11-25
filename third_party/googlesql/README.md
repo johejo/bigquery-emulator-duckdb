@@ -26,6 +26,11 @@ supports Base32.
 cannot bind arguments that reference a working-table column. The emulator translates that
 scan as a lateral SQL table function call instead.
 
+`table_function_arguments.patch` lets the inliner bind fixed-schema TVF table arguments,
+including GQL `CALL PER()`. It preserves the parameter schema when the body does not use all
+its columns, distinguishes local column references from correlated arguments, and lets the
+GQL validator recognize the inlined call's working-table CTE.
+
 `graph_measures.patch` preserves measure declarations and their expression SQL in the simple
 property-graph catalog. It skips scalar analysis of those expressions; `GRAPH_EXPAND` analyzes
 them against the result schema and supplies the element key to the measure rewriter.

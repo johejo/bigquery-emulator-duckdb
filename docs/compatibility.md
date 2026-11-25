@@ -347,8 +347,9 @@ temporary UDFs.
 
 ### Table functions
 
-Only persistent SQL table functions with fixed scalar argument types are supported. Temporary,
-non-SQL, templated, table-argument and value-table functions, and security clauses are unsupported.
+Only persistent SQL table functions with fixed scalar or fixed `TABLE<...>` argument types are
+supported. Temporary, non-SQL, templated and value-table functions, and security clauses are
+unsupported.
 
 ### JavaScript UDFs
 
@@ -494,12 +495,14 @@ that read external tables or tables with required partition filters.
 `GRAPH_EXPAND` requires literal arguments. It supports `AGG` over graph measures in
 both flattened and nested results. Other graph query forms do not support reading measures.
 
+Named per-row `CALL` and `OPTIONAL CALL` require a persistent SQL table function with fixed
+scalar arguments. Its body cannot call volatile functions or read external tables or tables with
+required partition filters. `CALL PER()` follows the [SQL table function limits](#table-functions).
+
 `GRAPH_TABLE` and GQL queries reject:
 
 - Repetition bounds that are not literals.
-- GQL `CALL PER()` and SQL/PGQ's `COLUMNS` clause. Named `CALL` and `OPTIONAL CALL` require a
-  persistent SQL table function with fixed scalar arguments. Its body cannot call volatile
-  functions or read external tables or tables with required partition filters.
+- SQL/PGQ's `COLUMNS` clause.
 - Graph element and path comparisons other than `=` and `!=` (`<>`).
 - `TO_JSON` of graph values inside a `STRUCT`.
 - Graph values in aggregate or analytic functions other than `COUNT`, `ANY_VALUE`, `MIN_BY`,

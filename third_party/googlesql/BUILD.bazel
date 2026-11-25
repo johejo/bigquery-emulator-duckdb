@@ -4,4 +4,5 @@ exports_files([
     "graph_call.patch",
     "graph_measures.patch",
     "openssl.patch",
+    "table_function_arguments.patch",
 ])

@@ -73,9 +73,7 @@ absl::StatusOr<std::vector<Row>> ParametersRows(const ViewContext& context) {
       for (const auto& argument : resource.at("arguments")) {
         parameter(++ordinal, procedure ? String(argument.value("mode", "IN")) : kNull, false,
                   String(argument.at("name").get<std::string>()),
-                  String(argument.value("argumentKind", "") == "ANY_TYPE"
-                             ? "ANY TYPE"
-                             : StandardSqlTypeName(argument.at("dataType"))));
+                  String(RoutineArgumentTypeName(argument)));
       }
     }
   }

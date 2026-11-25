@@ -284,6 +284,30 @@ steps:
         get:
           body: null
     test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_fixed_table_function:
+    # Argument in third_party/bigquery_docs/reference/rest/v2/routines.md
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: ds, routineId: max_price}
+              routineType: TABLE_VALUED_FUNCTION
+              definitionBody: SELECT MAX(price) AS highest FROM items
+              arguments:
+                - name: items
+                  argumentKind: FIXED_TABLE
+                  tableType:
+                    columns: [{name: price, type: {typeKind: INT64}}]
+    test: current.res.status == 200
+  get_fixed_table_function:
+    req:
+      /projects/rest-routines/datasets/ds/routines/max_price:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.arguments == [{"name":"items","argumentKind":"FIXED_TABLE","tableType":{"columns":[{"name":"price","type":{"typeKind":"INT64"}}]}}]
   delete_dataset:
     req:
       /projects/rest-routines/datasets/ds?deleteContents=true:

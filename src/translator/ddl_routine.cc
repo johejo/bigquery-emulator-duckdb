@@ -8,6 +8,7 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "googlesql/public/function_signature.h"
+#include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -231,18 +232,36 @@ std::optional<std::string> CreateTableFunction(
   }
   const googlesql::FunctionSignature& signature = create.signature();
   for (size_t i = 0; i < create.argument_name_list().size(); ++i) {
-    if (!signature.argument(static_cast<int>(i)).required()) {
+    const auto& parameter = signature.argument(static_cast<int>(i));
+    if (!parameter.required()) {
       return Unsupported(scope, "optional or repeated TVF arguments");
     }
-    const googlesql::Type* type = signature.argument(static_cast<int>(i)).type();
     nlohmann::json argument{{"name", create.argument_name_list(static_cast<int>(i))}};
-    if (type == nullptr) {
-      return Unsupported(scope, "TVF arguments other than fixed scalar types");
-    }
-    if (auto data_type = StandardSqlDataType(type)) {
-      argument["dataType"] = *std::move(data_type);
+    if (parameter.IsFixedRelation()) {
+      const auto& relation = parameter.options().relation_input_schema();
+      nlohmann::json columns = nlohmann::json::array();
+      for (const auto& column : relation.columns()) {
+        auto type = StandardSqlDataType(column.type);
+        if (!type || column.name.empty() || column.is_pseudo_column ||
+            column.annotation_map != nullptr ||
+            (column.type_modifiers && !column.type_modifiers->IsEmpty())) {
+          return Unsupported(scope, "TVF table argument column type or modifiers");
+        }
+        columns.push_back({{"name", column.name}, {"type", *std::move(type)}});
+      }
+      if (relation.is_value_table() || columns.empty()) {
+        return Unsupported(scope, "TVF arguments with empty schemas or value tables");
+      }
+      argument["argumentKind"] = "FIXED_TABLE";
+      argument["tableType"] = {{"columns", std::move(columns)}};
+    } else if (const auto* type = parameter.type(); type != nullptr) {
+      if (auto data_type = StandardSqlDataType(type)) {
+        argument["dataType"] = *std::move(data_type);
+      } else {
+        return Unsupported(scope, "TVF arguments of type " + type->DebugString());
+      }
     } else {
-      return Unsupported(scope, "TVF arguments of type " + type->DebugString());
+      return Unsupported(scope, "TVF arguments other than fixed scalar or table types");
     }
     resource["arguments"].push_back(std::move(argument));
   }
