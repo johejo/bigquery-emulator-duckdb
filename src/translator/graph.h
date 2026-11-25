@@ -14,7 +14,8 @@ class ResolvedGraphScan;
 namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> CreatePropertyGraph(
     const googlesql::ResolvedCreatePropertyGraphStmt& create, const Scope& scope);
-std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, const Scope& scope);
+std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, const Scope& scope,
+                                  bool count_only = false);
 std::optional<Relation> GraphTableScan(const googlesql::ResolvedGraphTableScan& scan,
                                        const Scope& scope);
 }  // namespace bigquery_emulator_duckdb::translator

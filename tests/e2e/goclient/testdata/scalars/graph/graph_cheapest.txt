@@ -31,7 +31,7 @@ SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (a:Account)-[e:T
 # a runtime error, as documented in
 # third_party/bigquery_docs/reference/standard-sql/graph-patterns.md, with these messages, and so
 # is a total that overflows its type; observed BigQuery answers collected with tools/bqanswers.
-# BigQuery answered COUNT(*) of the same paths without an error; see known_bugs.txt.
+# BigQuery answered COUNT(*) of the same paths without an error; see below.
 SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
 => "7:16:100,16:20:300,20:7:500,20:16:200"
 SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount = 100, NULL, e.amount)]->(b:Account) RETURN a.id AS a_id, b.id AS b_id, e.amount AS amount)
@@ -49,6 +49,27 @@ SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, b_id, amount), ',' ORDER BY a_id, b_i
 # BigQuery's message is "int64 overflow: 9223372036854775507 + 9223372036854775507".
 SELECT STRING_AGG(FORMAT('%d:%d:%d', a_id, c_id, amount), ',' ORDER BY a_id, c_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e1:Transfers COST 9223372036854775807 - e1.amount]->(b:Account)-[e2:Transfers COST 9223372036854775807 - e2.amount]->(c:Account) RETURN a.id AS a_id, c.id AS c_id, e1.amount + e2.amount AS amount)
 => error:
+
+# A plain COUNT(*) of an unfiltered match does not observe which path was picked.
+# BigQuery counts the endpoint pairs without evaluating the costs, despite the documented
+# runtime errors above. These answers were collected from BigQuery with tools/bqanswers.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IF(e.amount > 0, NULL, e.amount)]->(b:Account) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount - 100]->(b:Account) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST -e.amount]->(b:Account) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IEEE_DIVIDE(e.amount, 0)]->(b:Account) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST IEEE_DIVIDE(0, 0) + e.amount]->(b:Account) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e1:Transfers COST 9223372036854775807]->(b:Account)-[e2:Transfers COST 9223372036854775807]->(c:Account) RETURN COUNT(*) AS result)
+=> "5"
+
+# Filtering after selection makes the count depend on the cheapest edge. The selected
+# 7->16 edge costs 100, even though another edge between the same nodes costs 300.
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH ANY CHEAPEST (a:Account)-[e:Transfers COST e.amount]->(b:Account) FILTER WHERE e.amount >= 200 RETURN COUNT(*) AS result)
+=> "3"
 
 # ANY CHEAPEST needs a COST, on every quantified edge pattern, of a numeric type, and only on
 # edge patterns.

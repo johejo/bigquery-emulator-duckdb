@@ -1232,6 +1232,25 @@ std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& sc
 
 namespace {
 
+// A single unfiltered MATCH followed by an ungrouped COUNT(*) observes one row per
+// endpoint pair, not which path ANY CHEAPEST selects. Do not pass this through other
+// GQL steps: they can inspect the chosen path even when the final result is a count.
+bool CountsGraphRows(const googlesql::ResolvedScan& scan) {
+  const auto* input = &scan;
+  while (const auto* project = dynamic_cast<const googlesql::ResolvedProjectScan*>(input)) {
+    input = project->input_scan();
+  }
+  const auto* aggregate = dynamic_cast<const googlesql::ResolvedAggregateScan*>(input);
+  if (aggregate == nullptr || !aggregate->input_scan()->Is<googlesql::ResolvedGraphRefScan>() ||
+      !aggregate->group_by_list().empty() || !aggregate->grouping_set_list().empty() ||
+      aggregate->aggregate_list_size() != 1) {
+    return false;
+  }
+  const auto* count = dynamic_cast<const googlesql::ResolvedAggregateFunctionCall*>(
+      aggregate->aggregate_list(0)->expr());
+  return count != nullptr && count->function()->Name() == "$count_star";
+}
+
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
   if (scan.Is<googlesql::ResolvedGraphTableScan>()) {
     return GraphTableScan(*scan.GetAs<googlesql::ResolvedGraphTableScan>(), scope);
@@ -1247,8 +1266,14 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   }
   if (scan.Is<googlesql::ResolvedGraphLinearScan>()) {
     Scope linear = scope;
-    for (const auto& step : scan.GetAs<googlesql::ResolvedGraphLinearScan>()->scan_list()) {
-      auto result = Scan(*step, linear);
+    const auto& steps = scan.GetAs<googlesql::ResolvedGraphLinearScan>()->scan_list();
+    const auto* match = steps.size() == 2 && CountsGraphRows(*steps.back())
+                            ? dynamic_cast<const googlesql::ResolvedGraphScan*>(steps.front().get())
+                            : nullptr;
+    for (const auto& step : steps) {
+      auto result = step.get() == match && step->hint_list().empty()
+                        ? GraphScan(*match, linear, /*count_only=*/true)
+                        : Scan(*step, linear);
       if (!result) {
         return std::nullopt;
       }
