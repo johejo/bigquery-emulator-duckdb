@@ -4,6 +4,7 @@
 #include <array>
 #include <bit>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -11,6 +12,7 @@
 #include <map>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <string>
 #include <string_view>
@@ -34,6 +36,7 @@
 #include "google/cloud/project.h"
 #include "google/cloud/status.h"
 #include "googlesql/common/utf_util.h"
+#include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/bigtable_options.h"
 #include "src/duckdb_sql.h"
@@ -94,7 +97,9 @@ FieldSchema CellSchema(const BigtableCellOptions& defaults,
 struct FamilyRead {
   // The external table's name, which BigQuery's read errors give.
   std::string_view table;
+  // The family's struct, which an outputColumnFamiliesAsJson read builds JSON in the shape of.
   const FieldSchema& schema;
+  bool json = false;
   // A read of `column` counts every cell in the family, though its array excludes promoted cells.
   const std::set<size_t>* fields;
   std::map<std::string_view, size_t> promoted;
@@ -124,41 +129,70 @@ std::string DoubleLiteral(double number) {
   return "CAST('" + std::string(text.begin(), result.ptr) + "' AS DOUBLE)";
 }
 
+[[noreturn]] void ThrowConversion(std::string_view value) {
+  throw ApiError::Invalid("Could not convert cell value " + std::string(value) + ".");
+}
+
+// BINARY cells hold HBase Bytes.toBytes encodings, as BigtableColumnFamily.type documents.
 // BigQuery's parsing of TEXT cells matches absl::SimpleAtoi and absl::SimpleAtob, and strtod
 // after stripping ASCII whitespace, which also accepts hexadecimal floats and overflows to
 // infinity.
-std::string TextCellLiteral(std::string_view value, FieldType type) {
-  switch (type) {
-    case FieldType::kInteger:
-      if (int64_t number = 0; absl::SimpleAtoi(value, &number)) {
-        return std::to_string(number);
-      }
-      break;
-    case FieldType::kFloat: {
-      const std::string text(absl::StripAsciiWhitespace(value));
-      char* end = nullptr;
-      const double number = std::strtod(text.c_str(), &end);
-      if (!text.empty() && end == text.c_str() + text.size()) {
-        return DoubleLiteral(number);
-      }
-      break;
+int64_t IntegerCell(std::string_view value, bool text) {
+  if (text) {
+    int64_t number = 0;
+    if (!absl::SimpleAtoi(value, &number)) {
+      ThrowConversion(value);
     }
-    case FieldType::kBoolean:
-      if (bool flag = false; absl::SimpleAtob(value, &flag)) {
-        return flag ? "true" : "false";
-      }
-      break;
-    default:
-      return Bytes(value, type == FieldType::kString);
+    return number;
   }
-  throw ApiError::Invalid("Could not convert cell value " + std::string(value) + ".");
+  // BigQuery accepts both HBase Bytes.toBytes(int) and Bytes.toBytes(long).
+  if (value.size() != sizeof(int32_t) && value.size() != sizeof(int64_t)) {
+    ThrowCellSize(value, sizeof(int64_t));
+  }
+  const uint64_t bits = BigEndianBits(value);
+  return value.size() == sizeof(int32_t) ? std::bit_cast<int32_t>(static_cast<uint32_t>(bits))
+                                         : std::bit_cast<int64_t>(bits);
+}
+
+double FloatCell(std::string_view value, bool text) {
+  if (text) {
+    const std::string trimmed(absl::StripAsciiWhitespace(value));
+    char* end = nullptr;
+    const double number = std::strtod(trimmed.c_str(), &end);
+    if (trimmed.empty() || end != trimmed.c_str() + trimmed.size()) {
+      ThrowConversion(value);
+    }
+    return number;
+  }
+  // BigQuery accepts both HBase Bytes.toBytes(float) and Bytes.toBytes(double).
+  if (value.size() != sizeof(float) && value.size() != sizeof(double)) {
+    ThrowCellSize(value, sizeof(double));
+  }
+  const uint64_t bits = BigEndianBits(value);
+  return value.size() == sizeof(float) ? std::bit_cast<float>(static_cast<uint32_t>(bits))
+                                       : std::bit_cast<double>(bits);
+}
+
+bool BooleanCell(std::string_view value, bool text) {
+  if (text) {
+    bool flag = false;
+    if (!absl::SimpleAtob(value, &flag)) {
+      ThrowConversion(value);
+    }
+    return flag;
+  }
+  // As HBase Bytes.toBoolean does, BigQuery reads any nonzero byte as true.
+  if (value.size() != 1) {
+    ThrowCellSize(value, 1);
+  }
+  return value.front() != '\x00';
 }
 
 // A JSON cell's text, whatever its encoding, as BigQuery's answers in
 // bigtable_json.api.answers.json show. BigQuery fails a query that reads an invalid document with
 // nlohmann's message, and a number out of range with a suffix of its own.
-std::string JsonCellLiteral(std::string_view value) {
-  const auto json = ExternalValue(FieldType::kJson, value);
+std::string JsonCellText(std::string_view value) {
+  auto json = ExternalValue(FieldType::kJson, value);
   if (!json.ok()) {
     std::string message(json.status().message());
     if (message.starts_with("number overflow")) {
@@ -166,44 +200,19 @@ std::string JsonCellLiteral(std::string_view value) {
     }
     throw ApiError::InvalidQuery(message);
   }
-  return QuoteLiteral(*json);
+  return *std::move(json);
 }
 
-// BINARY cells hold HBase Bytes.toBytes encodings, as BigtableColumnFamily.type documents.
 std::string CellLiteral(std::string_view value, FieldType type, bool text) {
-  if (type == FieldType::kJson) {
-    return JsonCellLiteral(value);
-  }
-  if (text) {
-    return TextCellLiteral(value, type);
-  }
   switch (type) {
-    case FieldType::kInteger: {
-      // BigQuery accepts both HBase Bytes.toBytes(int) and Bytes.toBytes(long).
-      if (value.size() != sizeof(int32_t) && value.size() != sizeof(int64_t)) {
-        ThrowCellSize(value, sizeof(int64_t));
-      }
-      const uint64_t bits = BigEndianBits(value);
-      return value.size() == sizeof(int32_t)
-                 ? std::to_string(std::bit_cast<int32_t>(static_cast<uint32_t>(bits)))
-                 : std::to_string(std::bit_cast<int64_t>(bits));
-    }
-    case FieldType::kFloat: {
-      // BigQuery accepts both HBase Bytes.toBytes(float) and Bytes.toBytes(double).
-      if (value.size() != sizeof(float) && value.size() != sizeof(double)) {
-        ThrowCellSize(value, sizeof(double));
-      }
-      const uint64_t bits = BigEndianBits(value);
-      return DoubleLiteral(value.size() == sizeof(float)
-                               ? std::bit_cast<float>(static_cast<uint32_t>(bits))
-                               : std::bit_cast<double>(bits));
-    }
+    case FieldType::kJson:
+      return QuoteLiteral(JsonCellText(value));
+    case FieldType::kInteger:
+      return std::to_string(IntegerCell(value, text));
+    case FieldType::kFloat:
+      return DoubleLiteral(FloatCell(value, text));
     case FieldType::kBoolean:
-      // As HBase Bytes.toBoolean does, BigQuery reads any nonzero byte as true.
-      if (value.size() != 1) {
-        ThrowCellSize(value, 1);
-      }
-      return value.front() == '\x00' ? "false" : "true";
+      return BooleanCell(value, text) ? "true" : "false";
     default:
       return Bytes(value, type == FieldType::kString);
   }
@@ -288,6 +297,150 @@ std::optional<std::string> ReadFamily(const FamilyRead& read, const cbt::Row& ro
   return result + "}";
 }
 
+// A family's struct, or the shape of its JSON with outputColumnFamiliesAsJson.
+FieldSchema FamilySchema(const BigtableFamily& family) {
+  FieldSchema result{
+      .name = family.family_id,
+      .type = FieldType::kRecord,
+      .fields =
+          {
+              {
+                  .name = "column",
+                  .type = FieldType::kRecord,
+                  .mode = FieldMode::kRepeated,
+                  .fields =
+                      {
+                          {.name = "name", .type = FieldType::kString},
+                          CellSchema(family.cells),
+                      },
+              },
+          },
+  };
+  for (const auto& column : family.columns) {
+    result.fields.push_back({
+        .name = column.Name(),
+        .type = FieldType::kRecord,
+        .fields = {CellSchema(family.cells, column.cells)},
+    });
+  }
+  return result;
+}
+
+// With outputColumnFamiliesAsJson, a family is a JSON object keyed by qualifier, or by field name
+// for a named column, of {timestamp, value} versions newest first, or of the newest alone where
+// onlyReadLatest applies. A value is a string for BYTES and STRING cells and a JSON value for the
+// others, as bigtable_json_families.api.answers.json and
+// bigtable_json_families_types.api.answers.json show.
+std::optional<std::string> ReadJsonFamily(const FamilyRead& read, const cbt::Row& row) {
+  const auto& fields = read.schema.fields;
+  nlohmann::json result = nlohmann::json::object();
+  bool present = false;
+  const std::string* previous_qualifier = nullptr;
+  for (const auto& cell : row.cells()) {
+    if (cell.family_name() != read.schema.name) {
+      continue;
+    }
+    present = true;
+    const bool newest =
+        previous_qualifier == nullptr || *previous_qualifier != cell.column_qualifier();
+    previous_qualifier = &cell.column_qualifier();
+    const auto found = read.promoted.find(cell.column_qualifier());
+    const size_t field = found == read.promoted.end() ? 0 : found->second;
+    const FieldSchema& cell_schema =
+        field == 0 ? fields.front().fields.at(1) : fields.at(field).fields.front();
+    const bool repeated = cell_schema.mode == FieldMode::kRepeated;
+    if (!newest && !repeated) {
+      continue;
+    }
+    const FieldType type = cell_schema.fields.back().type;
+    // BigQuery checks the cells it gives as text. Its message also names the Bigtable cluster
+    // that served the read.
+    if ((type == FieldType::kBytes || type == FieldType::kString || type == FieldType::kJson) &&
+        !googlesql::IsWellFormedUTF8(cell.value())) {
+      throw ApiError::Invalid(
+          "Error while reading table: " + std::string(read.table) +
+          ", error message: Invalid utf-8 encoding found at column_family: " + read.schema.name);
+    }
+    const bool text = read.text.at(field);
+    nlohmann::json value;
+    switch (type) {
+      case FieldType::kInteger:
+        value = IntegerCell(cell.value(), text);
+        break;
+      case FieldType::kFloat:
+        // JSON has no NaN or infinities, which BigQuery gives as null.
+        if (const double number = FloatCell(cell.value(), text); std::isfinite(number)) {
+          value = number;
+        }
+        break;
+      case FieldType::kBoolean:
+        value = BooleanCell(cell.value(), text);
+        break;
+      case FieldType::kJson:
+        value = nlohmann::json::parse(JsonCellText(cell.value()));
+        break;
+      default:
+        value = cell.value();
+    }
+    nlohmann::json version = {{"timestamp", cell.timestamp().count()}, {"value", std::move(value)}};
+    // BigQuery replaces what is not UTF-8 in a qualifier with U+FFFD.
+    auto& entry = result[field == 0 ? googlesql::CoerceToWellFormedUTF8(cell.column_qualifier())
+                                    : fields.at(field).name];
+    if (repeated) {
+      entry.push_back(std::move(version));
+    } else {
+      entry = std::move(version);
+    }
+  }
+  if (!present) {
+    return std::nullopt;
+  }
+  return QuoteLiteral(result.dump());
+}
+
+// A regular expression that matches exactly a family ID, which holds only ASCII letters, digits,
+// '_', '-' and '.'.
+std::string QuoteFamilyRegex(std::string_view family) {
+  std::string result;
+  for (const char byte : family) {
+    if (!absl::ascii_isalnum(static_cast<unsigned char>(byte)) && byte != '_') {
+      result += '\\';
+    }
+    result += byte;
+  }
+  return result;
+}
+
+// The cells ReadFamily needs of a family. Older versions of a column matter only to a repeated
+// cell field: ReadFamily reads only the newest of the others, and so checks only its UTF-8.
+cbt::Filter FamilyFilter(const FamilyRead& read) {
+  const auto& fields = read.schema.fields;
+  // `column` holds its cell after `name`; a named field holds only its cell.
+  const auto repeated = [&](size_t field) {
+    return fields.at(field).fields.back().mode == FieldMode::kRepeated;
+  };
+  // ReadFamily checks unlisted cells whether or not the query reads them.
+  bool latest = !repeated(0);
+  for (size_t i = 1; i < fields.size(); ++i) {
+    latest &= !read.Reads(i) || !repeated(i);
+  }
+  auto family = cbt::Filter::FamilyRegex(QuoteFamilyRegex(read.schema.name));
+  return latest ? cbt::Filter::Chain(std::move(family), cbt::Filter::Latest(1)) : family;
+}
+
+// Reading the referenced families alone keeps a scan from transferring the rest of each row.
+cbt::Filter ReadFilter(const std::map<size_t, FamilyRead>& reads) {
+  if (reads.empty()) {
+    // Every row has a cell, and a scan that references no family includes every row.
+    return cbt::Filter::Chain(cbt::Filter::CellsRowLimit(1), cbt::Filter::StripValueTransformer());
+  }
+  std::vector<cbt::Filter> filters;
+  filters.reserve(reads.size());
+  std::ranges::transform(reads | std::views::values, std::back_inserter(filters), FamilyFilter);
+  return filters.size() == 1 ? std::move(filters.front())
+                             : cbt::Filter::InterleaveFromRange(filters.begin(), filters.end());
+}
+
 void AppendReadRow(std::string& query, const std::vector<FieldSchema>& schema,
                    const std::vector<std::string>& values) {
   query += query.empty() ? "SELECT " : " UNION ALL SELECT ";
@@ -327,33 +480,12 @@ std::vector<FieldSchema> DetectBigtableSchema(const GcsExternalData& definition)
                                                                 : FieldType::kBytes,
       },
   };
-  std::ranges::transform(families, std::back_inserter(schema), [](const BigtableFamily& family) {
-    FieldSchema result{
-        .name = family.family_id,
-        .type = FieldType::kRecord,
-        .fields =
-            {
-                {
-                    .name = "column",
-                    .type = FieldType::kRecord,
-                    .mode = FieldMode::kRepeated,
-                    .fields =
-                        {
-                            {.name = "name", .type = FieldType::kString},
-                            CellSchema(family.cells),
-                        },
-                },
-            },
-    };
-    for (const auto& column : family.columns) {
-      result.fields.push_back({
-          .name = column.Name(),
-          .type = FieldType::kRecord,
-          .fields = {CellSchema(family.cells, column.cells)},
+  const bool json = options.output_column_families_as_json.value_or(false);
+  std::ranges::transform(
+      families, std::back_inserter(schema), [json](const BigtableFamily& family) {
+        return json ? FieldSchema{.name = family.family_id, .type = FieldType::kJson}
+                    : FamilySchema(family);
       });
-    }
-    return result;
-  });
   SetModesGiven(schema);
   return schema;
 }
@@ -379,32 +511,48 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
                     {instance}, google::cloud::Options{}.set<cbt::EnableMetricsOption>(false)),
                 cbt::TableResource(source.project, source.instance, source.table),
                 connection_options);
+            const bool json =
+                definition.bigtable_options &&
+                definition.bigtable_options->output_column_families_as_json.value_or(false);
+            // The structs that JSON families are read in the shape of, which reads refer to.
+            std::map<size_t, FieldSchema> layouts;
             std::map<size_t, FamilyRead> reads;
             for (size_t i = 1; i < schema.size(); ++i) {
               const auto& field = schema.at(i);
               if (context.columns && !context.columns->contains(field.name)) {
                 continue;
               }
+              const BigtableFamily* family = nullptr;
+              if (definition.bigtable_options) {
+                const auto& families = definition.bigtable_options->column_families;
+                const auto found =
+                    std::ranges::find(families, field.name, &BigtableFamily::family_id);
+                family = found == families.end() ? nullptr : &*found;
+              }
+              const FieldSchema& layout =
+                  json
+                      ? layouts
+                            .emplace(i, FamilySchema(family != nullptr
+                                                         ? *family
+                                                         : BigtableFamily{.family_id = field.name}))
+                            .first->second
+                      : field;
               const auto selected = context.fields.find(field.name);
               FamilyRead read{
                   .table = table_name,
-                  .schema = field,
-                  .fields = selected == context.fields.end() ? nullptr : &selected->second,
+                  .schema = layout,
+                  .json = json,
+                  .fields = json || selected == context.fields.end() ? nullptr : &selected->second,
                   .promoted = {},
-                  .text = std::vector<bool>(field.fields.size(), false),
+                  .text = std::vector<bool>(layout.fields.size(), false),
               };
-              if (definition.bigtable_options) {
-                const auto& families = definition.bigtable_options->column_families;
-                const auto family =
-                    std::ranges::find(families, field.name, &BigtableFamily::family_id);
-                if (family != families.end()) {
-                  read.text.front() = family->cells.encoding == "TEXT";
-                  for (size_t j = 0; j < family->columns.size(); ++j) {
-                    const auto& column = family->columns.at(j);
-                    read.promoted.emplace(column.qualifier, j + 1);
-                    read.text.at(j + 1) = column.cells.encoding.value_or(
-                                              family->cells.encoding.value_or("")) == "TEXT";
-                  }
+              if (family != nullptr) {
+                read.text.front() = family->cells.encoding == "TEXT";
+                for (size_t j = 0; j < family->columns.size(); ++j) {
+                  const auto& column = family->columns.at(j);
+                  read.promoted.emplace(column.qualifier, j + 1);
+                  read.text.at(j + 1) =
+                      column.cells.encoding.value_or(family->cells.encoding.value_or("")) == "TEXT";
                 }
               }
               reads.emplace(i, std::move(read));
@@ -412,12 +560,12 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
             std::vector<std::string> values(schema.size(), "NULL");
             std::string query;
             for (const auto& row :
-                 table.ReadRows(cbt::RowRange::InfiniteRange(), cbt::Filter::PassAllFilter())) {
+                 table.ReadRows(cbt::RowRange::InfiniteRange(), ReadFilter(reads))) {
               CheckStatus(row.status());
               // BigQuery keeps rows matching any read, or all rows when no family is referenced.
               bool present = reads.empty();
               for (const auto& [i, read] : reads) {
-                auto value = ReadFamily(read, *row);
+                auto value = read.json ? ReadJsonFamily(read, *row) : ReadFamily(read, *row);
                 present |= value.has_value();
                 values.at(i) = value ? *std::move(value) : "NULL";
               }

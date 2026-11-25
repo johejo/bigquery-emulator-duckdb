@@ -672,4 +672,4 @@ rejected samples by statement or by a short label from the catalog.
 | Option | Type | Status | Notes |
 | --- | --- | --- | --- |
 | [`uris`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
-| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `PROTO_BINARY` encoding; `outputColumnFamiliesAsJson: true`. |
+| [`bigtable_options`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Partial | Unsupported: `PROTO_BINARY` encoding. |

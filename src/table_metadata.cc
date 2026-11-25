@@ -519,6 +519,9 @@ json BigtableOptionsJson(const BigtableOptions& options) {
   if (options.read_rowkey_as_string) {
     result["readRowkeyAsString"] = *options.read_rowkey_as_string;
   }
+  if (options.output_column_families_as_json) {
+    result["outputColumnFamiliesAsJson"] = *options.output_column_families_as_json;
+  }
   for (const auto& family : options.column_families) {
     json value = {{"familyId", family.family_id}};
     WriteBigtableCells(value, family.cells);
@@ -895,12 +898,14 @@ TableMetadata TableMetadataFromJson(const json& table) {
       }
       auto& parsed = metadata.external_data->bigtable_options.emplace();
       for (const auto& [name, value] : options.items()) {
-        if (name == "ignoreUnspecifiedColumnFamilies" || name == "readRowkeyAsString") {
+        if (name == "ignoreUnspecifiedColumnFamilies" || name == "readRowkeyAsString" ||
+            name == "outputColumnFamiliesAsJson") {
           if (!value.is_boolean()) {
             throw ApiError::Invalid("bigtableOptions." + name + " must be a boolean");
           }
-          (name == "readRowkeyAsString" ? parsed.read_rowkey_as_string
-                                        : parsed.ignore_unspecified_column_families) =
+          (name == "readRowkeyAsString"           ? parsed.read_rowkey_as_string
+           : name == "outputColumnFamiliesAsJson" ? parsed.output_column_families_as_json
+                                                  : parsed.ignore_unspecified_column_families) =
               value.get<bool>();
         } else if (name == "columnFamilies") {
           if (!value.is_array()) {

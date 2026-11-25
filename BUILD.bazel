@@ -2194,6 +2194,7 @@ cc_library(
         "@google_cloud_cpp//:bigtable",
         "@google_cloud_cpp//:common",
         "@googlesql//googlesql/common:utf_util",
+        "@nlohmann_json//:json",
     ],
     deps = [
         ":field_schema",

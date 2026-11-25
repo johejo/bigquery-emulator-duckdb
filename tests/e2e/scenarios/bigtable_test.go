@@ -207,3 +207,57 @@ func seedBigtableJSON(t *testing.T, project string) {
 		t.Fatal(err)
 	}
 }
+
+// Mirrors the fixture described in bigtable_json_families.api.yaml.
+func seedBigtableJSONFamilies(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-json-families-probe",
+		map[string]*adminpb.ColumnFamily{"text": {}, "raw": {}, "number": {}})
+	for _, row := range []struct {
+		key   string
+		cells []*btpb.Mutation
+	}{
+		{"r1", []*btpb.Mutation{
+			bigtableCell("text", "a", "x", 1000), bigtableCell("text", "a", "y", 2000),
+			bigtableCell("text", "b", "", 1000),
+			bigtableCell("raw", "q", "\xff\x00", 1000), bigtableCell("raw", "\xfe", "v", 1000),
+			bigtableCell("number", "n", "\x00\x00\x00\x00\x00\x00\x00\x01", 1000),
+			bigtableCell("number", "t", "12", 1000),
+		}},
+		{"r2", []*btpb.Mutation{bigtableCell("number", "n", "\x00\x00\x00\x00\x00\x00\x00\x02", 1000)}},
+	} {
+		if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+			TableName: table, RowKey: []byte(row.key), Mutations: row.cells,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Mirrors the fixture described in bigtable_json_families_types.api.yaml.
+func seedBigtableJSONFamilyTypes(t *testing.T, project string) {
+	t.Helper()
+	data, table := createBigtableFixture(t, project, "bigtable-json-families-types-probe",
+		map[string]*adminpb.ColumnFamily{"float": {}, "boolean": {}, "json": {}, "qualifier": {}, "other": {}})
+	for _, row := range []struct {
+		key   string
+		cells []*btpb.Mutation
+	}{
+		{"r1", []*btpb.Mutation{
+			bigtableCell("float", "double", "\x3f\xf8\x00\x00\x00\x00\x00\x00", 1000),
+			bigtableCell("float", "nan", "\x7f\xf8\x00\x00\x00\x00\x00\x00", 1000),
+			bigtableCell("float", "infinity", "\x7f\xf0\x00\x00\x00\x00\x00\x00", 1000),
+			bigtableCell("float", "text", "1.5", 1000),
+			bigtableCell("boolean", "flag", "\x01", 1000), bigtableCell("boolean", "text", "true", 1000),
+			bigtableCell("json", "doc", `{"b":1,"a":[true]}`, 1000), bigtableCell("json", "text", `"x"`, 1000),
+			bigtableCell("qualifier", "\xfe", "v", 1000),
+		}},
+		{"r2", []*btpb.Mutation{bigtableCell("other", "q", "v", 1000)}},
+	} {
+		if _, err := data.MutateRow(t.Context(), &btpb.MutateRowRequest{
+			TableName: table, RowKey: []byte(row.key), Mutations: row.cells,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

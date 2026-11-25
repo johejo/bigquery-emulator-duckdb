@@ -55,6 +55,7 @@ struct BigtableOptions {
   std::vector<BigtableFamily> column_families;
   std::optional<bool> ignore_unspecified_column_families;
   std::optional<bool> read_rowkey_as_string;
+  std::optional<bool> output_column_families_as_json;
   bool operator==(const BigtableOptions&) const = default;
 };
 
