@@ -64,7 +64,8 @@ explicit streams write only inserts. The emulator applies each change when it ap
 queries always see every change, as BigQuery's do without `max_staleness`; that table option
 remains unsupported. An `UPSERT` gives every row with its key its values, or inserts a row when
 none has it, and `_CHANGE_SEQUENCE_NUMBER` values order changes to the same key. Sequence numbers
-persist with `--data-dir`, and those of a deleted key last two days.
+persist with `--data-dir`, and those of a deleted key last two days. A sequence number on an
+`INSERT` row also orders later changes to its key, and `TRUNCATE TABLE` forgets the table's.
 
 A table that `UPSERT` and `DELETE` rows changed reports when they last did as its
 `upsert_stream_apply_watermark`, and rejects `UPDATE`, `DELETE` and `MERGE` statements; `INSERT`
@@ -74,13 +75,13 @@ the table exists.
 
 These forms are unsupported until BigQuery's behavior is verified:
 
-- `_CHANGE_TYPE` values that are not `INSERT`, `UPSERT` or `DELETE` after an `INSERT` first row,
-  writer schemas with `_CHANGE_TYPE` on a table without a primary key unless the first row is
-  an `INSERT` on the default stream, and invalid sequence numbers on `INSERT` rows.
-- For a `NULL` primary key value: `UPSERT` rows when DML inserted a row with it, `DELETE` rows
-  after an `UPSERT` row inserted one, and sequence numbers on later changes to it.
-- `TRUNCATE TABLE` on a table that changes with sequence numbers or `NULL` primary key values
-  changed.
+- `UPSERT` and `DELETE` rows on an explicit stream of a table without a primary key.
+- Sequence numbers on `INSERT` rows in `PENDING` and `BUFFERED` streams, on `INSERT` rows with a
+  `NULL` primary key value, and below an earlier change's to the same key.
+- For a `NULL` primary key value, which matches only the row an `UPSERT` inserted: an `UPSERT`
+  when DML also inserted a row with it, changes after a `DELETE` with a sequence number, a
+  `DELETE` with a sequence number after an `UPSERT`, and changes with and without sequence
+  numbers.
 - Collated primary key columns, and primary keys of more than 16 columns.
 
 ## Lifetime and persistence

@@ -102,8 +102,8 @@ std::string UpsertApplyWatermarkQuery(const TableReference& table, int64_t creat
                      ChangeSequencesOf(table, creation_time));
 }
 
-std::string ChangeSequencesQuery(const TableReference& table, int64_t creation_time) {
-  return std::format("SELECT 1 FROM {} WHERE {} LIMIT 1", ChangeSequenceTable(table.project_id),
+std::string ForgetChangeSequencesStatement(const TableReference& table, int64_t creation_time) {
+  return std::format("DELETE FROM {} WHERE {}", ChangeSequenceTable(table.project_id),
                      ChangeSequencesOf(table, creation_time));
 }
 
