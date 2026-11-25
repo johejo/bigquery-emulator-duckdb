@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "cases": {
+    "qualifier_name": {
+      "project": "johejo-sandbox2",
+      "run": "57r2rkus46qu66qfvafpaunihk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "complete": true,
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "676f6f64"
+                },
+                {
+                  "v": [
+                    {
+                      "v": "ff"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "ff"
+                },
+                {
+                  "v": [
+                    {
+                      "v": "71"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

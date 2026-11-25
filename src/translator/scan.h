@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "src/key_ranges.h"
 #include "src/timestamp_precision.h"
 #include "src/translator/context.h"
 
@@ -30,5 +31,11 @@ std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& sc
 // a type of its own, which DuckDB casts to BLOB.
 std::string StoredColumn(const std::string& column, const googlesql::Type* type,
                          TimestampPrecision precision);
+
+// The ranges of `scan`'s column `column_id`, a STRING or BYTES column, outside which the filters
+// that Context::scan_filters gives drop every row, or none when they keep any key; in
+// read_keys.cc.
+std::optional<KeyRanges> ScanKeyRanges(const googlesql::ResolvedTableScan& scan, int column_id,
+                                       const Scope& scope);
 
 }  // namespace bigquery_emulator_duckdb::translator

@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "cases": {
+    "equal": {
+      "project": "johejo-sandbox2",
+      "run": "z7peu7e5ieiqozfishc24trdmm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_equal.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_equal.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "prefix": {
+      "project": "johejo-sandbox2",
+      "run": "z7peu7e5ieiqozfishc24trdmm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_prefix.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_prefix.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "range": {
+      "project": "johejo-sandbox2",
+      "run": "z7peu7e5ieiqozfishc24trdmm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_range.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_range.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    },
+    "unrestricted": {
+      "project": "johejo-sandbox2",
+      "run": "z7peu7e5ieiqozfishc24trdmm",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_unrestricted.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_z7peu7e5ieiqozfishc24trdmm_unrestricted.t, error message: Invalid utf-8 encoding found At row:bad, column_family:family, column:q File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-row-key-filter-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

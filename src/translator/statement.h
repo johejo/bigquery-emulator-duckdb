@@ -14,7 +14,8 @@ namespace bigquery_emulator_duckdb::translator {
 struct Context;
 struct Scope;
 
-// Finds struct fields read before translating scans that can use the projection.
+// Finds what reads of tables can skip before translating scans: the struct fields that are not
+// read, and the filters that drop rows of each scan.
 void CollectReadFields(const googlesql::ResolvedStatement& statement, Context& context);
 void CollectReadFields(const googlesql::ResolvedExpr& expression, Context& context);
 

@@ -1,0 +1,65 @@
+version: 1
+# Recorded on BigQuery in run 57r2rkus46qu66qfvafpaunihk; see the adjacent answers file.
+description: Verify that a query fails on a row key that is not valid UTF-8 with readRowkeyAsString.
+# Fixture: use the instance from the Bigtable metadata scenario, in the same project as the URI
+# below. The row with key 0xFF holds the qualifier "q"; the row "good" holds the qualifier 0xFF.
+# Both cells hold "ok". In Bash:
+#   table=bigtable-utf8-key-probe
+#   cbt -project "$PROJECT" -instance bqanswers createtable "$table" families=family
+#   for pair in /w==:cQ== Z29vZA==:/w==; do
+#     curl --fail-with-body -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#       -H 'Content-Type: application/json' \
+#       "https://bigtable.googleapis.com/v2/projects/$PROJECT/instances/bqanswers/tables/$table:mutateRow" \
+#       -d "{\"rowKey\":\"${pair%%:*}\",\"mutations\":[{\"setCell\":{\"familyName\":\"family\",\"columnQualifier\":\"${pair#*:}\",\"timestampMicros\":\"1000\",\"value\":\"b2s=\"}}]}"
+#   done
+# After collecting answers, delete the Bigtable table. The cases only clean up their BigQuery datasets.
+vars:
+  dataset: bqa_${run}_${case}
+  uri: https://googleapis.com/bigtable/projects/${project}/instances/bqanswers/tables/bigtable-utf8-key-probe
+  create_body:
+    tableReference: {tableId: t}
+    externalDataConfiguration:
+      sourceFormat: BIGTABLE
+      sourceUris: ['${uri}']
+      bigtableOptions: '${options}'
+  read_body:
+    location: US
+    useLegacySql: false
+    timeoutMs: 100000
+    query: SELECT ${select} FROM `${project}.${dataset}.t` ORDER BY 1
+templates:
+  read:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: '${dataset}'}, location: US}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: '${create_body}'
+        observe: {status: /status}
+      - name: read
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: '${read_body}'
+        expectFailure: true
+        # The full message also names the Bigtable cluster that served the read.
+        observe: {status: /status, reason: /body/error/errors/0/reason}
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: string_row_key
+    template: read
+    vars:
+      options: {readRowkeyAsString: true, ignoreUnspecifiedColumnFamilies: true, columnFamilies: [{familyId: family}]}
+      select: rowkey
+    expect:
+      create: {status: 200}
+      read: {status: 400, reason: invalid}

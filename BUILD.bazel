@@ -1665,9 +1665,17 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":key_ranges",
         ":references",
         ":temporary_files",
     ],
+)
+
+cc_library(
+    name = "key_ranges",
+    srcs = ["src/key_ranges.cc"],
+    hdrs = ["src/key_ranges.h"],
+    copts = ["-std=c++20"],
 )
 
 cc_library(
@@ -2189,6 +2197,7 @@ cc_library(
         ":bigtable_options",
         ":duckdb_sql",
         ":external_values",
+        ":key_ranges",
         ":schema_sql",
         "@abseil-cpp//absl/strings",
         "@google_cloud_cpp//:bigtable",

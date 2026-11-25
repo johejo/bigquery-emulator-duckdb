@@ -42,6 +42,7 @@
 #include "src/duckdb_sql.h"
 #include "src/external_values.h"
 #include "src/field_schema.h"
+#include "src/key_ranges.h"
 #include "src/schema_sql.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
@@ -262,10 +263,11 @@ std::optional<std::string> ReadFamily(const FamilyRead& read, const cbt::Row& ro
       const FieldType type = cell_schema.fields.back().type;
       if ((type == FieldType::kString || type == FieldType::kJson) &&
           !googlesql::IsWellFormedUTF8(cell.value())) {
-        throw ApiError::Invalid(
-            "Error while reading table: " + std::string(read.table) +
-            ", error message: Invalid utf-8 encoding found At row:" + row.row_key() +
-            ", column_family:" + read.schema.name + ", column:" + cell.column_qualifier());
+        throw ApiError::Invalid("Error while reading table: " + std::string(read.table) +
+                                ", error message: Invalid utf-8 encoding found At row:" +
+                                googlesql::CoerceToWellFormedUTF8(row.row_key()) +
+                                ", column_family:" + read.schema.name +
+                                ", column:" + cell.column_qualifier());
       }
     }
     if (found != read.promoted.end()) {
@@ -275,6 +277,13 @@ std::optional<std::string> ReadFamily(const FamilyRead& read, const cbt::Row& ro
         AppendCell(named.at(field), cell, fields.at(field).fields.front(), read.text.at(field));
       }
     } else if (fallback) {
+      // The qualifier is the column's STRING name, which BigQuery gives with its bytes as they
+      // are, as bigtable_qualifier_names.api.yaml shows, but a DuckDB string cannot hold.
+      // Checking it here fails a read of the row even when a filter on rowkey drops it.
+      if (!googlesql::IsWellFormedUTF8(cell.column_qualifier())) {
+        throw ApiError::Unsupported("Bigtable qualifiers that are not valid UTF-8 as names of " +
+                                    read.schema.name + ".column");
+      }
       AppendCell(unlisted[cell.column_qualifier()], cell, fallback_cell, read.text.front());
     }
   }
@@ -559,6 +568,10 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
             }
             std::vector<std::string> values(schema.size(), "NULL");
             std::string query;
+            const bool text_key = schema.front().type == FieldType::kString;
+            // Every row is read and checked, since BigQuery fails a query on a cell it cannot
+            // read in a row that a filter on rowkey drops, as bigtable_row_key_filters.api.yaml
+            // shows. Only the rows in the filters' key ranges reach the query.
             for (const auto& row :
                  table.ReadRows(cbt::RowRange::InfiniteRange(), ReadFilter(reads))) {
               CheckStatus(row.status());
@@ -569,7 +582,15 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
                 present |= value.has_value();
                 values.at(i) = value ? *std::move(value) : "NULL";
               }
-              if (present) {
+              if (present && text_key && !googlesql::IsWellFormedUTF8(row->row_key())) {
+                // As bigtable_utf8_keys.api.yaml shows, without the Bigtable cluster that
+                // BigQuery's message also names.
+                throw ApiError::Invalid("Error while reading table: " + table_name +
+                                        ", error message: Invalid utf-8 encoding found At row:" +
+                                        googlesql::CoerceToWellFormedUTF8(row->row_key()) +
+                                        ", column:rowkey");
+              }
+              if (present && (!context.keys || KeyRangesContain(*context.keys, row->row_key()))) {
                 values.front() = Bytes(row->row_key(), schema.front().type == FieldType::kString);
                 AppendReadRow(query, schema, values);
               }
@@ -581,6 +602,7 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
             }
             return query;
           },
+      .key_column = "rowkey",
   };
 }
 

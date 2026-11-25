@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "cases": {
+    "string_row_key": {
+      "project": "johejo-sandbox2",
+      "run": "57r2rkus46qu66qfvafpaunihk",
+      "steps": {
+        "create": {
+          "status": 200
+        },
+        "read": {
+          "error": {
+            "body": {
+              "error": {
+                "code": 400,
+                "errors": [
+                  {
+                    "domain": "global",
+                    "message": "Error while reading table: johejo-sandbox2.bqa_57r2rkus46qu66qfvafpaunihk_string_row_key.t, error message: Invalid utf-8 encoding found At row:�, column:rowkey File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-utf8-key-probe",
+                    "reason": "invalid"
+                  }
+                ],
+                "message": "Error while reading table: johejo-sandbox2.bqa_57r2rkus46qu66qfvafpaunihk_string_row_key.t, error message: Invalid utf-8 encoding found At row:�, column:rowkey File: projects/johejo-sandbox2/zones/us-central1-b/clusters/bqanswers-c1/tables/bigtable-utf8-key-probe",
+                "status": "INVALID_ARGUMENT"
+              }
+            },
+            "status": 400
+          }
+        }
+      }
+    }
+  }
+}

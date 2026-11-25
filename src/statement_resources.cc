@@ -11,6 +11,7 @@
 #include <variant>
 
 #include "src/api_error.h"
+#include "src/key_ranges.h"
 #include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
@@ -24,7 +25,7 @@ constexpr size_t kMaxWarnings = 100;
 std::optional<std::string> StatementResources::ReadQuery(
     const TableReference& table, const std::optional<TableRead>& definition,
     StatementResources* resources, const std::optional<std::set<std::string>>& columns,
-    const ReadFields& fields) {
+    const ReadFields& fields, const std::optional<KeyRanges>& keys) {
   if (!definition) {
     return std::nullopt;
   }
@@ -53,6 +54,20 @@ std::optional<std::string> StatementResources::ReadQuery(
       key += std::to_string(ordinal);
     }
   }
+  const std::optional<KeyRanges> no_keys;
+  const auto& selected_keys =
+      projected != nullptr && !projected->key_column.empty() ? keys : no_keys;
+  if (selected_keys) {
+    // Length prefixes keep keys, which can hold any bytes, apart.
+    key.append(3, '\0');
+    for (const auto& range : *selected_keys) {
+      for (const auto& bound : {range.start, range.end}) {
+        key += bound ? (bound->inclusive ? '[' : '(') + std::to_string(bound->key.size()) + ':' +
+                           bound->key
+                     : "*";
+      }
+    }
+  }
   if (const auto found = resources->reads_.find(key); found != resources->reads_.end()) {
     return found->second;
   }
@@ -60,6 +75,7 @@ std::optional<std::string> StatementResources::ReadQuery(
       .files = resources->files_,
       .columns = columns,
       .fields = selected_fields,
+      .keys = selected_keys,
       .query = resources->query_,
       .warn =
           [resources](const ApiError& warning) {

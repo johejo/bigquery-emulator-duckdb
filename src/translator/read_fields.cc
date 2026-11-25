@@ -148,9 +148,70 @@ class FieldUses {
   std::vector<const googlesql::ResolvedWithRefScan*> with_refs_;
 };
 
+// Filters stay with the rows of the scans below them only through scans that drop rows failing
+// them and otherwise pass rows on unchanged, as projections, inner joins and UNNEST do. Any other
+// scan, such as LIMIT or an aggregation, ends them.
+class ScanFilters {
+ public:
+  explicit ScanFilters(Context& context) : context_(context) {}
+
+  void Visit(const googlesql::ResolvedNode& node,
+             std::vector<const googlesql::ResolvedExpr*> filters = {}) {
+    if (node.Is<googlesql::ResolvedTableScan>()) {
+      if (!filters.empty()) {
+        context_.scan_filters[node.GetAs<googlesql::ResolvedTableScan>()] = std::move(filters);
+      }
+    } else if (node.Is<googlesql::ResolvedFilterScan>()) {
+      const auto& filter = *node.GetAs<googlesql::ResolvedFilterScan>();
+      Visit(*filter.filter_expr());
+      filters.push_back(filter.filter_expr());
+      Visit(*filter.input_scan(), std::move(filters));
+    } else if (node.Is<googlesql::ResolvedProjectScan>()) {
+      const auto& project = *node.GetAs<googlesql::ResolvedProjectScan>();
+      for (const auto& computed : project.expr_list()) {
+        Visit(*computed);
+      }
+      Visit(*project.input_scan(), std::move(filters));
+    } else if (node.Is<googlesql::ResolvedJoinScan>() &&
+               node.GetAs<googlesql::ResolvedJoinScan>()->join_type() ==
+                   googlesql::ResolvedJoinScan::INNER) {
+      const auto& join = *node.GetAs<googlesql::ResolvedJoinScan>();
+      if (join.join_expr() != nullptr) {
+        Visit(*join.join_expr());
+        filters.push_back(join.join_expr());
+      }
+      Visit(*join.left_scan(), filters);
+      Visit(*join.right_scan(), std::move(filters));
+    } else if (node.Is<googlesql::ResolvedArrayScan>() &&
+               node.GetAs<googlesql::ResolvedArrayScan>()->input_scan() != nullptr) {
+      // Each input row gives its own rows, or one when the join is outer, all with its columns.
+      const auto& array = *node.GetAs<googlesql::ResolvedArrayScan>();
+      std::vector<const googlesql::ResolvedNode*> children;
+      node.GetChildNodes(&children);
+      for (const auto* child : children) {
+        if (child != array.input_scan()) {
+          Visit(*child);
+        }
+      }
+      Visit(*array.input_scan(), std::move(filters));
+    } else {
+      std::vector<const googlesql::ResolvedNode*> children;
+      node.GetChildNodes(&children);
+      for (const auto* child : children) {
+        Visit(*child);
+      }
+    }
+  }
+
+ private:
+  Context& context_;
+};
+
 void CollectForNode(const googlesql::ResolvedNode& node, Context& context) {
   if (context.resources != nullptr) {
     context.read_fields = FieldUses{}.Collect(node);
+    context.scan_filters.clear();
+    ScanFilters{context}.Visit(node);
   }
 }
 
