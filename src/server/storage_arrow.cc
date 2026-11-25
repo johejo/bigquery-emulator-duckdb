@@ -1,6 +1,7 @@
 #include "src/server/storage_arrow.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -8,6 +9,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -18,6 +20,7 @@
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
+#include "lz4frame.h"
 #include "nanoarrow/nanoarrow.h"
 #include "nanoarrow/nanoarrow.hpp"
 #include "nanoarrow/nanoarrow_ipc.h"
@@ -25,6 +28,7 @@
 #include "src/api_error.h"
 #include "src/field_schema.h"
 #include "src/server/storage_codec.h"
+#include "zstd.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -33,6 +37,9 @@ using nlohmann::json;
 namespace time_util = googlesql::functions;
 
 void Check(int code, const ArrowError& error) {
+  if (code == ENOTSUP) {
+    throw ApiError::Unsupported("Arrow IPC feature: " + std::string(error.message));
+  }
   if (code != NANOARROW_OK) {
     throw ApiError::Invalid("Invalid Arrow IPC message: " + std::string(error.message));
   }
@@ -51,6 +58,8 @@ ArrowBufferView Buffer(std::string_view bytes) {
   return view;
 }
 
+// Decodes the header of the message `bytes` starts with, returning the bytes after it, which
+// CheckBody checks.
 std::string_view DecodeMessage(ArrowIpcDecoder* decoder, std::string_view bytes,
                                ArrowIpcMessageType type, ArrowError& error) {
   Check(ArrowIpcDecoderVerifyHeader(decoder, Buffer(bytes), &error), error);
@@ -58,13 +67,89 @@ std::string_view DecodeMessage(ArrowIpcDecoder* decoder, std::string_view bytes,
       std::cmp_greater(decoder->header_size_bytes, bytes.size())) {
     throw ApiError::Invalid("Unexpected Arrow IPC message header");
   }
-  const auto body = bytes.substr(static_cast<size_t>(decoder->header_size_bytes));
+  Check(ArrowIpcDecoderDecodeHeader(decoder, Buffer(bytes), &error), error);
+  return bytes.substr(static_cast<size_t>(decoder->header_size_bytes));
+}
+
+void CheckBody(const ArrowIpcDecoder* decoder, std::string_view body) {
   if (std::cmp_not_equal(decoder->body_size_bytes, body.size())) {
     throw ApiError::Invalid("Arrow IPC message length does not match its header");
   }
-  Check(ArrowIpcDecoderDecodeHeader(decoder, Buffer(bytes), &error), error);
-  return body;
 }
+
+// What one batch's buffers may decompress to, so that a request, at most 20 MB, cannot expand
+// without bound.
+constexpr int64_t kMaxDecompressedBytes = int64_t{256} * 1024 * 1024;
+
+// Sets the message of `error`, truncating it to fit.
+void SetError(ArrowError* error, std::string_view message) {
+  const size_t size = message.copy(error->message, sizeof(error->message) - 1);
+  error->message[size] = '\0';  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+}
+
+ArrowErrorCode DecompressLz4Frame(ArrowBufferView src, uint8_t* dst, int64_t dst_size) {
+  LZ4F_dctx* context = nullptr;
+  if (LZ4F_isError(LZ4F_createDecompressionContext(&context, LZ4F_VERSION)) != 0) {
+    return ENOMEM;
+  }
+  const auto* in = src.data.as_uint8;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+  auto in_left = static_cast<size_t>(src.size_bytes);
+  auto out_left = static_cast<size_t>(dst_size);
+  size_t hint = 1;
+  // An IPC buffer is one frame, which must fill the buffer exactly.
+  while (hint != 0) {
+    size_t in_size = in_left;
+    size_t out_size = out_left;
+    hint = LZ4F_decompress(context, dst, &out_size, in, &in_size, nullptr);
+    if (LZ4F_isError(hint) != 0 || (in_size == 0 && out_size == 0)) {
+      break;
+    }
+    in += in_size;  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    in_left -= in_size;
+    dst += out_size;  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    out_left -= out_size;
+  }
+  LZ4F_freeDecompressionContext(context);
+  return hint == 0 && in_left == 0 && out_left == 0 ? NANOARROW_OK : EINVAL;
+}
+
+// Counts each buffer's recorded size in the batch's budget, the int64_t that private_data points
+// to, before nanoarrow allocates it.
+ArrowErrorCode DecompressReserve(ArrowIpcDecompressor* decompressor, int64_t dst_size,
+                                 ArrowError* error) {
+  auto& used = *static_cast<int64_t*>(decompressor->private_data);
+  if (dst_size > kMaxDecompressedBytes - used) {
+    SetError(error, "batch decompresses to more than 256 MiB");
+    return EINVAL;
+  }
+  used += dst_size;
+  return NANOARROW_OK;
+}
+
+ArrowErrorCode DecompressAdd(ArrowIpcDecompressor* /*decompressor*/, ArrowIpcCompressionType type,
+                             ArrowBufferView src, uint8_t* dst, int64_t dst_size,
+                             ArrowError* error) {
+  ArrowErrorCode code = EINVAL;
+  if (type == NANOARROW_IPC_COMPRESSION_TYPE_ZSTD) {
+    const void* data = src.data.data;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+    const size_t size = ZSTD_decompress(dst, static_cast<size_t>(dst_size), data,
+                                        static_cast<size_t>(src.size_bytes));
+    code = ZSTD_isError(size) == 0 && std::cmp_equal(size, dst_size) ? NANOARROW_OK : EINVAL;
+  } else if (type == NANOARROW_IPC_COMPRESSION_TYPE_LZ4_FRAME) {
+    code = DecompressLz4Frame(src, dst, dst_size);
+  }
+  if (code != NANOARROW_OK) {
+    SetError(error, "buffer does not decompress to its recorded length");
+  }
+  return code;
+}
+
+ArrowErrorCode DecompressWait(ArrowIpcDecompressor* /*decompressor*/, int64_t /*timeout_ms*/,
+                              ArrowError* /*error*/) {
+  return NANOARROW_OK;
+}
+
+void DecompressRelease(ArrowIpcDecompressor* decompressor) { decompressor->release = nullptr; }
 
 bool IsUnsigned(ArrowType type) {
   return type == NANOARROW_TYPE_UINT8 || type == NANOARROW_TYPE_UINT16 ||
@@ -268,11 +353,17 @@ StorageArrowDecoder::Field StorageArrowDecoder::Bind(const ArrowSchema& input,
   if (depth > 30) {
     throw ApiError::Invalid("Arrow writer schema exceeds maximum nesting depth");
   }
-  if (input.dictionary != nullptr || input.metadata != nullptr) {
-    throw ApiError::Unsupported("Arrow writer field encoding or metadata: " + destination.name);
+  // BigQuery takes no dictionary-encoded field.
+  if (input.dictionary != nullptr) {
+    throw StorageFieldMismatch(destination.name, "dictionary", destination.type);
   }
   const bool repeated = destination.mode == FieldMode::kRepeated;
-  Field field{.name = destination.name, .type = destination.type, .repeated = repeated};
+  Field field{
+      .name = destination.name,
+      .type = destination.type,
+      .repeated = repeated,
+      .has_default = !destination.default_value_expression.empty(),
+  };
   ArrowSchemaView view{};
   ArrowError error{};
   Check(ArrowSchemaViewInit(&view, &input, &error), error);
@@ -420,10 +511,19 @@ StorageArrowDecoder::StorageArrowDecoder(std::string_view wire_schema,
   ArrowError error{};
   auto* decoder = decoder_.get();
   Check(ArrowIpcDecoderInit(decoder), error);
-  if (!DecodeMessage(decoder, wire_schema, NANOARROW_IPC_MESSAGE_TYPE_SCHEMA, error).empty()) {
-    throw ApiError::Invalid("Arrow writer_schema must not have a message body");
-  }
-  if (decoder->feature_flags != 0 || decoder->endianness != ArrowIpcSystemEndianness()) {
+  ArrowIpcDecompressor decompressor{
+      .decompress_add = &DecompressAdd,
+      .decompress_wait = &DecompressWait,
+      .release = &DecompressRelease,
+      .private_data = &decompressed_bytes_,
+      .reserve = &DecompressReserve,
+  };
+  Check(ArrowIpcDecoderSetDecompressor(decoder, &decompressor), error);
+  const auto rest = DecodeMessage(decoder, wire_schema, NANOARROW_IPC_MESSAGE_TYPE_SCHEMA, error);
+  // Only the feature that a batch may be compressed is supported.
+  const auto features = static_cast<uint32_t>(decoder->feature_flags) &
+                        ~static_cast<uint32_t>(NANOARROW_IPC_FEATURE_COMPRESSED_BODY);
+  if (features != 0 || decoder->endianness != ArrowIpcSystemEndianness()) {
     throw ApiError::Unsupported("Arrow IPC schema features or byte order");
   }
   nanoarrow::UniqueSchema schema;
@@ -431,28 +531,58 @@ StorageArrowDecoder::StorageArrowDecoder(std::string_view wire_schema,
   if (schema->n_children == 0) {
     throw ApiError::Unsupported("empty Arrow writer schemas");
   }
+  // BigQuery checks the fields even with a dictionary batch after the schema message.
   fields_ = BindFields(*schema.get(), destination, 0);
+  for (const auto& column : destination) {
+    if (!column.default_value_expression.empty() &&
+        std::ranges::find(fields_, column.name, &Field::name) == fields_.end()) {
+      absent_.push_back({
+          .name = column.name,
+          .type = column.type,
+          .repeated = column.mode == FieldMode::kRepeated,
+          .has_default = true,
+      });
+    }
+  }
+  if (!rest.empty() || decoder->body_size_bytes != 0) {
+    throw ApiError::Invalid("Arrow writer_schema must not have a message body");
+  }
   Check(ArrowIpcDecoderSetSchema(decoder, schema.get(), &error), error);
 }
 
-json StorageArrowDecoder::Decode(std::string_view wire_batch) {
+json StorageArrowDecoder::Decode(std::string_view wire_batch, bool default_missing,
+                                 const std::unordered_map<std::string, bool>& missing) {
   ArrowError error{};
   auto* decoder = decoder_.get();
   const auto body =
       DecodeMessage(decoder, wire_batch, NANOARROW_IPC_MESSAGE_TYPE_RECORD_BATCH, error);
-  if (decoder->codec != NANOARROW_IPC_COMPRESSION_TYPE_NONE) {
-    throw ApiError::Unsupported("compressed Arrow writer batches");
-  }
+  CheckBody(decoder, body);
   ArrowArrayView* batch = nullptr;
+  decompressed_bytes_ = 0;
   Check(ArrowIpcDecoderDecodeArrayView(decoder, Buffer(body), -1, &batch, &error), error);
-  const auto body_size = static_cast<int64_t>(body.size());
+  // Decompressed buffers lie outside the body, within the bytes they decompressed to.
+  const auto body_size = static_cast<int64_t>(body.size()) + decompressed_bytes_;
   auto remaining = body_size;
   CheckLayout(*batch, body_size, remaining);
   Check(ArrowArrayViewValidate(batch, NANOARROW_VALIDATION_LEVEL_FULL, &error), error);
   CheckNullCounts(*batch);
   auto rows = json::array();
   for (int64_t row = 0; row < batch->length; ++row) {
-    rows.push_back(DecodeStruct(batch, row, fields_));
+    auto values = DecodeStruct(batch, row, fields_);
+    for (const auto& field : fields_) {
+      const auto found = missing.find(field.name);
+      if (field.has_default && values[field.name].is_null() &&
+          (found != missing.end() ? found->second : default_missing)) {
+        values.erase(field.name);
+      }
+    }
+    // A column the writer schema lacks takes its default unless `missing` says NULL_VALUE.
+    for (const auto& field : absent_) {
+      if (const auto found = missing.find(field.name); found != missing.end() && !found->second) {
+        values[field.name] = field.repeated ? json::array() : json(nullptr);
+      }
+    }
+    rows.push_back(std::move(values));
   }
   return rows;
 }

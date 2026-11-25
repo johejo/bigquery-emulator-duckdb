@@ -9,5 +9,13 @@ the pinned upstream archive in `MODULE.bazel`.
 and writes the IPC body compression metadata. The Storage Read codec supplies LZ4_FRAME and ZSTD
 compression; nanoarrow retains buffer layout, padding and nested-array traversal.
 
+`dictionary_schema.patch` decodes a dictionary-encoded field of a schema message as the C data
+interface represents it, so that Storage Write can name the field it rejects; dictionary batches
+remain unsupported.
+
+`decompress_reserve.patch` adds a decompressor callback that sees each buffer's recorded
+uncompressed size before the decoder allocates it, so Storage Write can bound what a batch
+decompresses to.
+
 `public_headers.patch` marks the public umbrella headers’ includes as exports for clang-tidy;
 it changes comments only.

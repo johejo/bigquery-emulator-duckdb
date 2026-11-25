@@ -1,0 +1,39 @@
+diff --git a/src/nanoarrow/nanoarrow_ipc.h b/src/nanoarrow/nanoarrow_ipc.h
+--- a/src/nanoarrow/nanoarrow_ipc.h
++++ b/src/nanoarrow/nanoarrow_ipc.h
+@@ -235,6 +235,11 @@
+ 
+   /// \brief Implementation-specific opaque data
+   void* private_data;
++
++  // Extension: if not NULL, called with each buffer's recorded uncompressed size before the
++  // decoder allocates it, so that the decompressor can reject a size it will not decompress.
++  ArrowErrorCode (*reserve)(struct ArrowIpcDecompressor* decompressor, int64_t dst_size,
++                            struct ArrowError* error);
+ };
+ 
+ /// \brief A self-contained decompression function
+diff --git a/src/nanoarrow/ipc/codecs.c b/src/nanoarrow/ipc/codecs.c
+--- a/src/nanoarrow/ipc/codecs.c
++++ b/src/nanoarrow/ipc/codecs.c
+@@ -104,6 +104,7 @@
+ 
+ ArrowErrorCode ArrowIpcSerialDecompressor(struct ArrowIpcDecompressor* decompressor) {
+   decompressor->decompress_add = &ArrowIpcSerialDecompressorAdd;
++  decompressor->reserve = NULL;
+   decompressor->decompress_wait = &ArrowIpcSerialDecompressorWait;
+   decompressor->release = &ArrowIpcSerialDecompressorRelease;
+   decompressor->private_data =
+diff --git a/src/nanoarrow/ipc/decoder.c b/src/nanoarrow/ipc/decoder.c
+--- a/src/nanoarrow/ipc/decoder.c
++++ b/src/nanoarrow/ipc/decoder.c
+@@ -1571,6 +1571,9 @@
+   // Prepare the source and destination
+   src.data.as_uint8 += sizeof(int64_t);
+   src.size_bytes -= sizeof(int64_t);
++  if (decompressor->reserve != NULL) {
++    NANOARROW_RETURN_NOT_OK(decompressor->reserve(decompressor, uncompressed_size, error));
++  }
+   NANOARROW_RETURN_NOT_OK(ArrowBufferResize(dst, uncompressed_size, 0));
+ 
+   // Add the task to the decompressor (this may execute synchronously for some

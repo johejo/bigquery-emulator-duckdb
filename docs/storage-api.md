@@ -7,7 +7,8 @@ See the [README](../README.md#bigquery-storage-api-grpc) for connection options 
 
 Use `storage/managedwriter.NewClient` or the generated Storage v1 client with a self-contained
 protobuf writer descriptor and serialized rows, or an Arrow IPC writer schema and record batch.
-Arrow writes accept uncompressed batches with scalar, list, STRUCT, and RANGE fields. See
+Arrow writes accept scalar, list, STRUCT, and RANGE fields, in batches that may be compressed
+with LZ4_FRAME or ZSTD. See
 [Write limitations](#write-limitations) for the differences from BigQuery.
 
 The default stream and COMMITTED streams publish immediately. BUFFERED streams publish through
@@ -39,9 +40,12 @@ As in BigQuery, protobuf rejects an entire batch if a value exceeds its `STRING(
 
 Arrow accepts the documented [Storage Write Arrow mappings](../third_party/bigquery_docs/supported-data-types.md),
 as well as signed `Int64` for INT64 and `Time64(MICROSECOND)` for TIME. The
-`MONTH_DAY_NANO` encoding preserves INTERVAL values to nanosecond precision. Compressed
-batches, dictionary encoding, field metadata, and missing-value interpretation options are
-unsupported.
+`MONTH_DAY_NANO` encoding preserves INTERVAL values to nanosecond precision. Field and schema
+metadata are ignored, and as in BigQuery, dictionary-encoded fields are rejected. A compressed
+batch may decompress
+to at most 256 MiB. An Arrow `NULL` in a top-level column is a missing value, which
+`default_missing_value_interpretation` and `missing_value_interpretations` can give the column's
+[default](../third_party/bigquery_docs/default-values.md), as they do for an unset protobuf field.
 
 Existing streams support adding nullable or repeated columns and relaxing REQUIRED columns to
 NULLABLE, including within records. Open connections report changes through `updated_schema`,

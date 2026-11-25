@@ -1,0 +1,392 @@
+version: 1
+description: >-
+  Storage Write Arrow batches with IPC body compression, field and schema metadata, dictionary
+  encoding, and missing value interpretations, which third_party/bigquery_docs/supported-data-types.md
+  and default-values.md do not describe for Arrow rows. Batches were written by arrow-go v18; a
+  missing value case's second row has a NULL name. Expectations are BigQuery's recorded answers
+  in the sidecar: BigQuery decompresses LZ4_FRAME and ZSTD bodies, ignores metadata, rejects
+  dictionary-encoded fields wherever the dictionary batch is, and takes an Arrow NULL as a missing
+  value, which a REQUIRED column rejects unless its default replaces it.
+vars:
+  dataset: bqa_${run}_${case}
+  stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+templates:
+  append:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              arrowRows:
+                writerSchema: {serializedSchema: '${schema}'}
+                rows: {serializedRecordBatch: '${batch}'}
+        observe:
+          code: /code
+          result: /messages/0/appendResult
+          errorCode: /messages/0/error/code
+          error: /messages/0/error/message
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT TO_JSON_STRING(t) AS row FROM `${project}.${dataset}.t` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  default_interpretation:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              arrowRows:
+                writerSchema: {serializedSchema: '${schema}'}
+                rows: {serializedRecordBatch: '${batch}'}
+              defaultMissingValueInterpretation: ${interpretation}
+        observe:
+          code: /code
+          result: /messages/0/appendResult
+          errorCode: /messages/0/error/code
+          error: /messages/0/error/message
+          rowErrors: /messages/0/rowErrors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT TO_JSON_STRING(t) AS row FROM `${project}.${dataset}.t` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  column_interpretation:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              arrowRows:
+                writerSchema: {serializedSchema: '${schema}'}
+                rows: {serializedRecordBatch: '${batch}'}
+              missingValueInterpretations: {name: '${interpretation}'}
+        observe:
+          code: /code
+          result: /messages/0/appendResult
+          errorCode: /messages/0/error/code
+          error: /messages/0/error/message
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT TO_JSON_STRING(t) AS row FROM `${project}.${dataset}.t` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  null_override:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              arrowRows:
+                writerSchema: {serializedSchema: '${schema}'}
+                rows: {serializedRecordBatch: '${batch}'}
+              defaultMissingValueInterpretation: DEFAULT_VALUE
+              missingValueInterpretations: {name: NULL_VALUE}
+        observe:
+          code: /code
+          result: /messages/0/appendResult
+          errorCode: /messages/0/error/code
+          error: /messages/0/error/message
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT TO_JSON_STRING(t) AS row FROM `${project}.${dataset}.t` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  # Utf8 'alpha', NULL, 'gamma' with ZSTD body compression.
+  - name: zstd_body
+    template: append
+    vars: {columns: value STRING, schema: '/////3AAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAUAAAAEAAUABAADwAOAAgAAAAEABAAAAAQAAAAFAAAAAAABQEQAAAAAAAAAAQABAAEAAAABQAAAHZhbHVlAAAA', batch: '/////7AAAAAUAAAAAAAAAAwAGAAWABUAEAAEAAwAAABgAAAAAAAAAAAAAAAUAAAAAAMEAAwAHgAQAAwACAAEAAwAAAAgAAAAJAAAAFgAAAADAAAAAAAAAAAAAAAAAAYACAAHAAYAAAAAAAABAwAAAAAAAAAAAAAAFgAAAAAAAAAYAAAAAAAAACUAAAAAAAAAQAAAAAAAAAAfAAAAAAAAAAAAAAABAAAAAwAAAAAAAAABAAAAAAAAAAEAAAAAAAAAKLUv/QQACQAABQ+XQBMAABAAAAAAAAAAKLUv/QQAgQAAAAAAAAUAAAAFAAAACgAAAMQusH4AAAAKAAAAAAAAACi1L/0EAFEAAGFscGhhZ2FtbWG6YAGQAA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"value\":\"alpha\"}"}]}, {"f": [{"v": "{\"value\":\"gamma\"}"}]}, {"f": [{"v": "{\"value\":null}"}]}]}
+  # The same rows with LZ4_FRAME body compression.
+  - name: lz4_frame_body
+    template: append
+    vars: {columns: value STRING, schema: '/////3AAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAUAAAAEAAUABAADwAOAAgAAAAEABAAAAAQAAAAFAAAAAAABQEQAAAAAAAAAAQABAAEAAAABQAAAHZhbHVlAAAA', batch: '/////6gAAAAUAAAAAAAAAAwAGAAWABUAEAAEAAwAAABoAAAAAAAAAAAAAAAUAAAAAAMEAAwAHAAQAAwACAAEAAwAAAAcAAAAHAAAAFAAAAADAAAAAAAAAAAAAAAEAAQABAAAAAMAAAAAAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAnAAAAAAAAAEAAAAAAAAAAIQAAAAAAAAAAAAAAAQAAAAMAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAQiTRhgQIIBAACABQAAAAAQAAAAAAAAAAQiTRhgQIIQAACAAAAAAAUAAAAFAAAACgAAAAAAAAAACgAAAAAAAAAEIk0YYECCCgAAgGFscGhhZ2FtbWEAAAAAAAAAAAAAAA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"value\":\"alpha\"}"}]}, {"f": [{"v": "{\"value\":\"gamma\"}"}]}, {"f": [{"v": "{\"value\":null}"}]}]}
+  # Utf8 'alpha' with field metadata {"comment": "probe"}.
+  - name: field_metadata
+    template: append
+    vars: {columns: value STRING, schema: '/////7AAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAYAAAAAAASABgAFAATABIADAAAAAgABAASAAAAFAAAAEQAAABIAAAAAAAFAUQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAQAAAABQAAAHByb2JlAAAABwAAAGNvbW1lbnQAAAAAAAQABAAEAAAABQAAAHZhbHVlAAAAAAAAAA==', batch: '/////5gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABIAAAAAQAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAFAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAYWxwaGEAAAA='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"value\":\"alpha\"}"}]}]}
+  # Utf8 '{"a":1}' marked ARROW:extension:name=google:sqlType:json, as Storage Read marks JSON.
+  - name: json_extension_metadata
+    template: append
+    vars: {columns: value JSON, schema: '/////8gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAYAAAAAAASABgAFAATABIADAAAAAgABAASAAAAFAAAAGAAAABkAAAAAAAFAWAAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAcAAAAEwAAAGdvb2dsZTpzcWxUeXBlOmpzb24AFAAAAEFSUk9XOmV4dGVuc2lvbjpuYW1lAAAAAAAAAAAEAAQABAAAAAUAAAB2YWx1ZQAAAA==', batch: '/////5gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABIAAAAAQAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAHAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAHAAAAeyJhIjoxfQA='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"value\":{\"a\":1}}"}]}]}
+  # Utf8 'alpha' with schema metadata {"pandas": "{\"columns\": []}"}, as pandas conversions add.
+  - name: schema_metadata
+    template: append
+    vars: {columns: value STRING, schema: '/////7gAAAAQAAAAAAAKAA4ADAALAAQACgAAABQAAAAAAAABBAAKAAwAAAAIAAQACgAAAAgAAABAAAAAAQAAAAwAAAAIAAwACAAEAAgAAAAIAAAAGAAAAA8AAAB7ImNvbHVtbnMiOiBbXX0ABgAAAHBhbmRhcwAAAQAAABQAAAAQABQAEAAPAA4ACAAAAAQAEAAAABAAAAAUAAAAAAAFARAAAAAAAAAABAAEAAQAAAAFAAAAdmFsdWUAAAAAAAAA', batch: '/////5gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABIAAAAAQAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAFAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAYWxwaGEAAAA='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"value\":\"alpha\"}"}]}]}
+  # Dictionary<Int32, Utf8> 'alpha', 'beta', 'alpha': the dictionary batch precedes the record
+  # batch in serialized_record_batch.
+  - name: dictionary_in_batch
+    template: append
+    vars: {columns: value STRING, schema: '/////5AAAAAQAAAAAAAKAAwACgAJAAQACgAAAAgAAAAAAQQAyP///wQAAAABAAAAFAAAABAAGAAUABMAEgAMAAgABAAQAAAAOAAAABgAAAA4AAAAAAAFATQAAAAIAAgAAAAEAAgAAAAMAAAACAAMAAgABwAIAAAAAAAAASAAAAAAAAAABAAEAAQAAAAFAAAAdmFsdWUAAAA=', batch: '/////6gAAAAUAAAAAAAAAAwAFAASABEADAAEAAwAAAAgAAAAAAAAABAAAAAAAgQACAAKAAAABAAIAAAAEAAAAAAACgAYAAwACAAEAAoAAAAUAAAASAAAAAIAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAABAAAAAAAAAACQAAAAAAAAAAAAAAAQAAAAIAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAkAAAAAAAAAYWxwaGFiZXRhAAAAAAAAAP////+IAAAAFAAAAAAAAAAMABYAFAATAAwABAAMAAAAEAAAAAAAAAAUAAAAAAAAAwQACgAYAAwACAAEAAoAAAAUAAAAOAAAAAMAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAABAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAA='}
+    expect:
+      append: {code: OK, errorCode: 3, error: "The Arrow field mismatched with BigQuery field at 'value', the Arrow field type dictionary, BigQuery field type STRING Entity: ${stream}"}
+      query: {}
+  # The same rows with the dictionary batch after the schema message in serialized_schema.
+  - name: dictionary_in_schema
+    template: append
+    vars: {columns: value STRING, schema: '/////5AAAAAQAAAAAAAKAAwACgAJAAQACgAAAAgAAAAAAQQAyP///wQAAAABAAAAFAAAABAAGAAUABMAEgAMAAgABAAQAAAAOAAAABgAAAA4AAAAAAAFATQAAAAIAAgAAAAEAAgAAAAMAAAACAAMAAgABwAIAAAAAAAAASAAAAAAAAAABAAEAAQAAAAFAAAAdmFsdWUAAAD/////qAAAABQAAAAAAAAADAAUABIAEQAMAAQADAAAACAAAAAAAAAAEAAAAAACBAAIAAoAAAAEAAgAAAAQAAAAAAAKABgADAAIAAQACgAAABQAAABIAAAAAgAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAJAAAAAAAAAAAAAAABAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAFAAAACQAAAAAAAABhbHBoYWJldGEAAAAAAAAA', batch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAwAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAEAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA=='}
+    expect:
+      append: {code: OK, errorCode: 3, error: "The Arrow field mismatched with BigQuery field at 'value', the Arrow field type dictionary, BigQuery field type STRING Entity: ${stream}"}
+      query: {}
+  # The same schema and record batch without any dictionary batch.
+  - name: dictionary_absent
+    template: append
+    vars: {columns: value STRING, schema: '/////5AAAAAQAAAAAAAKAAwACgAJAAQACgAAAAgAAAAAAQQAyP///wQAAAABAAAAFAAAABAAGAAUABMAEgAMAAgABAAQAAAAOAAAABgAAAA4AAAAAAAFATQAAAAIAAgAAAAEAAgAAAAMAAAACAAMAAgABwAIAAAAAAAAASAAAAAAAAAABAAEAAQAAAAFAAAAdmFsdWUAAAA=', batch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAwAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAEAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA=='}
+    expect:
+      append: {code: OK, errorCode: 3, error: "The Arrow field mismatched with BigQuery field at 'value', the Arrow field type dictionary, BigQuery field type STRING Entity: ${stream}"}
+      query: {}
+  # Rows (1, 'explicit') and (2, NULL) without an interpretation.
+  - name: missing_unspecified
+    template: append
+    vars: {columns: "id INT64, name STRING DEFAULT 'default_name'", schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"id\":1,\"name\":\"explicit\"}"}]}, {"f": [{"v": "{\"id\":2,\"name\":null}"}]}]}
+  - name: missing_default_value
+    template: default_interpretation
+    vars: {columns: "id INT64, name STRING DEFAULT 'default_name'", interpretation: DEFAULT_VALUE, schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"id\":1,\"name\":\"explicit\"}"}]}, {"f": [{"v": "{\"id\":2,\"name\":\"default_name\"}"}]}]}
+  - name: missing_column_default_value
+    template: column_interpretation
+    vars: {columns: "id INT64, name STRING DEFAULT 'default_name'", interpretation: DEFAULT_VALUE, schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"id\":1,\"name\":\"explicit\"}"}]}, {"f": [{"v": "{\"id\":2,\"name\":\"default_name\"}"}]}]}
+  - name: missing_column_null_over_default
+    template: null_override
+    vars: {columns: "id INT64, name STRING DEFAULT 'default_name'", schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"id\":1,\"name\":\"explicit\"}"}]}, {"f": [{"v": "{\"id\":2,\"name\":null}"}]}]}
+  - name: missing_default_value_without_default
+    template: default_interpretation
+    vars: {columns: "id INT64, name STRING", interpretation: DEFAULT_VALUE, schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"id\":1,\"name\":\"explicit\"}"}]}, {"f": [{"v": "{\"id\":2,\"name\":null}"}]}]}
+  - name: missing_required_default_value
+    template: default_interpretation
+    vars: {columns: "id INT64, name STRING DEFAULT 'default_name' NOT NULL", interpretation: DEFAULT_VALUE, schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"id\":1,\"name\":\"explicit\"}"}]}, {"f": [{"v": "{\"id\":2,\"name\":\"default_name\"}"}]}]}
+  - name: missing_required_null_value
+    template: default_interpretation
+    vars: {columns: "id INT64, name STRING DEFAULT 'default_name' NOT NULL", interpretation: NULL_VALUE, schema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA', batch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAwAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAgAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAABAAAAAAAAABgAAAAAAAAADAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAABAAAAAAAAAAAAAAAIAAAACAAAAAAAAABleHBsaWNpdA=='}
+    expect:
+      append: {code: OK, errorCode: 3, error: "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: ${stream}", rowErrors: [{"index": "1", "message": "Error found in field (or sub-field) 'name': Field 'name' is required but has null value."}]}
+      query: {}
+  # One connection's NULL names, each request's interpretation lasting as
+  # google/cloud/bigquery/storage/v1/storage.proto specifies: the map for its request, the default
+  # until another request sets it. Rows 9 and 10 use a writer schema without name, which per
+  # third_party/bigquery_docs/default-values.md takes the default unless the map says NULL_VALUE.
+  - name: missing_interpretation_lifetimes
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (id INT64, name STRING DEFAULT 'default_name')
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              arrowRows:
+                writerSchema: {serializedSchema: '/////7gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAIAAABUAAAAFAAAABAAFAAQAA8ADgAIAAAABAAQAAAAEAAAABQAAAAAAAUBEAAAAAAAAAAEAAQABAAAAAQAAABuYW1lAAAAABAAFAAQAAAADwAIAAAABAAQAAAAEAAAABgAAAAAAAACHAAAAAAAAAAIAAwACAAHAAgAAAAAAAABQAAAAAIAAABpZAAA'}
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+              missingValueInterpretations: {name: DEFAULT_VALUE}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+              defaultMissingValueInterpretation: DEFAULT_VALUE
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+              missingValueInterpretations: {name: NULL_VALUE}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAYAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAQAAAAAAAAAAgAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAgAAABleHBsaWNpdA=='}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////8gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAABQAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABoAAAAAQAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAABAAAAAAAAAAEgAAAAAAAAACAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'}
+              defaultMissingValueInterpretation: NULL_VALUE
+            - arrowRows:
+                writerSchema: {serializedSchema: '/////3gAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAUAAAAEAAUABAAAAAPAAgAAAAEABAAAAAQAAAAGAAAAAAAAAIcAAAAAAAAAAgADAAIAAcACAAAAAAAAAFAAAAAAgAAAGlkAAA='}
+                rows: {serializedRecordBatch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAIAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAAAAAAACQAAAAAAAAA='}
+              missingValueInterpretations: {name: NULL_VALUE}
+            - arrowRows:
+                rows: {serializedRecordBatch: '/////4gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAIAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAAA4AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAAAAAAACgAAAAAAAAA='}
+        observe:
+          code: /code
+          result0: /messages/0/appendResult
+          result1: /messages/1/appendResult
+          result2: /messages/2/appendResult
+          result3: /messages/3/appendResult
+          result4: /messages/4/appendResult
+          result5: /messages/5/appendResult
+          result6: /messages/6/appendResult
+          result7: /messages/7/appendResult
+          result8: /messages/8/appendResult
+          result9: /messages/9/appendResult
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT id, name FROM `${project}.${dataset}.t` ORDER BY id
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      append: {code: OK, result0: {}, result1: {}, result2: {}, result3: {}, result4: {}, result5: {}, result6: {}, result7: {}, result8: {}, result9: {}}
+      query: {"rows": [{"f": [{"v": "1"}, {"v": null}]}, {"f": [{"v": "2"}, {"v": "default_name"}]}, {"f": [{"v": "3"}, {"v": null}]}, {"f": [{"v": "4"}, {"v": "default_name"}]}, {"f": [{"v": "5"}, {"v": "default_name"}]}, {"f": [{"v": "6"}, {"v": null}]}, {"f": [{"v": "7"}, {"v": "explicit"}]}, {"f": [{"v": "8"}, {"v": null}]}, {"f": [{"v": "9"}, {"v": null}]}, {"f": [{"v": "10"}, {"v": "default_name"}]}]}
