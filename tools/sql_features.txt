@@ -122,6 +122,7 @@ query GQL queries | GRAPH d.g MATCH (p:Person) OPTIONAL CALL (p) { MATCH (p)-[:K
 query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{0,2}(b:Account) LET values = ARRAY_AGG(e.v) LET total = SUM(e.v) LET hops = COUNT(e) RETURN a.id, b.id AS dst, values, total, hops
 query GQL queries | CREATE TABLE FUNCTION d.twice(v INT64) AS (SELECT v * 2 AS doubled); GRAPH d.g MATCH (p:Person) CALL d.twice(p.id) YIELD doubled AS result RETURN result
 query GQL queries | CREATE TABLE FUNCTION d.only_positive(v INT64) AS (SELECT v AS found FROM (SELECT 1) WHERE v > 0); GRAPH d.g MATCH (p:Person) OPTIONAL CALL d.only_positive(p.id) RETURN p.id, found
+query GQL queries | CREATE TABLE FUNCTION d.random_row() AS (SELECT RAND() AS sample_value); GRAPH d.g MATCH (p:Person) CALL d.random_row() RETURN sample_value
 query GQL queries | CREATE TABLE FUNCTION d.pass_rows(input TABLE<id INT64>) AS (SELECT id FROM input); GRAPH d.g MATCH (p:Person) RETURN p.id AS id NEXT CALL PER() d.pass_rows() RETURN id
 query GQL queries | GRAPH d.g LET values = [1, NULL, 3] LET mean = AVG(values) LET lo = MIN(values) LET hi = MAX(values) RETURN mean, lo, hi
 query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{1,2}(b:Account) LET values = ARRAY_AGG(DISTINCT e.v ORDER BY e.v) RETURN values
@@ -490,7 +491,8 @@ query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x A
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS (SELECT x AS y); SELECT y FROM d.f(1)
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) RETURNS TABLE<y INT64> AS (SELECT x AS y); SELECT y FROM d.f(1)
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x ANY TYPE) AS (SELECT x AS y)
-query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x TABLE<id INT64>) AS (SELECT id FROM x)
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x TABLE<id INT64>) AS (SELECT id FROM x); SELECT id FROM d.f(TABLE d.t)
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x ANY TABLE) AS (SELECT * FROM x); SELECT id FROM d.f(TABLE d.t)
 query `DROP TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS (SELECT x AS y); DROP TABLE FUNCTION d.f
 note `CREATE TABLE FUNCTION` | See [Table functions](compatibility.md#table-functions).
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END

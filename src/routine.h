@@ -39,6 +39,9 @@ std::string StandardSqlTypeName(const nlohmann::json& type);
 // The GoogleSQL spelling of a StandardSqlTableType resource.
 std::string StandardSqlTableTypeName(const nlohmann::json& type);
 
+// The GoogleSQL spelling of a Routine Argument resource's type.
+std::string RoutineArgumentTypeName(const nlohmann::json& argument);
+
 // The canonical INFORMATION_SCHEMA.ROUTINES DDL of a routine.
 std::string RoutineDdl(const Routine& routine);
 

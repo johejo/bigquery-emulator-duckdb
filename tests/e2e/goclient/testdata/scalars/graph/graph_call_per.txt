@@ -1,0 +1,64 @@
+# BigQuery's documented CALL PER() example, reduced to one cell.
+# third_party/bigquery_docs/reference/standard-sql/graph-query-statements.md
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+RETURN p.name AS name
+NEXT
+CALL PER() scalar_graph.return_names() YIELD name AS person_name
+RETURN STRING_AGG(person_name, ',' ORDER BY person_name) AS result
+=> "Alex,Dana,Lee"
+
+# A single invocation sees the whole table, even when it is empty. Fixed schemas
+# match by name, not position, and may require only a subset of the input.
+# third_party/bigquery_docs/table-functions.md
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+RETURN p.id AS id, p.name AS name, 0 AS unused
+NEXT
+CALL PER() scalar_graph.count_names(2) YIELD n
+RETURN n AS result
+=> "2"
+
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person WHERE p.id < 0)
+RETURN p.name AS name, p.id AS id
+NEXT
+CALL PER() scalar_graph.count_names(1)
+RETURN n AS result
+=> "0"
+
+# Counting the input doesn't require any of the table argument's columns in the TVF body.
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+RETURN p.id AS id, p.name AS name
+NEXT
+CALL PER() scalar_graph.count_people()
+RETURN n AS result
+=> "3"
+
+# The TVF's output replaces the working table; unused is not available after CALL PER().
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+RETURN p.name AS name, 0 AS unused
+NEXT
+CALL PER() scalar_graph.return_names()
+RETURN unused AS result
+=> error:
+
+# BigQuery does not allow OPTIONAL with CALL PER().
+GRAPH scalar_graph.TransferGraph
+MATCH (p:Person)
+RETURN p.name AS name
+NEXT
+OPTIONAL CALL PER() scalar_graph.return_names()
+RETURN name AS result
+=> error:
+
+# The same fixed table signature can be used with an explicit SQL TABLE argument.
+SELECT n FROM scalar_graph.count_names(TABLE scalar_graph.Person, 2)
+=> "2"
+
+# TABLE can name a CTE; its expressions use local columns, not correlated arguments.
+WITH renamed AS (SELECT id, UPPER(name) AS name FROM scalar_graph.Person WHERE id > 1)
+SELECT n FROM scalar_graph.count_people(TABLE renamed)
+=> "2"

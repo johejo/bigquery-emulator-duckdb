@@ -36,7 +36,7 @@ rejected.
 | `DROP PROPERTY GRAPH` | Supported |  |
 | `GRAPH_EXPAND` | Supported | [Graph limits](compatibility.md#graphs). |
 | `GRAPH_TABLE` | Supported | [Graph limits](compatibility.md#graphs). |
-| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: TVF arguments other than fixed scalar types. |
+| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: volatile SQL table function body in GQL CALL. |
 
 ## Queries
 
@@ -129,7 +129,7 @@ rejected.
 | `DROP MATERIALIZED VIEW` | Supported | See [Materialized views](compatibility.md#materialized-views). |
 | `CREATE FUNCTION` | Partial | See [User-defined functions](compatibility.md#user-defined-functions). Unsupported: JavaScript UDF arguments of type DATE; Python UDF argument types other than BOOL, INT64, FLOAT64, STRING or BYTES; function IFERROR; persistent non-SQL UDFs; volatile SQL UDF arguments with subquery bodies. |
 | `DROP FUNCTION` | Supported |  |
-| `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: TVF arguments other than fixed scalar types; non-SQL, temporary or value-table TVFs and TVF security. |
+| `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: non-SQL, temporary or value-table TVFs and TVF security. |
 | `DROP TABLE FUNCTION` | Supported |  |
 | `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedure arguments of ANY TYPE. |
 | `DROP PROCEDURE` | Supported | See [Stored procedures](compatibility.md#stored-procedures). |

@@ -131,9 +131,7 @@ std::string RoutineHead(const Routine& routine) {
                          [&](const json& argument) {
                            return (procedure ? argument.value("mode", "IN") + " " : "") +
                                   googlesql::ToIdentifierLiteral(argument.value("name", "")) + " " +
-                                  (argument.value("argumentKind", "") == "ANY_TYPE"
-                                       ? "ANY TYPE"
-                                       : SqlTypeName(argument.value("dataType", json::object())));
+                                  RoutineArgumentTypeName(argument);
                          });
   std::string statement =
       std::format("CREATE {} {}.{}.{}({})",
@@ -173,6 +171,17 @@ std::string StandardSqlTableTypeName(const json& type) {
            SqlTypeName(column.at("type"));
   });
   return "TABLE<" + Join(columns, ", ") + ">";
+}
+
+std::string RoutineArgumentTypeName(const json& argument) {
+  const auto kind = argument.value("argumentKind", "");
+  if (kind == "ANY_TYPE") {
+    return "ANY TYPE";
+  }
+  if (kind == "FIXED_TABLE") {
+    return StandardSqlTableTypeName(argument.value("tableType", json::object()));
+  }
+  return StandardSqlTypeName(argument.value("dataType", json::object()));
 }
 
 std::string RoutineStatement(const Routine& routine) {

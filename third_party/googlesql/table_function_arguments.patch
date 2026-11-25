@@ -1,0 +1,41 @@
+diff --git a/googlesql/analyzer/resolver.cc b/googlesql/analyzer/resolver.cc
+--- a/googlesql/analyzer/resolver.cc
++++ b/googlesql/analyzer/resolver.cc
+@@ -2359,2 +2359,7 @@ absl::Status Resolver::PruneColumnLists(const ResolvedNode* node) const {
++    // The SQL TVF inliner replaces relation argument scans with positional
++    // references to the argument CTE. Preserve even unused parameter columns.
++    if (scan->Is<ResolvedRelationArgumentScan>()) {
++      continue;
++    }
+     const std::vector<int>* column_index_list = nullptr;
+     if (scan_node->node_kind() == RESOLVED_TABLE_SCAN) {
+diff --git a/googlesql/analyzer/rewriters/sql_function_inliner.cc b/googlesql/analyzer/rewriters/sql_function_inliner.cc
+--- a/googlesql/analyzer/rewriters/sql_function_inliner.cc
++++ b/googlesql/analyzer/rewriters/sql_function_inliner.cc
+@@ -1119,4 +1119,9 @@
+         GOOGLESQL_RET_CHECK_GE(scan->argument_list_size(), 1);
+-        GOOGLESQL_RETURN_IF_ERROR(
+-            ErrorIfArgumentIsCorrelated(*arg_scan, i + 1, arg_name));
++        GOOGLESQL_ASSIGN_OR_RETURN(auto correlated_columns,
++                         GetCorrelatedColumnSet(*arg_scan));
++        if (!correlated_columns.empty()) {
++          return absl::UnimplementedError(absl::StrCat(
++              "SQL TVF table argument '", arg_name,
++              "' cannot reference columns outside the argument."));
++        }
+         const std::string& arg_cte_name = argument_names[i];
+diff --git a/googlesql/resolved_ast/validator.cc b/googlesql/resolved_ast/validator.cc
+--- a/googlesql/resolved_ast/validator.cc
++++ b/googlesql/resolved_ast/validator.cc
+@@ -10524,3 +10524,11 @@ absl::Status Validator::ValidateInnerGraphLinearScanStructure(
+           break;
++        case RESOLVED_WITH_SCAN: {
++          // Inlining CALL PER() replaces the TVF scan with a WITH scan whose
++          // first entry reads the working table, the implicit table argument.
++          const auto* with_scan = primitive_ops[i]->GetAs<ResolvedWithScan>();
++          VALIDATOR_RET_CHECK(!with_scan->with_entry_list().empty());
++          input_scan = with_scan->with_entry_list(0)->with_subquery();
++          break;
++        }
+         case RESOLVED_TVFSCAN:
+           // The first table arg must be the GraphRefScan.
