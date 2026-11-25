@@ -36,7 +36,7 @@ rejected.
 | `DROP PROPERTY GRAPH` | Supported |  |
 | `GRAPH_EXPAND` | Supported | [Graph limits](compatibility.md#graphs). |
 | `GRAPH_TABLE` | Supported | [Graph limits](compatibility.md#graphs). |
-| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: volatile SQL table function body in GQL CALL. |
+| GQL queries | Partial | [Graph limits](compatibility.md#graphs). Unsupported: GQL CALL reading external storage or required partition filters. |
 
 ## Queries
 

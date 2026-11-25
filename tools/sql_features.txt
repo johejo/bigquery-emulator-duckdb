@@ -123,6 +123,7 @@ query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{0,2}(b:Acc
 query GQL queries | CREATE TABLE FUNCTION d.twice(v INT64) AS (SELECT v * 2 AS doubled); GRAPH d.g MATCH (p:Person) CALL d.twice(p.id) YIELD doubled AS result RETURN result
 query GQL queries | CREATE TABLE FUNCTION d.only_positive(v INT64) AS (SELECT v AS found FROM (SELECT 1) WHERE v > 0); GRAPH d.g MATCH (p:Person) OPTIONAL CALL d.only_positive(p.id) RETURN p.id, found
 query GQL queries | CREATE TABLE FUNCTION d.random_row() AS (SELECT RAND() AS sample_value); GRAPH d.g MATCH (p:Person) CALL d.random_row() RETURN sample_value
+query GQL queries | CREATE TABLE d.events (event_date DATE) PARTITION BY event_date OPTIONS (require_partition_filter = TRUE); CREATE TABLE FUNCTION d.event_count() AS (SELECT COUNT(*) AS n FROM d.events WHERE event_date = DATE '2025-01-01'); GRAPH d.g MATCH (p:Person) CALL d.event_count() RETURN n
 query GQL queries | CREATE TABLE FUNCTION d.pass_rows(input TABLE<id INT64>) AS (SELECT id FROM input); GRAPH d.g MATCH (p:Person) RETURN p.id AS id NEXT CALL PER() d.pass_rows() RETURN id
 query GQL queries | GRAPH d.g LET values = [1, NULL, 3] LET mean = AVG(values) LET lo = MIN(values) LET hi = MAX(values) RETURN mean, lo, hi
 query GQL queries | GRAPH d.g_nodes MATCH (a:Account)-[e:Transfers]->{1,2}(b:Account) LET values = ARRAY_AGG(DISTINCT e.v ORDER BY e.v) RETURN values

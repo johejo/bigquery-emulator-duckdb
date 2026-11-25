@@ -661,16 +661,6 @@ std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, cons
     return Unsupported(scope, "GQL CALL of a non-SQL or hinted table function");
   }
   const auto& body = *function->query();
-  std::vector<const googlesql::ResolvedNode*> calls;
-  body.GetDescendantsSatisfying(&googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCallBase>,
-                                &calls);
-  for (const auto* node : calls) {
-    const auto* call = node->GetAs<googlesql::ResolvedFunctionCallBase>();
-    if (call->function()->function_options().volatility == googlesql::FunctionEnums::VOLATILE) {
-      // DuckDB can evaluate a lateral right side just once for equal arguments.
-      return Unsupported(scope, "volatile SQL table function body in GQL CALL");
-    }
-  }
   // The body is not part of the caller's partition-filter or field-use analysis.
   std::vector<const googlesql::ResolvedNode*> tables;
   body.GetDescendantsWithKinds({googlesql::RESOLVED_TABLE_SCAN}, &tables);
@@ -685,7 +675,7 @@ std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, cons
   }
   Scope nested{.context = scope.context};
   const auto names = function->GetArgumentNames();
-  std::vector<std::string> arguments;
+  std::vector<std::string> bindings;
   for (int i = 0; i < tvf.argument_list_size(); ++i) {
     const auto* expr = tvf.argument_list(i)->expr();
     if (expr == nullptr) {
@@ -696,14 +686,17 @@ std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, cons
       return std::nullopt;
     }
     const auto name = QuoteIdentifier(scope.context.FreshName("call_arg"));
-    arguments.push_back(*sql + " AS " + name);
+    bindings.push_back(*sql + " AS " + name);
     nested.table_function_arguments.emplace(absl::AsciiStrToLower(names.at(i)),
                                             std::format("{}.{}", input_alias, name));
   }
-  if (!arguments.empty()) {
-    input.sql = std::format("SELECT {}.*, {} FROM ({}) AS {}", input_alias, Join(arguments, ", "),
-                            input.sql, input_alias);
-  }
+  // Even a TVF that references no arguments runs once per working row. Force a lateral
+  // dependency so DuckDB uses its dependent-join planner: it avoids deduplicating working
+  // rows when the TVF plan contains volatile expressions.
+  const auto anchor = QuoteIdentifier(scope.context.FreshName("call_anchor"));
+  bindings.push_back("1 AS " + anchor);
+  input.sql = std::format("SELECT {}.*, {} FROM ({}) AS {}", input_alias, Join(bindings, ", "),
+                          input.sql, input_alias);
   const auto relation = Scan(body, nested);
   if (!relation) {
     return std::nullopt;
@@ -716,8 +709,8 @@ std::optional<Relation> GraphCallTvf(const googlesql::ResolvedTVFScan& tvf, cons
     projections.push_back(relation->columns.at(source) + " AS " + name);
     result.columns.emplace(tvf.column_list(i).column_id(), "q." + name);
   }
-  result.sql =
-      "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) + relation->From();
+  projections.push_back(input_alias + "." + anchor);
+  result.sql = "SELECT " + Join(projections, ", ") + relation->From();
   return result;
 }
 
