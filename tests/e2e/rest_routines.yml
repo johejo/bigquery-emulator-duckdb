@@ -285,7 +285,7 @@ steps:
           body: null
     test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
   insert_fixed_table_function:
-    # third_party/bigquery_docs/reference/rest/v2/routines.md#argument
+    # Argument in third_party/bigquery_docs/reference/rest/v2/routines.md
     req:
       /projects/rest-routines/datasets/ds/routines:
         post:
