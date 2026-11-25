@@ -94,20 +94,10 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
     return std::nullopt;
   }
   if (const auto* stored = dynamic_cast<const BigQueryTable*>(table.table());
-      stored != nullptr && stored->UpsertApplyWatermark().has_value()) {
-    if (truncates) {
-      // Whether a later change still compares with the sequence numbers and NULL keys of rows
-      // TRUNCATE TABLE removed is not known.
-      if (stored->RecordsChangeKeys()) {
-        return Unsupported(scope,
-                           "TRUNCATE TABLE on a table that change data capture rows with "
-                           "sequence numbers or NULL primary key values changed");
-      }
-    } else {
-      throw ApiError::Invalid(
-          "DELETE/UPDATE/MERGE DMLs are currently not supported over tables that had UPSERT "
-          "streams.");
-    }
+      !truncates && stored != nullptr && stored->UpsertApplyWatermark().has_value()) {
+    throw ApiError::Invalid(
+        "DELETE/UPDATE/MERGE DMLs are currently not supported over tables that had UPSERT "
+        "streams.");
   }
   Target target{
       .table = QuoteIdentifierPath(table.table()->FullName()),

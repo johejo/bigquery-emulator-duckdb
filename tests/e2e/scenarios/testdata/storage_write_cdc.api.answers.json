@@ -137,6 +137,29 @@
         "create_table": {}
       }
     },
+    "explicit_stream_without_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "details": [
+                {
+                  "type_url": "type.googleapis.com/google.cloud.bigquery.storage.v1.StorageError",
+                  "value": "CAcSrAFwcm9qZWN0cy9qb2hlam8tc2FuZGJveC9kYXRhc2V0cy9icWFfcDMycHpuNG53bnI3Nnlkcm13Nnh2YjVlNXVfZXhwbGljaXRfc3RyZWFtX3dpdGhvdXRfcHJpbWFyeV9rZXkvdGFibGVzL3Qvc3RyZWFtcy9DaWMyWmpJMU1qbGlOaTB3TURBd0xUSXlOVFF0WWpVNE1TMHhNR1E1WVRJelkySmhORE02Y3pZGjJTY2hlbWEgbWlzbWF0Y2ggZHVlIHRvIGV4dHJhIGZpZWxkcyBpbiB1c2VyIHNjaGVtYQ=="
+                }
+              ],
+              "message": "Input schema has more fields than BigQuery schema, extra fields: '_change_type,_change_sequence_number' Entity: projects/johejo-sandbox/datasets/bqa_p32pzn4nwnr76ydrmw6xvb5e5u_explicit_stream_without_primary_key/tables/t/streams/Cic2ZjI1MjliNi0wMDAwLTIyNTQtYjU4MS0xMGQ5YTIzY2JhNDM6czY"
+            },
+            "messages": []
+          }
+        },
+        "create_table": {}
+      }
+    },
     "insert_after_upsert": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -251,6 +274,25 @@
         "create_table": {}
       }
     },
+    "insert_invalid_sequence": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error0": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_p32pzn4nwnr76ydrmw6xvb5e5u_insert_invalid_sequence/tables/t/streams/_default",
+          "errorCode0": 3,
+          "rowErrors0": [
+            {
+              "code": "FIELDS_ERROR",
+              "message": "invalid hex segment for _CHANGE_SEQUENCE_NUMBER:XYZ"
+            }
+          ]
+        },
+        "check": {},
+        "create_table": {}
+      }
+    },
     "insert_only": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -277,6 +319,38 @@
           ]
         },
         "create_table": {}
+      }
+    },
+    "insert_sequence_then_lower_upsert": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {},
+        "insert": {
+          "code": "OK",
+          "result0": {}
+        },
+        "upsert": {
+          "code": "OK",
+          "result0": {}
+        }
       }
     },
     "insert_then_upsert": {
@@ -528,6 +602,29 @@
         "create_table": {}
       }
     },
+    "missing_change_type_without_primary_key": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "details": [
+                {
+                  "type_url": "type.googleapis.com/google.cloud.bigquery.storage.v1.StorageError",
+                  "value": "CAcSgQFwcm9qZWN0cy9qb2hlam8tc2FuZGJveC9kYXRhc2V0cy9icWFfcDMycHpuNG53bnI3Nnlkcm13Nnh2YjVlNXVfbWlzc2luZ19jaGFuZ2VfdHlwZV93aXRob3V0X3ByaW1hcnlfa2V5L3RhYmxlcy90L3N0cmVhbXMvX2RlZmF1bHQaMlNjaGVtYSBtaXNtYXRjaCBkdWUgdG8gZXh0cmEgZmllbGRzIGluIHVzZXIgc2NoZW1h"
+                }
+              ],
+              "message": "Input schema has more fields than BigQuery schema, extra fields: '_change_type,_change_sequence_number' Entity: projects/johejo-sandbox/datasets/bqa_p32pzn4nwnr76ydrmw6xvb5e5u_missing_change_type_without_primary_key/tables/t/streams/_default"
+            },
+            "messages": []
+          }
+        },
+        "create_table": {}
+      }
+    },
     "null_key": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -573,6 +670,119 @@
                 },
                 {
                   "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {},
+        "seed": {}
+      }
+    },
+    "null_key_delete_after_upsert": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {},
+          "result1": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
+    "null_key_delete_with_sequence": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {},
+          "result1": {}
+        },
+        "check": {},
+        "create_table": {}
+      }
+    },
+    "null_key_lower_sequence": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {},
+          "result1": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {}
+      }
+    },
+    "null_key_upsert_over_dml": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {}
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": null
+                },
+                {
+                  "v": "b"
                 },
                 {
                   "v": "1"
@@ -839,6 +1049,39 @@
         "create_table": {}
       }
     },
+    "truncate_then_lower_sequence": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "b"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "create_table": {},
+        "first": {
+          "code": "OK",
+          "result0": {}
+        },
+        "second": {
+          "code": "OK",
+          "result0": {}
+        },
+        "truncate": {}
+      }
+    },
     "unknown_change_type": {
       "project": "johejo-sandbox",
       "run": "ax7v4shipmaq5t34kngneyicy4",
@@ -863,6 +1106,42 @@
           ]
         },
         "check": {},
+        "create_table": {}
+      }
+    },
+    "unknown_change_type_after_insert": {
+      "project": "johejo-sandbox",
+      "run": "p32pzn4nwnr76ydrmw6xvb5e5u",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error1": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_p32pzn4nwnr76ydrmw6xvb5e5u_unknown_change_type_after_insert/tables/t/streams/_default",
+          "errorCode1": 3,
+          "result0": {},
+          "rowErrors1": [
+            {
+              "code": "FIELDS_ERROR",
+              "message": "The given value is not a valid CHANGE_TYPE: MERGE"
+            }
+          ]
+        },
+        "check": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": "a"
+                },
+                {
+                  "v": "1"
+                }
+              ]
+            }
+          ]
+        },
         "create_table": {}
       }
     },

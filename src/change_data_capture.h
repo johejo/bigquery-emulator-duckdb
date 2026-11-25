@@ -57,9 +57,10 @@ std::string ChangeSequencesOf(const TableReference& table, int64_t creation_time
 // The query of the watermark, in milliseconds since the Unix epoch, of `table`, created at
 // `creation_time`, which has no row when no UPSERT or DELETE row changed the table.
 std::string UpsertApplyWatermarkQuery(const TableReference& table, int64_t creation_time);
-// The query whether the change sequence table records a key of `table`, created at
-// `creation_time`, which has a row only if it does.
-std::string ChangeSequencesQuery(const TableReference& table, int64_t creation_time);
+// The statement that forgets the keys the change sequence table records for `table`, created at
+// `creation_time`, which
+// TRUNCATE TABLE does: a later change orders after none of the changes before it.
+std::string ForgetChangeSequencesStatement(const TableReference& table, int64_t creation_time);
 
 // How long BigQuery keeps a deleted key's sequence number to order the changes that arrive after
 // it out of order.

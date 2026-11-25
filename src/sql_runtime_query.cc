@@ -41,6 +41,7 @@
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/builtin_function_options.h"
+#include "src/change_data_capture.h"
 #include "src/column_default.h"
 #include "src/ddl_write.h"
 #include "src/default_dataset.h"
@@ -62,6 +63,7 @@
 #include "src/sql_runtime.h"
 #include "src/statement_resources.h"
 #include "src/storage_snapshot.h"
+#include "src/table_comments.h"
 #include "src/table_source.h"
 #include "src/timestamp_precision.h"
 #include "src/translated_statement.h"
@@ -1247,6 +1249,15 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       kept = KeepVersion(backend, *translation.written_table);
     }
     result = backend.Execute(translation.sql, setup, null_arrays);
+    if (translation.statement_type == "TRUNCATE_TABLE" && translation.written_table.has_value()) {
+      const TableReference& table = *translation.written_table;
+      const auto comment = RelationComment(backend, RelationType::kTable, table);
+      if (const int64_t creation_time =
+              comment.has_value() ? HistoryCreationTime(table, CommentMetadata(*comment)) : 0;
+          creation_time != 0) {
+        backend.Execute(ForgetChangeSequencesStatement(table, creation_time));
+      }
+    }
   }
   if (schema.has_value()) {
     result.schema = ReconcileSchema(std::move(result.schema), *schema);

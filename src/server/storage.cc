@@ -856,9 +856,9 @@ class WriteService final : public pb::BigQueryWrite::Service {
   // Checks the `_CHANGE_TYPE` of each of `rows`, third_party/bigquery_docs/change-data-capture.md,
   // against the connection's mode: its first row decides whether a default stream connection
   // writes inserts, as rows without a `_CHANGE_TYPE` do, or UPSERT and DELETE rows, which need a
-  // primary key; an explicit stream writes only inserts. Returns whether `rows` are UPSERT and
-  // DELETE rows, whose `_CHANGE_TYPE` it spells in capitals, and removes the pseudocolumns of
-  // inserts.
+  // primary key; an explicit stream writes only inserts. Returns whether `rows` are changes,
+  // UPSERT and DELETE rows or INSERT rows with sequence numbers, whose `_CHANGE_TYPE` it spells in
+  // capitals, and otherwise removes the pseudocolumns.
   bool CheckChangeTypes(json& rows, bool arrow, Connection& connection, const WriteState& state,
                         pb::AppendRowsResponse& response) {
     const std::string& name = state.metadata.name();
@@ -886,13 +886,6 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (connection.upserts.value_or(false)) {
       require_key();
     }
-    // What an explicit stream answers for change data capture rows on a table without a primary
-    // key is not known.
-    if (typed && !IsDefault(name) && !keyed()) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write does not support _CHANGE_TYPE in explicit streams of tables without a "
-           "primary key");
-    }
     for (size_t index = 0; index < rows.size(); ++index) {
       json& row = rows.at(index);
       const auto found = row.find(kChangeTypeColumn);
@@ -902,18 +895,19 @@ class WriteService final : public pb::BigQueryWrite::Service {
           value.empty() ? ChangeType::kInsert : ParseChangeType(value);
       std::string error;
       if (!type.has_value()) {
-        if (connection.upserts.has_value() && !*connection.upserts) {
-          Fail(grpc::StatusCode::UNIMPLEMENTED,
-               "Storage Write does not support unknown _CHANGE_TYPE values in a connection that "
-               "writes inserts");
-        }
         error = "The given value is not a valid CHANGE_TYPE: " + value;
       } else {
         if (!connection.upserts.has_value()) {
           connection.upserts = IsDefault(name) && *type != ChangeType::kInsert;
           if (*connection.upserts) {
             require_key();
-          } else if (!value.empty() && !keyed()) {
+          } else if (typed && !keyed()) {
+            // What an explicit stream answers for an UPSERT or DELETE row here is not known.
+            if (*type != ChangeType::kInsert) {
+              Fail(grpc::StatusCode::UNIMPLEMENTED,
+                   "Storage Write does not support UPSERT and DELETE rows in explicit streams of "
+                   "tables without a primary key");
+            }
             // A table without a primary key has no pseudocolumns, so BigQuery takes them for
             // fields its schema lacks.
             std::vector<std::string> extra;
@@ -951,20 +945,38 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (connection.upserts.value_or(false)) {
       return true;
     }
-    if (typed && !rows.empty() && !keyed()) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED,
-           "Storage Write does not support rows without _CHANGE_TYPE on tables without a primary "
-           "key when the writer schema has it");
+    // BigQuery checks an INSERT row's sequence number and records it to order later changes to
+    // its key.
+    bool sequenced = false;
+    for (size_t index = 0; index < rows.size(); ++index) {
+      json& row = rows.at(index);
+      if (const auto sequence = row.find(kChangeSequenceColumn);
+          sequence != row.end() && sequence->is_string()) {
+        const auto parsed = ParseChangeSequence(sequence->get<std::string>());
+        if (const auto* message = std::get_if<std::string>(&parsed)) {
+          auto* row_error = response.add_row_errors();
+          row_error->set_index(static_cast<int64_t>(index));
+          row_error->set_code(pb::RowError::FIELDS_ERROR);
+          row_error->set_message(*message);
+        }
+        sequenced = true;
+      }
+    }
+    if (!response.row_errors().empty()) {
+      Fail(grpc::StatusCode::INVALID_ARGUMENT, RowErrors(name));
+    }
+    if (sequenced) {
+      if (state.metadata.type() != pb::WriteStream::COMMITTED) {
+        Fail(grpc::StatusCode::UNIMPLEMENTED,
+             "Storage Write does not support _CHANGE_SEQUENCE_NUMBER in PENDING and BUFFERED "
+             "streams");
+      }
+      for (json& row : rows) {
+        row[std::string(kChangeTypeColumn)] = "INSERT";
+      }
+      return true;
     }
     for (json& row : rows) {
-      // BigQuery takes a sequence number on an insert, which the emulator does not record.
-      if (const auto sequence = row.find(kChangeSequenceColumn);
-          sequence != row.end() && sequence->is_string() &&
-          !std::holds_alternative<ChangeSequence>(
-              ParseChangeSequence(sequence->get<std::string>()))) {
-        Fail(grpc::StatusCode::UNIMPLEMENTED,
-             "Storage Write does not support invalid _CHANGE_SEQUENCE_NUMBER values on inserts");
-      }
       row.erase(kChangeTypeColumn);
       row.erase(kChangeSequenceColumn);
     }
