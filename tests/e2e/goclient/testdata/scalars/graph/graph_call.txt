@@ -186,3 +186,25 @@ SELECT STRING_AGG(doubled, ',' ORDER BY doubled) FROM GRAPH_TABLE(scalar_graph.F
   CALL scalar_graph.keep_names(p.name)
   RETURN doubled)
 => "Alex:Alex,Lee:Lee"
+
+# The reference specifies that named CALL executes once per working row, even without
+# arguments. Check UUID uniqueness rather than any particular generated value.
+SELECT COUNT(*) = 12 AND COUNT(DISTINCT sample) = 12
+FROM GRAPH_TABLE(scalar_graph.FinGraph
+  MATCH (p:Person)
+  FOR tag IN [1, 2, 3, 4]
+  CALL scalar_graph.sample_row()
+  RETURN sample)
+=> "true"
+
+# Equal arguments do not share an invocation. OPTIONAL CALL keeps the rows for which the
+# TVF produces nothing, and still calls the TVF separately for the other rows.
+SELECT COUNT(*) = 12 AND COUNT(DISTINCT sample) = 6
+  AND COUNTIF(keep AND sample IS NOT NULL) = 6
+  AND COUNTIF(NOT keep AND sample IS NULL) = 6
+FROM GRAPH_TABLE(scalar_graph.FinGraph
+  MATCH (p:Person)
+  FOR keep IN [TRUE, FALSE, TRUE, FALSE]
+  OPTIONAL CALL scalar_graph.sample_if(keep)
+  RETURN keep, sample)
+=> "true"

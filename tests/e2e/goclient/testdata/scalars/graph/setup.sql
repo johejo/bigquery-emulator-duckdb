@@ -3,6 +3,10 @@ CREATE TABLE FUNCTION scalar_graph.echo_name(arg STRING) AS (SELECT arg AS col);
 CREATE TABLE FUNCTION scalar_graph.keep_names(arg STRING) AS (
   SELECT CONCAT(arg, ':', arg) AS doubled FROM (SELECT 1) WHERE arg != 'Dana'
 );
+CREATE TABLE FUNCTION scalar_graph.sample_row() AS (SELECT GENERATE_UUID() AS sample);
+CREATE TABLE FUNCTION scalar_graph.sample_if(keep BOOL) AS (
+  SELECT GENERATE_UUID() AS sample FROM (SELECT 1) WHERE keep
+);
 CREATE TABLE FUNCTION scalar_graph.return_names(t TABLE<name STRING>) AS (SELECT * FROM t);
 CREATE TABLE FUNCTION scalar_graph.count_people(t TABLE<id INT64, name STRING>) AS (
   SELECT COUNT(*) AS n FROM t

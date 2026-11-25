@@ -496,8 +496,8 @@ that read external tables or tables with required partition filters.
 both flattened and nested results. Other graph query forms do not support reading measures.
 
 Named per-row `CALL` and `OPTIONAL CALL` require a persistent SQL table function with fixed
-scalar arguments. Its body cannot call volatile functions or read external tables or tables with
-required partition filters. `CALL PER()` follows the [SQL table function limits](#table-functions).
+scalar arguments. Its body cannot read external tables or tables with required partition filters.
+`CALL PER()` follows the [SQL table function limits](#table-functions).
 
 `GRAPH_TABLE` and GQL queries reject:
 
