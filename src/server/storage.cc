@@ -1067,6 +1067,12 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (!first && arrow != (connection.arrow_decoder != nullptr)) {
       Fail(grpc::StatusCode::UNIMPLEMENTED, "Changing row format for the current destination");
     }
+    // BigQuery ends the RPC successfully, without answering or appending, at a later Arrow request
+    // that changes the writer schema; clients reconnect with the new one.
+    if (!first && arrow && request.arrow_rows().has_writer_schema() &&
+        request.arrow_rows().writer_schema().serialized_schema() != connection.arrow_schema) {
+      throw ConnectionError(grpc::StatusCode::OK, "");
+    }
     if (first) {
       if (arrow ? !request.arrow_rows().has_writer_schema()
                 : !request.proto_rows().has_writer_schema()) {

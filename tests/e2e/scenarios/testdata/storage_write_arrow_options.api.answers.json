@@ -343,6 +343,107 @@
         }
       }
     },
+    "missing_interpretation_lifetimes": {
+      "project": "johejo-sandbox",
+      "run": "bjsldx3qmrjctuquaox7lbadlj",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result0": {},
+          "result1": {},
+          "result2": {},
+          "result3": {},
+          "result4": {},
+          "result5": {},
+          "result6": {},
+          "result7": {}
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "1"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "default_name"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "3"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "4"
+                },
+                {
+                  "v": "default_name"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "default_name"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "explicit"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
     "missing_required_default_value": {
       "project": "johejo-sandbox",
       "run": "uqrokkkdqtlgteffj5d2o6jauq",
