@@ -2218,6 +2218,7 @@ cc_library(
         "@abseil-cpp//absl/strings",
         "@google_cloud_cpp//:bigtable",
         "@google_cloud_cpp//:common",
+        "@googleapis//google/bigtable/v2:bigtable_cc_proto",
         "@googlesql//googlesql/common:utf_util",
         "@nlohmann_json//:json",
     ],

@@ -253,18 +253,6 @@ FieldSchema TextGeographies(FieldSchema field) {
   return field;
 }
 
-// `field` with each JSON in it, at any depth, a STRING: an external read stages a JSON value as
-// its text, which a cast to JSON parses, so that a JSON null is not NULL.
-FieldSchema TextJsons(FieldSchema field) {
-  if (field.type == FieldType::kJson) {
-    field.type = FieldType::kString;
-  }
-  for (FieldSchema& child : field.fields) {
-    child = TextJsons(std::move(child));
-  }
-  return field;
-}
-
 // The DuckDB value `sql` of `column`, a Parquet column or null for none, as `field`. DuckDB casts
 // most columns itself, but StageParquetSources makes it read a wide DECIMAL as its bytes, and
 // it casts a DECIMAL to BIGNUM as an integer, so those go through GoogleSQL's conversions. A

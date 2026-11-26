@@ -80,6 +80,10 @@ inline FieldSchema AsNullable(FieldSchema field) {
   return field;
 }
 
+// `field` with each JSON in it, at any depth, a STRING: an external read stages a JSON value as
+// its text, which a cast to JSON parses, so that a JSON null is not NULL.
+FieldSchema TextJsons(FieldSchema field);
+
 // The field that the start or end bound of the RANGE `field` is, named `name`: a NULLABLE field of
 // its element type, whose NULL is an unbounded end, as the Storage Read API gives a RANGE.
 FieldSchema RangeBoundField(const FieldSchema& field, std::string name);

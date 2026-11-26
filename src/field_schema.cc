@@ -238,6 +238,16 @@ json FieldSchema::ToJson() const {
   return field;
 }
 
+FieldSchema TextJsons(FieldSchema field) {
+  if (field.type == FieldType::kJson) {
+    field.type = FieldType::kString;
+  }
+  for (FieldSchema& child : field.fields) {
+    child = TextJsons(std::move(child));
+  }
+  return field;
+}
+
 FieldSchema RangeBoundField(const FieldSchema& field, std::string name) {
   if (!field.range_element_type) {
     throw ApiError::Internal("RANGE field " + field.name + " has no element type");
