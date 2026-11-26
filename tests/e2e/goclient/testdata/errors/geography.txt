@@ -2,9 +2,3 @@
 
 SELECT TO_JSON_STRING(ST_GEOGPOINT(1, 2))
 => error contains: The emulator does not support function TO_JSON_STRING with GEOGRAPHY
-
-# BigQuery reads ST_ASGEOJSON's full polygon back as the full polygon. Its edges along the poles
-# collapse to them, which the emulator does not take.
-
-SELECT ST_GEOGFROMGEOJSON('{"type": "Polygon", "coordinates": [[[180, 90], [-180, 90], [-180, -90], [180, -90], [180, 90]]]}')
-=> error contains: The emulator does not support planar polygons with an edge along a pole

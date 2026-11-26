@@ -16,7 +16,8 @@ inline constexpr std::string_view kGeoJsonFailed = "ST_GeogFromGeoJSON failed: "
 // are planar, so each gains the vertices S2EdgeTessellator adds to keep the geodesic edges within
 // 10 meters of it, and an edge between longitudes 170 and -170 runs through 0. The parts are
 // combined as Combine does. A polygon is the region its rings enclose on the plane, whichever way
-// they run, however large; one with an edge along a pole is unsupported.
+// they run, however large. A ring tracing the four corners of the map boundary is the full
+// globe; other polygons with an edge along a pole are unsupported.
 absl::StatusOr<Geography> ReadGeoJson(std::string_view text, bool make_valid = false);
 
 }  // namespace googlesql_geography

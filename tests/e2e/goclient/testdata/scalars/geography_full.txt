@@ -126,5 +126,18 @@ SELECT ST_EQUALS(ST_UNION([ST_GEOGPOINT(1, 2), ST_GEOGFROMTEXT('fullglobe'), ST_
 SELECT ST_EQUALS(ST_GEOGFROMTEXT(ST_ASTEXT(ST_GEOGFROMTEXT('fullglobe'))), ST_GEOGFROMTEXT('fullglobe'))
 => "true"
 
+# BigQuery reads the full polygon written by ST_ASGEOJSON back as the full sphere.
+WITH input AS (SELECT ST_GEOGFROMTEXT('fullglobe') AS g)
+SELECT ST_EQUALS(ST_GEOGFROMGEOJSON(ST_ASGEOJSON(g)), g) FROM input
+=> "true"
+
+# BigQuery also accepts a different starting corner.
+SELECT ST_EQUALS(ST_GEOGFROMGEOJSON('{"type":"Polygon","coordinates":[[[-180,90],[-180,-90],[180,-90],[180,90],[-180,90]]]}'), ST_GEOGFROMTEXT('fullglobe'))
+=> "true"
+
+# The same boundary in clockwise order still represents the full sphere.
+SELECT ST_EQUALS(ST_GEOGFROMGEOJSON('{"type":"Polygon","coordinates":[[[180,90],[180,-90],[-180,-90],[-180,90],[180,90]]]}'), ST_GEOGFROMTEXT('fullglobe'))
+=> "true"
+
 SELECT ST_EQUALS(ST_UNION(ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING EMPTY'), [ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0, 0 2, 0 0)')]), ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 0 2, 0 0))')), ST_GEOGFROMTEXT('fullglobe'))
 => "true"

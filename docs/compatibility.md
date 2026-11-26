@@ -275,8 +275,8 @@ BigQuery loads as NULL.
   through a pole that follows the antimeridian may retain a portion BigQuery clips away.
   Ambiguous cuts, including some polygons with a ring vertex at an antimeridian corner,
   are unsupported.
-- Planar polygons with an edge along a pole, including GeoJSON polygons such as
-  `ST_ASGEOJSON`'s full polygon, are unsupported.
+- Planar polygons with an edge along a pole are unsupported, except for a GeoJSON ring
+  tracing the full-globe boundary through its four corners.
 
 `ST_BOUNDINGBOX` latitude bounds can differ from BigQuery in the last floating-point bit.
 `ST_SNAPTOGRID` rounds a coordinate halfway between grid lines, such as longitude 1.25 on a 0.1
