@@ -1040,7 +1040,15 @@ absl::StatusOr<std::vector<R2Point>> GeoJsonProject(const std::vector<S2Point>& 
   std::vector<R2Point> projected;
   // A pole has distinct planar positions on the incoming and outgoing edges.
   // Use the neighboring tessellated longitudes so the join stays on the map boundary.
-  const auto append_polar = [&](const S2Point& a, const S2Point& b, bool starts_at_pole) {
+  const auto append_polar = [&](S2Point a, const S2Point& b, bool starts_at_pole) {
+    if (starts_at_pole && std::abs(ToPoint(a).longitude) == 180) {
+      // Start on the incident edge's side of the map. Otherwise the tessellator
+      // can unwrap the whole outgoing edge beyond +/-180.
+      const double longitude = ToPoint(b).longitude;
+      if (longitude != 0) {
+        a = S2Point(a.x(), std::copysign(a.y(), longitude), a.z());
+      }
+    }
     std::vector<R2Point> edge;
     tessellator.AppendProjected(a, b, &edge);
     if (starts_at_pole) {
@@ -1171,6 +1179,22 @@ std::vector<std::vector<S2Point>> GeoJsonPieces(const std::vector<S2Point>& line
              S2Polyline(line), s2builderutil::IdentitySnapFunction(S1Angle::Zero()))) {
       const auto vertices = part->vertices_span();
       pieces.emplace_back(vertices.begin(), vertices.end());
+    }
+    // BigQuery drops the seam half of a two-point north-pole crossing on the
+    // prime/antimeridian pair. S2's map clip can retain the whole edge when it
+    // grazes the corner, so in that case clip explicitly at the pole.
+    if (line.size() == 2 && pieces.size() == 1 && pieces.front() == line) {
+      const Point a = ToPoint(line.front());
+      const Point b = ToPoint(line.back());
+      if (a.latitude > 0 && b.latitude > 0) {
+        const S2Point north = ToS2Point({.longitude = 0, .latitude = 90});
+        if (std::abs(a.longitude) == 180 && b.longitude == 0) {
+          return {{north, line.back()}};
+        }
+        if (a.longitude == 0 && std::abs(b.longitude) == 180) {
+          return {{line.front(), north}};
+        }
+      }
     }
     return pieces;
   }
