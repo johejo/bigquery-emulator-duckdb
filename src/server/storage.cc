@@ -993,11 +993,6 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (!arrow && !request.has_proto_rows()) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "AppendRows requires row data");
     }
-    if (arrow && (request.default_missing_value_interpretation() !=
-                      pb::AppendRowsRequest::MISSING_VALUE_INTERPRETATION_UNSPECIFIED ||
-                  !request.missing_value_interpretations().empty())) {
-      Fail(grpc::StatusCode::UNIMPLEMENTED, "Missing value interpretations for Arrow rows");
-    }
     absl::MutexLock const lock(mutex_);
     if (connection.name.empty() && request.write_stream().empty()) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "The first request must specify write_stream");
@@ -1061,9 +1056,17 @@ class WriteService final : public pb::BigQueryWrite::Service {
       const auto& wire = input.has_writer_schema() ? input.writer_schema().serialized_schema()
                                                    : connection.arrow_schema;
       if (first || schema_changed || wire != connection.arrow_schema) {
-        auto decoder = std::make_unique<StorageArrowDecoder>(wire, state->schema);
-        connection.arrow_schema = wire;
-        connection.arrow_decoder = std::move(decoder);
+        try {
+          auto decoder = std::make_unique<StorageArrowDecoder>(wire, state->schema);
+          connection.arrow_schema = wire;
+          connection.arrow_decoder = std::move(decoder);
+        } catch (const StorageFieldMismatch& error) {
+          // Unlike a protobuf mismatch, BigQuery answers this request and keeps the connection.
+          Fail(grpc::StatusCode::INVALID_ARGUMENT,
+               "The Arrow field mismatched with BigQuery field at '" + error.field +
+                   "', the Arrow field type " + error.proto_type + ", BigQuery field type " +
+                   std::string(FieldTypeName(error.type)) + " Entity: " + name);
+        }
       }
     } else if (first || schema_changed ||
                (request.proto_rows().has_writer_schema() &&
@@ -1113,8 +1116,22 @@ class WriteService final : public pb::BigQueryWrite::Service {
     }
     json rows = json::array();
     if (arrow) {
-      rows =
-          connection.arrow_decoder->Decode(request.arrow_rows().rows().serialized_record_batch());
+      rows = connection.arrow_decoder->Decode(request.arrow_rows().rows().serialized_record_batch(),
+                                              connection.default_missing, missing);
+      // BigQuery reports a NULL left in a REQUIRED column of an Arrow batch without a code.
+      for (size_t i = 0; i < rows.size(); ++i) {
+        const auto& row = rows.at(i);
+        const auto null = std::ranges::find_if(state->schema, [&](const FieldSchema& field) {
+          const auto found = row.find(field.name);
+          return field.mode == FieldMode::kRequired && found != row.end() && found->is_null();
+        });
+        if (null != state->schema.end()) {
+          auto* error = response.add_row_errors();
+          error->set_index(static_cast<int64_t>(i));
+          error->set_message("Error found in field (or sub-field) '" + null->name + "': Field '" +
+                             null->name + "' is required but has null value.");
+        }
+      }
     }
     for (int i = 0; i < request.proto_rows().rows().serialized_rows_size(); ++i) {
       try {

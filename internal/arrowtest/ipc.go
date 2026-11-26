@@ -10,10 +10,11 @@ import (
 )
 
 // Encode returns the schema and batch messages separately, without a stream terminator.
-// The record must not contain dictionary arrays.
-func Encode(record arrow.RecordBatch) (schema, batch []byte, err error) {
+// The record must not contain dictionary arrays. Options such as ipc.WithZstd apply to the
+// batch.
+func Encode(record arrow.RecordBatch, options ...ipc.Option) (schema, batch []byte, err error) {
 	var output bytes.Buffer
-	w := ipc.NewWriter(&output, ipc.WithSchema(record.Schema()))
+	w := ipc.NewWriter(&output, append([]ipc.Option{ipc.WithSchema(record.Schema())}, options...)...)
 	if err := w.Write(record); err != nil {
 		return nil, nil, err
 	}

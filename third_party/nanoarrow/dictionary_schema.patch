@@ -1,0 +1,82 @@
+diff --git a/src/nanoarrow/ipc/decoder.c b/src/nanoarrow/ipc/decoder.c
+--- a/src/nanoarrow/ipc/decoder.c
++++ b/src/nanoarrow/ipc/decoder.c
+@@ -828,12 +828,6 @@
+ 
+ static int ArrowIpcDecoderSetField(struct ArrowSchema* schema, ns(Field_table_t) field,
+                                    struct ArrowError* error) {
+-  // No dictionary support yet
+-  if (ns(Field_dictionary_is_present(field))) {
+-    ArrowErrorSet(error, "Schema message field with DictionaryEncoding not supported");
+-    return ENOTSUP;
+-  }
+-
+   int result;
+   if (ns(Field_name_is_present(field))) {
+     result = ArrowSchemaSetName(schema, ns(Field_name_get(field)));
+@@ -874,7 +868,64 @@
+   }
+ 
+   NANOARROW_RETURN_NOT_OK(ArrowIpcDecoderSetChildren(schema, children, error));
+-  return ArrowIpcDecoderSetMetadata(schema, ns(Field_custom_metadata(field)), error);
++  NANOARROW_RETURN_NOT_OK(
++      ArrowIpcDecoderSetMetadata(schema, ns(Field_custom_metadata(field)), error));
++  if (!ns(Field_dictionary_is_present(field))) {
++    return NANOARROW_OK;
++  }
++
++  // Extension: decode a dictionary-encoded field's schema as the C data interface does, with
++  // its index type and the value type as its dictionary. Batches of it remain unsupported.
++  ns(DictionaryEncoding_table_t) encoding = ns(Field_dictionary(field));
++  ns(Int_table_t) index = ns(DictionaryEncoding_indexType(encoding));
++  int32_t bit_width = index == NULL ? 32 : ns(Int_bitWidth(index));
++  int is_signed = index == NULL || ns(Int_is_signed(index));
++  enum ArrowType index_type;
++  switch (bit_width) {
++    case 8:
++      index_type = is_signed ? NANOARROW_TYPE_INT8 : NANOARROW_TYPE_UINT8;
++      break;
++    case 16:
++      index_type = is_signed ? NANOARROW_TYPE_INT16 : NANOARROW_TYPE_UINT16;
++      break;
++    case 32:
++      index_type = is_signed ? NANOARROW_TYPE_INT32 : NANOARROW_TYPE_UINT32;
++      break;
++    case 64:
++      index_type = is_signed ? NANOARROW_TYPE_INT64 : NANOARROW_TYPE_UINT64;
++      break;
++    default:
++      ArrowErrorSet(error, "Invalid dictionary index bit width %d", (int)bit_width);
++      return EINVAL;
++  }
++  // The field's name, nullability and metadata stay on it; the dictionary has only the values.
++  struct ArrowSchema value;
++  ArrowSchemaMove(schema, &value);
++  ArrowSchemaInit(schema);
++  result = ArrowSchemaSetType(schema, index_type);
++  if (result == NANOARROW_OK) {
++    result = ArrowSchemaSetName(schema, value.name);
++  }
++  if (result == NANOARROW_OK) {
++    result = ArrowSchemaSetMetadata(schema, value.metadata);
++  }
++  if (result == NANOARROW_OK) {
++    result = ArrowSchemaSetMetadata(&value, NULL);
++  }
++  if (result == NANOARROW_OK) {
++    result = ArrowSchemaAllocateDictionary(schema);
++  }
++  if (result != NANOARROW_OK) {
++    ArrowSchemaRelease(&value);
++    ArrowErrorSet(error, "Failed to set dictionary-encoded field");
++    return result;
++  }
++  schema->flags = value.flags;
++  if (ns(DictionaryEncoding_isOrdered(encoding))) {
++    schema->flags |= ARROW_FLAG_DICTIONARY_ORDERED;
++  }
++  ArrowSchemaMove(&value, schema->dictionary);
++  return NANOARROW_OK;
+ }
+ 
+ static int ArrowIpcDecoderSetChildren(struct ArrowSchema* schema, ns(Field_vec_t) fields,

@@ -44,7 +44,10 @@ cc_library(
         "@googlesql//googlesql/public:interval_value",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:date_time_util",
+        "@lz4//:lz4_frame",
+        "@zstd",
     ],
+    visibility = ["//:__pkg__"],
     deps = [
         "//:field_schema",
         "@nanoarrow",

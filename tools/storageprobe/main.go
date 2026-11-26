@@ -19,6 +19,7 @@ import (
 	"cloud.google.com/go/bigquery/storage/apiv1/storagepb"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/arrowtest"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
@@ -115,28 +116,39 @@ func arrowRangeAppend(boundType bigquery.FieldType, wireType arrow.DataType, sam
 }
 
 func arrowAppendField(field bigquery.FieldSchema, wireType arrow.DataType, sample string) func(context.Context, *env) error {
-	field.Name = "value"
+	return arrowAppendWith(field, arrow.Field{Type: wireType}, sample, nil, nil)
+}
+
+// arrowAppendWith appends sample as a batch of one wire field, written with options, in a
+// request that edit, if not nil, changes.
+func arrowAppendWith(field bigquery.FieldSchema, wire arrow.Field, sample string, options []ipc.Option,
+	edit func(*storagepb.AppendRowsRequest)) func(context.Context, *env) error {
+	field.Name, wire.Name = "value", "value"
 	return func(ctx context.Context, e *env) error {
 		path, err := e.table(ctx, bigquery.Schema{&field})
 		if err != nil {
 			return err
 		}
-		b := array.NewRecordBuilder(memory.DefaultAllocator, arrow.NewSchema([]arrow.Field{{Name: "value", Type: wireType}}, nil))
+		b := array.NewRecordBuilder(memory.DefaultAllocator, arrow.NewSchema([]arrow.Field{wire}, nil))
 		defer b.Release()
 		if err := b.Field(0).AppendValueFromString(sample); err != nil {
-			return fmt.Errorf("encode Arrow probe sample for %s: %w", wireType, err)
+			return fmt.Errorf("encode Arrow probe sample for %s: %w", wire.Type, err)
 		}
 		record := b.NewRecordBatch()
 		defer record.Release()
-		schema, batch, err := arrowtest.Encode(record)
+		schema, batch, err := arrowtest.Encode(record, options...)
 		if err != nil {
 			return err
 		}
-		return e.send(ctx, &storagepb.AppendRowsRequest{WriteStream: path + "/streams/_default",
+		request := &storagepb.AppendRowsRequest{WriteStream: path + "/streams/_default",
 			Rows: &storagepb.AppendRowsRequest_ArrowRows{ArrowRows: &storagepb.AppendRowsRequest_ArrowData{
 				WriterSchema: &storagepb.ArrowSchema{SerializedSchema: schema},
 				Rows:         &storagepb.ArrowRecordBatch{SerializedRecordBatch: batch},
-			}}})
+			}}}
+		if edit != nil {
+			edit(request)
+		}
+		return e.send(ctx, request)
 	}
 }
 
@@ -460,6 +472,16 @@ var sections = []section{
 			{"Arrow RANGE<DATE> rows", arrowRangeAppend(bigquery.DateFieldType, arrow.FixedWidthTypes.Date32, `{"start":"2000-01-01","end":null}`)},
 			{"Arrow RANGE<DATETIME> rows", arrowRangeAppend(bigquery.DateTimeFieldType, &arrow.TimestampType{Unit: arrow.Microsecond}, `{"start":"2000-01-01T00:00:00","end":null}`)},
 			{"Arrow RANGE<TIMESTAMP> rows", arrowRangeAppend(bigquery.TimestampFieldType, &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: "UTC"}, `{"start":"2000-01-01T00:00:00Z","end":null}`)},
+			{"Arrow ZSTD-compressed batches", arrowAppendWith(bigquery.FieldSchema{Type: bigquery.StringFieldType},
+				arrow.Field{Type: arrow.BinaryTypes.String}, "probe", []ipc.Option{ipc.WithZstd()}, nil)},
+			{"Arrow LZ4_FRAME-compressed batches", arrowAppendWith(bigquery.FieldSchema{Type: bigquery.StringFieldType},
+				arrow.Field{Type: arrow.BinaryTypes.String}, "probe", []ipc.Option{ipc.WithLZ4()}, nil)},
+			{"Arrow field metadata", arrowAppendWith(bigquery.FieldSchema{Type: bigquery.StringFieldType},
+				arrow.Field{Type: arrow.BinaryTypes.String, Metadata: arrow.NewMetadata([]string{"comment"}, []string{"probe"})}, "probe", nil, nil)},
+			{"Arrow missing value interpretations", arrowAppendWith(bigquery.FieldSchema{Type: bigquery.StringFieldType, DefaultValueExpression: "'probe'"},
+				arrow.Field{Type: arrow.BinaryTypes.String, Nullable: true}, "probe", nil, func(request *storagepb.AppendRowsRequest) {
+					request.DefaultMissingValueInterpretation = storagepb.AppendRowsRequest_DEFAULT_VALUE
+				})},
 			{"writer schema changes on a connection", func(ctx context.Context, e *env) error {
 				path, err := e.table(ctx, bigquery.Schema{{Name: "value", Type: bigquery.StringFieldType},
 					{Name: "other", Type: bigquery.StringFieldType}})
