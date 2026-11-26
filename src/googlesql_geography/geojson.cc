@@ -84,6 +84,23 @@ absl::StatusOr<Geography> ReadLine(const json& coordinates, bool /*make_valid*/)
   return PlanarLine(positions, kGeoJsonFailed);
 }
 
+// The full sphere is the map boundary in GeoJSON. On the sphere its polar
+// edges collapse and its two meridians coincide, leaving no ring to tessellate.
+bool IsFullGlobeRing(const std::vector<R2Point>& ring) {
+  constexpr std::array kCorners = {
+      R2Point(180, 90),
+      R2Point(-180, 90),
+      R2Point(-180, -90),
+      R2Point(180, -90),
+  };
+  // All four corners must occur once, with opposite corners two steps apart.
+  // This allows either winding and any start, but not a diagonal crossing.
+  return ring.size() == kCorners.size() + 1 && ring.front() == ring.back() &&
+         ring.front().x() == -ring.at(2).x() && ring.front().y() == -ring.at(2).y() &&
+         std::ranges::is_permutation(ring.begin(), ring.end() - 1, kCorners.begin(),
+                                     kCorners.end());
+}
+
 // A polygon is the region its rings enclose on the plane. Each loop runs as the ring does, and
 // where the ring runs clockwise, in reverse as S2Loop::Invert reverses it, so that the region it
 // adds or removes lies on its left.
@@ -93,7 +110,10 @@ absl::StatusOr<Geography> ReadPolygon(const json& coordinates, bool make_valid) 
     GOOGLESQL_ASSIGN_OR_RETURN(auto positions, ReadPositions(ring));
     rings.push_back(std::move(positions));
   }
-  return PlanarPolygon(rings, kGeoJsonFailed, make_valid);
+  if (rings.size() == 1 && IsFullGlobeRing(rings.front())) {
+    return FullGeography();
+  }
+  return PlanarPolygon(rings, kGeoJsonFailed, make_valid, /*allow_polar_edges=*/true);
 }
 
 // A geometry type other than GeometryCollection, whose coordinates are one part as `read` reads
