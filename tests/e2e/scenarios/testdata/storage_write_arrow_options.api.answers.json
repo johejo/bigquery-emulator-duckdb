@@ -1,6 +1,27 @@
 {
   "version": 1,
   "cases": {
+    "arrow_json_extension_on_json": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result": {}
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"value\":{\"a\":1}}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
     "dictionary_absent": {
       "project": "johejo-sandbox",
       "run": "h3qknfvjhwrwodu7r2tekd5sef",
@@ -94,6 +115,27 @@
         }
       }
     },
+    "geography_extension_on_string": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result": {}
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"value\":\"POINT(1 2)\"}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
     "json_extension_metadata": {
       "project": "johejo-sandbox",
       "run": "h3qknfvjhwrwodu7r2tekd5sef",
@@ -111,6 +153,27 @@
               "f": [
                 {
                   "v": "{\"value\":{\"a\":1}}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "json_extension_on_string": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result": {}
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"value\":\"{\\\"a\\\":1}\"}"
                 }
               ]
             }
@@ -280,92 +343,100 @@
         }
       }
     },
-    "missing_unspecified": {
+    "missing_interpretation_lifetimes": {
       "project": "johejo-sandbox",
-      "run": "h3qknfvjhwrwodu7r2tekd5sef",
+      "run": "bjsldx3qmrjctuquaox7lbadlj",
       "steps": {
         "append": {
           "code": "OK",
-          "response": {
-            "appendResult": {},
-            "writeStream": "projects/johejo-sandbox/datasets/bqa_h3qknfvjhwrwodu7r2tekd5sef_missing_unspecified/tables/t/streams/_default"
-          }
+          "result0": {},
+          "result1": {},
+          "result2": {},
+          "result3": {},
+          "result4": {},
+          "result5": {},
+          "result6": {},
+          "result7": {}
         },
         "query": {
           "rows": [
             {
               "f": [
                 {
-                  "v": "{\"id\":1,\"name\":\"explicit\"}"
+                  "v": "1"
+                },
+                {
+                  "v": null
                 }
               ]
             },
             {
               "f": [
                 {
-                  "v": "{\"id\":2,\"name\":null}"
-                }
-              ]
-            }
-          ]
-        }
-      }
-    },
-    "schema_metadata": {
-      "project": "johejo-sandbox",
-      "run": "h3qknfvjhwrwodu7r2tekd5sef",
-      "steps": {
-        "append": {
-          "code": "OK",
-          "response": {
-            "appendResult": {},
-            "writeStream": "projects/johejo-sandbox/datasets/bqa_h3qknfvjhwrwodu7r2tekd5sef_schema_metadata/tables/t/streams/_default"
-          }
-        },
-        "query": {
-          "rows": [
-            {
-              "f": [
+                  "v": "2"
+                },
                 {
-                  "v": "{\"value\":\"alpha\"}"
-                }
-              ]
-            }
-          ]
-        }
-      }
-    },
-    "zstd_body": {
-      "project": "johejo-sandbox",
-      "run": "h3qknfvjhwrwodu7r2tekd5sef",
-      "steps": {
-        "append": {
-          "code": "OK",
-          "response": {
-            "appendResult": {},
-            "writeStream": "projects/johejo-sandbox/datasets/bqa_h3qknfvjhwrwodu7r2tekd5sef_zstd_body/tables/t/streams/_default"
-          }
-        },
-        "query": {
-          "rows": [
-            {
-              "f": [
-                {
-                  "v": "{\"value\":\"alpha\"}"
+                  "v": "default_name"
                 }
               ]
             },
             {
               "f": [
                 {
-                  "v": "{\"value\":\"gamma\"}"
+                  "v": "3"
+                },
+                {
+                  "v": null
                 }
               ]
             },
             {
               "f": [
                 {
-                  "v": "{\"value\":null}"
+                  "v": "4"
+                },
+                {
+                  "v": "default_name"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "5"
+                },
+                {
+                  "v": "default_name"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "6"
+                },
+                {
+                  "v": null
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "7"
+                },
+                {
+                  "v": "explicit"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "8"
+                },
+                {
+                  "v": null
                 }
               ]
             }
@@ -431,6 +502,189 @@
           }
         },
         "query": {}
+      }
+    },
+    "missing_unspecified": {
+      "project": "johejo-sandbox",
+      "run": "h3qknfvjhwrwodu7r2tekd5sef",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "response": {
+            "appendResult": {},
+            "writeStream": "projects/johejo-sandbox/datasets/bqa_h3qknfvjhwrwodu7r2tekd5sef_missing_unspecified/tables/t/streams/_default"
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"id\":1,\"name\":\"explicit\"}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"id\":2,\"name\":null}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "nested_dictionary": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error": "The Arrow field mismatched with BigQuery field at 'rec.child', the Arrow field type dictionary, BigQuery field type STRING Entity: projects/johejo-sandbox/datasets/bqa_qqzjdph3gongmg63hm6o6vuqto_nested_dictionary/tables/t/streams/_default",
+          "errorCode": 3
+        },
+        "query": {}
+      }
+    },
+    "nested_required": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_qqzjdph3gongmg63hm6o6vuqto_nested_required/tables/t/streams/_default",
+          "errorCode": 3,
+          "rowErrors": [
+            {
+              "index": "1",
+              "message": "Error found in field (or sub-field) 'x': Field 'x' is required but has null value."
+            }
+          ]
+        },
+        "query": {}
+      }
+    },
+    "required_without_default": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "error": "Errors found while processing rows. Please refer to the row_errors field for details. The list may not be complete because of the size limitations. Entity: projects/johejo-sandbox/datasets/bqa_qqzjdph3gongmg63hm6o6vuqto_required_without_default/tables/t/streams/_default",
+          "errorCode": 3,
+          "rowErrors": [
+            {
+              "index": "1",
+              "message": "Error found in field (or sub-field) 'id': Field 'id' is required but has null value."
+            }
+          ]
+        },
+        "query": {}
+      }
+    },
+    "schema_metadata": {
+      "project": "johejo-sandbox",
+      "run": "h3qknfvjhwrwodu7r2tekd5sef",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "response": {
+            "appendResult": {},
+            "writeStream": "projects/johejo-sandbox/datasets/bqa_h3qknfvjhwrwodu7r2tekd5sef_schema_metadata/tables/t/streams/_default"
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"value\":\"alpha\"}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "writer_schema_change_without_stream": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "error": {
+            "code": "InvalidArgument",
+            "error": {
+              "code": 3,
+              "message": "Invalid stream name. Entity: projects/johejo-sandbox/datasets/bqa_qqzjdph3gongmg63hm6o6vuqto_missing_interpretation_lifetimes/tables/t/streams/_default"
+            },
+            "messages": [
+              {
+                "appendResult": {},
+                "writeStream": "projects/johejo-sandbox/datasets/bqa_qqzjdph3gongmg63hm6o6vuqto_missing_interpretation_lifetimes/tables/t/streams/_default"
+              },
+              {
+                "appendResult": {}
+              },
+              {
+                "appendResult": {}
+              },
+              {
+                "appendResult": {}
+              },
+              {
+                "appendResult": {}
+              },
+              {
+                "appendResult": {}
+              },
+              {
+                "appendResult": {}
+              },
+              {
+                "appendResult": {}
+              }
+            ]
+          }
+        }
+      }
+    },
+    "zstd_body": {
+      "project": "johejo-sandbox",
+      "run": "h3qknfvjhwrwodu7r2tekd5sef",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "response": {
+            "appendResult": {},
+            "writeStream": "projects/johejo-sandbox/datasets/bqa_h3qknfvjhwrwodu7r2tekd5sef_zstd_body/tables/t/streams/_default"
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"value\":\"alpha\"}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"value\":\"gamma\"}"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "{\"value\":null}"
+                }
+              ]
+            }
+          ]
+        }
       }
     }
   }

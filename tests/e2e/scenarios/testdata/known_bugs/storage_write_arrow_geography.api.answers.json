@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "cases": {
+    "geography_extension_on_geography": {
+      "project": "johejo-sandbox",
+      "run": "qqzjdph3gongmg63hm6o6vuqto",
+      "steps": {
+        "append": {
+          "code": "OK",
+          "result": {}
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "{\"value\":\"POINT(1 2)\"}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

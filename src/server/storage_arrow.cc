@@ -37,9 +37,6 @@ using nlohmann::json;
 namespace time_util = googlesql::functions;
 
 void Check(int code, const ArrowError& error) {
-  if (code == ENOTSUP) {
-    throw ApiError::Unsupported("Arrow IPC feature: " + std::string(error.message));
-  }
   if (code != NANOARROW_OK) {
     throw ApiError::Invalid("Invalid Arrow IPC message: " + std::string(error.message));
   }
@@ -357,6 +354,19 @@ StorageArrowDecoder::Field StorageArrowDecoder::Bind(const ArrowSchema& input,
   if (input.dictionary != nullptr) {
     throw StorageFieldMismatch(destination.name, "dictionary", destination.type);
   }
+  // BigQuery ignores other metadata, and these extension types even on other columns' types;
+  // what it does with other extension types is not known.
+  ArrowStringView extension{};
+  Check(ArrowMetadataGetValue(input.metadata, ArrowCharView("ARROW:extension:name"), &extension),
+        ArrowError{});
+  if (extension.data != nullptr) {
+    const std::string_view name(extension.data, static_cast<size_t>(extension.size_bytes));
+    if (name != "google:sqlType:json" && name != "google:sqlType:geography" &&
+        name != "arrow.json") {
+      throw ApiError::Unsupported("Arrow extension type " + std::string(name) + " for field " +
+                                  destination.name);
+    }
+  }
   const bool repeated = destination.mode == FieldMode::kRepeated;
   Field field{
       .name = destination.name,
@@ -384,7 +394,13 @@ StorageArrowDecoder::Field StorageArrowDecoder::Bind(const ArrowSchema& input,
       if (input.n_children == 0) {
         throw ApiError::Unsupported("empty Arrow writer structs");
       }
-      field.children = BindFields(input, destination.fields, depth + 1);
+      try {
+        field.children = BindFields(input, destination.fields, depth + 1);
+      } catch (const StorageFieldMismatch& mismatch) {
+        // BigQuery names a nested field by its path, such as rec.child.
+        throw StorageFieldMismatch(destination.name + "." + mismatch.field, mismatch.proto_type,
+                                   mismatch.type);
+      }
       break;
     case FieldType::kRange: {
       if (input.n_children != 2) {
