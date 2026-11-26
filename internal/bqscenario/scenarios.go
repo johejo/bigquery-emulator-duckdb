@@ -71,6 +71,10 @@ type GCSRequest struct {
 	Object string `json:"object"`
 	// Base64 is the object's contents for PUT, decoded after variable expansion.
 	Base64 *string `json:"base64,omitempty"`
+	// ContentType and Metadata, the object's custom metadata, are set by PUT;
+	// application/octet-stream and none by default.
+	ContentType string            `json:"contentType,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
 type GRPCRequest struct {
@@ -438,8 +442,8 @@ func checkGCS(request GCSRequest) error {
 			return errors.New("gcs PUT requires base64 contents")
 		}
 	case "DELETE":
-		if request.Base64 != nil {
-			return errors.New("gcs DELETE takes no contents")
+		if request.Base64 != nil || request.ContentType != "" || request.Metadata != nil {
+			return errors.New("gcs DELETE takes no contents or metadata")
 		}
 	default:
 		return fmt.Errorf("gcs method must be PUT or DELETE, not %q", request.Method)

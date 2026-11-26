@@ -73,7 +73,7 @@ rejected samples by statement or by a short label from the catalog.
 | [ALTER DATA_POLICY SET OPTIONS](#alter-data_policy-set-options) | 0 | 0 | 2 | 0 |
 | [ALTER CONNECTION SET OPTIONS](#alter-connection-set-options) | 0 | 0 | 2 | 0 |
 | [UNDROP SCHEMA](#undrop-schema) | 0 | 0 | 1 | 0 |
-| [CREATE EXTERNAL TABLE](#create-external-table) | 10 | 1 | 1 | 8 |
+| [CREATE EXTERNAL TABLE](#create-external-table) | 11 | 1 | 1 | 7 |
 | [CREATE EXTERNAL TABLE CSV](#create-external-table-csv) | 16 | 0 | 0 | 0 |
 | [CREATE TABLE generated column](#create-table-generated-column) | 0 | 0 | 1 | 0 |
 | [ALTER TABLE ADD COLUMN generated column](#alter-table-add-column-generated-column) | 0 | 0 | 1 | 0 |
@@ -625,7 +625,7 @@ rejected samples by statement or by a short label from the catalog.
 | [`file_set_spec_type`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`json_extension`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`max_staleness`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `INTERVAL` | Unsupported |  |
-| [`object_metadata`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
+| [`object_metadata`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Supported |  |
 | [`projection_fields`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`reference_file_schema_uri`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `STRING` | Untested | No sample for this option's constraints. |
 | [`require_hive_partition_filter`](../third_party/bigquery_docs/reference/standard-sql/data-definition-language.md) | `BOOL` | Supported |  |

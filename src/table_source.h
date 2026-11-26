@@ -152,6 +152,9 @@ class TableSource {
     return std::nullopt;
   }
 
+  // Whether a connection `key`, as ConnectionKey gives it, exists. None by default.
+  virtual bool HasConnection(const std::string& /*key*/) { return false; }
+
   // The columns that EXTERNAL_QUERY returns for `query` on the connection `key`, as
   // ConnectionKey gives it, with the given JSON options, once its DuckDB
   // table macro ExternalDatabaseName(key) is registered. An error status for a connection that does

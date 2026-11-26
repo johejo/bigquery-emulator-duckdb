@@ -78,6 +78,7 @@ constexpr auto kNames = std::to_array<std::pair<I, std::string_view>>({
     {I::kTimestampFormat, "timestamp_format"},
     {I::kHivePartitionUriPrefix, "hive_partition_uri_prefix"},
     {I::kRequireHivePartitionFilter, "require_hive_partition_filter"},
+    {I::kObjectMetadata, "object_metadata"},
 });
 constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kCreateExternalTable, .name = I::kSkipLeadingRows, .type = kInt64},
@@ -105,6 +106,7 @@ constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = C::kCreateExternalTable, .name = I::kDecimalTargetTypes, .type = kStrings},
     {.context = C::kCreateExternalTable, .name = I::kHivePartitionUriPrefix, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kRequireHivePartitionFilter, .type = kBool},
+    {.context = C::kCreateExternalTable, .name = I::kObjectMetadata, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kDescription, .type = kString},
     {.context = C::kCreateExternalTable, .name = I::kTags, .type = kLabels},
     {.context = C::kCreateExternalTable, .name = I::kExpirationTimestamp, .type = kTimestamp},

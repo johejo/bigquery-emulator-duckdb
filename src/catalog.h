@@ -64,6 +64,12 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
                                  const googlesql::PropertyGraph*& graph,
                                  const FindOptions& options) override;
 
+  // A connection that the source has, named by any form ConnectionKey takes. Its name is the
+  // PROJECT.LOCATION.CONNECTION that ConnectionKey gives.
+  absl::Status FindConnection(const absl::Span<const std::string>& path,
+                              const googlesql::Connection** connection,
+                              const FindOptions& options) override;
+
  protected:
   [[nodiscard]] TableSource& source() const { return source_; }
   [[nodiscard]] googlesql::TypeFactory* type_factory() const { return type_factory_; }
@@ -89,6 +95,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // so they must stay valid for as long as the catalog does.
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleTable>> tables_;
   std::unique_ptr<googlesql::TableValuedFunction> external_query_;
+  std::map<std::string, std::unique_ptr<googlesql::SimpleConnection>> connections_;
   // Destroy graphs before their analyzer outputs and the tables they borrow.
   std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> graph_artifacts_;
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleCatalog>> graphs_;

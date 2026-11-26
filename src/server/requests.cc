@@ -24,6 +24,7 @@
 #include "google/protobuf/util/json_util.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/connection_id.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/httplib.h"
@@ -95,6 +96,8 @@ const ResourceMask& TableFields() {
                    "externalDataConfiguration.parquetOptions.enableListInference",
                    "externalDataConfiguration.parquetOptions.enumAsString",
                    "externalDataConfiguration.decimalTargetTypes",
+                   "externalDataConfiguration.objectMetadata",
+                   "externalDataConfiguration.connectionId",
                    "externalDataConfiguration.csvOptions.skipLeadingRows",
                    "externalDataConfiguration.csvOptions.fieldDelimiter",
                    "externalDataConfiguration.csvOptions.quote",
@@ -810,6 +813,18 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
     }
     if (request.metadata.external_data->format == "BIGTABLE" && !request.schema.empty()) {
       throw ApiError::Unsupported("explicit schema on a Bigtable external table");
+    }
+    // An object table has a fixed schema and names its connection as EXTERNAL_QUERY does.
+    if (GcsExternalData& external = *request.metadata.external_data; external.object_table()) {
+      if (!request.schema.empty()) {
+        throw ApiError::Invalid("Specifying a schema is disallowed for STORAGE_FORMAT_OBJECT");
+      }
+      const std::optional<std::string> key =
+          ConnectionKey(external.connection_id.value_or(""), dataset.project_id);
+      if (!key) {
+        throw ApiError::Invalid("Invalid connection: " + external.connection_id.value_or(""));
+      }
+      external.connection_id = key;
     }
     SetModesGiven(request.schema);
   }

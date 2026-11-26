@@ -543,9 +543,16 @@ json TableMetadata::ToJson() const {
   json fields = json::object();
   if (external_data) {
     fields["externalDataConfiguration"] = {
-        {"sourceFormat", external_data->format},
         {"sourceUris", external_data->uris},
     };
+    if (const std::optional<std::string>& object = external_data->object_metadata) {
+      fields["externalDataConfiguration"]["objectMetadata"] = *object;
+      if (external_data->connection_id) {
+        fields["externalDataConfiguration"]["connectionId"] = *external_data->connection_id;
+      }
+    } else {
+      fields["externalDataConfiguration"]["sourceFormat"] = external_data->format;
+    }
     if (external_data->bigtable_options) {
       fields["externalDataConfiguration"]["bigtableOptions"] =
           BigtableOptionsJson(*external_data->bigtable_options);
@@ -866,19 +873,74 @@ TableMetadata TableMetadataFromJson(const json& table) {
           name != "compression" && name != "maxBadRecords" && name != "jsonOptions" &&
           name != "timeZone" && name != "dateFormat" && name != "datetimeFormat" &&
           name != "timeFormat" && name != "timestampFormat" && name != "bigtableOptions" &&
-          name != "decimalTargetTypes") {
+          name != "decimalTargetTypes" && name != "objectMetadata" && name != "connectionId") {
         throw ApiError::Unsupported("externalDataConfiguration." + name);
       }
+    }
+    const auto uris = config.value("sourceUris", json::array());
+    const auto check_uris = [&uris] {
+      if (!uris.is_array() || uris.empty()) {
+        throw ApiError::Invalid("externalDataConfiguration.sourceUris must not be empty");
+      }
+    };
+    // An object table omits sourceFormat, which ObjectMetadata replaces, and reads through its
+    // connection: third_party/bigquery_docs/reference/rest/v2/tables.md
+    if (config.contains("objectMetadata")) {
+      if (config.contains("sourceFormat")) {
+        throw ApiError::ConflictingFields(
+            "Request invalidated by conflicting fields. Fields 'source_format' and "
+            "'object_metadata' can not be used at the same time.");
+      }
+      for (const auto& [name, value] : config.items()) {
+        if (name != "objectMetadata" && name != "sourceUris" && name != "connectionId" &&
+            name != "autodetect") {
+          throw ApiError::Unsupported("object table option " + name);
+        }
+      }
+      if (config["objectMetadata"] != "SIMPLE") {
+        throw ApiError::Unsupported("objectMetadata other than SIMPLE");
+      }
+      // An object table's schema is fixed, so autodetect is only metadata: BigQuery marks a table
+      // DDL creates, and the Terraform provider sends false.
+      if (config.contains("autodetect") && !config["autodetect"].is_boolean()) {
+        throw ApiError::Invalid("externalDataConfiguration.autodetect must be a boolean");
+      }
+      if (!config.contains("connectionId")) {
+        throw ApiError::Invalid("Object table requires the use of connection credential.");
+      }
+      if (!config["connectionId"].is_string()) {
+        throw ApiError::Invalid("externalDataConfiguration.connectionId must be a string");
+      }
+      check_uris();
+      metadata.external_data.emplace();
+      metadata.external_data->format.clear();
+      metadata.external_data->object_metadata = "SIMPLE";
+      metadata.external_data->connection_id = config["connectionId"].get<std::string>();
+      if (config.contains("autodetect")) {
+        metadata.external_data->autodetect = config["autodetect"].get<bool>();
+      }
+      for (const auto& uri : uris) {
+        if (!uri.is_string()) {
+          throw ApiError::Invalid("external table source URI must be a string");
+        }
+        if (!uri.get_ref<const std::string&>().starts_with("gs://")) {
+          throw ApiError::Unsupported("external table sources other than gs://");
+        }
+        metadata.external_data->uris.push_back(uri.get<std::string>());
+      }
+      ParsePartitioning(table, metadata);
+      UpdateTableMetadata(metadata, table, /*patch=*/false);
+      return metadata;
+    }
+    if (config.contains("connectionId")) {
+      throw ApiError::Unsupported("external tables with a connection other than object tables");
     }
     const std::string format = config.value("sourceFormat", "");
     if (format != "PARQUET" && format != "CSV" && format != "NEWLINE_DELIMITED_JSON" &&
         format != "BIGTABLE") {
       throw ApiError::Unsupported("external tables other than PARQUET, CSV, JSON or BIGTABLE");
     }
-    const auto uris = config.value("sourceUris", json::array());
-    if (!uris.is_array() || uris.empty()) {
-      throw ApiError::Invalid("externalDataConfiguration.sourceUris must not be empty");
-    }
+    check_uris();
     metadata.external_data.emplace();
     metadata.external_data->format = format;
     if (format == "BIGTABLE") {

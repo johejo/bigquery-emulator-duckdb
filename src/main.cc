@@ -64,7 +64,7 @@ void AddEmulatorFlags(CLI::App& app, EmulatorFlags& flags) {
   app.add_option("--connection", flags.connections,
                  "Let EXTERNAL_QUERY reach PostgreSQL, MySQL or Spanner (libpq connection "
                  "string/URI or spanner://projects/P/instances/I/databases/D), or OBJ functions "
-                 "read Cloud Storage (cloud_resource), as the connection ID "
+                 "and object tables read Cloud Storage (cloud_resource), as the connection ID "
                  "PROJECT.LOCATION.CONNECTION (repeatable)")
       ->type_name("ID=CONNINFO")
       ->allow_extra_args(false)

@@ -1,0 +1,827 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, run u7xjbk4utowz2ye6g65bzxcnug, in the bucket
+# johejo-sandbox-us; the answers sidecar keeps the observations. The rows query differs from the
+# collected one: it sorts custom metadata, which BigQuery listed in either order across cases, and
+# leaves out a comparison of ref.details' updated, which tests/e2e/goclient/testdata/unverified/
+# object_tables.api.yaml asks about. The ddl case leaves out the empty schema of its jobs.query
+# response, as external_table_schema.api.yaml does: the emulator omits schemas for CREATE EXTERNAL
+# TABLE.
+# Object tables, as third_party/bigquery_docs/object-table-introduction.md and
+# third_party/bigquery_docs/object-tables.md describe them. Collection needs a Cloud resource
+# connection `storage` in US, with the Storage Object Viewer role on ${bucket}; end-to-end
+# verification uses test.us.storage, which tools/e2e declares.
+# Beyond the documentation: md5_hash is hex, as the introduction's example shows, although its
+# schema table says base64. A table created by DDL is marked autodetect and its INFORMATION_SCHEMA
+# DDL lists no columns, while one created through tables.insert lists them; object_metadata is
+# unquoted there and in TABLE_OPTIONS. A URI that names no object reads as no rows, and an object two URIs name, once.
+description: >-
+  Object tables created through DDL and tables.insert: their metadata, the rows they list, and
+  the forms BigQuery rejects.
+vars:
+  dataset: bqa_${run}_${case}
+  connection: us.storage
+  prefix: gs://${bucket}/${run}/${case}
+  # "hello\n"
+  text: aGVsbG8K
+  # "\x00\xff"
+  binary: AP8=
+  ddl: >-
+    CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `${connection}`
+    OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/*'])
+  rows_query: >-
+    SELECT uri, content_type, size, md5_hash,
+    ARRAY(SELECT AS STRUCT * FROM UNNEST(metadata) ORDER BY name) AS metadata,
+    generation > 0 AS generation,
+    ref.uri = uri AS ref_uri, ref.version = CAST(generation AS STRING) AS ref_version,
+    ref.authorizer, TO_JSON_STRING(JSON_REMOVE(ref.details, '$.gcs_metadata.updated')) AS details
+    FROM `${project}.${dataset}.t` ORDER BY uri
+templates:
+  # Creates the table through the request `create_body` to `create_path`, over two objects, then
+  # reads its metadata and rows.
+  created:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: text
+        gcs:
+          method: PUT
+          object: ${run}/${case}/a.txt
+          base64: ${text}
+          contentType: text/plain
+          metadata: {k2: v2, k1: v1}
+      - name: binary
+        gcs: {method: PUT, object: '${run}/${case}/b/c.bin', base64: '${binary}'}
+      - name: create
+        rest: {method: POST, path: '/bigquery/v2/projects/${project}/${create_path}', body: '${create_body}'}
+        observe:
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          type: /body/type
+          schema: /body/schema
+          external: /body/externalDataConfiguration
+          numRows: /body/numRows
+          numBytes: /body/numBytes
+      - name: list
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+        observe:
+          type: /body/tables/0/type
+          external: /body/tables/0/externalDataConfiguration
+      - name: information_schema
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: >-
+              SELECT table_type, is_insertable_into, ddl
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLES` WHERE table_name = 't'
+        observe: {errors: /body/errors, rows: /body/rows}
+      - name: table_options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: >-
+              SELECT option_name, option_type, option_value
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS`
+              WHERE table_name = 't' ORDER BY option_name
+        observe: {errors: /body/errors, rows: /body/rows}
+      - name: rows
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            timeoutMs: 200000
+            query: ${rows_query}
+        observe: {errors: /body/errors, rows: /body/rows, schema: /body/schema}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_text
+        gcs: {method: DELETE, object: '${run}/${case}/a.txt'}
+      - name: delete_binary
+        gcs: {method: DELETE, object: '${run}/${case}/b/c.bin'}
+  # Runs `query` against an object table created through DDL.
+  query:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: text
+        gcs: {method: PUT, object: '${run}/${case}/a.txt', base64: '${text}', contentType: text/plain}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, query: '${ddl}'}
+        observe: {errors: /body/errors}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, timeoutMs: 200000, query: '${query}'}
+        observe: {errors: /body/errors, rows: /body/rows}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_text
+        gcs: {method: DELETE, object: '${run}/${case}/a.txt'}
+  # Fails to run `query` against an object table created through DDL.
+  rejected_query:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: text
+        gcs: {method: PUT, object: '${run}/${case}/a.txt', base64: '${text}', contentType: text/plain}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, query: '${ddl}'}
+        observe: {errors: /body/errors}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, timeoutMs: 200000, query: '${query}'}
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+        expectFailure: true
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_text
+        gcs: {method: DELETE, object: '${run}/${case}/a.txt'}
+  # Fails to create a table with the DDL `statement`.
+  rejected_ddl:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, query: '${statement}'}
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+        expectFailure: true
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+  # Fails to create the table `table` through tables.insert.
+  rejected_rest:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body: ${table}
+        observe:
+          status: /status
+          reason: /body/error/errors/0/reason
+          message: /body/error/message
+        expectFailure: true
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: ddl
+    template: created
+    vars:
+      create_path: queries
+      create_body: {useLegacySql: false, location: US, query: '${ddl}'}
+    expect:
+      create: {}
+      get:
+        external:
+          autodetect: true
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/ddl/*"]
+        numBytes: "0"
+        numRows: "0"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      information_schema:
+        rows:
+          - f:
+              - {v: "EXTERNAL"}
+              - {v: "NO"}
+              - v: "CREATE EXTERNAL TABLE `${project}.bqa_${run}_ddl.t`\nWITH CONNECTION `${project}.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://${bucket}/${run}/ddl/*\"]\n);"
+      list: {type: "EXTERNAL"}
+      rows:
+        rows:
+          - f:
+              - {v: "gs://${bucket}/${run}/ddl/a.txt"}
+              - {v: "text/plain"}
+              - {v: "6"}
+              - {v: "b1946ac92492d2347c6235b4d2611184"}
+              - {v: [{v: {f: [{v: "k1"}, {v: "v1"}]}}, {v: {f: [{v: "k2"}, {v: "v2"}]}}]}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+          - f:
+              - {v: "gs://${bucket}/${run}/ddl/b/c.bin"}
+              - {v: "application/octet-stream"}
+              - {v: "2"}
+              - {v: "d07d34efac6328007ad67c7e0a985e00"}
+              - {v: []}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - {mode: "NULLABLE", name: "generation", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_uri", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_version", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+            - {mode: "NULLABLE", name: "details", type: "STRING"}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - {f: [{v: "uris"}, {v: "ARRAY<STRING>"}, {v: "[\"gs://${bucket}/${run}/ddl/*\"]"}]}
+  - name: rest
+    template: created
+    vars:
+      create_path: datasets/${dataset}/tables
+      create_body:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          objectMetadata: SIMPLE
+          sourceUris: ['${prefix}/*']
+          connectionId: ${project}.us.storage
+    expect:
+      create:
+        external:
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/rest/*"]
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      get:
+        external:
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/rest/*"]
+        numBytes: "0"
+        numRows: "0"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      information_schema:
+        rows:
+          - f:
+              - {v: "EXTERNAL"}
+              - {v: "NO"}
+              - v: "CREATE EXTERNAL TABLE `${project}.bqa_${run}_rest.t`\n(\n  uri STRING,\n  generation INT64,\n  content_type STRING,\n  size INT64,\n  md5_hash STRING,\n  updated TIMESTAMP,\n  metadata ARRAY<STRUCT<name STRING, value STRING>>,\n  ref STRUCT<uri STRING, version STRING, authorizer STRING, details JSON>\n)\nWITH CONNECTION `${project}.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://${bucket}/${run}/rest/*\"]\n);"
+      list: {type: "EXTERNAL"}
+      rows:
+        rows:
+          - f:
+              - {v: "gs://${bucket}/${run}/rest/a.txt"}
+              - {v: "text/plain"}
+              - {v: "6"}
+              - {v: "b1946ac92492d2347c6235b4d2611184"}
+              - {v: [{v: {f: [{v: "k1"}, {v: "v1"}]}}, {v: {f: [{v: "k2"}, {v: "v2"}]}}]}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+          - f:
+              - {v: "gs://${bucket}/${run}/rest/b/c.bin"}
+              - {v: "application/octet-stream"}
+              - {v: "2"}
+              - {v: "d07d34efac6328007ad67c7e0a985e00"}
+              - {v: []}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - {mode: "NULLABLE", name: "generation", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_uri", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_version", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+            - {mode: "NULLABLE", name: "details", type: "STRING"}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - {f: [{v: "uris"}, {v: "ARRAY<STRING>"}, {v: "[\"gs://${bucket}/${run}/rest/*\"]"}]}
+  - name: rest_short_connection
+    template: created
+    vars:
+      create_path: datasets/${dataset}/tables
+      create_body:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          objectMetadata: SIMPLE
+          sourceUris: ['${prefix}/*']
+          connectionId: us.storage
+    expect:
+      create:
+        external:
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/rest_short_connection/*"]
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      get:
+        external:
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/rest_short_connection/*"]
+        numBytes: "0"
+        numRows: "0"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      information_schema:
+        rows:
+          - f:
+              - {v: "EXTERNAL"}
+              - {v: "NO"}
+              - v: "CREATE EXTERNAL TABLE `${project}.bqa_${run}_rest_short_connection.t`\n(\n  uri STRING,\n  generation INT64,\n  content_type STRING,\n  size INT64,\n  md5_hash STRING,\n  updated TIMESTAMP,\n  metadata ARRAY<STRUCT<name STRING, value STRING>>,\n  ref STRUCT<uri STRING, version STRING, authorizer STRING, details JSON>\n)\nWITH CONNECTION `${project}.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://${bucket}/${run}/rest_short_connection/*\"]\n);"
+      list: {type: "EXTERNAL"}
+      rows:
+        rows:
+          - f:
+              - {v: "gs://${bucket}/${run}/rest_short_connection/a.txt"}
+              - {v: "text/plain"}
+              - {v: "6"}
+              - {v: "b1946ac92492d2347c6235b4d2611184"}
+              - {v: [{v: {f: [{v: "k1"}, {v: "v1"}]}}, {v: {f: [{v: "k2"}, {v: "v2"}]}}]}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+          - f:
+              - {v: "gs://${bucket}/${run}/rest_short_connection/b/c.bin"}
+              - {v: "application/octet-stream"}
+              - {v: "2"}
+              - {v: "d07d34efac6328007ad67c7e0a985e00"}
+              - {v: []}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - {mode: "NULLABLE", name: "generation", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_uri", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_version", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+            - {mode: "NULLABLE", name: "details", type: "STRING"}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - f:
+              - {v: "uris"}
+              - {v: "ARRAY<STRING>"}
+              - {v: "[\"gs://${bucket}/${run}/rest_short_connection/*\"]"}
+  - name: rest_resource_connection
+    template: created
+    vars:
+      create_path: datasets/${dataset}/tables
+      create_body:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          objectMetadata: SIMPLE
+          sourceUris: ['${prefix}/*']
+          connectionId: projects/${project}/locations/us/connections/storage
+          autodetect: false
+    expect:
+      create:
+        external:
+          autodetect: false
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/rest_resource_connection/*"]
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      get:
+        external:
+          autodetect: false
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/rest_resource_connection/*"]
+        numBytes: "0"
+        numRows: "0"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "generation", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - {mode: "NULLABLE", name: "updated", type: "TIMESTAMP"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - fields:
+                - {mode: "NULLABLE", name: "uri", type: "STRING"}
+                - {mode: "NULLABLE", name: "version", type: "STRING"}
+                - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+                - {mode: "NULLABLE", name: "details", type: "JSON"}
+              mode: "NULLABLE"
+              name: "ref"
+              type: "RECORD"
+        type: "EXTERNAL"
+      information_schema:
+        rows:
+          - f:
+              - {v: "EXTERNAL"}
+              - {v: "NO"}
+              - v: "CREATE EXTERNAL TABLE `${project}.bqa_${run}_rest_resource_connection.t`\n(\n  uri STRING,\n  generation INT64,\n  content_type STRING,\n  size INT64,\n  md5_hash STRING,\n  updated TIMESTAMP,\n  metadata ARRAY<STRUCT<name STRING, value STRING>>,\n  ref STRUCT<uri STRING, version STRING, authorizer STRING, details JSON>\n)\nWITH CONNECTION `${project}.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://${bucket}/${run}/rest_resource_connection/*\"]\n);"
+      list: {type: "EXTERNAL"}
+      rows:
+        rows:
+          - f:
+              - {v: "gs://${bucket}/${run}/rest_resource_connection/a.txt"}
+              - {v: "text/plain"}
+              - {v: "6"}
+              - {v: "b1946ac92492d2347c6235b4d2611184"}
+              - {v: [{v: {f: [{v: "k1"}, {v: "v1"}]}}, {v: {f: [{v: "k2"}, {v: "v2"}]}}]}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+          - f:
+              - {v: "gs://${bucket}/${run}/rest_resource_connection/b/c.bin"}
+              - {v: "application/octet-stream"}
+              - {v: "2"}
+              - {v: "d07d34efac6328007ad67c7e0a985e00"}
+              - {v: []}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "true"}
+              - {v: "${project}.us.storage"}
+              - v: "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "content_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "size", type: "INTEGER"}
+            - {mode: "NULLABLE", name: "md5_hash", type: "STRING"}
+            - fields:
+                - {mode: "NULLABLE", name: "name", type: "STRING"}
+                - {mode: "NULLABLE", name: "value", type: "STRING"}
+              mode: "REPEATED"
+              name: "metadata"
+              type: "RECORD"
+            - {mode: "NULLABLE", name: "generation", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_uri", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "ref_version", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "authorizer", type: "STRING"}
+            - {mode: "NULLABLE", name: "details", type: "STRING"}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - f:
+              - {v: "uris"}
+              - {v: "ARRAY<STRING>"}
+              - {v: "[\"gs://${bucket}/${run}/rest_resource_connection/*\"]"}
+  - name: no_match
+    template: query
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `${connection}`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/none*'])
+      query: SELECT COUNT(*) FROM `${project}.${dataset}.t`
+    expect:
+      create: {}
+      query: {rows: [{f: [{v: "0"}]}]}
+  - name: missing_exact_uri
+    template: query
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `${connection}`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/missing.txt'])
+      query: SELECT COUNT(*) FROM `${project}.${dataset}.t`
+    expect:
+      create: {}
+      query: {rows: [{f: [{v: "0"}]}]}
+  - name: overlapping_uris
+    template: query
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `${connection}`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/a.txt', '${prefix}/*'])
+      query: SELECT uri FROM `${project}.${dataset}.t` ORDER BY uri
+    expect:
+      create: {}
+      query: {rows: [{f: [{v: "gs://${bucket}/${run}/overlapping_uris/a.txt"}]}]}
+  - name: delete
+    template: rejected_query
+    vars:
+      query: DELETE FROM `${project}.${dataset}.t` WHERE TRUE
+    expect:
+      create: {}
+      query:
+        message: "DML statements are only supported over tables that have data stored in BigQuery. Unsupported table: ${project}:bqa_${run}_delete.t"
+        reason: "invalid"
+        status: 400
+  - name: without_connection
+    template: rejected_ddl
+    vars:
+      statement: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/*'])
+    expect:
+      create:
+        message: "Object table requires the use of connection credential."
+        reason: "invalid"
+        status: 400
+  - name: missing_connection
+    template: rejected_ddl
+    vars:
+      statement: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `us.missing_${run}`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/*'])
+    expect:
+      create: {message: "Not found: Connection missing_${run}", reason: "notFound", status: 404}
+  - name: with_format
+    template: rejected_ddl
+    vars:
+      statement: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `${connection}`
+        OPTIONS (object_metadata = 'SIMPLE', format = 'PARQUET', uris = ['${prefix}/*'])
+    expect:
+      create:
+        message: "cannot explicitly specify format for object table"
+        reason: "invalidQuery"
+        status: 400
+  - name: with_columns
+    template: rejected_ddl
+    vars:
+      statement: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` (uri STRING) WITH CONNECTION `${connection}`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/*'])
+    expect:
+      create:
+        message: "Specifying a schema is disallowed for STORAGE_FORMAT_OBJECT"
+        reason: "invalid"
+        status: 400
+  - name: rest_with_source_format
+    template: rejected_rest
+    vars:
+      table:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          objectMetadata: SIMPLE
+          sourceFormat: PARQUET
+          sourceUris: ['${prefix}/*']
+          connectionId: ${project}.us.storage
+    expect:
+      create:
+        message: "Request invalidated by conflicting fields. Fields 'source_format' and 'object_metadata' can not be used at the same time."
+        reason: "conflictingFields"
+        status: 400
+  - name: rest_with_schema
+    template: rejected_rest
+    vars:
+      table:
+        tableReference: {tableId: t}
+        schema:
+          fields: [{name: uri, type: STRING}]
+        externalDataConfiguration:
+          objectMetadata: SIMPLE
+          sourceUris: ['${prefix}/*']
+          connectionId: ${project}.us.storage
+    expect:
+      create:
+        message: "Specifying a schema is disallowed for STORAGE_FORMAT_OBJECT"
+        reason: "invalid"
+        status: 400
+  - name: rest_without_connection
+    template: rejected_rest
+    vars:
+      table:
+        tableReference: {tableId: t}
+        externalDataConfiguration:
+          objectMetadata: SIMPLE
+          sourceUris: ['${prefix}/*']
+    expect:
+      create:
+        message: "Object table requires the use of connection credential."
+        reason: "invalid"
+        status: 400

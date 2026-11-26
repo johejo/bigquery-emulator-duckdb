@@ -16,6 +16,9 @@ class ApiError : public std::runtime_error {
     return {400, "invalidQuery", message};
   }
   static ApiError Invalid(const std::string& message) { return {400, "invalid", message}; }
+  static ApiError ConflictingFields(const std::string& message) {
+    return {400, "conflictingFields", message};
+  }
   // A query's failure with `message`: an invalid one for BigQuery's error of reading external
   // data or an external table, which an external read raises as it reads, or else an
   // invalidQuery one.

@@ -24,8 +24,10 @@
 #include "src/builtin_catalog.h"
 #include "src/builtin_function_options.h"
 #include "src/catalog_table.h"
+#include "src/connection_id.h"
 #include "src/field_schema.h"
 #include "src/information_schema.h"
+#include "src/location.h"
 #include "src/table_metadata.h"
 #include "src/table_path.h"
 #include "src/table_source.h"
@@ -149,8 +151,12 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
             *schema, [](const FieldSchema& field) { return field.type == FieldType::kJson; })) {
       throw ApiError::Invalid("Unsupported field type: JSON");
     }
+    // An object table has the pseudocolumn `data` of each object's content in place of
+    // _FILE_NAME: object_tables.api.yaml.
+    const bool object = description->metadata.external_data->object_table();
     if (absl::Status status = simple_table->AddColumn(std::make_unique<googlesql::SimpleColumn>(
-            normalized.at(2), "_FILE_NAME", googlesql::types::StringType(),
+            normalized.at(2), object ? "data" : "_FILE_NAME",
+            object ? googlesql::types::BytesType() : googlesql::types::StringType(),
             /*is_pseudo_column=*/true));
         !status.ok()) {
       return status;
@@ -174,6 +180,30 @@ absl::Status BigQueryCatalog::FindTableWithPathPrefix(absl::Span<const std::stri
                                       "\" must be qualified with a dataset (e.g. dataset.table).");
   }
   return status;
+}
+
+absl::Status BigQueryCatalog::FindConnection(const absl::Span<const std::string>& path,
+                                             const googlesql::Connection** connection,
+                                             const FindOptions& /*options*/) {
+  // The resolver looks up WITH CONNECTION DEFAULT by this name.
+  if (path.size() == 1 && path.front() == "$connection_default") {
+    throw ApiError::Unsupported("default connections");
+  }
+  const std::string name = absl::StrJoin(path, ".");
+  const std::optional<std::string> key = ConnectionKey(name, default_project_);
+  // BigQuery names only the connection's ID.
+  if (!key || !source_.HasConnection(*key)) {
+    throw ApiError::NotFound("Not found: Connection " + name.substr(name.rfind('.') + 1));
+  }
+  // A statement reads through a connection in the connection's location.
+  const std::string location = ConnectionKeyLocation(*key);
+  source_.ReferenceLocation("Connection " + *key, CanonicalLocation(location).value_or(location));
+  std::unique_ptr<googlesql::SimpleConnection>& found = connections_[*key];
+  if (found == nullptr) {
+    found = std::make_unique<googlesql::SimpleConnection>(*key);
+  }
+  *connection = found.get();
+  return absl::OkStatus();
 }
 
 }  // namespace bigquery_emulator_duckdb

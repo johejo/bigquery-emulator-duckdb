@@ -13,6 +13,7 @@
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "googlesql/public/cast.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/language_options.h"
@@ -541,14 +542,17 @@ bool ForeignKeys(const googlesql::ResolvedCreateTableStmtBase& create, TableDefi
   return true;
 }
 
+// The CREATE TABLE statement that starts creating the table `create` creates. Only an object
+// table, which CreateExternalTable checks for, can have a connection.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
-                                           const Scope& scope) {
+                                           const Scope& scope, bool connection = false) {
   if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP &&
       !create.option_list().empty()) {
     throw std::invalid_argument("OPTIONS on temporary tables are not supported");
   }
   if (create.is_value_table() || !create.pseudo_column_list().empty() ||
-      create.connection_list() != nullptr || !create.check_constraint_list().empty()) {
+      (create.connection_list() != nullptr && !connection) ||
+      !create.check_constraint_list().empty()) {
     return Unsupported(scope, "CREATE TABLE option");
   }
   const auto path = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP
@@ -1052,7 +1056,7 @@ std::optional<std::string> CreateExternalTable(
       !create.foreign_key_list().empty() || create.collation_name() != nullptr) {
     return Unsupported(scope, "this CREATE EXTERNAL TABLE clause");
   }
-  auto head = CreateTableHead(create, scope);
+  auto head = CreateTableHead(create, scope, /*connection=*/true);
   const auto target = scope.context.statement.ddl_target_table;
   auto metadata =
       OptionsMetadata(create.option_list(), DdlOptionContext::kCreateExternalTable, scope);
@@ -1082,6 +1086,25 @@ std::optional<std::string> CreateExternalTable(
   // dropped.
   if (!table.metadata.external_data) {
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
+  }
+  // An object table has a fixed schema and reads through its connection; the runtime adds the
+  // columns. third_party/bigquery_docs/object-tables.md
+  if (table.metadata.external_data->object_table()) {
+    if (!table.schema.empty()) {
+      throw ApiError::Invalid("Specifying a schema is disallowed for STORAGE_FORMAT_OBJECT");
+    }
+    if (create.with_partition_columns() != nullptr) {
+      return Unsupported(scope, "Hive partitioning on an object table");
+    }
+    if (create.connection() == nullptr) {
+      throw ApiError::Invalid("Object table requires the use of connection credential.");
+    }
+    table.metadata.external_data->connection_id = create.connection()->connection()->Name();
+    scope.context.statement.table = std::move(table);
+    return head;
+  }
+  if (create.connection_list() != nullptr) {
+    return Unsupported(scope, "external tables with a connection other than object tables");
   }
   auto& hive = table.metadata.external_data->hive_partitioning;
   if (table.metadata.external_data->format == "BIGTABLE" &&

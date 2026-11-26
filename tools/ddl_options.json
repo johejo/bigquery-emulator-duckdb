@@ -432,7 +432,8 @@
       },
       {
         "name": "object_metadata",
-        "type": "STRING"
+        "type": "STRING",
+        "values": ["'SIMPLE'"]
       },
       {
         "name": "preserve_ascii_control_characters",
@@ -2144,7 +2145,8 @@
         "format": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (uris = ['gs://bucket/data.parquet'], {option})",
         "uris": "CREATE EXTERNAL TABLE d.n (id INT64) OPTIONS (format = 'PARQUET', {option})",
         "hive_partition_uri_prefix": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], {option})",
-        "require_hive_partition_filter": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], hive_partition_uri_prefix = 'gs://bucket', {option})"
+        "require_hive_partition_filter": "CREATE EXTERNAL TABLE d.n (id INT64) WITH PARTITION COLUMNS OPTIONS (format = 'PARQUET', uris = ['gs://bucket/k=1/*'], hive_partition_uri_prefix = 'gs://bucket', {option})",
+        "object_metadata": "CREATE EXTERNAL TABLE d.n WITH CONNECTION `test.us.probe` OPTIONS (uris = ['gs://bucket/*'], {option})"
       }
     },
     {

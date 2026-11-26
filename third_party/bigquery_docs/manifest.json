@@ -225,6 +225,22 @@
       "updateTime": "2026-10-02T03:43:51Z"
     },
     {
+      "url": "https://docs.cloud.google.com/bigquery/docs/object-table-introduction",
+      "file": "third_party/bigquery_docs/object-table-introduction.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/object-table-introduction",
+      "title": "Introduction to object tables",
+      "sha256": "581c78f05fba4b5d0eb2a505afb2ac798b3623017fe69906a7fe7eae7adf3a19",
+      "updateTime": "2026-11-06T21:32:42Z"
+    },
+    {
+      "url": "https://docs.cloud.google.com/bigquery/docs/object-tables",
+      "file": "third_party/bigquery_docs/object-tables.md",
+      "name": "documents/docs.cloud.google.com/bigquery/docs/object-tables",
+      "title": "Create object tables",
+      "sha256": "dcad5f2c4bf036f1a63fbc90fa30401982a840515a212bc95da4b892bca432fd",
+      "updateTime": "2026-11-11T04:20:24Z"
+    },
+    {
       "url": "https://docs.cloud.google.com/bigquery/docs/parameterized-queries",
       "file": "third_party/bigquery_docs/parameterized-queries.md",
       "name": "documents/docs.cloud.google.com/bigquery/docs/parameterized-queries",

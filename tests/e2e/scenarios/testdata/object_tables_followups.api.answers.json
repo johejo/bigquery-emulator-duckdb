@@ -1,0 +1,270 @@
+{
+  "version": 1,
+  "cases": {
+    "data_pseudocolumn": {
+      "project": "johejo-sandbox",
+      "run": "2kgmfpcupjamd2fmwkfr5hct7z",
+      "steps": {
+        "create": {},
+        "get": {
+          "external": {
+            "autodetect": true,
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/2kgmfpcupjamd2fmwkfr5hct7z/data_pseudocolumn/*"
+            ]
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/2kgmfpcupjamd2fmwkfr5hct7z/data_pseudocolumn/a.txt"
+                },
+                {
+                  "v": "aGVsbG8K"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "data",
+                "type": "BYTES"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/2kgmfpcupjamd2fmwkfr5hct7z/data_pseudocolumn/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "lowercase_simple": {
+      "project": "johejo-sandbox",
+      "run": "2kgmfpcupjamd2fmwkfr5hct7z",
+      "steps": {
+        "create": {},
+        "get": {
+          "external": {
+            "autodetect": true,
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/2kgmfpcupjamd2fmwkfr5hct7z/lowercase_simple/*"
+            ]
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/2kgmfpcupjamd2fmwkfr5hct7z/lowercase_simple/a.txt"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/2kgmfpcupjamd2fmwkfr5hct7z/lowercase_simple/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "updated_precision": {
+      "project": "johejo-sandbox",
+      "run": "utfbhyz46dbh64ch33itbszx2h",
+      "steps": {
+        "create": {},
+        "get": {
+          "external": {
+            "autodetect": true,
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/utfbhyz46dbh64ch33itbszx2h/updated_precision/*"
+            ]
+          }
+        },
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "false"
+                },
+                {
+                  "v": "false"
+                },
+                {
+                  "v": "false"
+                },
+                {
+                  "v": "number"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "millis",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_micros",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_millis",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_seconds",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_whole_seconds",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_near",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "fetch_same",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY<STRING>"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/utfbhyz46dbh64ch33itbszx2h/updated_precision/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

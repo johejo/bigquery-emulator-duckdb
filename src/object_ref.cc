@@ -38,6 +38,24 @@ std::string ConnectionError(const std::string& key) {
 
 }  // namespace
 
+std::string ObjectRefDetails(const GcsObjectMetadata& metadata, bool whole_seconds) {
+  // The time of the last update, as microseconds.
+  const auto since_epoch = metadata.updated.time_since_epoch();
+  const auto updated = whole_seconds
+                           ? std::chrono::duration_cast<std::chrono::microseconds>(
+                                 std::chrono::duration_cast<std::chrono::seconds>(since_epoch))
+                           : std::chrono::duration_cast<std::chrono::microseconds>(since_epoch);
+  json gcs_metadata = {
+      {"content_type", metadata.content_type},
+      {"size", metadata.size},
+      {"updated", updated.count()},
+  };
+  if (std::string md5; absl::Base64Unescape(metadata.md5_hash, &md5) && !md5.empty()) {
+    gcs_metadata["md5_hash"] = absl::BytesToHexString(md5);
+  }
+  return json{{"gcs_metadata", gcs_metadata}}.dump();
+}
+
 // NOLINTBEGIN(bugprone-easily-swappable-parameters): an ObjectRef and the project of its query.
 std::string FetchObjectMetadata(GcsClient& gcs,
                                 const std::unordered_map<std::string, std::string>& connections,
@@ -95,19 +113,8 @@ std::string FetchObjectMetadata(GcsClient& gcs,
     return fail(error.http_status(),
                 error.http_status() == 404 ? std::string("No such object") : error.what());
   }
-  // BigQuery gives the time of the last update in whole seconds, as microseconds.
-  const auto updated =
-      std::chrono::duration_cast<std::chrono::seconds>(metadata.updated.time_since_epoch());
-  json gcs_metadata = {
-      {"content_type", metadata.content_type},
-      {"size", metadata.size},
-      {"updated", updated.count() * 1000000},
-  };
-  if (std::string md5; absl::Base64Unescape(metadata.md5_hash, &md5) && !md5.empty()) {
-    gcs_metadata["md5_hash"] = absl::BytesToHexString(md5);
-  }
   output["version"] = std::to_string(metadata.generation);
-  output["details"] = {{"gcs_metadata", gcs_metadata}};
+  output["details"] = json::parse(ObjectRefDetails(metadata, /*whole_seconds=*/true));
   return output.dump();
 }
 

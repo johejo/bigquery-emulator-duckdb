@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/time/time.h"
 #include "googlesql/public/type.h"
@@ -604,6 +605,16 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       }
       continue;
     }
+    // An object table takes object_metadata in place of format:
+    // third_party/bigquery_docs/object-tables.md. BigQuery stores 'simple' as SIMPLE.
+    if (decoded && external && decoded->id == DdlOptionId::kObjectMetadata) {
+      if (decoded->value.is_null() ||
+          absl::AsciiStrToUpper(decoded->value.string_value()) != "SIMPLE") {
+        return Unsupported(scope, "object_metadata other than SIMPLE");
+      }
+      metadata.external_data->object_metadata = "SIMPLE";
+      continue;
+    }
     if (decoded && external && decoded->id == DdlOptionId::kHivePartitionUriPrefix) {
       if (!decoded->value.is_null()) {
         auto& hive = metadata.external_data->hive_partitioning;
@@ -678,6 +689,26 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
       return Unsupported(
           scope, std::string(DdlOptionContextName(statement)) + " option " + option->name());
     }
+  }
+  if (external && metadata.external_data->object_table()) {
+    // An object table has no format and takes no read options.
+    GcsExternalData& data = *metadata.external_data;
+    if (format) {
+      throw ApiError::InvalidQuery("cannot explicitly specify format for object table");
+    }
+    if (scalar_uri || data != GcsExternalData{
+                                  .uris = data.uris,
+                                  .autodetect = data.autodetect,
+                                  .format = "PARQUET",
+                                  .object_metadata = data.object_metadata,
+                              }) {
+      return Unsupported(scope, "object table options other than object_metadata and uris");
+    }
+    if (data.uris.empty()) {
+      return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");
+    }
+    data.format.clear();
+    return metadata;
   }
   if (external && (!format || metadata.external_data->uris.empty())) {
     return Unsupported(scope, "CREATE EXTERNAL TABLE without format and uris");

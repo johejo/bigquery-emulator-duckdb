@@ -30,6 +30,7 @@
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/language_options.h"
+#include "src/multi_catalog.h"
 #include "src/routine.h"
 #include "src/routine_catalog.h"
 #include "src/system_variables.h"
@@ -235,8 +236,7 @@ class ProcedureValidator {
       variables.AddOwnedConstant(std::move(constant));
     }
     std::unique_ptr<googlesql::MultiCatalog> catalog;
-    GOOGLESQL_RETURN_IF_ERROR(
-        googlesql::MultiCatalog::Create("procedure", {&variables, &catalog_}, &catalog));
+    GOOGLESQL_RETURN_IF_ERROR(CreateMultiCatalog("procedure", {&variables, &catalog_}, &catalog));
     return callback(*catalog);
   }
 

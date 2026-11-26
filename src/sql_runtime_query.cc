@@ -52,6 +52,7 @@
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/location.h"
+#include "src/multi_catalog.h"
 #include "src/partition_policy_history.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
@@ -659,8 +660,7 @@ TranslatedStatement SqlRuntime::Translate(
   std::unique_ptr<googlesql::MultiCatalog> scoped_catalog;
   if (declarations != nullptr) {
     variables.emplace("variables", &type_factory);
-    const auto status =
-        googlesql::MultiCatalog::Create("script", {&*variables, &catalog}, &scoped_catalog);
+    const auto status = CreateMultiCatalog("script", {&*variables, &catalog}, &scoped_catalog);
     if (!status.ok()) {
       throw ApiError::InvalidQuery(std::string(status.message()));
     }
@@ -1108,7 +1108,8 @@ QueryResult SqlRuntime::RunStatement(const TranslatedStatement& translation,
       return {};
     }
     TranslatedStatement detected = translation;
-    // GCS schema detection is reported as autodetect; Bigtable gets its schema from families.
+    // GCS schema detection, an object table's fixed schema included, is reported as autodetect;
+    // Bigtable gets its schema from families.
     if (table->schema.empty() && table->metadata.external_data->format != "BIGTABLE") {
       detected.table->metadata.external_data->autodetect = true;
     }

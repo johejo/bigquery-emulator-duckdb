@@ -206,9 +206,10 @@ where BigQuery requires it. `jobs.query` cases should request a sufficient `time
 ## Cloud Storage
 
 A `gcs` step writes or deletes one object of `${bucket}`, such as the source of an external
-table. `PUT` uploads the standard base64 `base64` contents after variable expansion; `DELETE`
-takes none. Put objects under `${run}/` and delete them in `cleanup`, where a missing object is
-not a failure:
+table. `PUT` uploads the standard base64 `base64` contents after variable expansion, with the
+optional `contentType`, `application/octet-stream` by default, and custom `metadata`, a map of
+strings; `DELETE` takes none. Put objects under `${run}/` and delete them in `cleanup`, where a
+missing object is not a failure:
 
 ```yaml
 - name: source

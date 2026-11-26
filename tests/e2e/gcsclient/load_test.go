@@ -24,13 +24,20 @@ import (
 // server supplies permissions, pagination and failures that fixtures cannot express.
 func start(t *testing.T) *bigquery.Client {
 	t.Helper()
+	return startWith(t)
+}
+
+// startWith starts the emulator with the extra arguments `args`, such as connections.
+func startWith(t *testing.T, args ...string) *bigquery.Client {
+	t.Helper()
 	binary := os.Getenv("BQ_EMULATOR_BINARY")
 	if binary == "" {
 		t.Skip("BQ_EMULATOR_BINARY is not set; run just e2e")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
-	p, err := serverprocess.StartEmulator(ctx, binary, "", "--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`)
+	args = append([]string{"--host", "127.0.0.1", "--http-port", "0", `--project={"projectId":"test"}`}, args...)
+	p, err := serverprocess.StartEmulator(ctx, binary, "", args...)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -382,6 +382,10 @@ class DuckDbTableSource : public TableSource {
     return found;
   }
 
+  bool HasConnection(const std::string& key) override {
+    return external_ != nullptr && external_->HasConnection(key);
+  }
+
   // NOLINTBEGIN(bugprone-easily-swappable-parameters): a connection and its query options.
   absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(
       const std::string& key, const std::string& query, const std::string& options) override {

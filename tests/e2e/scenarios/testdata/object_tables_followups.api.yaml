@@ -1,0 +1,173 @@
+version: 1
+# Recorded on BigQuery in project johejo-sandbox, runs 2kgmfpcupjamd2fmwkfr5hct7z and
+# utfbhyz46dbh64ch33itbszx2h (updated_precision), in the bucket johejo-sandbox-us; the answers
+# sidecar keeps the observations. Collection needs a Cloud resource
+# connection `storage` in US, with the Storage Object Viewer role on ${bucket}.
+# Object tables beyond object_tables.api.yaml. Contrary to
+# third_party/bigquery_docs/object-table-introduction.md, which says queries can't include the
+# `data` pseudocolumn, BigQuery reads it as each object's content. object_metadata = 'simple' is
+# stored as SIMPLE. ref.details gives updated exactly, in microseconds, where OBJ.FETCH_METADATA
+# truncates it to seconds. updated_precision leaves out the collected column `millis`: Cloud
+# Storage's times are in whole milliseconds, and the fake GCS server's are finer.
+description: >-
+  Object tables: the data pseudocolumn, a lowercase object_metadata and the precision of updated.
+vars:
+  dataset: bqa_${run}_${case}
+  prefix: gs://${bucket}/${run}/${case}
+  # "hello\n"
+  text: aGVsbG8K
+templates:
+  # Creates the table with the DDL `ddl` over one object, then reads its metadata and runs `query`.
+  query:
+    steps:
+      - name: dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: text
+        gcs: {method: PUT, object: '${run}/${case}/a.txt', base64: '${text}', contentType: text/plain}
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, query: '${ddl}'}
+        observe: {errors: /body/errors}
+      - name: get
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe:
+          external: /body/externalDataConfiguration
+      - name: table_options
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            useLegacySql: false
+            location: US
+            query: >-
+              SELECT option_name, option_type, option_value
+              FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS`
+              WHERE table_name = 't' ORDER BY option_name
+        observe: {errors: /body/errors, rows: /body/rows}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body: {useLegacySql: false, location: US, timeoutMs: 200000, query: '${query}'}
+        observe: {errors: /body/errors, rows: /body/rows, schema: /body/schema}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+      - name: delete_text
+        gcs: {method: DELETE, object: '${run}/${case}/a.txt'}
+cases:
+  - name: data_pseudocolumn
+    template: query
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `us.storage`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/*'])
+      query: SELECT uri, data FROM `${project}.${dataset}.t`
+    expect:
+      create: {}
+      get:
+        external:
+          autodetect: true
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/data_pseudocolumn/*"]
+      query:
+        rows: [{f: [{v: "gs://${bucket}/${run}/data_pseudocolumn/a.txt"}, {v: "aGVsbG8K"}]}]
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "uri", type: "STRING"}
+            - {mode: "NULLABLE", name: "data", type: "BYTES"}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - f:
+              - {v: "uris"}
+              - {v: "ARRAY<STRING>"}
+              - {v: "[\"gs://${bucket}/${run}/data_pseudocolumn/*\"]"}
+  - name: lowercase_simple
+    template: query
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `us.storage`
+        OPTIONS (object_metadata = 'simple', uris = ['${prefix}/*'])
+      query: SELECT uri FROM `${project}.${dataset}.t`
+    expect:
+      create: {}
+      get:
+        external:
+          autodetect: true
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/lowercase_simple/*"]
+      query:
+        rows: [{f: [{v: "gs://${bucket}/${run}/lowercase_simple/a.txt"}]}]
+        schema: {fields: [{mode: "NULLABLE", name: "uri", type: "STRING"}]}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - f:
+              - {v: "uris"}
+              - {v: "ARRAY<STRING>"}
+              - {v: "[\"gs://${bucket}/${run}/lowercase_simple/*\"]"}
+  - name: updated_precision
+    template: query
+    vars:
+      ddl: >-
+        CREATE EXTERNAL TABLE `${project}.${dataset}.t` WITH CONNECTION `us.storage`
+        OPTIONS (object_metadata = 'SIMPLE', uris = ['${prefix}/*'])
+      query: >-
+        SELECT INT64(ref.details.gcs_metadata.updated) = UNIX_MICROS(updated) AS details_micros,
+        INT64(ref.details.gcs_metadata.updated) = UNIX_MILLIS(updated) AS details_millis,
+        INT64(ref.details.gcs_metadata.updated) = UNIX_SECONDS(updated) AS details_seconds,
+        MOD(INT64(ref.details.gcs_metadata.updated), 1000000) = 0 AS details_whole_seconds,
+        JSON_TYPE(ref.details.gcs_metadata.updated) AS details_type,
+        INT64(ref.details.gcs_metadata.updated) - UNIX_MICROS(updated) BETWEEN -1000000 AND 1000000
+        AS details_near,
+        TO_JSON_STRING(OBJ.FETCH_METADATA(ref).details.gcs_metadata.updated)
+        = TO_JSON_STRING(ref.details.gcs_metadata.updated) AS fetch_same
+        FROM `${project}.${dataset}.t`
+    expect:
+      create: {}
+      get:
+        external:
+          autodetect: true
+          connectionId: "${project}.us.storage"
+          objectMetadata: "SIMPLE"
+          sourceUris: ["gs://${bucket}/${run}/updated_precision/*"]
+      query:
+        rows:
+          - f:
+              - {v: "true"}
+              - {v: "false"}
+              - {v: "false"}
+              - {v: "false"}
+              - {v: "number"}
+              - {v: "true"}
+              - {v: "false"}
+        schema:
+          fields:
+            - {mode: "NULLABLE", name: "details_micros", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "details_millis", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "details_seconds", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "details_whole_seconds", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "details_type", type: "STRING"}
+            - {mode: "NULLABLE", name: "details_near", type: "BOOLEAN"}
+            - {mode: "NULLABLE", name: "fetch_same", type: "BOOLEAN"}
+      table_options:
+        rows:
+          - {f: [{v: "object_metadata"}, {v: "STRING"}, {v: "SIMPLE"}]}
+          - f:
+              - {v: "uris"}
+              - {v: "ARRAY<STRING>"}
+              - {v: "[\"gs://${bucket}/${run}/updated_precision/*\"]"}

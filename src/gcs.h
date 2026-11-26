@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace bigquery_emulator_duckdb {
@@ -17,6 +18,14 @@ struct GcsObjectMetadata {
   std::uint64_t size = 0;
   std::int64_t generation = 0;
   std::chrono::system_clock::time_point updated;
+  // Custom metadata, ordered by key.
+  std::vector<std::pair<std::string, std::string>> custom;
+};
+
+// An object's URI and the metadata of its current version.
+struct GcsObject {
+  std::string uri;
+  GcsObjectMetadata metadata;
 };
 
 // Retains SDK connection pools and credentials for the lifetime of the emulator. Concurrent
@@ -43,6 +52,11 @@ class GcsClient {
   // Expands one object-name wildcard; exact URIs do not require listing permission.
   // Throws ApiError for malformed patterns, listing failures, or no matches.
   std::vector<std::string> Expand(const std::string& uri);
+
+  // The objects that `uri`, with at most one object-name wildcard, names, ordered by URI: none
+  // when no object matches, and none or one for an exact URI. A wildcard matches as Expand's
+  // does. Throws ApiError for malformed patterns and listing failures.
+  std::vector<GcsObject> List(const std::string& uri);
 
   // The metadata of the current version of the object `uri`. Throws ApiError, a NotFound one when
   // the object does not exist.
