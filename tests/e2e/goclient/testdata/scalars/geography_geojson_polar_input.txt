@@ -1,0 +1,27 @@
+# ST_GEOGFROMGEOJSON collapses each run along a pole to one spherical vertex.
+# These wedges are small enough not to tessellate the opposite edge.
+
+SELECT ST_ASTEXT(ST_GEOGFROMGEOJSON('{"type":"Polygon","coordinates":[[[0,89.99],[10,89.99],[10,90],[0,90],[0,89.99]]]}'))
+=> "POLYGON((0 89.99, 10 89.99, 10 90, 0 89.99))"
+
+SELECT ST_ASTEXT(ST_GEOGFROMGEOJSON('{"type":"Polygon","coordinates":[[[10,-89.99],[10,-90],[5,-90],[0,-90],[0,-89.99],[10,-89.99]]]}'))
+=> "POLYGON((0 -89.99, 10 -90, 10 -89.99, 0 -89.99))"
+
+# A northern cap has a full-width polar edge and two copies of the same seam.
+# The seam disappears and the north pole becomes interior.
+WITH input AS (SELECT ST_GEOGFROMGEOJSON('{"type":"Polygon","coordinates":[[[-180,89.99],[0,89.99],[180,89.99],[180,90],[-180,90],[-180,89.99]]]}') AS g)
+SELECT TO_JSON_STRING(STRUCT(ST_GEOMETRYTYPE(g) AS kind, ST_CONTAINS(g, ST_GEOGPOINT(0,90)) AS contains_north, ST_COVERS(g, ST_GEOGPOINT(0,89.98)) AS covers_outside)) FROM input
+=> "{\"kind\":\"ST_Polygon\",\"contains_north\":true,\"covers_outside\":false}"
+
+# Round trip a polar edge without an antimeridian cut. Avoid ST_EQUALS: the
+# two tessellations can move the boundary without changing its interior here.
+WITH input AS (SELECT ST_GEOGFROMTEXT('POLYGON((-90 89.95, 90 89.95, 0 89.95, -90 89.95))') AS g),
+  result AS (SELECT ST_GEOGFROMGEOJSON(ST_ASGEOJSON(g)) AS g FROM input)
+SELECT TO_JSON_STRING(STRUCT(ST_GEOMETRYTYPE(g) AS kind, ST_COVERS(g, ST_GEOGPOINT(0,89.975)) AS covers_inside, ST_COVERS(g, ST_GEOGPOINT(180,89.975)) AS covers_outside)) FROM result
+=> "{\"kind\":\"ST_Polygon\",\"covers_inside\":true,\"covers_outside\":false}"
+
+# Round trip a polar edge after ST_ASGEOJSON splits the polygon at the seam.
+WITH input AS (SELECT ST_GEOGFROMTEXT('POLYGON((135 89.95, -45 89.95, -135 89.95, 135 89.95))') AS g),
+  result AS (SELECT ST_GEOGFROMGEOJSON(ST_ASGEOJSON(g)) AS g FROM input)
+SELECT TO_JSON_STRING(STRUCT(ST_GEOMETRYTYPE(g) AS kind, ST_COVERS(g, ST_GEOGPOINT(180,89.98)) AS covers_seam, ST_COVERS(g, ST_GEOGPOINT(0,89.98)) AS covers_outside)) FROM result
+=> "{\"kind\":\"ST_Polygon\",\"covers_seam\":true,\"covers_outside\":false}"

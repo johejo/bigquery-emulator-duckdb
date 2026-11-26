@@ -48,7 +48,8 @@ absl::StatusOr<Geography> PlanarLine(const std::vector<R2Point>& positions,
 }
 
 absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>& rings,
-                                        std::string_view failed, bool make_valid) {
+                                        std::string_view failed, bool make_valid,
+                                        bool allow_polar_edges) {
   if (rings.empty()) {
     return absl::OutOfRangeError(std::string(failed) + "Polygon should have shell");
   }
@@ -69,18 +70,36 @@ absl::StatusOr<Geography> PlanarPolygon(const std::vector<std::vector<R2Point>>&
     }
     double area = 0;
     bool long_edge = false;
+    bool polar_edge = false;
     for (size_t i = 0; i + 1 < positions.size(); ++i) {
       const R2Point& a = positions.at(i);
       const R2Point& b = positions.at(i + 1);
       if (std::abs(a.y()) == 90 && b.y() == a.y() && b.x() != a.x()) {
-        return absl::UnimplementedError(
-            "The emulator does not support planar polygons with an edge along a pole");
+        if (!allow_polar_edges) {
+          return absl::UnimplementedError(
+              "The emulator does not support planar polygons with an edge along a pole");
+        }
+        polar_edge = true;
       }
       area += a.CrossProd(b);
       long_edge = long_edge || std::abs(a.x() - b.x()) > 180;
     }
     auto& loop = loops.emplace_back(Unproject(positions));
     loop.pop_back();
+    if (polar_edge) {
+      // Tessellate with the original coordinates so the incident edges keep
+      // their own longitudes. Then keep the first vertex of each polar run.
+      const auto same_pole = [](const S2Point& a, const S2Point& b) {
+        const double latitude = ToPoint(a).latitude;
+        return std::abs(latitude) == 90 && latitude == ToPoint(b).latitude;
+      };
+      const auto removed = std::ranges::unique(
+          loop, [&](const S2Point& a, const S2Point& b) { return a == b || same_pole(a, b); });
+      loop.erase(removed.begin(), removed.end());
+      if (loop.size() > 1 && same_pole(loop.front(), loop.back())) {
+        loop.pop_back();
+      }
+    }
     if (area < 0) {
       // BigQuery retains the input start when reversing a planar ring with an edge longer
       // than 180 degrees; for shorter edges it uses S2Loop::Invert's reversed vertex order.

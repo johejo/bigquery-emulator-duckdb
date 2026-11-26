@@ -113,7 +113,7 @@ absl::StatusOr<Geography> ReadPolygon(const json& coordinates, bool make_valid) 
   if (rings.size() == 1 && IsFullGlobeRing(rings.front())) {
     return FullGeography();
   }
-  return PlanarPolygon(rings, kGeoJsonFailed, make_valid);
+  return PlanarPolygon(rings, kGeoJsonFailed, make_valid, /*allow_polar_edges=*/true);
 }
 
 // A geometry type other than GeometryCollection, whose coordinates are one part as `read` reads
