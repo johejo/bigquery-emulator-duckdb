@@ -531,3 +531,62 @@ func TestBigtableRowKeyFilters(t *testing.T) {
 		})
 	}
 }
+
+// A dry run validates a query against the stored schema without reading the source, as
+// docs/external-tables.md describes, so it succeeds after the Bigtable table is deleted.
+func TestBigtableDryRun(t *testing.T) {
+	t.Parallel()
+	client := newClient(t)
+	host := os.Getenv("BIGTABLE_EMULATOR_HOST")
+	if host == "" {
+		t.Fatal("BIGTABLE_EMULATOR_HOST is required; run just e2e")
+	}
+	ctx := t.Context()
+	conn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	admin := adminpb.NewBigtableTableAdminClient(conn)
+	parent := "projects/test/instances/test"
+	source := parent + "/tables/go-bigtable-dry-run"
+	if _, err := admin.CreateTable(ctx, &adminpb.CreateTableRequest{
+		Parent: parent, TableId: "go-bigtable-dry-run",
+		Table: &adminpb.Table{ColumnFamilies: map[string]*adminpb.ColumnFamily{"family": {}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = admin.DeleteTable(context.Background(), &adminpb.DeleteTableRequest{Name: source})
+	})
+	newDataset(t, client, "go_bigtable_dry_run")
+	if err := wait(ctx, client.Query(fmt.Sprintf(`CREATE EXTERNAL TABLE go_bigtable_dry_run.t
+  OPTIONS (format = 'CLOUD_BIGTABLE', uris = 'https://googleapis.com/bigtable/%s')`, source))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.DeleteTable(ctx, &adminpb.DeleteTableRequest{Name: source}); err != nil {
+		t.Fatal(err)
+	}
+	const sql = "SELECT rowkey, family.column FROM go_bigtable_dry_run.t WHERE rowkey = b'a'"
+	q := client.Query(sql)
+	q.DryRun = true
+	job, err := q.Run(ctx)
+	if err == nil {
+		err = job.LastStatus().Err()
+	}
+	if err != nil {
+		t.Fatalf("dry run: %v", err)
+	}
+	statistics, ok := job.LastStatus().Statistics.Details.(*bigquery.QueryStatistics)
+	if !ok {
+		t.Fatalf("dry run statistics = %T", job.LastStatus().Statistics.Details)
+	}
+	if len(statistics.Schema) != 2 || statistics.Schema[0].Name != "rowkey" || statistics.Schema[0].Type != bigquery.BytesFieldType ||
+		statistics.Schema[1].Name != "column" || !statistics.Schema[1].Repeated {
+		t.Errorf("dry run schema = %v, want rowkey BYTES and REPEATED column", statistics.Schema)
+	}
+	// The query itself reads the deleted source.
+	if _, err := client.Query(sql).Read(ctx); err == nil {
+		t.Fatal("query of a deleted Bigtable table succeeded")
+	}
+}

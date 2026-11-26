@@ -506,6 +506,16 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
           [definition = std::move(definition), schema = std::move(schema),
            table_name = std::move(table_name)](TableReadContext& context) {
             ValidateBigtableExternal(definition);
+            if (context.dry_run) {
+              // A dry run binds the stored schema without reading Bigtable.
+              std::vector<std::string> columns;
+              std::ranges::transform(schema, std::back_inserter(columns),
+                                     [](const FieldSchema& field) {
+                                       return "CAST(NULL AS " + ToDuckDbReadType(field) + ") AS " +
+                                              QuoteIdentifier(field.name);
+                                     });
+              return "SELECT " + Join(columns, ", ") + " WHERE FALSE";
+            }
             const BigtableSource source = ParseBigtableSource(definition);
             google::cloud::Options connection_options;
             if (!source.profile.empty()) {
